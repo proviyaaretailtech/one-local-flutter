@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthApiException;
 import 'package:vinii_pos/auth/partner_api.dart';
+import 'package:vinii_pos/home/control_centre_screen.dart';
 import 'package:vinii_pos/screens/email_login_screen.dart';
 import 'package:vinii_pos/screens/email_verify_pending_screen.dart';
 import 'package:vinii_pos/screens/login_success_screen.dart';
@@ -471,14 +472,20 @@ void main() {
       expect(find.textContaining('Sharma Store'), findsOneWidget);
       expect(find.text('r•••@sharmastore.in'), findsOneWidget);
     });
-    testWidgets('Continue to store answers, Switch account signs out', (t) async {
+    testWidgets('Continue to store opens the control centre', (t) async {
+      final api = FakeApi(() async => PartnerMe(name: 'Riya', email: 'r@x.in', outlet: ''));
+      await show(t, LoginSuccessScreen(api: api, auth: FakeAuth()));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Continue to store'));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 400));
+      expect(find.byType(ControlCentreScreen), findsOneWidget);
+    });
+    testWidgets('Switch account signs out', (t) async {
       final a = FakeAuth();
       final api = FakeApi(() async => PartnerMe(name: 'Riya', email: 'r@x.in', outlet: ''));
       await show(t, LoginSuccessScreen(api: api, auth: a));
       await t.pumpAndSettle();
-      await t.tap(find.text('Continue to store'));
-      await t.pump();
-      expect(toast('Your store opens in the next release.'), findsOneWidget);
       await t.tap(find.text('Switch account'));
       await t.pump();
       expect(a.calls, ['signOut']);
