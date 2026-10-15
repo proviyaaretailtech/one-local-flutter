@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:vinii_pos/auth/partner_api.dart';
 import 'package:vinii_pos/onboarding/agreement_screens.dart';
 import 'package:vinii_pos/onboarding/checklist_screen.dart';
@@ -10,6 +12,7 @@ import 'package:vinii_pos/onboarding/onboarding_api.dart';
 import 'package:vinii_pos/onboarding/profile_screens.dart';
 import 'package:vinii_pos/onboarding/section_screens.dart';
 import 'package:vinii_pos/onboarding/status_screens.dart';
+import 'package:vinii_pos/setup/setup_api.dart';
 
 import 'helpers.dart';
 
@@ -394,10 +397,12 @@ void main() {
       expect(find.text('PAN does not match the business name.'), findsOneWidget);
       expect(find.text('Not approved'), findsOneWidget);
     });
-    testWidgets('approved: workspace setup is honestly "next release"', (t) async {
-      await show(t, ApprovedScreen(api: FakeOnb(), app: sample(done: 7, status: 'approved')));
+    testWidgets('approved: "Finish workspace setup" opens workspace setup (section C)', (t) async {
+      final setup = SetupApi(client: MockClient((r) async => http.Response('{"detail":"down"}', 503)), baseUrl: 'http://x', accessToken: () => 't');
+      await show(t, ApprovedScreen(api: FakeOnb(), app: sample(done: 7, status: 'approved'), setupApi: setup));
       await tapText(t, 'Finish workspace setup');
-      expect(toast('Workspace setup opens in the next release.'), findsOneWidget);
+      await t.pumpAndSettle();
+      expect(find.text('We could not load your setup.'), findsOneWidget);
     });
     testWidgets('complete screen greets by first name', (t) async {
       await show(t, CompleteScreen(app: sample(done: 7, status: 'approved')));

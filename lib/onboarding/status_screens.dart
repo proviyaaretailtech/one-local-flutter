@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../setup/setup_api.dart';
+import '../setup/setup_flow.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'agreement_screens.dart';
@@ -132,11 +134,21 @@ class _StatusScreenState extends State<StatusScreen> {
   }
 }
 
-/// Figma "Onboarding Approved". Workspace setup (Figma section C) is a later phase, so its button says so.
+/// Figma "Onboarding Approved". "Finish workspace setup" opens workspace setup (Figma section C, lib/setup), which ends at
+/// [CompleteScreen].
 class ApprovedScreen extends StatelessWidget {
-  const ApprovedScreen({super.key, required this.api, required this.app});
+  const ApprovedScreen({super.key, required this.api, required this.app, this.setupApi});
   final OnboardingApi api;
   final Application app;
+  final SetupApi? setupApi;
+
+  void _setup(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => SetupEntry(
+          api: setupApi,
+          onFinished: (ctx) => Navigator.of(ctx).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => CompleteScreen(app: app)), (r) => r.isFirst),
+        ),
+      ));
+
   @override
   Widget build(BuildContext context) {
     return OnbPage(
@@ -152,10 +164,10 @@ class ApprovedScreen extends StatelessWidget {
           noteTitle: 'Next: workspace readiness',
           noteBody: 'Approval confirms the review decision. Your workspace preferences and first catalogue setup are still outstanding.',
         ),
-        const SectionCard(title: 'Remaining setup', action: 'Set up', lines: ['Confirm workspace preferences', 'Set up your first catalogue'], chip: StatusChip('Setup pending', Tone.warn)),
+        SectionCard(title: 'Remaining setup', action: 'Set up', onAction: () => _setup(context), lines: const ['Confirm workspace preferences', 'Set up your first catalogue'], chip: const StatusChip('Setup pending', Tone.warn)),
       ],
       actions: [
-        PrimaryAction(label: 'Finish workspace setup', onPressed: () => showToast(context, 'Workspace setup opens in the next release.')),
+        PrimaryAction(label: 'Finish workspace setup', onPressed: () => _setup(context)),
         const SizedBox(height: 12),
         SecondaryAction(label: 'View approved application', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => VerificationScreen(api: api, app: app)))),
       ],
