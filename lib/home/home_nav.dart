@@ -24,6 +24,9 @@ class HomeNav {
   static HomeRoute? items;
   static HomeRoute? stock;
   static HomeRoute? bill;
+  // Section I: the Service POS calendar, used instead of `bill` by service partners (partner_type 'service').
+  static HomeRoute? service;
+  static String? partnerType;
   static HomeRoute? money;
   static HomeRoute? notifications;
   static HomeRoute? complaints;
@@ -41,6 +44,6 @@ class HomeNav {
 
   /// Clears every hook (tests).
   static void reset() {
-    home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = null;
+    home = orders = orderHistory = setup = items = stock = bill = service = money = notifications = complaints = reviews = support = partnerType = null;
   }
 }

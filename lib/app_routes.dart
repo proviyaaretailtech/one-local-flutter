@@ -6,6 +6,7 @@ import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
 import 'orders/cart_screen.dart';
 import 'orders/orders_home.dart';
+import 'service/calendar_screen.dart';
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 
@@ -15,6 +16,7 @@ void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
   HomeNav.orders = HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
   HomeNav.bill = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CartScreen(onNavigate: (id) => _tab(c, id))));
+  HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
@@ -32,7 +34,9 @@ void _tab(BuildContext context, String id) => switch (id) {
 Future<void> openWorkspace(BuildContext context, {AuthRepository? auth, SetupApi? setupApi}) async {
   bool needsSetup = false;
   try {
-    needsSetup = !(await (setupApi ?? SetupApi()).get()).completed;
+    final setup = await (setupApi ?? SetupApi()).get();
+    needsSetup = !setup.completed;
+    HomeNav.partnerType = setup.partnerType;
   } on PartnerApiException {
     needsSetup = false;
   } catch (_) {
