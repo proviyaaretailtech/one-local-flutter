@@ -1,0 +1,41 @@
+name: vinii_pos
+description: "A new Flutter project."
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.18.3
+  http: ^1.6.0
+  flutter_svg: ^2.3.0
+  lucide_icons_flutter: ^3.1.25
+  file_picker: ^13.1.0
+  url_launcher: ^6.3.3
+  geolocator: ^14.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/figma/
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: fonts/Inter.ttf
+    - family: Poppins
+      fonts:
+        # ExtraBold (800) is what Figma uses; only Bold exists on this machine, so Bold stands in until the ExtraBold file is added.
+        - asset: fonts/Poppins-Bold.ttf
+          weight: 800
