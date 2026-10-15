@@ -1,0 +1,493 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../ui/theme.dart';
+import '../ui/widgets.dart';
+import 'agreement_screens.dart';
+import 'document_picker.dart';
+import 'onboarding_api.dart';
+import 'onboarding_widgets.dart';
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Section 3: address. Figma "Address".
+// The map is the illustrative picture the design draws; no map provider or location permission exists yet, so the pin is
+// not set and the server stores the address without coordinates.
+// ---------------------------------------------------------------------------------------------------------------------
+class AddressScreen extends StatefulWidget {
+  const AddressScreen({super.key, required this.api, required this.app});
+  final OnboardingApi api;
+  final Application app;
+  @override
+  State<AddressScreen> createState() => _AddressScreenState();
+}
+
+class _AddressScreenState extends State<AddressScreen> {
+  late final _line = TextEditingController(text: widget.app.address['address_line'] as String? ?? '');
+  late final _area = TextEditingController(text: widget.app.address['locality'] as String? ?? '');
+  late final _city = TextEditingController(text: widget.app.address['city'] as String? ?? '');
+  late final _pin = TextEditingController(text: widget.app.address['pin_code'] as String? ?? '');
+  late String? _state = widget.app.address['state'] as String?;
+  late bool _confirmed = widget.app.address['confirmed'] == true;
+  late final Future<Taxonomy> _tax = widget.api.taxonomy();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    for (final c in [_line, _area, _city, _pin]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    if (_line.text.trim().length < 3) return showToast(context, 'Enter your address line.');
+    if (_area.text.trim().length < 2) return showToast(context, 'Enter your area or locality.');
+    if (_city.text.trim().length < 2) return showToast(context, 'Enter your city.');
+    if (_state == null) return showToast(context, 'Choose your state.');
+    if (!RegExp(r'^[1-9][0-9]{5}$').hasMatch(_pin.text)) return showToast(context, 'PIN code must be 6 digits.');
+    if (!_confirmed) return showToast(context, 'Confirm that the address identifies your business.');
+    setState(() => _saving = true);
+    final saved = await guarded(
+      context,
+      () => widget.api.saveAddress({
+        'address_line': _line.text.trim(),
+        'locality': _area.text.trim(),
+        'city': _city.text.trim(),
+        'state': _state,
+        'pin_code': _pin.text,
+        'confirmed': true,
+      }),
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (saved != null) Navigator.of(context).pop(saved);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OnbPage(
+      kicker: 'Business setup',
+      title: 'Locate your business.',
+      caption: 'Section 3 of 7',
+      subtitle: 'Confirm your shop address and map pin. You can always enter the address manually.',
+      children: [
+        Container(
+          height: 160,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: const Color(0xFFE8ECDA), borderRadius: BorderRadius.circular(16)),
+          child: Stack(children: [
+            Align(
+              alignment: Alignment.center,
+              child: Container(width: 44, height: 44, decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle), child: const Icon(Icons.location_on_outlined, color: kCheck, size: 24)),
+            ),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: Text([_area.text, _city.text].where((s) => s.trim().isNotEmpty).join(' · '), style: inter(13, 600)),
+            ),
+            Align(alignment: Alignment.bottomRight, child: Text('Illustrative map', style: inter(11, 400, color: kMuted))),
+          ]),
+        ),
+        LabeledField(label: 'Address line', controller: _line, labelSize: 13, labelWeight: 500, onChanged: (_) => setState(() {})),
+        LabeledField(label: 'Area / locality', controller: _area, labelSize: 13, labelWeight: 500, onChanged: (_) => setState(() {})),
+        LabeledField(label: 'City', controller: _city, labelSize: 13, labelWeight: 500, onChanged: (_) => setState(() {})),
+        FutureBuilder<Taxonomy>(
+          future: _tax,
+          builder: (_, s) => SelectField(label: 'State', value: _state, options: s.data?.states ?? const [], hint: s.hasError ? 'Could not load states' : 'Choose', onChanged: (v) => setState(() => _state = v)),
+        ),
+        LabeledField(
+          label: 'PIN code',
+          controller: _pin,
+          keyboardType: TextInputType.number,
+          labelSize: 13,
+          labelWeight: 500,
+          maxLength: 6,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        ),
+        CheckRow(value: _confirmed, onChanged: (v) => setState(() => _confirmed = v), text: 'The address and map pin identify my business location.'),
+      ],
+      actions: [PrimaryAction(label: _saving ? 'Saving…' : 'Confirm address', onPressed: _saving ? null : _save)],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Section 4: tax. Figma "Tax Details". PAN is encrypted on the server; only the masked form comes back, so it is typed
+// again whenever the section is saved again.
+// ---------------------------------------------------------------------------------------------------------------------
+class TaxScreen extends StatefulWidget {
+  const TaxScreen({super.key, required this.api, required this.app});
+  final OnboardingApi api;
+  final Application app;
+  @override
+  State<TaxScreen> createState() => _TaxScreenState();
+}
+
+class _TaxScreenState extends State<TaxScreen> {
+  final _pan = TextEditingController();
+  final _gstin = TextEditingController();
+  late bool? _gst = widget.app.tax['gst_registered'] as bool?;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _pan.dispose();
+    _gstin.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    final pan = _pan.text.trim().toUpperCase();
+    final keepSaved = pan.isEmpty && widget.app.tax['pan_masked'] != null;
+    if (!keepSaved && !RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]$').hasMatch(pan)) return showToast(context, 'PAN looks wrong. It has 5 letters, 4 digits and 1 letter.');
+    if (_gst == null) return showToast(context, 'Tell us whether your business is GST-registered.');
+    if (_gst == true && _gstin.text.trim().length != 15) return showToast(context, 'Enter your 15-character GSTIN.');
+    setState(() => _saving = true);
+    final saved = await guarded(context, () => widget.api.saveTax({'pan': pan, 'gst_registered': _gst, if (_gst == true) 'gstin': _gstin.text.trim().toUpperCase()}));
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (saved != null) Navigator.of(context).pop(saved);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final masked = widget.app.tax['pan_masked'] as String?;
+    final gstMasked = widget.app.tax['gstin_masked'] as String?;
+    final upper = TextInputFormatter.withFunction((o, n) => n.copyWith(text: n.text.toUpperCase()));
+    return OnbPage(
+      kicker: 'Business setup',
+      title: 'Tax information.',
+      caption: 'Section 4 of 7',
+      subtitle: 'Share the tax details that apply to your business in India.',
+      children: [
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          LabeledField(label: 'PAN', controller: _pan, labelWeight: 500, maxLength: 10, hint: masked ?? 'ABCDE1234F', inputFormatters: [upper, FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]'))]),
+          const SizedBox(height: 8),
+          Text(masked == null ? 'Use the PAN associated with this business or proprietor, as applicable.' : 'Saved as $masked. Leave this blank to keep it, or type a new one.', style: inter(13, 400, color: kMuted, height: 1.5)),
+        ]),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Is your business GST-registered?', style: inter(17, 600)),
+          const SizedBox(height: 14),
+          ChoiceCard(icon: Icons.task_outlined, title: 'GST registered', body: 'Add the registration details for this business.', selected: _gst == true, onTap: () => setState(() => _gst = true)),
+          const SizedBox(height: 12),
+          ChoiceCard(icon: Icons.insert_drive_file_outlined, title: 'Not registered / not applicable', body: 'Continue with the details relevant to you.', selected: _gst == false, onTap: () => setState(() => _gst = false)),
+        ]),
+        if (_gst == true)
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            LabeledField(label: 'GSTIN', controller: _gstin, labelWeight: 500, maxLength: 15, hint: gstMasked ?? '29ABCDE1234F1Z5', inputFormatters: [upper, FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]'))]),
+            const SizedBox(height: 8),
+            Text('Shown because GST registered is selected.', style: inter(13, 400, color: kMuted)),
+          ]),
+        const NoteCard(title: 'Only applicable information', body: 'GST registration is not assumed for every merchant. Review your own tax situation; this screen is not tax advice.'),
+      ],
+      actions: [
+        PrimaryAction(label: _saving ? 'Saving…' : 'Save & continue', onPressed: _saving ? null : _save),
+        const SizedBox(height: 12),
+        const FooterNote('Tax applicability depends on your business circumstances.'),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Section 5a: identity. Figma "KYC / KYB". Records consent and the optional Aadhaar last four, then opens the documents.
+// ---------------------------------------------------------------------------------------------------------------------
+class IdentityScreen extends StatefulWidget {
+  const IdentityScreen({super.key, required this.api, required this.app, this.picker = const DevicePicker()});
+  final OnboardingApi api;
+  final Application app;
+  final DocumentPicker picker;
+  @override
+  State<IdentityScreen> createState() => _IdentityScreenState();
+}
+
+class _IdentityScreenState extends State<IdentityScreen> {
+  late Application _app = widget.app;
+  late final _last4 = TextEditingController(text: _app.identity['aadhaar_last4'] as String? ?? '');
+  late bool _consent = _app.identity['consent'] == true;
+  late String? _structure = _app.app['business_structure'] as String?;
+  bool _saving = false;
+
+  static const _structures = ['Sole proprietorship', 'Partnership', 'LLP', 'Private limited company', 'Other'];
+
+  @override
+  void dispose() {
+    _last4.dispose();
+    super.dispose();
+  }
+
+  Future<void> _next() async {
+    if (_saving) return;
+    if (!_consent) return showToast(context, 'Please consent to the use of your details for verification.');
+    final l4 = _last4.text.trim();
+    if (l4.isNotEmpty && !RegExp(r'^[0-9]{4}$').hasMatch(l4)) return showToast(context, 'Enter only the last 4 digits of your Aadhaar. Never share the full number.');
+    setState(() => _saving = true);
+    final saved = await guarded(context, () => widget.api.saveIdentity({'consent': true, if (l4.isNotEmpty) 'aadhaar_last4': l4, if (_structure != null) 'business_structure': _structure}));
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (saved == null) return;
+    _app = saved;
+    final after = await Navigator.of(context).push<Application>(MaterialPageRoute(builder: (_) => DocumentsScreen(api: widget.api, app: saved, picker: widget.picker)));
+    if (mounted) Navigator.of(context).pop(after ?? saved);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pan = _app.identity['pan_masked'] as String?;
+    final proof = _app.document('business_proof');
+    return OnbPage(
+      kicker: 'Business setup',
+      title: 'Verify who’s behind your business.',
+      caption: 'Section 5 of 7 · Identity',
+      subtitle: 'Individual identity and business verification are separate checks. Provide only what applies to your profile.',
+      children: [
+        Text('KYC · Individual identity', style: inter(17, 600)),
+        SectionCard(
+          title: _app.ownerName,
+          lines: ['Proprietor · Primary account owner', 'PAN: ${pan ?? 'not added yet'}', 'Aadhaar context: ${_last4.text.length == 4 ? '•••• •••• ${_last4.text}' : 'optional'}'],
+          chip: StatusChip(pan == null ? 'Add PAN in tax details' : 'Details saved', pan == null ? Tone.warn : Tone.neutral),
+        ),
+        LabeledField(label: 'Aadhaar last 4 digits (optional)', controller: _last4, keyboardType: TextInputType.number, maxLength: 4, labelWeight: 500, inputFormatters: [FilteringTextInputFormatter.digitsOnly], onChanged: (_) => setState(() {})),
+        Text('KYB · Business identity', style: inter(17, 600)),
+        SectionCard(
+          title: _app.businessName,
+          action: 'Add proof',
+          onAction: _next,
+          lines: [
+            '${_structure ?? 'Business type not chosen'} · ${(_app.app['subcategories'] as List?)?.firstOrNull ?? _app.app['category'] ?? ''}',
+            proof == null ? 'Business proof: not yet uploaded' : 'Business proof: ${proof['file_name']}',
+            'Shop Act or other applicable business proof',
+          ],
+          chip: StatusChip(proof == null ? 'Document needed' : 'Uploaded', proof == null ? Tone.warn : Tone.neutral),
+        ),
+        SelectField(label: 'Business type', value: _structure, options: _structures, onChanged: (v) => setState(() => _structure = v)),
+        const NoteCard(title: 'Requirements vary by profile', body: 'Food License details are relevant only to applicable food activities. We’ll show the document options for your category.'),
+        CheckRow(value: _consent, onChanged: (v) => setState(() => _consent = v), text: 'I consent to use of the details and documents I provide for identity and business verification.', sub: 'Review how verification information is handled in the privacy notice.'),
+      ],
+      actions: [
+        PrimaryAction(label: _saving ? 'Saving…' : 'Continue to documents', onPressed: _saving ? null : _next),
+        const SizedBox(height: 12),
+        const FooterNote('Never share an OTP or full Aadhaar number in support messages.'),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Section 5b: documents. Figma "Document Upload". PDF, JPG or PNG up to 5 MB.
+// ---------------------------------------------------------------------------------------------------------------------
+class DocumentsScreen extends StatefulWidget {
+  const DocumentsScreen({super.key, required this.api, required this.app, this.picker = const DevicePicker()});
+  final OnboardingApi api;
+  final Application app;
+  final DocumentPicker picker;
+  @override
+  State<DocumentsScreen> createState() => _DocumentsScreenState();
+}
+
+class _DocumentsScreenState extends State<DocumentsScreen> {
+  late Application _app = widget.app;
+  String? _busy;
+
+  static const _max = 5 * 1024 * 1024;
+
+  Future<void> _upload(String kind) async {
+    if (_busy != null) return;
+    final f = await widget.picker.pick();
+    if (f == null || !mounted) return;
+    if (f.bytes.isEmpty) return showToast(context, 'That file is empty.');
+    if (f.bytes.length > _max) return showToast(context, 'Each file can be up to 5 MB.');
+    setState(() => _busy = kind);
+    final saved = await guarded(context, () => widget.api.uploadDocument(kind: kind, bytes: f.bytes, fileName: f.name, contentType: f.contentType));
+    if (!mounted) return;
+    setState(() {
+      _busy = null;
+      if (saved != null) _app = saved;
+    });
+  }
+
+  Future<void> _preview(String kind) async {
+    final url = await guarded(context, () => widget.api.previewUrl(kind));
+    if (url == null || !mounted) return;
+    if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication) && mounted) showToast(context, 'The preview could not be opened.');
+  }
+
+  String _sizeLabel(Map<String, dynamic> d) {
+    final b = (d['size_bytes'] ?? 0) as num;
+    final type = (d['mime_type'] as String? ?? '').split('/').last.toUpperCase();
+    final mb = b >= 1024 * 1024 ? '${(b / 1024 / 1024).toStringAsFixed(1)} MB' : '${(b / 1024).ceil()} KB';
+    return '${type == 'JPEG' ? 'JPG' : type} · $mb · Upload complete';
+  }
+
+  Widget _small(String title, String kind, String blurb, String idle, {required String actionIdle, bool optional = false}) {
+    final d = _app.document(kind);
+    return SectionCard(
+      title: title,
+      action: _busy == kind ? 'Uploading…' : d == null ? actionIdle : 'Replace',
+      onAction: () => _upload(kind),
+      lines: [blurb, d == null ? idle : '${d['file_name']} · ${_sizeLabel(d)}'],
+      chip: d == null ? StatusChip(optional ? 'Conditional' : 'To do', optional ? Tone.neutral : Tone.warn) : const StatusChip('Uploaded · Not yet reviewed', Tone.neutral),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pan = _app.document('pan_copy');
+    return OnbPage(
+      kicker: 'Business setup',
+      title: 'Add your documents.',
+      caption: 'Section 5 of 7 · Documents',
+      subtitle: 'Add clear, readable copies of applicable documents.',
+      onBack: () => Navigator.of(context).pop(_app),
+      children: [
+        WhiteCard(
+          padding: 24,
+          child: Column(children: [
+            Container(width: 64, height: 64, decoration: BoxDecoration(color: pan == null ? const Color(0xFFF1F2F4) : kNote, shape: BoxShape.circle), child: Icon(pan == null ? Icons.upload_file_outlined : Icons.check_circle_outline, size: 30, color: pan == null ? kMuted : const Color(0xFF15803D))),
+            const SizedBox(height: 16),
+            Text(pan == null ? 'Add your PAN copy' : 'PAN copy uploaded', textAlign: TextAlign.center, style: inter(22, 700)),
+            const SizedBox(height: 8),
+            Text(pan == null ? 'Use a masked copy where supported.' : '${pan['file_name']}\n${_sizeLabel(pan)}', textAlign: TextAlign.center, style: inter(14, 400, color: kMuted, height: 1.5)),
+            if (pan != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: kBg, borderRadius: BorderRadius.circular(16)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Uploaded · Not yet reviewed', style: inter(13, 600)),
+                  const SizedBox(height: 8),
+                  Text('Review your masked document before submitting. A completed upload does not mean verification is approved.', style: inter(14, 400, color: kMuted, height: 1.5)),
+                ]),
+              ),
+            ],
+            const SizedBox(height: 16),
+            if (pan != null) ...[PrimaryAction(label: 'Preview PAN copy', onPressed: () => _preview('pan_copy')), const SizedBox(height: 12)],
+            pan == null ? PrimaryAction(label: _busy == 'pan_copy' ? 'Uploading…' : 'Upload PAN copy', onPressed: _busy == null ? () => _upload('pan_copy') : null) : SecondaryAction(label: _busy == 'pan_copy' ? 'Uploading…' : 'Replace document', onPressed: _busy == null ? () => _upload('pan_copy') : null),
+          ]),
+        ),
+        _small('Business proof', 'business_proof', 'Shop Act certificate or applicable alternative', 'Pending · No file added', actionIdle: 'Upload'),
+        _small('Food License · if applicable', 'food_license', 'Add for applicable food activities only.', 'Applicability has not been confirmed.', actionIdle: 'Review', optional: true),
+        const NoteCard(green: true, title: 'Protect your identity', body: 'Use masked identity copies where supported. Do not upload a full Aadhaar number.'),
+      ],
+      actions: [
+        PrimaryAction(label: 'Save & continue', onPressed: () {
+          if (_app.document('pan_copy') == null || _app.document('business_proof') == null) return showToast(context, 'Add your PAN copy and business proof to continue.');
+          Navigator.of(context).pop(_app);
+        }),
+        const SizedBox(height: 12),
+        const FooterNote('Upload limits: PDF, JPG or PNG · up to 5 MB each.'),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Section 6: bank. Figma "Bank Details". The account number is encrypted on the server; only the last four come back.
+// ---------------------------------------------------------------------------------------------------------------------
+class BankScreen extends StatefulWidget {
+  const BankScreen({super.key, required this.api, required this.app});
+  final OnboardingApi api;
+  final Application app;
+  @override
+  State<BankScreen> createState() => _BankScreenState();
+}
+
+class _BankScreenState extends State<BankScreen> {
+  late final _holder = TextEditingController(text: widget.app.bank?['holder_name'] as String? ?? widget.app.ownerName);
+  final _acct = TextEditingController();
+  final _confirm = TextEditingController();
+  late final _ifsc = TextEditingController(text: widget.app.bank?['ifsc'] as String? ?? '');
+  late String? _bank = widget.app.bank?['bank_name'] as String?;
+  late String? _type = widget.app.bank?['account_type'] as String?;
+  late bool _auth = widget.app.bank?['authorised'] == true;
+  late final Future<Taxonomy> _tax = widget.api.taxonomy();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    for (final c in [_holder, _acct, _confirm, _ifsc]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Map<String, dynamic> _body({required bool draft}) => {
+        'holder_name': _holder.text.trim(),
+        if (_bank != null) 'bank_name': _bank,
+        if (_acct.text.isNotEmpty) 'account_number': _acct.text.trim(),
+        if (_confirm.text.isNotEmpty) 'confirm_account_number': _confirm.text.trim(),
+        if (_ifsc.text.trim().isNotEmpty) 'ifsc': _ifsc.text.trim().toUpperCase(),
+        if (_type != null) 'account_type': _type,
+        'authorised': _auth,
+        if (draft) 'draft': true,
+      };
+
+  Future<void> _save({required bool draft}) async {
+    if (_saving) return;
+    if (!draft) {
+      if (_holder.text.trim().length < 2) return showToast(context, 'Enter the account holder name.');
+      if (_bank == null) return showToast(context, 'Choose your bank.');
+      if (_acct.text.trim().length < 9) return showToast(context, 'Account number must be 9 to 18 digits.');
+      if (_acct.text.trim() != _confirm.text.trim()) return showToast(context, 'The account numbers do not match.');
+      if (!RegExp(r'^[A-Za-z]{4}0[A-Za-z0-9]{6}$').hasMatch(_ifsc.text.trim())) return showToast(context, 'IFSC looks wrong. It has 4 letters, a 0, then 6 characters.');
+      if (_type == null) return showToast(context, 'Choose the account type.');
+      if (!_auth) return showToast(context, 'Confirm that you are authorized to use this account for this business.');
+    }
+    setState(() => _saving = true);
+    final saved = await guarded(context, () => widget.api.saveBank(_body(draft: draft)));
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (saved == null) return;
+    if (draft) return Navigator.of(context).pop(saved);
+    final after = await Navigator.of(context).push<Application>(MaterialPageRoute(builder: (_) => VerificationScreen(api: widget.api, app: saved)));
+    if (mounted) Navigator.of(context).pop(after ?? saved);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final saved = widget.app.bank;
+    return OnbPage(
+      kicker: 'Business setup',
+      title: 'Add your bank details.',
+      caption: 'Section 6 of 7',
+      subtitle: 'Use an account associated with the business or proprietor, as applicable.',
+      children: [
+        if (saved != null)
+          WhiteCard(
+            padding: 14,
+            radius: 12,
+            child: Row(children: [
+              const Icon(Icons.account_balance_outlined, color: kLink),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Account ownership', style: inter(15, 600)),
+                Text('${saved['bank_name'] ?? ''} · ${saved['account_masked'] ?? ''}', style: inter(13, 400, color: kMuted)),
+              ])),
+            ]),
+          ),
+        const NoteCard(title: 'Ownership will be checked separately.', body: 'Saved details are not the same as verified details.'),
+        LabeledField(label: 'Account holder name', controller: _holder, labelWeight: 500),
+        FutureBuilder<Taxonomy>(future: _tax, builder: (_, s) => SelectField(label: 'Bank name', value: _bank, options: s.data?.banks ?? const [], hint: s.hasError ? 'Could not load banks' : 'Choose', onChanged: (v) => setState(() => _bank = v))),
+        LabeledField(label: 'Account number', controller: _acct, labelWeight: 500, obscure: true, keyboardType: TextInputType.number, maxLength: 18, hint: saved?['account_masked'] as String?, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
+        LabeledField(label: 'Confirm account number', controller: _confirm, labelWeight: 500, keyboardType: TextInputType.number, maxLength: 18, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
+        LabeledField(label: 'IFSC', controller: _ifsc, labelWeight: 500, maxLength: 11, hint: 'e.g. HDFC0001234', inputFormatters: [TextInputFormatter.withFunction((o, n) => n.copyWith(text: n.text.toUpperCase()))]),
+        SelectField(
+          label: 'Account type',
+          value: _type == null ? null : (_type == 'current' ? 'Current account' : 'Savings account'),
+          options: const ['Savings account', 'Current account'],
+          onChanged: (v) => setState(() => _type = v.startsWith('Current') ? 'current' : 'savings'),
+        ),
+        CheckRow(value: _auth, onChanged: (v) => setState(() => _auth = v), text: 'I confirm that I am authorized to use this account for this business.'),
+        const NoteCard(green: true, title: 'No banking passwords needed', body: 'OneLocal does not ask for your PIN, OTP or internet banking password on this form.'),
+      ],
+      actions: [
+        PrimaryAction(label: _saving ? 'Saving…' : 'Save & verify ownership', onPressed: _saving ? null : () => _save(draft: false)),
+        const SizedBox(height: 12),
+        SecondaryAction(label: 'Save for later', onPressed: _saving ? null : () => _save(draft: true)),
+      ],
+    );
+  }
+}

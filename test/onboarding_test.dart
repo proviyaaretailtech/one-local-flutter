@@ -1,0 +1,446 @@
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:vinii_pos/auth/partner_api.dart';
+import 'package:vinii_pos/onboarding/agreement_screens.dart';
+import 'package:vinii_pos/onboarding/checklist_screen.dart';
+import 'package:vinii_pos/onboarding/document_picker.dart';
+import 'package:vinii_pos/onboarding/onboarding_api.dart';
+import 'package:vinii_pos/onboarding/profile_screens.dart';
+import 'package:vinii_pos/onboarding/section_screens.dart';
+import 'package:vinii_pos/onboarding/status_screens.dart';
+
+import 'helpers.dart';
+
+/// An application as the server describes it. [done] is how many of the seven sections are complete (in order).
+Application sample({int done = 4, String status = 'draft', String? plan = 'onelocal_app', Map<String, dynamic>? extra}) {
+  const keys = ['business', 'contact', 'address', 'tax', 'documents', 'bank', 'agreement'];
+  const titles = ['Business details', 'Contact details', 'Address', 'Tax details', 'Identity & documents', 'Bank details', 'Agreement & consent'];
+  return Application({
+    'exists': true,
+    'application': {
+      'id': 'a1', 'reference': 'OL-2026-0001', 'status': status, 'partner_type': 'store', 'business_name': 'Sharma General Store',
+      'owner_name': 'Riya Sharma', 'phone': '9876543210', 'sell_plan': plan, 'selling_mode': 'physical', 'category': 'Grocery & essentials',
+      'subcategories': ['General store'], 'submitted_at': '2026-10-05T10:00:00Z', 'review_note': null,
+    },
+    'address': {'address_line': '12, 2nd Main Road', 'locality': 'Indiranagar', 'city': 'Bengaluru', 'state': 'Karnataka', 'pin_code': '560038', 'confirmed': done > 2},
+    'tax': {'pan_masked': done > 3 ? '••••••123F' : null, 'gst_registered': done > 3 ? true : null},
+    'identity': {'consent': false, 'pan_masked': done > 3 ? '••••••123F' : null, 'aadhaar_last4': null},
+    'bank': null,
+    'consents': {'service_terms': false, 'privacy_notice': false, 'marketing_updates': false, 'merchant_agreement': false},
+    'documents': <Map<String, dynamic>>[],
+    'sections': [for (var i = 0; i < 7; i++) {'key': keys[i], 'title': titles[i], 'done': i < done, 'summary': 'x$i'}],
+    'progress': {'done': done, 'total': 7, 'percent': (done * 100 / 7).round(), 'next': done >= 7 ? null : keys[done], 'can_submit': done == 7},
+    'checks': <Map<String, dynamic>>[],
+    'timeline': [
+      {'key': 'received', 'state': 'complete'},
+      {'key': 'review', 'state': 'in_progress'},
+      {'key': 'decision', 'state': 'pending'},
+    ],
+    ...?extra,
+  });
+}
+
+class FakeOnb extends OnboardingApi {
+  FakeOnb({Application? initial}) : _app = initial ?? sample();
+  Application _app;
+  final calls = <String>[];
+  final bodies = <String, Map<String, dynamic>>{};
+  Object? failWith;
+
+  Future<Application> _do(String what, [Map<String, dynamic>? body]) async {
+    calls.add(what);
+    if (body != null) bodies[what] = body;
+    if (failWith != null) throw failWith!;
+    return _app;
+  }
+
+  @override
+  Future<Application> get() => _do('get');
+  @override
+  Future<Taxonomy> taxonomy() async => Taxonomy({
+        'states': ['Karnataka', 'Goa'],
+        'banks': ['HDFC Bank', 'Other'],
+        'restaurant': {'categories': ['Bakery', 'Cafe']},
+        'store': [{'family': 'Food', 'name': 'Grocery & essentials', 'subcategories': ['General store', 'Kirana']}],
+        'service': {'categories': [{'name': 'Cleaning', 'subcategories': []}]},
+      });
+  @override
+  Future<Application> saveProfile(Map<String, dynamic> b) => _do('profile', b);
+  @override
+  Future<Application> choosePlan(String plan) => _do('plan $plan');
+  @override
+  Future<Application> saveAddress(Map<String, dynamic> b) => _do('address', b);
+  @override
+  Future<Application> saveTax(Map<String, dynamic> b) => _do('tax', b);
+  @override
+  Future<Application> saveIdentity(Map<String, dynamic> b) => _do('identity', b);
+  @override
+  Future<Application> saveBank(Map<String, dynamic> b) => _do('bank', b);
+  @override
+  Future<Application> saveConsents(Map<String, dynamic> b) => _do('consents', b);
+  @override
+  Future<Application> acceptAgreement(String v) => _do('agreement $v');
+  @override
+  Future<Application> submit() => _do('submit');
+  @override
+  Future<Application> uploadDocument({required String kind, required Uint8List bytes, required String fileName, required String contentType}) =>
+      _do('upload $kind $fileName $contentType');
+}
+
+class FakePicker extends DocumentPicker {
+  FakePicker(this.file);
+  final PickedDocument? file;
+  @override
+  Future<PickedDocument?> pick() async => file;
+}
+
+Future<void> tapIt(WidgetTester t, Finder f) async {
+  await t.ensureVisible(f);
+  await t.tap(f);
+  await t.pumpAndSettle();
+}
+
+Future<void> tapText(WidgetTester t, String text) async {
+  await t.pump(const Duration(seconds: 4)); // a toast from the step before would sit over the buttons
+  await t.pumpAndSettle();
+  final f = find.text(text).first;
+  await t.ensureVisible(f);
+  await t.tap(f);
+  await t.pumpAndSettle();
+}
+
+void main() {
+  group('Merchant profile', () {
+    testWidgets('store: refuses an empty form with the first missing answer', (t) async {
+      final api = FakeOnb();
+      await show(t, MerchantProfileScreen(api: api, type: 'store'));
+      await t.pumpAndSettle();
+      expect(find.text('Register as a Store'), findsOneWidget);
+      await tapText(t, 'Continue to business details');
+      expect(toast('Enter your shop name.'), findsOneWidget);
+      expect(api.calls, isNot(contains('profile')));
+    });
+
+    testWidgets('store: a full form is saved and leads to "How do you want to sell?"', (t) async {
+      final api = FakeOnb(initial: sample(done: 2, plan: null));
+      await show(t, MerchantProfileScreen(api: api, type: 'store', phone: '+919876543210'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextField).at(0), 'Sharma General Store');
+      await tapText(t, 'Choose'); // category
+      await tapText(t, 'Grocery & essentials');
+      await tapText(t, 'Choose'); // subcategory
+      await tapText(t, 'General store');
+      await t.enterText(find.byType(TextField).at(1), 'Riya Sharma');
+      await tapText(t, 'Online or both');
+      await tapText(t, 'Continue to business details');
+      expect(api.bodies['profile'], {
+        'partner_type': 'store', 'business_name': 'Sharma General Store', 'owner_name': 'Riya Sharma', 'phone': '9876543210',
+        'selling_mode': 'online_or_both', 'category': 'Grocery & essentials', 'subcategory': 'General store',
+      });
+      expect(find.text('How do you want to sell?'), findsOneWidget);
+    });
+
+    testWidgets('restaurant has no subcategory; service says "Services"', (t) async {
+      await show(t, MerchantProfileScreen(api: FakeOnb(), type: 'restaurant'));
+      await t.pumpAndSettle();
+      expect(find.text('Register as a Restaurant'), findsOneWidget);
+      expect(find.text('Subcategory'), findsNothing);
+      await show(t, MerchantProfileScreen(api: FakeOnb(), type: 'service'));
+      await t.pumpAndSettle();
+      expect(find.text('Services'), findsOneWidget);
+    });
+
+    testWidgets('the server\'s own message is shown when a save is refused', (t) async {
+      final api = FakeOnb()..failWith = const PartnerApiException(400, 'Enter a 10-digit mobile number.');
+      await show(t, MerchantProfileScreen(api: api, type: 'restaurant', app: sample(), phone: '9876543210'));
+      await t.pumpAndSettle();
+      await tapText(t, 'Continue to business details');
+      expect(toast('Enter a 10-digit mobile number.'), findsOneWidget);
+    });
+  });
+
+  group('Choose how to sell', () {
+    testWidgets('app only: records the plan and opens the checklist', (t) async {
+      final api = FakeOnb();
+      await show(t, ChooseSellScreen(api: api, app: sample(plan: null)));
+      await tapText(t, 'Sell on OneLocal App');
+      expect(api.calls, contains('plan onelocal_app'));
+      expect(find.text('Let’s finish your setup.'), findsOneWidget);
+    });
+    testWidgets('POS: shows the plan, Purchase POS records it', (t) async {
+      final api = FakeOnb();
+      await show(t, ChooseSellScreen(api: api, app: sample(plan: null)));
+      await tapText(t, 'Purchase POS & sell on OneLocal');
+      expect(find.text('Basic Pack'), findsOneWidget);
+      expect(find.text('Auto inventory sync'), findsOneWidget);
+      await tapText(t, 'Purchase POS');
+      expect(api.calls, contains('plan pos_and_onelocal'));
+      expect(find.text('Let’s finish your setup.'), findsOneWidget);
+    });
+  });
+
+  group('Checklist', () {
+    testWidgets('shows progress and offers the next section', (t) async {
+      await show(t, ChecklistScreen(api: FakeOnb(), app: sample()));
+      expect(find.text('4 of 7 sections complete'), findsOneWidget);
+      expect(find.text('57%'), findsOneWidget);
+      expect(find.text('Resume identity & documents'), findsOneWidget);
+      expect(find.text('Three sections to go'), findsOneWidget);
+      expect(find.text('Submit application'), findsNothing);
+    });
+    testWidgets('all seven done: Submit application goes to the receipt', (t) async {
+      final api = FakeOnb(initial: sample(done: 7, status: 'submitted'));
+      await show(t, ChecklistScreen(api: api, app: sample(done: 7)));
+      await tapText(t, 'Submit application');
+      expect(api.calls, contains('submit'));
+      expect(find.text('Application received.'), findsOneWidget);
+      expect(find.text('Reference: OL-2026-0001'), findsOneWidget);
+    });
+    testWidgets('a section opens its screen', (t) async {
+      await show(t, ChecklistScreen(api: FakeOnb(), app: sample(done: 2)));
+      await tapText(t, 'Address');
+      expect(find.text('Locate your business.'), findsOneWidget);
+    });
+  });
+
+  group('Address', () {
+    testWidgets('needs the confirmation, then saves every part', (t) async {
+      final api = FakeOnb();
+      await show(t, AddressScreen(api: api, app: sample(done: 2)));
+      await t.pumpAndSettle();
+      await tapText(t, 'Confirm address');
+      expect(toast('Confirm that the address identifies your business.'), findsOneWidget);
+      await tapIt(t, find.text('The address and map pin identify my business location.'));
+      await tapText(t, 'Confirm address');
+      expect(api.bodies['address'], {'address_line': '12, 2nd Main Road', 'locality': 'Indiranagar', 'city': 'Bengaluru', 'state': 'Karnataka', 'pin_code': '560038', 'confirmed': true});
+    });
+    testWidgets('a short PIN code is refused before any call', (t) async {
+      final api = FakeOnb();
+      await show(t, AddressScreen(api: api, app: sample(done: 2)));
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextField).last, '5600');
+      await tapText(t, 'Confirm address');
+      expect(toast('PIN code must be 6 digits.'), findsOneWidget);
+      expect(api.calls, isNot(contains('address')));
+    });
+  });
+
+  group('Tax', () {
+    testWidgets('bad PAN refused; GST-registered needs a GSTIN', (t) async {
+      final api = FakeOnb();
+      await show(t, TaxScreen(api: api, app: sample(done: 3)));
+      await t.enterText(find.byType(TextField).first, 'abc');
+      await tapText(t, 'Save & continue');
+      expect(toast('PAN looks wrong. It has 5 letters, 4 digits and 1 letter.'), findsOneWidget);
+      await t.enterText(find.byType(TextField).first, 'abcde1234f');
+      await tapText(t, 'GST registered');
+      await tapText(t, 'Save & continue');
+      expect(toast('Enter your 15-character GSTIN.'), findsOneWidget);
+      await t.enterText(find.byType(TextField).last, '29abcde1234f1z5');
+      await tapText(t, 'Save & continue');
+      expect(api.bodies['tax'], {'pan': 'ABCDE1234F', 'gst_registered': true, 'gstin': '29ABCDE1234F1Z5'});
+    });
+    testWidgets('not registered sends no GSTIN; a saved PAN may be left blank', (t) async {
+      final api = FakeOnb();
+      await show(t, TaxScreen(api: api, app: sample(done: 4)));
+      await tapText(t, 'Not registered / not applicable');
+      await tapText(t, 'Save & continue');
+      expect(api.bodies['tax'], {'pan': '', 'gst_registered': false});
+    });
+  });
+
+  group('Identity and documents', () {
+    testWidgets('consent is required before documents open', (t) async {
+      final api = FakeOnb();
+      await show(t, IdentityScreen(api: api, app: sample()));
+      await tapText(t, 'Continue to documents');
+      expect(toast('Please consent to the use of your details for verification.'), findsOneWidget);
+      expect(api.calls, isNot(contains('identity')));
+    });
+    testWidgets('consent saved, then the documents screen opens', (t) async {
+      final api = FakeOnb();
+      await show(t, IdentityScreen(api: api, app: sample()));
+      await tapIt(t, find.textContaining('I consent to use of the details'));
+      await tapText(t, 'Continue to documents');
+      expect(api.bodies['identity'], {'consent': true});
+      expect(find.text('Add your documents.'), findsOneWidget);
+    });
+    testWidgets('upload sends kind, name and type; an oversize file never leaves the phone', (t) async {
+      final api = FakeOnb();
+      await show(t, DocumentsScreen(api: api, app: sample(), picker: FakePicker(PickedDocument(name: 'pan.pdf', bytes: Uint8List(10), contentType: 'application/pdf'))));
+      await tapText(t, 'Upload PAN copy');
+      expect(api.calls, contains('upload pan_copy pan.pdf application/pdf'));
+      final api2 = FakeOnb();
+      await show(t, DocumentsScreen(api: api2, app: sample(), picker: FakePicker(PickedDocument(name: 'big.png', bytes: Uint8List(5 * 1024 * 1024 + 1), contentType: 'image/png'))));
+      await tapText(t, 'Upload');
+      expect(toast('Each file can be up to 5 MB.'), findsOneWidget);
+      expect(api2.calls.where((c) => c.startsWith('upload')), isEmpty);
+    });
+    testWidgets('both required documents present: shows them uploaded and lets the person continue', (t) async {
+      final docs = [
+        {'kind': 'pan_copy', 'file_name': 'pan.pdf', 'mime_type': 'application/pdf', 'size_bytes': 1258291, 'status': 'uploaded'},
+        {'kind': 'business_proof', 'file_name': 'shop.jpg', 'mime_type': 'image/jpeg', 'size_bytes': 2048, 'status': 'uploaded'},
+      ];
+      await show(t, DocumentsScreen(api: FakeOnb(), app: sample(extra: {'documents': docs})));
+      expect(find.text('PAN copy uploaded'), findsOneWidget);
+      expect(find.textContaining('1.2 MB'), findsWidgets);
+      expect(find.text('Preview PAN copy'), findsOneWidget);
+      await tapText(t, 'Save & continue');
+      expect(toast('Add your PAN copy and business proof to continue.'), findsNothing);
+    });
+  });
+
+  group('Bank', () {
+    testWidgets('refuses mismatching numbers; Save for later sends draft', (t) async {
+      final api = FakeOnb();
+      await show(t, BankScreen(api: api, app: sample()));
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextField).at(1), '123456789012');
+      await t.enterText(find.byType(TextField).at(2), '123456789013');
+      await tapText(t, 'Choose'); // bank
+      await tapText(t, 'HDFC Bank');
+      await tapText(t, 'Save & verify ownership');
+      expect(toast('The account numbers do not match.'), findsOneWidget);
+      await tapText(t, 'Save for later');
+      expect(api.bodies['bank']!['draft'], true);
+      expect(api.bodies['bank']!['bank_name'], 'HDFC Bank');
+    });
+    testWidgets('a full valid form is saved and the verification overview opens', (t) async {
+      final api = FakeOnb();
+      await show(t, BankScreen(api: api, app: sample()));
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextField).at(1), '123456789012');
+      await t.enterText(find.byType(TextField).at(2), '123456789012');
+      await t.enterText(find.byType(TextField).at(3), 'hdfc0001234');
+      await tapText(t, 'Choose'); // bank
+      await tapText(t, 'HDFC Bank');
+      await tapText(t, 'Choose'); // account type
+      await tapText(t, 'Current account');
+      await tapIt(t, find.text('I confirm that I am authorized to use this account for this business.'));
+      await tapText(t, 'Save & verify ownership');
+      expect(api.bodies['bank'], {
+        'holder_name': 'Riya Sharma', 'bank_name': 'HDFC Bank', 'account_number': '123456789012', 'confirm_account_number': '123456789012',
+        'ifsc': 'HDFC0001234', 'account_type': 'current', 'authorised': true,
+      });
+      expect(find.text('Business verification.'), findsOneWidget);
+      expect(find.text('Not checked yet'), findsWidgets);
+    });
+  });
+
+  group('Verification overview', () {
+    testWidgets('shows what operations recorded, never "verified" for saved details', (t) async {
+      final checks = [
+        {'kind': 'individual_identity', 'status': 'verified'},
+        {'kind': 'business_identity', 'status': 'under_review'},
+        {'kind': 'business_address', 'status': 'pending'},
+        {'kind': 'bank_ownership', 'status': 'failed', 'note': 'Name differs'},
+      ];
+      await show(t, VerificationScreen(api: FakeOnb(), app: sample(extra: {'checks': checks})));
+      expect(find.text('Verified'), findsOneWidget);
+      expect(find.text('Under review'), findsOneWidget);
+      expect(find.text('Check pending'), findsOneWidget);
+      expect(find.text('Needs correction'), findsOneWidget);
+    });
+  });
+
+  group('Agreement and consent', () {
+    testWidgets('the overview must be acknowledged; then consent opens', (t) async {
+      final api = FakeOnb();
+      await show(t, AgreementScreen(api: api, app: sample(done: 6)));
+      await tapText(t, 'Accept & continue');
+      expect(toast('Please acknowledge that you have reviewed the agreement.'), findsOneWidget);
+      await tapIt(t, find.textContaining('I have reviewed this agreement preview'));
+      await tapText(t, 'Accept & continue');
+      expect(api.calls, contains('agreement $kAgreementVersion'));
+      expect(find.text('Your terms. Your choices.'), findsOneWidget);
+    });
+    testWidgets('terms and privacy are required, marketing is optional', (t) async {
+      final api = FakeOnb();
+      await show(t, ConsentScreen(api: api, app: sample(done: 6)));
+      await tapText(t, 'Save & continue to review');
+      expect(toast('Please agree to the OneLocal service terms to continue.'), findsOneWidget);
+      await tapIt(t, find.text('I agree to the OneLocal service terms.'));
+      await tapText(t, 'Save & continue to review');
+      expect(toast('Please acknowledge the privacy notice to continue.'), findsOneWidget);
+      await tapIt(t, find.textContaining('I acknowledge the privacy notice'));
+      await tapText(t, 'Save & continue to review');
+      expect(api.bodies['consents'], {'service_terms': true, 'privacy_notice': true, 'marketing_updates': false});
+    });
+  });
+
+  group('After submit', () {
+    testWidgets('receipt shows reference and date', (t) async {
+      await show(t, SubmittedScreen(api: FakeOnb(), app: sample(done: 7, status: 'submitted')));
+      expect(find.text('Submitted, not yet approved'), findsOneWidget);
+      expect(find.text('Reference: OL-2026-0001'), findsOneWidget);
+      expect(find.textContaining('05 Oct 2026'), findsOneWidget);
+      expect(find.textContaining('Thanks, Riya.'), findsOneWidget);
+    });
+    testWidgets('status: timeline, and Refresh moves to Approved when the decision arrives', (t) async {
+      final api = FakeOnb(initial: sample(done: 7, status: 'approved'));
+      await show(t, StatusScreen(api: api, app: sample(done: 7, status: 'submitted')));
+      expect(find.text('Your review is in progress.'), findsOneWidget);
+      expect(find.text('In progress'), findsOneWidget);
+      await tapText(t, 'Refresh status');
+      expect(find.text('Your application is approved.'), findsOneWidget);
+    });
+    testWidgets('a rejected application shows the reviewer\'s note', (t) async {
+      final app = sample(done: 7, status: 'rejected');
+      app.app['review_note'] = 'PAN does not match the business name.';
+      await show(t, StatusScreen(api: FakeOnb(), app: app));
+      expect(find.text('Your application was not approved.'), findsOneWidget);
+      expect(find.text('PAN does not match the business name.'), findsOneWidget);
+      expect(find.text('Not approved'), findsOneWidget);
+    });
+    testWidgets('approved: workspace setup is honestly "next release"', (t) async {
+      await show(t, ApprovedScreen(api: FakeOnb(), app: sample(done: 7, status: 'approved')));
+      await tapText(t, 'Finish workspace setup');
+      expect(toast('Workspace setup opens in the next release.'), findsOneWidget);
+    });
+    testWidgets('complete screen greets by first name', (t) async {
+      await show(t, CompleteScreen(app: sample(done: 7, status: 'approved')));
+      expect(find.text('You’re all set, Riya.'), findsOneWidget);
+    });
+  });
+
+  group('Entry', () {
+    Future<void> enter(WidgetTester t, Application a) async {
+      await show(t, OnboardingEntry(key: UniqueKey(), api: FakeOnb(initial: a), auth: FakeAuth()));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('no application: choose Restaurant, Store or Service', (t) async {
+      await enter(t, Application({'exists': false}));
+      expect(find.text('Welcome to OneLocal.'), findsOneWidget);
+      await tapText(t, 'Store');
+      await tapText(t, 'Continue as merchant');
+      expect(find.text('Register as a Store'), findsOneWidget);
+    });
+    testWidgets('draft without a plan: how do you want to sell', (t) async {
+      await enter(t, sample(done: 2, plan: null));
+      expect(find.text('How do you want to sell?'), findsOneWidget);
+    });
+    testWidgets('draft with a plan: checklist', (t) async {
+      await enter(t, sample());
+      expect(find.text('Let’s finish your setup.'), findsOneWidget);
+    });
+    testWidgets('submitted: status; approved: approved', (t) async {
+      await enter(t, sample(done: 7, status: 'submitted'));
+      expect(find.text('Your review is in progress.'), findsOneWidget);
+      await enter(t, sample(done: 7, status: 'approved'));
+      expect(find.text('Your application is approved.'), findsOneWidget);
+    });
+    testWidgets('offline: Try again asks again; Switch account signs out', (t) async {
+      final api = FakeOnb()..failWith = const PartnerApiException(503, 'down');
+      final auth = FakeAuth();
+      await show(t, OnboardingEntry(api: api, auth: auth));
+      await t.pumpAndSettle();
+      expect(find.text('We could not reach OneLocal.'), findsOneWidget);
+      api.failWith = null;
+      await tapText(t, 'Try again');
+      expect(find.text('Let’s finish your setup.'), findsOneWidget);
+    });
+  });
+}
