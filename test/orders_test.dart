@@ -51,7 +51,7 @@ void main() {
       expect(r.url.toString(), 'http://pos.test/api/partner/pos-orders/checkout');
       expect(r.headers['Authorization'], 'Bearer token-123');
       expect(r.headers['Idempotency-Key'], 'pos-abc12345');
-      expect(jsonDecode(r.body), {'lines': [{'menu_itemorderId': 'm1', 'qty': 2}], 'method': 'cash', 'tendered': 2000});
+      expect(jsonDecode(r.body), {'lines': [{'menu_item_id': 'm1', 'qty': 2}], 'method': 'cash', 'tendered': 2000});
       expect(v.title, 'Order Confirmation');
     });
 
@@ -131,7 +131,7 @@ void main() {
     ];
     Map<String, dynamic> quote() => {
           'subtotal': 920, 'gst_pct': 5, 'gst_amount': 46, 'service_charge': 92, 'discount': 0, 'round_off': 0, 'total': 1058,
-          'lines': [{'menu_itemorderId': 'm1', 'amount': 640}, {'menu_itemorderId': 'm2', 'amount': 280}],
+          'lines': [{'menu_item_id': 'm1', 'amount': 640}, {'menu_item_id': 'm2', 'amount': 280}],
         };
 
     testWidgets('shows server totals, then checks out with cash tendered and one key', (t) async {
@@ -141,7 +141,7 @@ void main() {
       expect(find.text('Draft · not placed'), findsOneWidget);
       expect(find.text('₹1,058'), findsOneWidget);
       expect(find.text('₹640'), findsOneWidget);
-      expect(jsonDecode(s.where('POST', '/quote').first.body), {'lines': [{'menu_itemorderId': 'm1', 'qty': 2}, {'menu_itemorderId': 'm2', 'qty': 1}]});
+      expect(jsonDecode(s.where('POST', '/quote').first.body), {'lines': [{'menu_item_id': 'm1', 'qty': 2}, {'menu_item_id': 'm2', 'qty': 1}]});
 
       await t.tap(find.text('Proceed to Checkout ₹1,058'));
       await t.pumpAndSettle();
@@ -257,7 +257,7 @@ void main() {
       await t.pumpAndSettle();
       final body = jsonDecode(s.where('POST', '/act').single.body) as Map;
       expect(body['action'], 'pick');
-      expect((body['lines'] as List).first, {'order_itemorderId': '00000001-0000-0000-0000-000000000000', 'qty': 2});
+      expect((body['lines'] as List).first, {'order_item_id': '00000001-0000-0000-0000-000000000000', 'qty': 2});
       expect((body['lines'] as List), hasLength(5));
     });
 
