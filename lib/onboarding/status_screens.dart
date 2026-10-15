@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../home/home_nav.dart';
 import '../setup/setup_api.dart';
 import '../setup/setup_flow.dart';
 import '../ui/theme.dart';
@@ -145,7 +146,7 @@ class ApprovedScreen extends StatelessWidget {
   void _setup(BuildContext context) => Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => SetupEntry(
           api: setupApi,
-          onFinished: (ctx) => Navigator.of(ctx).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => CompleteScreen(app: app)), (r) => r.isFirst),
+          onFinished: (ctx) => Navigator.of(ctx).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => CompleteScreen(app: app, onGo: () => HomeNav.go(ctx, HomeNav.home, 'Your workspace'))), (r) => r.isFirst),
         ),
       ));
 

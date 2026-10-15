@@ -10,6 +10,9 @@ typedef HomeRoute = void Function(BuildContext context);
 class HomeNav {
   HomeNav._();
 
+  // The control centre itself (set by app_routes.dart).
+  static HomeRoute? home;
+
   // Section E: orders across channels.
   static HomeRoute? orders;
   static HomeRoute? orderHistory;
@@ -38,6 +41,6 @@ class HomeNav {
 
   /// Clears every hook (tests).
   static void reset() {
-    orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = null;
+    home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = null;
   }
 }

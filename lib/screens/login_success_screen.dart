@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_repository.dart';
 import '../auth/partner_api.dart';
-import '../home/control_centre_screen.dart';
+import '../app_routes.dart';
 import '../onboarding/checklist_screen.dart';
 import '../ui/mask.dart';
 import '../ui/theme.dart';
@@ -114,7 +114,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    PrimaryAction(label: 'Continue to store', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ControlCentreScreen(auth: _auth)))),
+                    PrimaryAction(label: 'Continue to store', onPressed: () => openWorkspace(context, auth: _auth)),
                     const SizedBox(height: 12),
                     SecondaryAction(label: 'Switch account', onPressed: () => _auth.signOut()),
                   ],
