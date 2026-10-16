@@ -7,8 +7,15 @@ import * as onboarding from './modules/onboarding.ts';
 import * as setup from './modules/setup.ts';
 import * as home from './modules/home.ts';
 import * as orders from './modules/orders.ts';
+import { rpcBatch, rpcOne } from './rpc.ts';
+import { webhookRoutes } from './modules/secure/index.ts';
 
 add('GET', '/health', () => json({ ok: true }));
+
+// ---- the one generic endpoint (allowlist: src/rpc-manifest.ts). Everything below this block is the older per-feature routes.
+add('POST', '/rpc/:name', rpcOne);
+add('POST', '/rpc', rpcBatch);
+for (const w of webhookRoutes) add('POST', w.path, w.handler);
 
 // ---- sign-in check
 add('GET', '/api/partner/me', async request => json(await me(await requireStaff(request))));
