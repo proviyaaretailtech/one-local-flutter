@@ -37,7 +37,7 @@ Only where a secret, storage or a third party is needed. They get the user id fr
 | `partner_setup_image_slot`, `partner_setup_image_attach` | same, bucket `partner-listing-media` | path inside the caller's business folder |
 | `POST /webhooks/razorpay`, `POST /webhooks/cashfree` | payment provider webhooks (real HTTP endpoints, no user token) | **not connected**: answer 501 until `RAZORPAY_WEBHOOK_SECRET` / `CASHFREE_WEBHOOK_SECRET` and the hand-off to a database function exist |
 
-Delivery dispatch on accept/reject: the database writes the outbox event in the same transaction as the action (0361). Nothing reads those events yet; whoever connects the delivery partner consumes `dispatch.*` from `domain_events`. This is the open gap from the README.
+Delivery dispatch on accept/reject: the database writes the outbox event in the same transaction as the action (0361); `dispatch_apply_pos_events()` (0363, pg_cron every 10 s) consumes `dispatch.*` from `domain_events` and releases the held delivery job (a reject already cancels it inside `ol_partner_act`). No server code involved.
 
 ## 2. Presentation routes (still dedicated; they run as the caller, no service role)
 
