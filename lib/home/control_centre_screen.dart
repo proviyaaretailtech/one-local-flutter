@@ -80,7 +80,7 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
             }),
             _MenuRow(icon: LucideIcons.settings, label: 'Settings', onTap: () {
               Navigator.pop(ctx);
-              HomeNav.go(context, HomeNav.setup, 'Settings');
+              HomeNav.go(context, HomeNav.settings ?? HomeNav.setup, 'Settings');
             }),
             _MenuRow(icon: LucideIcons.logOut, label: 'Sign out', onTap: () {
               Navigator.pop(ctx);

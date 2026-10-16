@@ -12,6 +12,8 @@ import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
 import 'sell/sell_env.dart';
 import 'sell/sell_screen.dart';
+import 'settings/settings_screen.dart';
+import 'settings/support_screens.dart';
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 
@@ -29,6 +31,9 @@ void installRoutes() {
       onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
   HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
   HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
+  // Section P: the Settings page and Support & Help. The Team hook (users, roles, invites) belongs to section L.
+  HomeNav.settings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SettingsScreen()));
+  HomeNav.support = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SupportScreen()));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 

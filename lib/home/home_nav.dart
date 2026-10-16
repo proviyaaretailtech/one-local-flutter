@@ -18,8 +18,10 @@ class HomeNav {
   static HomeRoute? orders;
   static HomeRoute? orderHistory;
 
-  // Section C: setup and settings.
+  // Section C: setup. Section P: the Settings page and Support & Help. Section L (Team) plugs in `team`: users, roles and invites.
   static HomeRoute? setup;
+  static HomeRoute? settings;
+  static HomeRoute? team;
 
   // Later phases (G catalogue, H inventory, F sell, J–Q back office).
   static HomeRoute? items;
@@ -49,6 +51,6 @@ class HomeNav {
   /// Clears every hook (tests).
   static void reset() {
     stockItem = null;
-    home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = grn = receipt = null;
+    home = orders = orderHistory = setup = settings = team = items = stock = bill = money = notifications = complaints = reviews = support = grn = receipt = null;
   }
 }

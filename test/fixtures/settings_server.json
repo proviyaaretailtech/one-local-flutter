@@ -1,0 +1,118 @@
+{
+ "fresh": {
+  "qr": {
+   "uploaded": false
+  },
+  "bank": {
+   "ifsc": "HDFC0001234",
+   "last4": "4321",
+   "status": "unverified",
+   "bank_name": "HDFC Bank",
+   "holder_name": "Rohan Shah"
+  },
+  "help": {
+   "info": null,
+   "name": null,
+   "phone": null
+  },
+  "hours": {
+   "opens_at": null,
+   "closes_at": null
+  },
+  "owner": {
+   "name": null,
+   "phone": null
+  },
+  "users": {
+   "active": 1
+  },
+  "pickup": false,
+  "support": {
+   "open": 0
+  },
+  "can_edit": true,
+  "language": "en",
+  "location": {
+   "address": null
+  },
+  "documents": {
+   "count": 0
+  },
+  "readiness": {
+   "prep_minutes": null
+  },
+  "qr_checkout": false,
+  "snapshot_at": "2026-10-16T21:48:41.810419+00:00",
+  "staff_phone": null,
+  "bank_visible": true,
+  "organization": {
+   "id": "48000000-0000-0000-0000-0000000000a1",
+   "name": "Latur Kitchen"
+  }
+ },
+ "full": {
+  "qr": {
+   "uploaded": false
+  },
+  "bank": {
+   "ifsc": "HDFC0001234",
+   "last4": "4321",
+   "status": "unverified",
+   "bank_name": "HDFC Bank",
+   "holder_name": "Rohan Shah"
+  },
+  "help": {
+   "info": "Call first",
+   "name": "Asha",
+   "phone": "9876543210"
+  },
+  "hours": {
+   "opens_at": "09:00",
+   "closes_at": "22:30"
+  },
+  "owner": {
+   "name": "Rohan Shah",
+   "phone": "9123456780"
+  },
+  "users": {
+   "active": 1
+  },
+  "pickup": false,
+  "support": {
+   "open": 0
+  },
+  "can_edit": true,
+  "language": "en",
+  "location": {
+   "address": "12 Station Road, Latur 413512"
+  },
+  "documents": {
+   "count": 0
+  },
+  "readiness": {
+   "prep_minutes": 20
+  },
+  "qr_checkout": true,
+  "snapshot_at": "2026-10-16T21:48:41.810419+00:00",
+  "staff_phone": "9000011111",
+  "bank_visible": true,
+  "organization": {
+   "id": "48000000-0000-0000-0000-0000000000a1",
+   "name": "Latur Kitchen"
+  }
+ },
+ "support": {
+  "hours": "9 AM–9 PM",
+  "requests": [
+   {
+    "id": "cb4cc062-6066-4a8b-a25a-cda57c80d82b",
+    "kind": "support",
+    "title": "Payout not received in my bank",
+    "topic": "payments",
+    "status": "open",
+    "reference": "SUP-2004",
+    "created_at": "2026-10-16T21:48:41.810419+00:00"
+   }
+  ]
+ }
+}
