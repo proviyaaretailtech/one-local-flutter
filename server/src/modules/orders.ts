@@ -15,10 +15,9 @@
 // current_org_id(), the role checks inside the functions and row-level security all apply: org A can never read or move org B's orders.
 // This file holds no business rules of its own: it turns the database's facts into the labels and buttons the app shows.
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { db, rpc, userClient } from '../db.ts';
+import { userClient } from '../db.ts';
 import { HttpError, readBody } from '../http.ts';
 import { idempotencyKey } from '../idempotency.ts';
-import type { Staff } from '../staff.ts';
 
 type Row = Record<string, any>;
 
@@ -49,22 +48,6 @@ async function call<T = Row>(client: SupabaseClient, fn: string, p: Row): Promis
   const { data, error } = await client.rpc(fn, { p });
   if (error) dbFail(error);
   return data as T;
-}
-
-// ---------------------------------------------------------------- online order action
-// One Local orders keep their own state machine (ol_orders), driven by the database function ol_partner_act. The caller's staff row
-// is already verified (requireStaff) and the order was read AS the caller first, so it is theirs; the function re-checks the version.
-// Not done here: the delivery job follow-up (release on accept, cancel on reject) that the customer app's dispatch module performed.
-// See README "Still depends on the customer app".
-async function onlineAct(staff: Staff, orderId: string, action: 'accept' | 'reject' | 'ready', body: { version: string; prep_minutes: number; reason: string }) {
-  const { data } = await db().from('orders').select('organization_id').eq('id', orderId).maybeSingle();
-  if (!data || data.organization_id !== staff.organizationId) throw new HttpError(404, 'Order not found');
-  if (typeof body.version !== 'string') throw new HttpError(400, 'Refresh the order and try again.');
-  await rpc('ol_partner_act', {
-    p_order: orderId, p_action: action, p_actor: staff.userId, p_actor_name: staff.name, p_expected: body.version,
-    p_prep: action === 'accept' ? body.prep_minutes : null,
-    p_reason: action === 'reject' ? body.reason.slice(0, 200) : null,
-  });
 }
 
 // ---------------------------------------------------------------- input
@@ -397,17 +380,16 @@ export async function cancel(request: Request, id: string) {
 const FULFIL = ['accept', 'pick', 'report_missing', 'pack', 'handover', 'dispatch', 'set_delivery_info', 'choose_collection', 'confirm_delivery', 'report_delivery_issue', 'return_to_store'];
 const ONLINE: Record<string, 'accept' | 'reject' | 'ready'> = { online_accept: 'accept', online_reject: 'reject', online_ready: 'ready' };
 
-export async function actOn(request: Request, staff: Staff, id: string) {
+export async function actOn(request: Request, id: string) {
   if (!uuid(id)) throw new HttpError(404, 'Order not found.', undefined, 'not_found');
   const body = await readBody(request);
   const action = text(body.action, 40);
   const client = asCaller(request);
   if (ONLINE[action]) {
-    // One Local orders keep their own state machine (ol_orders) and their own action (restaurant.act -> ol_partner_act). Reading the order
-    // as the caller first proves it is theirs (RLS + pos_order_view); restaurant.act re-checks the organisation, the role and the version.
-    const current = await call<Row>(client, 'pos_order_view', { order_id: id });
-    if (!current.online) throw new HttpError(409, 'This is not an online order.', undefined, 'wrong_state');
-    await onlineAct(staff, id, ONLINE[action], { version: current.order.updated_at, prep_minutes: Number(body.prep_minutes ?? 20), reason: text(body.reason, 200) });
+    // One Local orders keep their own state machine (ol_orders). The database function gw_online_order_act (0361) checks the order is the
+    // caller's, that it is an online order and that their role may move orders, then runs ol_partner_act and records the delivery follow-up
+    // as an outbox event. Nothing here uses a privileged key.
+    await call(client, 'gw_online_order_act', { order_id: id, action: ONLINE[action], prep_minutes: Number(body.prep_minutes ?? 20), reason: text(body.reason, 200) });
     return view(client, id);
   }
   if (!FULFIL.includes(action)) throw new HttpError(400, 'Unknown action.', undefined, 'bad_request');

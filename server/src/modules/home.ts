@@ -3,6 +3,7 @@
 // assigned to in org_user_locations when they have any assignment. Numbers come straight from the
 // source tables (Commerce = orders/order_items, Inventory = inventory_* / pos_raw_materials,
 // Purchasing = pos_goods_receipts). A figure with no source is sent as null, never as a guess.
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { db, fromDbError } from '../db.ts';
 import { HttpError } from '../http.ts';
 import type { Staff } from '../staff.ts';
@@ -73,6 +74,8 @@ export function addDays(date: string, days: number): string {
 // ---------------- scope ----------------
 
 export type Scope = {
+  // Reads run through this client: the caller's own (row-level security applies) when a route passes one.
+  client: SupabaseClient;
   organizationId: string;
   outlets: Outlet[];
   // null = the whole organisation (no outlet assignment, so bills without an outlet count too)
@@ -82,8 +85,8 @@ export type Scope = {
 
 // Outlets this person may see. With rows in org_user_locations they see only those; without, every open outlet of
 // their organisation. `wanted` narrows to one outlet and must be one of them (another organisation's id is a 404).
-export async function scopeFor(staff: Staff, wanted?: string | null): Promise<Scope> {
-  const d = db();
+export async function scopeFor(staff: Staff, wanted?: string | null, client: SupabaseClient = db()): Promise<Scope> {
+  const d = client;
   const assigned = must(await d.from('org_user_locations').select('location_id')
     .eq('organization_id', staff.organizationId).eq('user_id', staff.userId)) as Row[];
   let q = d.from('locations').select('id, name, kind, timezone, last_sync_at')
@@ -95,10 +98,11 @@ export async function scopeFor(staff: Staff, wanted?: string | null): Promise<Sc
     if (!/^[0-9a-f-]{36}$/i.test(wanted)) throw new HttpError(400, 'Unknown outlet.');
     const one = outlets.find(o => o.id === wanted);
     if (!one) throw new HttpError(404, 'Outlet not found.');
-    return { organizationId: staff.organizationId, outlets: [one], locationIds: [one.id], timezone: one.timezone };
+    return { client: d, organizationId: staff.organizationId, outlets: [one], locationIds: [one.id], timezone: one.timezone };
   }
   if (assigned.length && !outlets.length) throw new HttpError(403, 'No outlet is assigned to you yet.');
   return {
+    client: d,
     organizationId: staff.organizationId,
     outlets,
     locationIds: assigned.length ? outlets.map(o => o.id) : null,
@@ -113,24 +117,24 @@ function scoped(q: any, s: Scope): any {
 }
 
 async function ordersBetween(s: Scope, from: Date, to: Date, columns: string): Promise<Row[]> {
-  return all((a, b) => scoped(db().from('orders').select(columns), s)
+  return all((a, b) => scoped(s.client.from('orders').select(columns), s)
     .gte('created_at', from.toISOString()).lt('created_at', to.toISOString())
     .order('created_at').order('id').range(a, b));
 }
 
 // Rows whose `column` is one of `ids`, read in batches so the request address stays short.
-async function rowsFor(table: string, column: string, ids: string[], columns: string, extra?: (q: any) => any): Promise<Row[]> {
+async function rowsFor(client: SupabaseClient, table: string, column: string, ids: string[], columns: string, extra?: (q: any) => any): Promise<Row[]> {
   const out: Row[] = [];
   for (const part of chunks(ids)) {
-    let q: any = db().from(table).select(columns).in(column, part);
+    let q: any = client.from(table).select(columns).in(column, part);
     if (extra) q = extra(q);
     out.push(...(must(await q) as Row[]));
   }
   return out;
 }
 
-async function accepting(organizationId: string): Promise<boolean | null> {
-  const row = must(await db().from('ol_merchant_channels').select('accepting').eq('organization_id', organizationId).maybeSingle()) as Row | null;
+async function accepting(client: SupabaseClient, organizationId: string): Promise<boolean | null> {
+  const row = must(await client.rpc('pos_home_channel')) as Row | null;   // (0362) the marketplace switch, for the caller's own business
   return row ? row.accepting === true : null;
 }
 
@@ -159,9 +163,9 @@ export function fulfilment(channel: string, hasAddress: boolean): string {
   return 'other';
 }
 
-export async function homeSummary(staff: Staff, wanted?: string | null, now = new Date()) {
-  const d = db();
-  const s = await scopeFor(staff, wanted);
+export async function homeSummary(staff: Staff, wanted?: string | null, now = new Date(), client: SupabaseClient = db()) {
+  const d = client;
+  const s = await scopeFor(staff, wanted, client);
   const today = localDate(s.timezone, now);
   const from = startOfLocalDay(s.timezone, today);
   const to = startOfLocalDay(s.timezone, addDays(today, 1));
@@ -172,7 +176,7 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
   // Today's bills (Commerce). Cancelled bills are not sales.
   const day = await ordersBetween(s, from, to, 'id, status, total, guest_count, paid_at');
   const sold = day.filter(o => o.status !== 'cancelled');
-  const lines = await rowsFor('order_items', 'order_id', sold.map(o => o.id as string), 'name, qty, unit_price, status', q => q.neq('status', 'cancelled'));
+  const lines = await rowsFor(d, 'order_items', 'order_id', sold.map(o => o.id as string), 'name, qty, unit_price, status', q => q.neq('status', 'cancelled'));
   const byItem = new Map<string, { qty: number; revenue: number }>();
   for (const l of lines) {
     const k = String(l.name ?? '').trim() || 'Item';
@@ -190,8 +194,8 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
   const latest = must(await scoped(d.from('orders').select('id, display_no, order_no, status, channel, total, created_at'), s)
     .in('status', ACTIVE).order('created_at', { ascending: false }).limit(3)) as Row[];
   const latestIds = latest.map(o => o.id as string);
-  const latestLines = await rowsFor('order_items', 'order_id', latestIds, 'order_id, qty', q => q.neq('status', 'cancelled'));
-  const latestOl = await rowsFor('ol_orders', 'pos_order_id', latestIds, 'pos_order_id, status, delivery_address, promised_eta_at', q => q.eq('organization_id', staff.organizationId));
+  const latestLines = await rowsFor(d, 'order_items', 'order_id', latestIds, 'order_id, qty', q => q.neq('status', 'cancelled'));
+  const latestOl = (must(await d.rpc('pos_home_online', { p: { order_ids: latestIds } })) ?? []) as Row[];   // (0362) status, has_address, eta only
   const activeOrders = latest.map(o => {
     const ol = latestOl.find(x => x.pos_order_id === o.id) ?? null;
     const eta = ol?.status === 'out' && ol.promised_eta_at ? Math.max(0, Math.round((Date.parse(ol.promised_eta_at) - now.getTime()) / 60000)) : null;
@@ -200,7 +204,7 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
       number: (o.display_no as string) || String(o.order_no ?? ''),
       items: latestLines.filter(l => l.order_id === o.id).reduce((n, l) => n + num(l.qty), 0),
       total: money(num(o.total)),
-      fulfilment: fulfilment(o.channel, !!ol?.delivery_address),
+      fulfilment: fulfilment(o.channel, !!ol?.has_address),
       status: cardStatus(o.status, ol?.status ?? null),
       eta_minutes: eta,
     };
@@ -220,7 +224,7 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
   // Stock at or under its reorder level (Inventory): the OS ledger and the POS-synced raw materials.
   const balances = await all((a, b) => scoped(d.from('inventory_balances').select('inventory_item_id, available'), s).order('inventory_item_id').range(a, b));
   const materials = await all((a, b) => scoped(d.from('pos_raw_materials').select('name, unit, stock_qty, reorder_level'), s).is('deleted_at', null).order('row_id').range(a, b));
-  const invItems = await rowsFor('inventory_items', 'id', [...new Set(balances.map(b => String(b.inventory_item_id)))], 'id, name, unit, reorder_level', q => q.eq('organization_id', staff.organizationId));
+  const invItems = await rowsFor(d, 'inventory_items', 'id', [...new Set(balances.map(b => String(b.inventory_item_id)))], 'id, name, unit, reorder_level', q => q.eq('organization_id', staff.organizationId));
   const low: { name: string; quantity: number; unit: string | null; level: 'out' | 'low' }[] = [];
   for (const b of balances) {
     const it = invItems.find(i => i.id === b.inventory_item_id);
@@ -237,7 +241,7 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
 
   // Food the kitchen was told to make (a KOT) on a bill that was then cancelled: made, never charged.
   const cancelledIds = day.filter(o => o.status === 'cancelled').map(o => o.id as string);
-  const kots = await rowsFor('kot_tickets', 'order_id', cancelledIds, 'id', q => q.eq('organization_id', staff.organizationId).neq('status', 'cancelled'));
+  const kots = await rowsFor(d, 'kot_tickets', 'order_id', cancelledIds, 'id', q => q.eq('organization_id', staff.organizationId).neq('status', 'cancelled'));
 
   // Goods received today (Purchasing).
   const grn = must(await scoped(d.from('pos_goods_receipts').select('total'), s).is('deleted_at', null)
@@ -251,7 +255,7 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
       name: one?.name || (s.outlets.length > 1 ? `All outlets (${s.outlets.length})` : staff.organizationName),
       organization: staff.organizationName,
       kind,
-      is_open: await accepting(staff.organizationId),
+      is_open: await accepting(s.client, staff.organizationId),
       last_sync_at: one?.last_sync_at ?? null,
     },
     outlets: s.outlets.map(o => ({ id: o.id, name: o.name })),
@@ -301,9 +305,9 @@ function periodTotals(rows: Row[]) {
   };
 }
 
-export async function homeFeed(staff: Staff, opts: { days: number; compare: boolean; location?: string | null }, now = new Date()) {
+export async function homeFeed(staff: Staff, opts: { days: number; compare: boolean; location?: string | null }, now = new Date(), client: SupabaseClient = db()) {
   if (![1, 7, 30].includes(opts.days)) throw new HttpError(400, 'Choose 1, 7 or 30 days.');
-  const s = await scopeFor(staff, opts.location);
+  const s = await scopeFor(staff, opts.location, client);
   const today = localDate(s.timezone, now);
   const firstDay = addDays(today, 1 - opts.days);
   const from = startOfLocalDay(s.timezone, firstDay);
@@ -329,7 +333,7 @@ export async function homeFeed(staff: Staff, opts: { days: number; compare: bool
     days: opts.days,
     date: today,
     as_of: now.toISOString(),
-    today: { sales: todays.net_sales, orders: todays.orders, is_open: await accepting(staff.organizationId) },
+    today: { sales: todays.net_sales, orders: todays.orders, is_open: await accepting(s.client, staff.organizationId) },
     period: periodTotals(inPeriod),
     previous: opts.compare ? periodTotals(before) : null,
     daily,

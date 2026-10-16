@@ -83,6 +83,8 @@ export const MANIFEST: Entry[] = [
   db('pos_set_order_status', { args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
   db('pos_fulfilment_act', { args: 'passthrough', map: P, rate: 'write', idem: true, roles: 'staff with order.update_status' }),
   db('pos_refund', { args: 'passthrough', map: P, rate: 'money', idem: true, roles: 'manager roles only' }),
+  db('pos_home_online', { args: 'passthrough', map: P, rate: 'read', roles: STAFF }),
+  db('pos_home_channel', { args: 'passthrough', map: () => ({}), rate: 'read', roles: STAFF }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 

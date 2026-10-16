@@ -25,10 +25,10 @@ export async function requireStaff(request: Request): Promise<Staff> {
   return { userId, email: data.email ?? '', name: data.full_name ?? '', role, organizationId: org.id, organizationName: org.name ?? '' };
 }
 
-/** A signed-in person; the database decides what they own (onboarding and setup, before any staff row may exist). */
-export async function requireUser(request: Request, bucket: string): Promise<string> {
+/** A signed-in person, nothing more: for routes that run entirely AS the caller, where the database (row-level security and the function's own checks) decides what they may see or do. */
+export async function requireSignedIn(request: Request, bucket: string, max = 600): Promise<string> {
   const id = await signedInUserId(request);
   if (!id) throw new HttpError(401, 'Sign in to continue.');
-  limit(id, bucket, 120, 60_000);
+  limit(id, bucket, max, 60_000);
   return id;
 }
