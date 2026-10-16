@@ -73,3 +73,25 @@ Staff only. Every database call runs AS the signed-in staff member (their token 
 ## Not called by the app today (exist in the customer app for the OLD partner app, not ported)
 
 `/api/partner/outlet`, `/items`, `/orders`, `/payments`, `/devices`, `/test-order`, `/account/*`. The new POS has no Dart caller for them. If a future screen needs one, port it here against the same database functions rather than calling the customer app.
+
+## Section F: the till on top of E (search, split payment, receipts, returns, coupons) — `lib/sell/sell_api.dart`, `modules/sell.ts`, migrations 0380 to 0382
+
+Staff only; every database call runs AS the signed-in staff member, like section E. Manager-only rules (refund, approve a return, coupons) are the database's: anyone else gets 403 with the database's sentence. `Idempotency-Key` header required where marked. `POST /pos-orders/quote | checkout | hold` now also take `coupon_code` (checkout and hold also `customer_name`, `customer_phone`); the discount is worked out by `pos_place_order` (0380).
+
+| Method | Path | Request | Database function |
+|---|---|---|---|
+| GET | `/api/partner/sell/catalog` | `q?` (name or SKU), `category?`, `available=1?`, `sort=name\|price_asc\|price_desc` | `menu_items` (RLS) → `{items:[{id,name,sku,price,category,image_url,available}], categories}`; unavailable items are listed, flagged |
+| POST | `/api/partner/sell/orders/:id/split-pay` (key) | `{payments:[{method:cash\|card\|upi, amount, tendered?, reference?}] (2 to 4, must add up to the amount due), version}` | `pos_split_pay` |
+| POST | `/api/partner/sell/orders/:id/refund` (key) | `{amount, method:cash\|upi\|card\|other, kind?:goodwill\|cancel\|missing_items, reason}` | `pos_refund` (manager only, capped to money taken) |
+| POST | `/api/partner/sell/orders/:id/attempts` | `{method:cash\|upi\|card\|online, status?:declined\|failed\|cancelled, code?, message?}` → failure card, `charged:false` | `pos_payment_attempt_record` (moves no money) |
+| POST | `/api/partner/sell/orders/:id/online-checkout` | `{}` | none yet: **503 `provider_not_configured`** until a payment provider (Razorpay, test mode) is set up on this server |
+| GET | `/api/partner/sell/receipts` | `q?`, `status=all\|paid\|part_paid\|unpaid\|refunded\|cancelled`, `from?`, `to?` (2026-10-09, India time), `before?` | `pos_receipt_list` → bills with lines, totals, status words, `receipt_text` |
+| GET | `/api/partner/sell/returns` | `status?`, `q?` | `pos_return_list` |
+| POST | `/api/partner/sell/returns` (key) | `{order_id, lines:[{order_item_id, qty}], reason, note?}` | `pos_return_create` (amount = the items' share of the bill, set by the database) |
+| POST | `/api/partner/sell/returns/:id/decide` | `{decision:approve\|reject, note?}` (reject needs a note) | `pos_return_decide` (manager only) |
+| POST | `/api/partner/sell/returns/:id/refund` (key) | `{method}` | `pos_return_issue_refund` → `pos_refund` (manager only) |
+| GET | `/api/partner/sell/coupons` | – | `sell_coupons` (RLS) |
+| POST | `/api/partner/sell/coupons` | `{code, label?, kind:percent\|flat, value, min_order?, max_discount?, active?, starts_at?, ends_at?}` | `pos_coupon_save` (manager only) |
+
+New error codes: `coupon_minimum`, `over_refund`, `over_return`, `idempotency_mismatch` (422). Tests: `node scripts/sell-e2e.mjs` (70 checks: two businesses, tenancy, roles, idempotency, caps).
+
