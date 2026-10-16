@@ -7,6 +7,9 @@ import { anonKey, supabaseUrl } from './config.ts';
 import { VERSION } from './version.ts';
 import * as home from './modules/home.ts';
 import * as orders from './modules/orders.ts';
+import * as sell from './modules/sell.ts';
+import * as catalogue from './modules/catalogue.ts';
+import * as grn from './modules/grn.ts';
 import { rpcBatch, rpcOne } from './rpc.ts';
 import { webhookRoutes } from './modules/secure/index.ts';
 
@@ -49,3 +52,36 @@ add('GET', `${O}/:id`, async (r, p) => { await requireSignedIn(r, 'pos-orders');
 add('POST', `${O}/:id/pay`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await orders.pay(r, p.id)); });
 add('POST', `${O}/:id/cancel`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await orders.cancel(r, p.id)); });
 add('POST', `${O}/:id/act`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await orders.actOn(r, p.id)); });
+
+// ---- section F (sell) and G (catalogue, GRN): run as the caller; they move onto /rpc once their labels and receipt text leave src/modules/sell.ts (see specs/pos-figma-rebuild/PLAN-2)
+const S = '/api/partner/sell';
+add('GET', `${S}/catalog`, async r => { await requireSignedIn(r, 'pos-orders'); return json(await sell.catalog(r)); });
+add('POST', `${S}/orders/:id/split-pay`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await sell.splitPay(r, p.id)); });
+add('POST', `${S}/orders/:id/refund`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await sell.refundOrder(r, p.id)); });
+add('POST', `${S}/orders/:id/attempts`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await sell.recordAttempt(r, p.id)); });
+add('POST', `${S}/orders/:id/online-checkout`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await sell.onlineCheckout(r, p.id)); });
+add('GET', `${S}/receipts`, async r => { await requireSignedIn(r, 'pos-orders'); return json(await sell.receipts(r)); });
+add('GET', `${S}/returns`, async r => { await requireSignedIn(r, 'pos-orders'); return json(await sell.returnsList(r)); });
+add('POST', `${S}/returns`, async r => { await requireSignedIn(r, 'pos-orders'); return json(await sell.returnCreate(r)); });
+add('POST', `${S}/returns/:id/decide`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await sell.returnDecide(r, p.id)); });
+add('POST', `${S}/returns/:id/refund`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await sell.returnRefund(r, p.id)); });
+add('GET', `${S}/coupons`, async r => { await requireSignedIn(r, 'pos-orders'); return json(await sell.couponsList(r)); });
+add('POST', `${S}/coupons`, async r => { await requireSignedIn(r, 'pos-orders'); return json(await sell.couponSave(r)); });
+
+const C = '/api/partner/catalogue';
+add('GET', C, async r => { await requireSignedIn(r, 'pos-orders'); return json(await catalogue.list(r)); });
+add('GET', `${C}/search`, async r => { await requireSignedIn(r, 'pos-orders'); return json(await catalogue.search(r)); });
+add('GET', `${C}/lookup`, async r => { await requireSignedIn(r, 'pos-orders'); return json(await catalogue.lookup(r)); });
+add('POST', C, async r => { await requireSignedIn(r, 'pos-orders'); return json(await catalogue.create(r)); });
+add('GET', `${C}/:id`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await catalogue.getOne(r, p.id)); });
+add('PUT', `${C}/:id`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await catalogue.update(r, p.id)); });
+const G = '/api/partner/grn';
+add('GET', G, async r => { await requireSignedIn(r, 'pos-orders'); return json(await grn.list(r)); });
+add('POST', `${G}/open`, async r => { await requireSignedIn(r, 'pos-orders'); return json(await grn.open(r)); });
+add('GET', `${G}/:id`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await grn.view(r, p.id)); });
+add('GET', `${G}/:id/matching`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await grn.matching(r, p.id)); });
+add('PUT', `${G}/:id/invoice`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await grn.saveInvoice(r, p.id)); });
+add('PUT', `${G}/:id/costs`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await grn.saveCosts(r, p.id)); });
+add('POST', `${G}/:id/resolve`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await grn.resolve(r, p.id)); });
+add('POST', `${G}/:id/request-approval`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await grn.requestApproval(r, p.id)); });
+add('POST', `${G}/:id/decide`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await grn.decide(r, p.id)); });
