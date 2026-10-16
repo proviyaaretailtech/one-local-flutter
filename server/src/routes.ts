@@ -7,6 +7,7 @@ import * as onboarding from './modules/onboarding.ts';
 import * as setup from './modules/setup.ts';
 import * as home from './modules/home.ts';
 import * as orders from './modules/orders.ts';
+import * as sell from './modules/sell.ts';
 
 add('GET', '/health', () => json({ ok: true }));
 
@@ -68,3 +69,18 @@ add('GET', `${O}/:id`, async (r, p) => { await requireStaff(r); return json(awai
 add('POST', `${O}/:id/pay`, async (r, p) => { await requireStaff(r); return json(await orders.pay(r, p.id)); });
 add('POST', `${O}/:id/cancel`, async (r, p) => { await requireStaff(r); return json(await orders.cancel(r, p.id)); });
 add('POST', `${O}/:id/act`, async (r, p) => json(await orders.actOn(r, await requireStaff(r), p.id)));
+
+// ---- section F: the till on top of E (search, split payment, receipts, returns and refunds, coupons)
+const S = '/api/partner/sell';
+add('GET', `${S}/catalog`, async r => { await requireStaff(r); return json(await sell.catalog(r)); });
+add('POST', `${S}/orders/:id/split-pay`, async (r, p) => { await requireStaff(r); return json(await sell.splitPay(r, p.id)); });
+add('POST', `${S}/orders/:id/refund`, async (r, p) => { await requireStaff(r); return json(await sell.refundOrder(r, p.id)); });
+add('POST', `${S}/orders/:id/attempts`, async (r, p) => { await requireStaff(r); return json(await sell.recordAttempt(r, p.id)); });
+add('POST', `${S}/orders/:id/online-checkout`, async (r, p) => { await requireStaff(r); return json(await sell.onlineCheckout(r, p.id)); });
+add('GET', `${S}/receipts`, async r => { await requireStaff(r); return json(await sell.receipts(r)); });
+add('GET', `${S}/returns`, async r => { await requireStaff(r); return json(await sell.returnsList(r)); });
+add('POST', `${S}/returns`, async r => { await requireStaff(r); return json(await sell.returnCreate(r)); });
+add('POST', `${S}/returns/:id/decide`, async (r, p) => { await requireStaff(r); return json(await sell.returnDecide(r, p.id)); });
+add('POST', `${S}/returns/:id/refund`, async (r, p) => { await requireStaff(r); return json(await sell.returnRefund(r, p.id)); });
+add('GET', `${S}/coupons`, async r => { await requireStaff(r); return json(await sell.couponsList(r)); });
+add('POST', `${S}/coupons`, async r => { await requireStaff(r); return json(await sell.couponSave(r)); });

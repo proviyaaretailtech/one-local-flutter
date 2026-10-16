@@ -31,11 +31,13 @@ const POS_ERRORS: Record<string, { status: number; code: string }> = {
   POS_STALE: { status: 409, code: 'version_conflict' }, POS_WRONG_STATE: { status: 409, code: 'wrong_state' }, POS_ITEM_UNAVAILABLE: { status: 409, code: 'item_unavailable' },
   POS_HAS_PAYMENTS: { status: 409, code: 'has_payments' }, POS_NOT_PAID_IN_FULL: { status: 409, code: 'not_paid_in_full' },
   POS_UNDERPAID: { status: 422, code: 'underpaid' }, POS_OVERPAY: { status: 422, code: 'overpay' }, POS_COUPON_UNKNOWN: { status: 422, code: 'coupon_unknown' },
+  POS_COUPON_MIN: { status: 422, code: 'coupon_minimum' }, POS_OVER_REFUND: { status: 422, code: 'over_refund' }, POS_OVER_RETURN: { status: 422, code: 'over_return' },
+  POS_IDEMPOTENCY_MISMATCH: { status: 422, code: 'idempotency_mismatch' },
   OL_IDEMPOTENCY_MISMATCH: { status: 422, code: 'idempotency_mismatch' }, OL_IN_PROGRESS: { status: 409, code: 'in_progress' },
   OL_STATUS_AUTHORITY: { status: 409, code: 'wrong_state' }, OL_ORDER_FROZEN: { status: 409, code: 'wrong_state' },
 };
 
-function dbFail(error: { message?: string; code?: string }): never {
+export function dbFail(error: { message?: string; code?: string }): never {
   const message = String(error.message ?? '');
   const m = message.match(/^([A-Z]+_[A-Z_]+):\s*(.*)$/);
   if (m && POS_ERRORS[m[1]]) throw new HttpError(POS_ERRORS[m[1]].status, sentence(m[2]), undefined, POS_ERRORS[m[1]].code);
@@ -45,7 +47,7 @@ function dbFail(error: { message?: string; code?: string }): never {
 }
 const sentence = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) + (/[.!?]$/.test(s) ? '' : '.') : 'Request refused.');
 
-async function call<T = Row>(client: SupabaseClient, fn: string, p: Row): Promise<T> {
+export async function call<T = Row>(client: SupabaseClient, fn: string, p: Row): Promise<T> {
   const { data, error } = await client.rpc(fn, { p });
   if (error) dbFail(error);
   return data as T;
@@ -68,8 +70,8 @@ async function onlineAct(staff: Staff, orderId: string, action: 'accept' | 'reje
 }
 
 // ---------------------------------------------------------------- input
-const uuid = (v: unknown) => (typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : null);
-const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+export const uuid = (v: unknown) => (typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : null);
+export const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 function lines(v: unknown) {
   if (!Array.isArray(v) || v.length < 1 || v.length > 50) throw new HttpError(400, 'Add between 1 and 50 items.', undefined, 'empty_cart');
   return v.map(l => {
@@ -78,12 +80,12 @@ function lines(v: unknown) {
     return { menu_item_id: id, qty };
   });
 }
-function requiredKey(request: Request) {
+export function requiredKey(request: Request) {
   const key = idempotencyKey(request);
   if (!key) throw new HttpError(400, 'Idempotency-Key header is required.', undefined, 'invalid_request');
   return key;
 }
-function money(v: unknown) {
+export function money(v: unknown) {
   if (v === undefined || v === null || v === '') return null;
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0) throw new HttpError(400, 'Enter the amount received.', undefined, 'bad_request');
@@ -91,15 +93,15 @@ function money(v: unknown) {
 }
 
 // ---------------------------------------------------------------- formatting
-const rupees = (n: number | string) => {
+export const rupees = (n: number | string) => {
   const v = Number(n);
   return `${v < 0 ? '-' : ''}₹${Math.abs(v).toLocaleString('en-IN', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 })}`;
 };
 const IST = { timeZone: 'Asia/Kolkata' } as const;
-const time = (iso: string) => new Intl.DateTimeFormat('en-IN', { ...IST, hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(iso)).replace(/\s?([ap])\.?m\.?$/i, (_, a: string) => ` ${a.toUpperCase()}M`);
-const day = (iso: string) => new Intl.DateTimeFormat('en-GB', { ...IST, day: '2-digit', month: 'short' }).format(new Date(iso));
-const dayYear = (iso: string) => new Intl.DateTimeFormat('en-GB', { ...IST, day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(iso));
-const METHOD: Record<string, string> = { cash: 'Cash', upi: 'UPI', card: 'Card', split: 'Split', wallet: 'Wallet', online: 'Online', other: 'Other', due: 'Due' };
+export const time = (iso: string) => new Intl.DateTimeFormat('en-IN', { ...IST, hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(iso)).replace(/\s?([ap])\.?m\.?$/i, (_, a: string) => ` ${a.toUpperCase()}M`);
+export const day = (iso: string) => new Intl.DateTimeFormat('en-GB', { ...IST, day: '2-digit', month: 'short' }).format(new Date(iso));
+export const dayYear = (iso: string) => new Intl.DateTimeFormat('en-GB', { ...IST, day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(iso));
+export const METHOD: Record<string, string> = { cash: 'Cash', upi: 'UPI', card: 'Card', split: 'Split', wallet: 'Wallet', online: 'Online', other: 'Other', due: 'Due' };
 const OL_METHOD: Record<string, string> = { cod: 'Cash on delivery', upi: 'UPI', card: 'Card', netbanking: 'Net banking', wallet: 'Wallet', paylater: 'Pay Later', emi: 'EMI', cardless_emi: 'EMI' };
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -364,7 +366,7 @@ export async function checkout(request: Request, hold: boolean) {
   return { ...(await view(client, out.order_id)), replayed: !!out.replayed };
 }
 
-async function view(client: SupabaseClient, id: string) {
+export async function view(client: SupabaseClient, id: string) {
   return shapeView(await call<Row>(client, 'pos_order_view', { order_id: id }));
 }
 
