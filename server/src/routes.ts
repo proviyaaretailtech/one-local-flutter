@@ -3,12 +3,22 @@ import { add } from './router.ts';
 import { json } from './http.ts';
 import { requireSignedIn, requireStaff } from './staff.ts';
 import { userClient } from './db.ts';
+import { anonKey, supabaseUrl } from './config.ts';
+import { VERSION } from './version.ts';
 import * as home from './modules/home.ts';
 import * as orders from './modules/orders.ts';
 import { rpcBatch, rpcOne } from './rpc.ts';
 import { webhookRoutes } from './modules/secure/index.ts';
 
-add('GET', '/health', () => json({ ok: true }));
+// Health probe: version and whether the database answers. Uses the public key only; nothing secret is read or shown.
+add('GET', '/health', async () => {
+  const url = supabaseUrl(), key = anonKey();
+  let reachable = false;
+  if (url && key) {
+    try { reachable = (await fetch(`${url}/auth/v1/health`, { headers: { apikey: key }, signal: AbortSignal.timeout(3000) })).ok; } catch { /* unreachable */ }
+  }
+  return json({ ok: true, version: VERSION, db: reachable ? 'reachable' : 'unreachable' });
+});
 
 // ---- the one generic endpoint (allowlist: src/rpc-manifest.ts). Everything below this block is the older per-feature routes.
 add('POST', '/rpc/:name', rpcOne);
