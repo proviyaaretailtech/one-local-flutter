@@ -1,9 +1,8 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
 
 /// The application as the server describes it. Read-only; every field the screens show comes from here.
@@ -72,57 +71,37 @@ class Taxonomy {
   List<({String name, List<String> subs})> get serviceCategories => _cats((raw['service'] as Map?)?['categories']);
 }
 
-/// One call per screen action, all through the One Local server (`/api/onboarding/*`). The server checks every rule again.
+/// One call per screen action, all through the one `/rpc/<name>` door ([RpcClient]). The database checks every rule.
 class OnboardingApi {
-  OnboardingApi({http.Client? client, String? baseUrl, String? Function()? accessToken})
+  OnboardingApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc})
       : _http = client ?? http.Client(),
-        _token = accessToken ?? (() => Supabase.instance.client.auth.currentSession?.accessToken),
-        _base = (baseUrl ?? const String.fromEnvironment('PARTNER_API_BASE_URL')).replaceAll(RegExp(r'/+$'), '');
+        _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken);
 
   final http.Client _http;
-  final String? Function() _token;
-  final String _base;
+  final RpcClient _rpc;
 
-  Future<Map<String, dynamic>> _send(String method, String path, [Object? body]) async {
-    final token = _token();
-    if (token == null) throw const PartnerApiException(401, 'Sign in to continue.');
-    final uri = Uri.parse('$_base/api/onboarding$path');
-    final headers = {'Authorization': 'Bearer $token', if (body != null) 'Content-Type': 'application/json'};
-    final res = await switch (method) {
-      'GET' => _http.get(uri, headers: headers),
-      'PUT' => _http.put(uri, headers: headers, body: jsonEncode(body ?? {})),
-      _ => _http.post(uri, headers: headers, body: body == null ? null : jsonEncode(body)),
-    }.timeout(const Duration(seconds: 30));
-    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
-    final map = decoded is Map ? decoded.cast<String, dynamic>() : <String, dynamic>{};
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw PartnerApiException(res.statusCode, (map['detail'] as String?) ?? 'Something went wrong. Please try again.');
-    }
-    return map;
-  }
+  Future<Application> _state(String fn, [Map<String, dynamic> args = const {}]) async => Application(await _rpc.callMap(fn, args));
 
-  Future<Application> _state(String method, String path, [Object? body]) async => Application(await _send(method, path, body));
+  Future<Application> get() => _state('partner_app_get');
+  Future<Taxonomy> taxonomy() async => Taxonomy(await _rpc.callMap('static_taxonomy'));
 
-  Future<Application> get() => _state('GET', '/application');
-  Future<Taxonomy> taxonomy() async => Taxonomy(await _send('GET', '/taxonomy'));
-
-  Future<Application> saveProfile(Map<String, dynamic> body) => _state('PUT', '/profile', body);
-  Future<Application> choosePlan(String plan) => _state('PUT', '/plan', {'plan': plan});
-  Future<Application> saveAddress(Map<String, dynamic> body) => _state('PUT', '/address', body);
-  Future<Application> saveTax(Map<String, dynamic> body) => _state('PUT', '/tax', body);
-  Future<Application> saveIdentity(Map<String, dynamic> body) => _state('PUT', '/identity', body);
-  Future<Application> saveBank(Map<String, dynamic> body) => _state('PUT', '/bank', body);
-  Future<Application> saveConsents(Map<String, dynamic> body) => _state('PUT', '/consents', body);
-  Future<Application> acceptAgreement(String version) => _state('PUT', '/agreement', {'version': version, 'acknowledged': true});
-  Future<Application> submit() => _state('POST', '/submit');
+  Future<Application> saveProfile(Map<String, dynamic> body) => _state('partner_app_save_profile', body);
+  Future<Application> choosePlan(String plan) => _state('partner_app_choose_plan', {'plan': plan});
+  Future<Application> saveAddress(Map<String, dynamic> body) => _state('partner_app_save_address', body);
+  Future<Application> saveTax(Map<String, dynamic> body) => _state('partner_app_save_tax', body);
+  Future<Application> saveIdentity(Map<String, dynamic> body) => _state('partner_app_save_identity', body);
+  Future<Application> saveBank(Map<String, dynamic> body) => _state('partner_app_save_bank', body);
+  Future<Application> saveConsents(Map<String, dynamic> body) => _state('partner_app_save_consents', body);
+  Future<Application> acceptAgreement(String version) => _state('partner_app_accept_agreement', {'version': version, 'acknowledged': true});
+  Future<Application> submit() => _state('partner_app_submit');
 
   /// Two steps: ask for a private slot, send the bytes to it, then confirm so the server attaches the file.
   Future<Application> uploadDocument({required String kind, required Uint8List bytes, required String fileName, required String contentType}) async {
-    final slot = await _send('POST', '/documents/upload', {'kind': kind, 'content_type': contentType, 'size': bytes.length, 'file_name': fileName});
+    final slot = await _rpc.callMap('partner_app_document_slot', {'kind': kind, 'content_type': contentType, 'size': bytes.length, 'file_name': fileName});
     final put = await _http.put(Uri.parse(slot['upload_url'] as String), headers: {'Content-Type': contentType, 'x-upsert': 'true'}, body: bytes).timeout(const Duration(seconds: 120));
     if (put.statusCode < 200 || put.statusCode >= 300) throw const PartnerApiException(502, 'The upload did not finish. Please try again.');
-    return _state('POST', '/documents', {'kind': kind, 'path': slot['path'], 'content_type': contentType, 'size': bytes.length, 'file_name': fileName});
+    return _state('partner_app_document_attach', {'kind': kind, 'path': slot['path'], 'content_type': contentType, 'size': bytes.length, 'file_name': fileName});
   }
 
-  Future<String> previewUrl(String kind) async => (await _send('GET', '/documents/$kind/preview'))['url'] as String;
+  Future<String> previewUrl(String kind) async => (await _rpc.callMap('partner_app_document_preview', {'kind': kind}))['url'] as String;
 }
