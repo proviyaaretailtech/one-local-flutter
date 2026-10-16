@@ -14,10 +14,12 @@
 // is copied into args.idempotency_key when the body has none).
 // scripts/manifest-audit.mjs reads this file and fails on any function that is unsafe for the `authenticated` role.
 import type { z } from 'zod';
-import { secureHandlers, withImageLinks, type SecureHandler } from './modules/secure/index.ts';
+import { dropRemovedFile, secureHandlers, withImageLinks, type SecureHandler } from './modules/secure/index.ts';
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
+import * as st from './schemas/settings.ts';
+import { helpContent } from './modules/help.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -100,6 +102,28 @@ export const MANIFEST: Entry[] = [
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  // ---- settings and store profile, section P (0470). Body = the function's `p` object; the database checks the caller's business and role
+  //      (read: any active person; save: owner, admin, business manager, manager; bank only owner and admin). Bank numbers are saved by the
+  //      existing secure handler partner_setup_save_payment and are never returned.
+  db('pos_settings_get', { args: st.Empty, map: P, rate: 'read', roles: STAFF }),
+  db('pos_settings_save_hours', { args: st.Hours, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_readiness', { args: st.Readiness, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_help', { args: st.Help, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_owner', { args: st.Owner, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_staff_phone', { args: st.StaffPhone, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_set_pickup', { args: st.Switch, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_set_qr_checkout', { args: st.Switch, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_location', { args: st.Location, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_language', { args: st.Language, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_documents', { args: st.Empty, map: P, rate: 'read', roles: 'owner, admin, managers, finance' }),
+  db('pos_settings_document_remove', { args: st.DocumentRemove, map: P, post: dropRemovedFile, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_remove_qr', { args: st.Empty, map: P, post: dropRemovedFile, rate: 'write', roles: 'owner or manager' }),
+  db('pos_support_list', { args: st.Empty, map: P, rate: 'read', roles: STAFF }),
+  db('pos_support_create', { args: st.SupportCreate, map: P, rate: 'write', idem: true, roles: STAFF }),
+  { kind: 'local', alias: 'pos_help_content', args: 'passthrough', rate: 'read', roles: ANY, run: () => helpContent() },   // static FAQ, no database
+  sec('pos_settings_file_slot', { args: st.FileAsk, rate: 'secure', roles: STAFF }),
+  sec('pos_settings_file_attach', { args: st.FileAttach, rate: 'secure', roles: STAFF }),
+  sec('pos_settings_file_link', { args: st.FileLink, rate: 'secure', roles: STAFF }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 

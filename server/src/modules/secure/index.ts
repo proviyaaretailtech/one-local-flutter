@@ -4,6 +4,7 @@
 import type { Handler } from '../../http.ts';
 import * as pii from './pii.ts';
 import * as storage from './storage.ts';
+import * as settingsFiles from './settings_files.ts';
 import { me } from './me.ts';
 import { webhook } from './payments.ts';
 
@@ -20,6 +21,9 @@ export const secureHandlers = {
   partner_app_document_preview: storage.documentPreview,
   partner_setup_image_slot: storage.imageSlot,
   partner_setup_image_attach: storage.imageAttach,
+  pos_settings_file_slot: settingsFiles.fileSlot,
+  pos_settings_file_attach: settingsFiles.fileAttach,
+  pos_settings_file_link: settingsFiles.fileLink,
 } satisfies Record<string, SecureHandler>;
 
 /** Real HTTP endpoints (no user token): provider webhooks. */
@@ -29,3 +33,4 @@ export const webhookRoutes: { path: string; handler: Handler }[] = [
 ];
 
 export { withImageLinks } from './storage.ts';
+export { dropRemovedFile } from './settings_files.ts';

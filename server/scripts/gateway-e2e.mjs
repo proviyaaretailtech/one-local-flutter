@@ -167,6 +167,51 @@ try {
   ok('inventory: A document untouched after all of that', sql(`select status||':'||version from inventory_documents where id='${docId}'`) === 'draft:' + d1.j.version && sql(`select count(*) from stock_movements where organization_id='${orgA}'`) === '1');
   ok('inventory: A viewer can read stock but not create documents', (await rpc(V, 'inv_dashboard')).s === 200 && (await rpc(V, 'inv_document_save', draft, `gw-inv-${randomUUID()}`)).s === 403);
   ok('inventory: applicant with no business gets nothing', refused(await rpc(P1, 'inv_dashboard')) && refused(await rpc(P1, 'inv_stock_detail', { item_id: itemA })));
+  // ---- settings and store profile (section P, 0470): A's settings, documents, files and support requests against B's token
+  ok('settings: no token is 401; service-only helpers and tables are not on the allowlist', (await rpc(null, 'pos_settings_get')).s === 401 && (await rpc(A, 'pos_settings__org')).s === 404 && (await rpc(A, 'org_store_preferences')).s === 404);
+  ok('settings: static help content answers (FAQ, categories, hours)', await (async () => { const r = await rpc(A, 'pos_help_content'); return r.s === 200 && r.j.faq.length >= 3 && r.j.categories.length === 4 && r.j.hours === '9 AM–9 PM'; })());
+  const sHours = await rpc(A, 'pos_settings_save_hours', { opens_at: '09:00', closes_at: '21:30' });
+  ok('settings: A manager saves hours and reads them back', sHours.s === 200 && sHours.j.hours.opens_at === '09:00' && sHours.j.hours.closes_at === '21:30', sHours);
+  ok('settings: a bad time is a 400 with a sentence', await (async () => { const r = await rpc(A, 'pos_settings_save_hours', { opens_at: 'late', closes_at: '21:30' }); return r.s === 400 && typeof r.j.detail === 'string'; })());
+  ok('settings: a bad phone is refused by the database with its sentence', await (async () => { const r = await rpc(A, 'pos_settings_save_owner', { name: 'Rohan', phone: '12345' }); return r.s === 400 && /10-digit/.test(r.j.detail); })());
+  ok('settings: A saves owner and help contacts', (await rpc(A, 'pos_settings_save_owner', { name: 'Rohan Shah', phone: '+91 91234 56780' })).j?.owner?.phone === '9123456780' && (await rpc(A, 'pos_settings_save_readiness', { prep_minutes: 20 })).j?.readiness?.prep_minutes === 20);
+  const sB = await rpc(B, 'pos_settings_get');
+  ok('settings: B page has none of A (hours, owner, readiness)', sB.s === 200 && sB.j.hours.opens_at === null && sB.j.owner.name === null && sB.j.readiness.prep_minutes === null && sB.j.organization.id === orgB, sB);
+  ok('settings: B saving changes only B', (await rpc(B, 'pos_settings_save_hours', { opens_at: '06:00', closes_at: '12:00' })).s === 200
+    && sql(`select opens_at::text from org_listing_profiles where organization_id='${orgA}'`) === '09:00:00' && sql(`select count(*) from org_listing_profiles where organization_id='${orgB}'`) === '1');
+  ok('settings: a body that names another organisation is ignored (A page still A)', await (async () => { const r = await rpc(B, 'pos_settings_save_language', { language: 'hi', organization_id: orgA }); return r.s === 200 && sql(`select coalesce(language,'en') from org_store_preferences where organization_id='${orgA}'`) === 'en' && sql(`select language from org_store_preferences where organization_id='${orgB}'`) === 'hi'; })());
+  ok('settings: viewer reads the page but cannot save (403)', (await rpc(V, 'pos_settings_get')).s === 200 && (await rpc(V, 'pos_settings_save_hours', { opens_at: '10:00', closes_at: '20:00' })).s === 403 && (await rpc(V, 'pos_settings_set_pickup', { enabled: true })).s === 403);
+  ok('settings: viewer cannot list documents, applicant has no page at all', (await rpc(V, 'pos_settings_documents')).s === 403 && refused(await rpc(P1, 'pos_settings_get')) && refused(await rpc(P1, 'pos_support_list')));
+  const docA = sql(`insert into pos_business_documents(organization_id,name,doc_type,doc_no,file_url,review_status) values ('${orgA}','ZZ FSSAI','food_safety','ZZ-0001','${orgA}/document/zz-seed.pdf','pending') returning id`).split('\n')[0];
+  ok('settings: B document list has none of A; A list masks the number', !JSON.stringify((await rpc(B, 'pos_settings_documents')).j).includes(docA) && await (async () => { const r = await rpc(A, 'pos_settings_documents'); return r.s === 200 && r.j.documents.some(d => d.id === docA && d.doc_no_masked === 'XXX0001') && !JSON.stringify(r.j).includes('ZZ-0001'); })());
+  ok('settings: B cannot open or remove A document', (await rpc(B, 'pos_settings_file_link', { kind: 'document', id: docA })).s === 404 && (await rpc(B, 'pos_settings_document_remove', { id: docA })).s === 404);
+  // files: a real upload through the signed qrSlot (local storage), attach, open; then the other business tries the same path
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const qrSlot = await rpc(A, 'pos_settings_file_slot', { kind: 'store_qr', content_type: 'image/png', size: png.length });
+  ok('settings: A gets an upload qrSlot under its own business folder', qrSlot.s === 200 && qrSlot.j.path.startsWith(`${orgA}/store_qr/`), qrSlot);
+  ok('settings: viewer cannot get a qrSlot for store files (403)', (await rpc(V, 'pos_settings_file_slot', { kind: 'store_qr', content_type: 'image/png', size: png.length })).s === 403);
+  if (qrSlot.s === 200) {
+    const qrPut = await fetch(qrSlot.j.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png', 'x-upsert': 'true' }, body: png });
+    ok('settings: the bytes reach the private bucket', qrPut.status >= 200 && qrPut.status < 300, qrPut.status);
+    ok('settings: B cannot attach A path (400)', (await rpc(B, 'pos_settings_file_attach', { kind: 'store_qr', content_type: 'image/png', size: png.length, path: qrSlot.j.path })).s === 400);
+    const qrAtt = await rpc(A, 'pos_settings_file_attach', { kind: 'store_qr', content_type: 'image/png', size: png.length, path: qrSlot.j.path });
+    ok('settings: A attaches the QR; the page says uploaded', qrAtt.s === 200 && (await rpc(A, 'pos_settings_get')).j.qr.uploaded === true, qrAtt);
+    const qrLink = await rpc(A, 'pos_settings_file_link', { kind: 'store_qr' });
+    ok('settings: A opens its QR by a short qrLink (and the qrLink serves the image)', qrLink.s === 200 && (await fetch(qrLink.j.url)).status === 200, qrLink);
+    ok('settings: B has no QR to open, and the stored path is never in a response', (await rpc(B, 'pos_settings_file_link', { kind: 'store_qr' })).s === 404 && !JSON.stringify(qrAtt.j).includes(orgA));
+    const qrRm = await rpc(A, 'pos_settings_remove_qr');
+    ok('settings: removing the QR answers without the storage path and deletes the file', qrRm.s === 200 && !JSON.stringify(qrRm.j).includes('store_qr/') && (await rpc(A, 'pos_settings_get')).j.qr.uploaded === false);
+  }
+  // support: A's request is invisible to B; a retry with the same key makes no second ticket; the viewer sees only their own
+  const skey = `gw-sup-${randomUUID()}`;
+  const s1 = await rpc(A, 'pos_support_create', { topic: 'payments', message: 'ZZ payout not received' }, skey);
+  const s2 = await rpc(A, 'pos_support_create', { topic: 'payments', message: 'ZZ payout not received' }, skey);
+  ok('settings: support request gets a reference; the same Idempotency-Key replays it', s1.s === 200 && /^SUP-\d+$/.test(s1.j.reference) && s2.j.id === s1.j.id && s2.j.replayed === true, [s1, s2]);
+  ok('settings: B support list has none of A', !JSON.stringify((await rpc(B, 'pos_support_list')).j).includes(s1.j.id));
+  ok('settings: viewer sees no request of A manager, and can open their own', !JSON.stringify((await rpc(V, 'pos_support_list')).j).includes(s1.j.id) && (await rpc(V, 'pos_support_create', { message: 'ZZ how do I void a bill' }, `gw-sup-${randomUUID()}`)).s === 200);
+  ok('settings: a support attachment path of another business is refused', refused(await rpc(B, 'pos_support_create', { kind: 'feedback', message: 'ZZ screenshot', attachment_path: `${orgA}/feedback/x.png` })));
+  ok('settings: bank save stays on the setup handler, owner only (manager and viewer 403)', [403, 404].includes((await rpc(A, 'partner_setup_save_payment', { holder_name: 'ZZ Holder' })).s) && [403, 404].includes((await rpc(V, 'partner_setup_save_payment', { holder_name: 'ZZ Holder' })).s));
+  ok('settings: no response from the settings page carries an account number or key', !/account_enc|account_number|PARTNER_PII/i.test(JSON.stringify((await rpc(A, 'pos_settings_get')).j)));
   ok('payment webhook hook answers 501 (not connected)', (await fetch(`${API}/webhooks/razorpay`, { method: 'POST' })).status === 501);
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.stack?.slice(0, 600));
@@ -177,6 +222,7 @@ try {
   sql(`delete from org_bill_settings where organization_id in ('${orgA}','${orgB}')`);
   sql(`delete from org_counters where organization_id in ('${orgA}','${orgB}')`);
   try { sql(`delete from inventory_bins where organization_id in ('${orgA}','${orgB}')`); } catch {}
+  try { sql(`delete from pos_business_documents where organization_id in ('${orgA}','${orgB}')`); sql(`delete from pos_support_requests where organization_id in ('${orgA}','${orgB}')`); sql(`delete from org_store_preferences where organization_id in ('${orgA}','${orgB}')`); } catch {}
   try { console.log(execSync('../../database/purge_test_orders.sh', { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { console.log('purge:', e.message.slice(0, 120)); }
   console.log('leftover test businesses: ' + sql(`select count(*) from organizations where id in ('${orgA}','${orgB}')`));
 }
