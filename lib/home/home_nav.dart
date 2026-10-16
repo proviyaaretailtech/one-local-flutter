@@ -30,6 +30,10 @@ class HomeNav {
   static HomeRoute? reviews;
   static HomeRoute? support;
 
+  // Section G: the GRN queue, and where "Open Receipt" on the GRN dashboard goes (section H's receipt screen plugs in here).
+  static HomeRoute? grn;
+  static void Function(BuildContext context, String receiptDocumentId)? receipt;
+
   /// Opens [route], or tells the person that [what] is not available yet.
   static void go(BuildContext context, HomeRoute? route, String what) {
     if (route != null) {
@@ -41,6 +45,6 @@ class HomeNav {
 
   /// Clears every hook (tests).
   static void reset() {
-    home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = null;
+    home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = grn = receipt = null;
   }
 }

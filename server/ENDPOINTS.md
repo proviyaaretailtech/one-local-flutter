@@ -70,6 +70,37 @@ Staff only. Every database call runs AS the signed-in staff member (their token 
 | POST | `/api/partner/pos-orders/:id/cancel` | `{reason, version}` | `pos_set_order_status` |
 | POST | `/api/partner/pos-orders/:id/act` (key) | `{action, version, lines?, delivery?, note?, reason?}` | `pos_fulfilment_act`; `online_accept/online_reject/online_ready` → `ol_partner_act` |
 
+## Section G: store catalogue and GRN matching — `lib/catalogue/catalogue_api.dart`, `modules/catalogue.ts`, `modules/grn.ts`, migrations 0390 and 0391
+
+Staff only; every call runs AS the signed-in staff member (their token on the anon key). The server checks request shape (zod, unknown fields refused); every rule is in the database. Money is in **minor units** (paise). Optional `Idempotency-Key` on item create.
+
+Stable item fields (section F reads these): `id`, `name`, `sku`, `barcode`, `category`, `price_minor`, `mrp_minor`, `currency`, `selling_unit`, `net_qty`, `net_qty_unit`, `gst_pct`, `hsn`, `status` (`active|inactive|draft`), `available`, `stock_qty` (null when stock is unknown), `inventory_item_id`, `version`.
+
+| Method | Path | Request | Database function |
+|---|---|---|---|
+| GET | `/api/partner/catalogue` | `q? status?(all\|active\|inactive\|draft\|out\|combo) category? page? page_size?(1-100) location?` | `cat_item_list` → `{counts{total,active,out_of_stock,inactive,combos,categories,drafts}, categories[], total_matching, page, page_size, items[]}` |
+| GET | `/api/partner/catalogue/search` | `q, limit?(1-50)` | `cat_item_list` (active items by name, SKU, barcode or brand) → `{items[]}`. Use this from the sell screen. |
+| GET | `/api/partner/catalogue/lookup` | `code` (barcode, then SKU) | `cat_item_lookup` (404 when no item has the code) |
+| GET | `/api/partner/catalogue/:id` | – | `cat_item_view` |
+| POST | `/api/partner/catalogue` | `{mode: quick\|full, draft?, name, sku, price_minor, category?, brand?, barcode?, mrp_minor?, cost_minor?, hsn?, gst_pct?, selling_unit?, net_qty?, net_qty_unit?, unit_description?, purchase_pack_units?, storage?}` | `cat_item_save`. Full non-draft needs `hsn` + `gst_pct` (422 `tax_required`); duplicate SKU/barcode 409; price above MRP 400. |
+| PUT | `/api/partner/catalogue/:id` | same fields, `version` required | `cat_item_save` (409 `version_conflict` when stale) |
+
+GRN: `:id` is the RECEIPT document id of section H (`inventory_documents.id`). A receipt must be sent to GRN review in section H first. **Needs section H merged.**
+
+| Method | Path | Request | Database function |
+|---|---|---|---|
+| GET | `/api/partner/grn` | – | `grn_list` (receipts in review and approved in the last 30 days) |
+| POST | `/api/partner/grn/open` | `{receipt_document_id}` | `grn_open` (creates the GRN number once; 409 if the receipt is not in review) |
+| GET | `/api/partner/grn/:id` | – | `grn_view` (dashboard: totals, rows, resolution, posting preview, checklist, blockers, allowed actions) |
+| GET | `/api/partner/grn/:id/matching` | – | `grn_matching_view` (invoice lines, received rows with state: matched, short, over, price_diff, rejected, missing, not_on_invoice) |
+| PUT | `/api/partner/grn/:id/invoice` | `{supplier_name, invoice_no, invoice_date: YYYY-MM-DD, po_ref?, lines:[{inventory_item_id?, product_name, qty, unit?, unit_price_minor}]}` | `grn_invoice_save` (replaces the invoice while matching; clears the resolution) |
+| PUT | `/api/partner/grn/:id/costs` | `{costs:[{line_id, unit_cost_minor}]}` | `grn_costs_save` (unit prices noticed at receiving) |
+| POST | `/api/partner/grn/:id/resolve` | `{version, resolution: accept_claim_credit\|accept_as_received, claim_ref?, evidence?, note?}` | `grn_resolve` (claim needs reference + evidence; waiving a claim needs a note) |
+| POST | `/api/partner/grn/:id/request-approval` | `{version}` | `grn_request_approval` (422 `unresolved` while exceptions are unresolved) |
+| POST | `/api/partner/grn/:id/decide` | `{version, decision: approve\|reject, note?}` | `grn_decide` (approver role only; the requester cannot approve unless the only approver; approve posts stock through section H `inv_document_act`; reject needs a note) |
+
+A GRN review that is not approved blocks section H's own `post` of that receipt (trigger `grn_post_gate`).
+
 ## Not called by the app today (exist in the customer app for the OLD partner app, not ported)
 
 `/api/partner/outlet`, `/items`, `/orders`, `/payments`, `/devices`, `/test-order`, `/account/*`. The new POS has no Dart caller for them. If a future screen needs one, port it here against the same database functions rather than calling the customer app.

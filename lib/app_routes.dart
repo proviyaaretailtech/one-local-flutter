@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'auth/auth_repository.dart';
 import 'auth/partner_api.dart';
+import 'catalogue/catalogue_screen.dart';
+import 'catalogue/grn_screens.dart';
 import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
 import 'orders/orders_home.dart';
@@ -11,12 +13,14 @@ import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
-/// workspace setup (C), the control centre (D) and orders (E) into the [HomeNav] hooks.
+/// workspace setup (C), the control centre (D), orders (E) and the catalogue and GRN (G) into the [HomeNav] hooks.
 void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
   HomeNav.orders = HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
   // Section F: the till (sell, search, carts, payment, history, returns, receipts). Section E's cart screen stays reachable from the orders list.
   HomeNav.bill = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'sell'), builder: (_) => SellScreen(env: SellEnv(onTab: (id) => _tab(c, id)))));
+  HomeNav.items = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CatalogueScreen(onNavigate: (id) => _tab(c, id))));
+  HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const GrnQueueScreen()));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
