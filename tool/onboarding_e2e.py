@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Walks one test partner through all of onboarding against the LOCAL stack: sign in, 7 sections, upload, submit.
-Needs: local Supabase, the One Local dev server on :8092, .env.local, .phasea_test_pw. Prints PASS/FAIL lines only, never secrets."""
+Needs: local Supabase, the POS server on :8090 (new-mobile-flutter/server, `npm run dev`), .env.local, .phasea_test_pw. Prints PASS/FAIL lines only, never secrets."""
 import json, os, sys, urllib.request, urllib.error, uuid
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -9,9 +9,9 @@ def env(path, key):
         if l.startswith(key + '='): return l.split('=', 1)[1].strip()
 SB = 'http://127.0.0.1:54321'
 PK = env(os.path.join(ROOT, '.env.local'), 'SUPABASE_PUBLISHABLE_KEY')
-SRK = env(os.path.join(ROOT, '..', 'One Local Mobile App ', 'OL-ui', 'frontend', '.env.local'), 'SUPABASE_SERVICE_ROLE_KEY')
+SRK = env(os.path.join(ROOT, 'server', '.env'), 'SUPABASE_SERVICE_ROLE_KEY')  # the standalone POS server's own env file
 PW = open(os.path.join(ROOT, '.phasea_test_pw')).read().strip()
-API = 'http://localhost:8092'
+API = os.environ.get('POS_API', 'http://localhost:8090')  # the standalone POS server (new-mobile-flutter/server, `npm run dev`)
 EMAIL = 'phasea.onboard@test.local'
 results = []
 

@@ -12,9 +12,9 @@ def env(path, key):
         if l.startswith(key + '='): return l.split('=', 1)[1].strip().strip('"')
 SB = 'http://127.0.0.1:54321'
 PK = env(os.path.join(ROOT, '.env.local'), 'SUPABASE_PUBLISHABLE_KEY')
-SRK = env(os.path.join(ROOT, '..', 'One Local Mobile App ', 'OL-ui', 'frontend', '.env.local'), 'SUPABASE_SERVICE_ROLE_KEY')
+SRK = env(os.path.join(ROOT, 'server', '.env'), 'SUPABASE_SERVICE_ROLE_KEY')  # the standalone POS server's own env file
 PW = open(os.path.join(ROOT, '.phasea_test_pw')).read().strip()
-API = os.environ.get('SETUP_API', 'http://localhost:8093')
+API = os.environ.get('POS_API', 'http://localhost:8090')  # the standalone POS server (new-mobile-flutter/server, `npm run dev`)
 DEV_KEY = 'dev-only-partner-pii-key-0123456789'   # the server's local-only fallback key (server/partner-setup.ts); never a real key
 RUN = '%06d' % random.randint(0, 999999)
 results = []
@@ -51,10 +51,12 @@ def approved_partner(tag, partner_type, sell_plan, phone, with_bank):
       values ('latur', 'E2E Setup {tag} {RUN}', '{'restaurant' if partner_type == 'restaurant' else 'grocery'}', '{partner_type}', 'Main Road, Latur', '413512',
         'Riya Sharma', '{phone}', '{email}', 'v1', now(), 'k-setup-{tag}-{RUN}', 'submitted', '{uid}', 'Grocery', '{{Grocery}}', '{sell_plan}', false,
         '12 Main Road', 'Shivaji Nagar', 'Latur', '{{pickup}}', false, now()) returning id""").splitlines()[0]
-    if with_bank:
-        psql(f"""insert into ol_partner_application_bank (application_id, holder_name, bank_name, account_last4, account_enc, ifsc, account_type, authorised_at, status)
-          values ('{app_id}', 'Riya Sharma', 'HDFC Bank', '6789', extensions.pgp_sym_encrypt('000123456789', '{DEV_KEY}'), 'HDFC0001234', 'current', now(), 'verified')""")
     staff = psql("select user_id from platform_admins where status = 'Active' order by created_at limit 1")
+    if with_bank:  # a verified account needs verified_at and verified_by (constraint ol_partner_application_bank_verified_by_someone)
+        psql(f"""insert into ol_partner_application_bank (application_id, holder_name, bank_name, account_last4, account_enc, ifsc, account_type, authorised_at, status, verified_at, verified_by)
+          values ('{app_id}', 'Riya Sharma', 'HDFC Bank', '6789', extensions.pgp_sym_encrypt('000123456789', '{DEV_KEY}'), 'HDFC0001234', 'current', now(), 'verified', now(), '{staff}')""")
+    for kind in ('individual_identity', 'business_identity', 'business_address', 'bank_ownership'):  # 0371: approve only after every check is verified
+        psql(f"select master_partner_application_check_set('{app_id}', '{kind}', 'verified', null, '{staff}')")
     psql(f"select master_partner_application_decide('{app_id}', 'approve', null, '{staff}')")
     s, tok = call('POST', f'{SB}/auth/v1/token?grant_type=password', {'email': email, 'password': PW}, {'apikey': PK})
     return {'Authorization': 'Bearer ' + tok['access_token']}
