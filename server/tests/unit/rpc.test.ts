@@ -43,6 +43,9 @@ test('database error prefixes of every family map to a status and a code', () =>
   t('POS_UNDERPAID: short', 422, 'underpaid');
   t('GRN_NOT_FOUND: nope', 404, 'not_found');
   t('INV_FROZEN: x', 409, 'wrong_state');
+  t('INV_SHORT: only 3 left', 409, 'short');
+  t('INV_CAPACITY: bin full', 422, 'capacity');
+  t('INV_STALE: changed', 409, 'version_conflict');
   t('OL_BAD_REQUEST: x', 400, 'bad_request');
   assert.throws(() => mapDbError({ message: 'new row violates row-level security policy', code: '42501' }), (e: HttpError) => e.status === 403);
   assert.throws(() => mapDbError({ message: 'PLAN_LIMIT: x' }), (e: HttpError) => e.status === 500);
@@ -54,4 +57,22 @@ test('profile arguments are checked against the lists', () => {
   assert.equal(ok.phone, '9876543210');
   assert.deepEqual(ok.subcategories, ['Indian']);
   assert.throws(() => ob.profileArgs(ob.Profile.parse({ ...base, category: 'Not a type' })), (e: HttpError) => e.status === 400);
+});
+
+test('inventory (section H): every function is listed, reads are "read", writes carry the Idempotency-Key, shapes are checked', async () => {
+  const reads = ['inv_options', 'inv_dashboard', 'inv_stock_list', 'inv_stock_detail', 'inv_movement_list', 'inv_movement_detail', 'inv_document_list', 'inv_document_view', 'inv_forecast'];
+  const writes = ['inv_document_save', 'inv_document_act', 'inv_audit_to_adjustment'];
+  for (const a of reads) assert.equal(lookup(a)?.rate, 'read', a);
+  for (const a of writes) { const e = lookup(a); assert.ok(e && e.kind === 'db' && e.idem && e.rate === 'write', a); }
+  for (const a of [...reads, ...writes]) assert.equal(lookup(a)?.kind, 'db', a);
+  assert.equal(lookup('inv_post_movement'), undefined);       // service-only helpers are not reachable
+  assert.equal(lookup('inv_item_stats'), undefined);
+  assert.equal((await post('/rpc/inv_dashboard')).status, 401);
+  const parse = (alias: string, body: unknown) => (lookup(alias) as { args: { safeParse(v: unknown): { success: boolean; data?: any } } }).args.safeParse(body);
+  assert.equal(parse('inv_document_act', { id: 'not-an-id', action: 'submit', version: 1 }).success, false);
+  assert.equal(parse('inv_document_act', { id: '40000000-0000-0000-0000-0000000000a1', action: 'submit' }).success, false);
+  assert.equal(parse('inv_stock_list', { filter: 'everything' }).success, false);
+  assert.equal(parse('inv_stock_list', { page_size: 500 }).success, false);
+  const keep = parse('inv_document_save', { doc_type: 'receipt', title: 'x', lines: [{ inventory_item_id: 'a', qty: 1 }] });
+  assert.ok(keep.success && keep.data.title === 'x' && keep.data.lines.length === 1);   // fields the schema does not name still reach the database
 });

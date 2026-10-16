@@ -1,9 +1,8 @@
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
 
 /// A server answer read as typed fields. Every number, status and permission comes from the server; the app only draws them.
@@ -26,7 +25,7 @@ class Facts {
   static num? _num(Object? v) => v is num ? v : (v == null ? null : num.tryParse(v.toString()));
 }
 
-/// One stock document (receipt, adjustment, transfer, audit) as `GET /documents/:id` returns it.
+/// One stock document (receipt, adjustment, transfer, audit) as `inv_document_view` returns it.
 class InvDocument extends Facts {
   const InvDocument(super.raw);
   String get id => s('id');
@@ -87,20 +86,16 @@ class DraftLine {
   static String _day(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
 
-/// Calls One Local's server (`/api/partner/inventory/*`, contract in specs/pos-section-h/spec.md). The Supabase session token is the only
-/// credential; the server and the database check the business, the location, the role and every rule again. Creating a document and every
-/// document action carry an Idempotency-Key so a retried tap never doubles; edits carry the version the person saw.
+/// Inventory calls through the one generic door, `POST /rpc/<inv_function>` ([RpcClient]); the database functions of migrations 0400-0403 do
+/// the work and check the business, the location, the role and every rule. The Supabase session token is the only credential. Creating a
+/// document and every document action carry an Idempotency-Key so a retried tap never doubles; edits carry the version the person saw.
 class InventoryApi {
-  InventoryApi({http.Client? client, String? baseUrl, String? Function()? accessToken, this.locationId})
-      : _http = client ?? http.Client(),
-        _token = accessToken ?? (() => Supabase.instance.client.auth.currentSession?.accessToken),
-        _base = (baseUrl ?? const String.fromEnvironment('PARTNER_API_BASE_URL')).replaceAll(RegExp(r'/+$'), '');
+  InventoryApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc, this.locationId})
+      : _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken);
 
-  final http.Client _http;
-  final String? Function() _token;
-  final String _base;
+  final RpcClient _rpc;
 
-  /// The store the screens look at; null lets the server pick the person's main location.
+  /// The store the screens look at; null lets the database pick the person's main location.
   String? locationId;
 
   static final _rand = Random.secure();
@@ -108,61 +103,52 @@ class InventoryApi {
   /// A fresh key for one intent (one tap). Keep it and send it again when retrying that same tap.
   static String newKey() => 'inv-${List.generate(16, (_) => _rand.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
 
-  Future<Map<String, dynamic>> _send(String method, String path, {Object? body, String? key, Map<String, String>? query}) async {
-    final token = _token();
-    if (token == null) throw const PartnerApiException(401, 'Sign in to continue.');
-    final q = {'location_id': ?locationId, ...?query}..removeWhere((_, v) => v.isEmpty);
-    var uri = Uri.parse('$_base/api/partner/inventory$path');
-    if (q.isNotEmpty) uri = uri.replace(queryParameters: q);
-    final headers = {
-      'Authorization': 'Bearer $token',
-      if (body != null) 'Content-Type': 'application/json',
-      'Idempotency-Key': ?key,
-    };
-    final res = await (method == 'GET' ? _http.get(uri, headers: headers) : _http.post(uri, headers: headers, body: body == null ? null : jsonEncode(body)))
-        .timeout(const Duration(seconds: 30));
-    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
-    final map = decoded is Map ? decoded.cast<String, dynamic>() : <String, dynamic>{};
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw InventoryApiException(res.statusCode, (map['detail'] as String?) ?? 'Something went wrong. Please try again.', map['code'] as String?);
+  Future<Map<String, dynamic>> _call(String fn, Map<String, Object?> args, {String? key}) async {
+    final body = <String, dynamic>{
+      if (locationId != null && locationId!.isNotEmpty) 'location_id': locationId,
+      ...args,
+    }..removeWhere((_, v) => v == null);
+    try {
+      return await _rpc.callMap(fn, body, key);
+    } on RpcException catch (e) {
+      throw InventoryApiException(e.status, e.message, e.code);
     }
-    return map;
   }
 
-  Future<Facts> options() async => Facts(await _send('GET', '/options'));
-  Future<Facts> dashboard() async => Facts(await _send('GET', '/dashboard'));
+  Future<Facts> options() async => Facts(await _call('inv_options', {}));
+  Future<Facts> dashboard() async => Facts(await _call('inv_dashboard', {}));
 
-  Future<Facts> stock({String filter = 'all', String q = '', String category = '', int page = 1, int pageSize = 8}) async => Facts(await _send('GET', '/stock',
-      query: {'filter': filter, 'q': q.trim(), 'category': category, 'page': '$page', 'page_size': '$pageSize'}));
+  Future<Facts> stock({String filter = 'all', String q = '', String category = '', int page = 1, int pageSize = 8}) async =>
+      Facts(await _call('inv_stock_list', {'filter': filter, 'q': q.trim(), 'category': category, 'page': page, 'page_size': pageSize}));
 
-  Future<Facts> stockDetail(String itemId) async => Facts(await _send('GET', '/stock/$itemId'));
+  Future<Facts> stockDetail(String itemId) async => Facts(await _call('inv_stock_detail', {'item_id': itemId}));
 
   Future<List<Facts>> movements({String? itemId, int? beforeId, int limit = 30}) async {
-    final r = await _send('GET', '/movements', query: {'item_id': ?itemId, if (beforeId != null) 'before_id': '$beforeId', 'limit': '$limit'});
+    final r = await _call('inv_movement_list', {'item_id': itemId, 'before_id': beforeId, 'limit': limit});
     return Facts(r).l('movements');
   }
 
-  Future<Facts> movement(int id) async => Facts(await _send('GET', '/movements/$id'));
+  Future<Facts> movement(int id) async => Facts(await _call('inv_movement_detail', {'id': id}));
 
   Future<List<Facts>> documents(String type, {List<String> statuses = const [], String scope = 'all', String q = '', int limit = 20}) async {
-    final r = await _send('GET', '/documents',
-        query: {'doc_type': type, 'statuses': statuses.join(','), 'scope': scope, 'q': q.trim(), 'limit': '$limit'});
+    final r = await _call('inv_document_list', {'doc_type': type, 'statuses': statuses.isEmpty ? null : statuses, 'scope': scope, 'q': q.trim(), 'limit': limit});
     return Facts(r).l('documents');
   }
 
-  Future<InvDocument> document(String id) async => InvDocument(await _send('GET', '/documents/$id'));
+  Future<InvDocument> document(String id) async => InvDocument(await _call('inv_document_view', {'id': id}));
 
   /// Creates a draft. [fields] are header fields (title, reason, note, supplier_name, po_ref, invoice_ref, expected_at, to_location_id, operator_id).
   Future<InvDocument> createDraft(String type, {Map<String, Object?> fields = const {}, List<DraftLine>? lines, required String key}) async =>
-      InvDocument(await _send('POST', '/documents', key: key, body: {
+      InvDocument(await _call('inv_document_save', {
         'doc_type': type,
         ...fields,
         if (lines != null) 'lines': lines.map((l) => l.toJson()).toList(),
-      }));
+      }, key: key));
 
   /// Saves a draft the person opened at [version]. Only the fields and lines sent change.
   Future<InvDocument> saveDraft(String id, {required int version, Map<String, Object?> fields = const {}, List<DraftLine>? lines}) async =>
-      InvDocument(await _send('POST', '/documents/$id', body: {
+      InvDocument(await _call('inv_document_save', {
+        'id': id,
         'version': version,
         ...fields,
         if (lines != null) 'lines': lines.map((l) => l.toJson()).toList(),
@@ -170,14 +156,14 @@ class InventoryApi {
 
   /// submit / approve / reject / post / dispatch / receive / return / reopen / complete / cancel.
   Future<InvDocument> act(String id, String action, {required int version, String? note, String? key}) async =>
-      InvDocument(await _send('POST', '/documents/$id/act', key: key ?? newKey(), body: {'action': action, 'version': version, 'note': ?note}));
+      InvDocument(await _call('inv_document_act', {'id': id, 'action': action, 'version': version, 'note': note}, key: key ?? newKey()));
 
   /// From an audit in review or completed: one adjustment draft for its variances (the same one again if it exists).
   Future<InvDocument> adjustmentFromAudit(String auditId, {String? key}) async =>
-      InvDocument(await _send('POST', '/documents/$auditId/adjustment-draft', key: key ?? newKey()));
+      InvDocument(await _call('inv_audit_to_adjustment', {'id': auditId}, key: key ?? newKey()));
 
   Future<Facts> forecast(String itemId, {int days = 7, num? demandPerDay}) async =>
-      Facts(await _send('GET', '/forecast', query: {'item_id': itemId, 'days': '$days', if (demandPerDay != null) 'demand_per_day': '$demandPerDay'}));
+      Facts(await _call('inv_forecast', {'item_id': itemId, 'days': days, 'demand_per_day': demandPerDay}));
 }
 
 class InventoryApiException extends PartnerApiException {

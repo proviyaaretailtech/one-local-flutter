@@ -37,16 +37,16 @@ void main() {
           baseUrl: 'http://frames.local',
           accessToken: () => 'frames',
           client: MockClient((r) async {
-            final p = r.url.path.replaceFirst('/api/partner/inventory', '');
-            if (p == '/options') return ok(fx['options']);
-            if (p == '/dashboard') return ok(fx['dashboard']);
-            if (p == '/stock') return ok(fx['stock_list']);
-            if (p.startsWith('/stock/')) return ok(fx['stock_detail']);
-            if (p == '/movements') return ok(fx['movements']);
-            if (p.startsWith('/movements/')) return ok(fx['movement']);
-            if (p == '/forecast') return ok(fx['forecast']);
-            if (p == '/documents') return ok({'documents': [row(fx[docKey] as Map<String, dynamic>)]});
-            if (p.startsWith('/documents/')) return ok(fx[docKey]);
+            final p = r.url.path.split('/').last;
+            if (p == 'inv_options') return ok(fx['options']);
+            if (p == 'inv_dashboard') return ok(fx['dashboard']);
+            if (p == 'inv_stock_list') return ok(fx['stock_list']);
+            if (p == 'inv_stock_detail') return ok(fx['stock_detail']);
+            if (p == 'inv_movement_list') return ok(fx['movements']);
+            if (p == 'inv_movement_detail') return ok(fx['movement']);
+            if (p == 'inv_forecast') return ok(fx['forecast']);
+            if (p == 'inv_document_list') return ok({'documents': [row(fx[docKey] as Map<String, dynamic>)]});
+            if (p == 'inv_document_view') return ok(fx[docKey]);
             return http.Response('{}', 404);
           }),
         ),

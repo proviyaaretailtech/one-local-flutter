@@ -25,11 +25,9 @@ grn_open, grn_list, grn_view, grn_matching_view, grn_invoice_save, grn_costs_sav
 (grn_decide posts the receipt through section H's inv_document_act.) Errors use prefixes GRN_, POS_, INV_: all already mapped in db.ts.
 
 ## Seen on the local database from other sections (not in the two branches above)
-Section H (inventory): inv_dashboard, inv_stock_list, inv_stock_detail, inv_options, inv_movement_list, inv_movement_detail, inv_document_list, inv_document_view,
-inv_document_save, inv_document_act, inv_audit_to_adjustment, inv_forecast.
+Section H (inventory): now in the manifest (all twelve inv_ functions), audited and in the cross-tenant e2e.
 Section I (services): svc_catalogue, svc_quote, svc_calendar, svc_slots, svc_book, svc_appointment_view, svc_appointment_act, svc_bill, svc_history.
 Section J (back office): backoffice_low_stock, purchase_suggestions_refresh, purchase_suggestions_list, purchase_suggestions_close.
-The review of section H found a temp-table trick in some inventory function: it must be fixed in the database first; the audit script fails on a body that creates a temp table.
 
 ## Never through the gateway (service role or a third party)
 ol_partner_act (replaced by gw_online_order_act), pos_start_online_payment, pos_online_payment_status, partner_app_save_tax / save_bank / attach_document /

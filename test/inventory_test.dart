@@ -30,6 +30,11 @@ http.Response ok(Object body) => http.Response(jsonEncode(body), 200, headers: {
 http.Response err(int status, String detail, [String? code]) =>
     http.Response(jsonEncode({'detail': detail, 'code': ?code}), status, headers: {'content-type': 'application/json; charset=utf-8'});
 
+String fnOf(http.Request r) => r.url.path.split('/').last;
+Map<String, dynamic> argsOf(http.Request r) => jsonDecode(r.body) as Map<String, dynamic>;
+const _writeFns = {'inv_document_save', 'inv_document_act', 'inv_audit_to_adjustment'};
+bool isWrite(http.Request r) => _writeFns.contains(fnOf(r));
+
 /// Fake server: records each request and answers from [handler], falling back to the fixtures for reads.
 class Fake {
   Fake([http.Response? Function(http.Request r)? handler]) : _handler = handler;
@@ -43,22 +48,21 @@ class Fake {
       requests.add(r);
       final custom = _handler?.call(r);
       if (custom != null) return custom;
-      final p = r.url.path.replaceFirst('/api/partner/inventory', '');
-      if (p == '/options') return ok(fx['options']);
-      if (p == '/dashboard') return ok(fx['dashboard']);
-      if (p == '/stock') return ok(fx['stock_list']);
-      if (p.startsWith('/stock/')) return ok(fx['stock_detail']);
-      if (p == '/movements') return ok(fx['movements']);
-      if (p.startsWith('/movements/')) return ok(fx['movement']);
-      if (p == '/documents' && r.method == 'GET') return ok(fx['documents_receipt']);
-      if (p == '/forecast') return ok(fx['forecast']);
+      final p = fnOf(r);
+      if (p == 'inv_options') return ok(fx['options']);
+      if (p == 'inv_dashboard') return ok(fx['dashboard']);
+      if (p == 'inv_stock_list') return ok(fx['stock_list']);
+      if (p == 'inv_stock_detail') return ok(fx['stock_detail']);
+      if (p == 'inv_movement_list') return ok(fx['movements']);
+      if (p == 'inv_movement_detail') return ok(fx['movement']);
+      if (p == 'inv_document_list') return ok(fx['documents_receipt']);
+      if (p == 'inv_forecast') return ok(fx['forecast']);
       return err(404, 'not found: $p');
     }),
   );
 
-  Iterable<http.Request> where(String method, String pathEnd) => requests.where((r) => r.method == method && r.url.path.endsWith(pathEnd));
   Map<String, dynamic> body(http.Request r) => jsonDecode(r.body) as Map<String, dynamic>;
-  http.Request get lastPost => requests.lastWhere((r) => r.method == 'POST');
+  http.Request get lastPost => requests.lastWhere(isWrite);
 }
 
 Future<void> showTall(WidgetTester t, Widget screen) async {
@@ -91,7 +95,9 @@ void main() {
       s.api.locationId = 'loc-1';
       final d = await s.api.dashboard();
       final r = s.requests.single;
-      expect(r.url.toString(), 'http://inv.test/api/partner/inventory/dashboard?location_id=loc-1');
+      expect(r.method, 'POST');
+      expect(r.url.toString(), 'http://inv.test/rpc/inv_dashboard');
+      expect(argsOf(r), {'location_id': 'loc-1'});
       expect(r.headers['Authorization'], 'Bearer token-123');
       expect(d.m('counts').n('total'), 2);
       expect(d.m('location').s('name'), 'Latur Main Branch');
@@ -100,7 +106,8 @@ void main() {
     test('stock list sends filter, search, category and page', () async {
       final s = Fake();
       await s.api.stock(filter: 'low', q: ' cola ', category: 'Beverages', page: 2);
-      expect(s.requests.single.url.queryParameters, {'filter': 'low', 'q': 'cola', 'category': 'Beverages', 'page': '2', 'page_size': '8'});
+      expect(s.requests.single.url.path, '/rpc/inv_stock_list');
+      expect(argsOf(s.requests.single), {'filter': 'low', 'q': 'cola', 'category': 'Beverages', 'page': 2, 'page_size': 8});
     });
 
     test('creating a draft sends the key, the type and only ids and quantities', () async {
@@ -109,7 +116,7 @@ void main() {
       final d = await s.api.createDraft('receipt', fields: {'supplier_name': 'Coca-Cola Bottling'}, lines: [line], key: 'inv-abc');
       final r = s.requests.single;
       expect(r.method, 'POST');
-      expect(r.url.path, '/api/partner/inventory/documents');
+      expect(r.url.path, '/rpc/inv_document_save');
       expect(r.headers['Idempotency-Key'], 'inv-abc');
       expect(s.body(r), {
         'doc_type': 'receipt',
@@ -124,12 +131,12 @@ void main() {
     test('saving a draft carries the version the person saw; an action carries its own key', () async {
       final s = Fake((r) => ok(fx['receipt_draft']));
       await s.api.saveDraft('doc-1', version: 4, fields: {'note': 'x'});
-      expect(s.body(s.lastPost), {'version': 4, 'note': 'x'});
-      expect(s.requests.last.url.path, '/api/partner/inventory/documents/doc-1');
+      expect(s.body(s.lastPost), {'id': 'doc-1', 'version': 4, 'note': 'x'});
+      expect(s.requests.last.url.path, '/rpc/inv_document_save');
       await s.api.act('doc-1', 'submit', version: 4, key: 'inv-k1');
-      expect(s.requests.last.url.path, '/api/partner/inventory/documents/doc-1/act');
+      expect(s.requests.last.url.path, '/rpc/inv_document_act');
       expect(s.requests.last.headers['Idempotency-Key'], 'inv-k1');
-      expect(s.body(s.lastPost), {'action': 'submit', 'version': 4});
+      expect(s.body(s.lastPost), {'id': 'doc-1', 'action': 'submit', 'version': 4});
       await s.api.act('doc-1', 'reject', version: 5, note: 'why');
       expect(s.requests.last.headers['Idempotency-Key'], startsWith('inv-'));
       expect(s.body(s.lastPost)['note'], 'why');
@@ -241,11 +248,11 @@ void main() {
       await showTall(t, StockListScreen(env: InvEnv(api: s.api)));
       await t.tap(find.byKey(const ValueKey('chip-low')));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['filter'], 'low');
+      expect(argsOf(s.requests.last)['filter'], 'low');
       await t.enterText(find.byType(TextField), 'cola');
       await t.pump(const Duration(milliseconds: 400));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['q'], 'cola');
+      expect(argsOf(s.requests.last)['q'], 'cola');
     });
 
     testWidgets('tapping an item opens its detail', (t) async {
@@ -254,7 +261,7 @@ void main() {
       await t.tap(find.text('Paneer'));
       await t.pumpAndSettle();
       expect(find.byType(StockDetailScreen), findsOneWidget);
-      expect(s.where('GET', '/stock/40b00000-0000-0000-0000-000000000002'), hasLength(1));
+      expect(s.requests.where((r) => fnOf(r) == 'inv_stock_detail' && argsOf(r)['item_id'] == '40b00000-0000-0000-0000-000000000002'), hasLength(1));
     });
 
     testWidgets('export is honest about not being built', (t) async {
@@ -313,9 +320,9 @@ void main() {
   group('Receiving (Figma "Receiving")', () {
     http.Response? route(http.Request r, {String status = 'draft'}) {
       final key = status == 'review' ? 'receipt_review' : 'receipt_draft';
-      final p = r.url.path.replaceFirst('/api/partner/inventory', '');
-      if (p == '/documents' && r.method == 'GET') return ok(docList('receipt', [row(doc(key))]));
-      if (p.startsWith('/documents/') && r.method == 'GET') return ok(doc(key));
+      final p = fnOf(r);
+      if (p == 'inv_document_list') return ok(docList('receipt', [row(doc(key))]));
+      if (p == 'inv_document_view') return ok(doc(key));
       return null;
     }
 
@@ -334,37 +341,37 @@ void main() {
     testWidgets('Send to GRN Review saves the draft, then submits it with the version and a key', (t) async {
       final s = Fake((r) {
         final base = route(r);
-        if (r.method == 'POST' && r.url.path.endsWith('/act')) return ok(doc('receipt_review'));
-        if (r.method == 'POST') return ok(doc('receipt_draft', version: 3));
+        if (fnOf(r) == 'inv_document_act') return ok(doc('receipt_review'));
+        if (isWrite(r)) return ok(doc('receipt_draft', version: 3));
         return base;
       });
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
       await t.tap(find.text('Send to GRN Review'));
       await t.pumpAndSettle();
-      final posts = s.requests.where((r) => r.method == 'POST').toList();
+      final posts = s.requests.where(isWrite).toList();
       expect(posts, hasLength(2));
       expect(s.body(posts[0])['version'], (fx['receipt_draft'] as Map)['version']);
       expect(s.body(posts[0])['lines'], isA<List>());
-      expect(s.body(posts[1]), {'action': 'submit', 'version': 3});
+      expect(s.body(posts[1]), allOf(containsPair('action', 'submit'), containsPair('version', 3)));
       expect(posts[1].headers['Idempotency-Key'], startsWith('inv-'));
       expect(toast('Sent to GRN review. Stock changes when the receipt is posted.'), findsOneWidget);
     });
 
     testWidgets('a stale version shows the server message and reloads the document', (t) async {
       final s = Fake((r) {
-        if (r.method == 'POST') return err(409, 'INV_STALE: someone changed RCV-002 since you opened it', 'version_conflict');
+        if (isWrite(r)) return err(409, 'INV_STALE: someone changed RCV-002 since you opened it', 'version_conflict');
         return route(r);
       });
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
       await t.tap(find.text('Save Draft'));
       await t.pumpAndSettle();
       expect(toast('INV_STALE: someone changed RCV-002 since you opened it'), findsOneWidget);
-      expect(s.requests.where((r) => r.method == 'GET' && r.url.path.contains('/documents/')), isNotEmpty);
+      expect(s.requests.where((r) => fnOf(r) == 'inv_document_view'), isNotEmpty);
     });
 
     testWidgets('a receipt in review offers Post Receipt only when the server allows it', (t) async {
       final s = Fake((r) {
-        if (r.method == 'POST') return ok(doc('receipt_posted'));
+        if (isWrite(r)) return ok(doc('receipt_posted'));
         return route(r, status: 'review');
       });
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api), documentId: (fx['receipt_review'] as Map)['id'] as String));
@@ -385,8 +392,8 @@ void main() {
 
     testWidgets('no open receipt: say so and offer to start one', (t) async {
       final s = Fake((r) {
-        final p = r.url.path;
-        if (p.endsWith('/documents') && r.method == 'GET') return ok(docList('receipt', []));
+        final p = fnOf(r);
+        if (p == 'inv_document_list') return ok(docList('receipt', []));
         return null;
       });
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
@@ -396,9 +403,9 @@ void main() {
 
   group('Adjustment (Figma "Adjustment")', () {
     http.Response? route(http.Request r, {String key = 'adjustment_draft', String? status}) {
-      final p = r.url.path.replaceFirst('/api/partner/inventory', '');
-      if (p == '/documents' && r.method == 'GET') return ok(docList('adjustment', [row(doc(key, status: status))]));
-      if (p.startsWith('/documents/') && r.method == 'GET') return ok(doc(key, status: status));
+      final p = fnOf(r);
+      if (p == 'inv_document_list') return ok(docList('adjustment', [row(doc(key, status: status))]));
+      if (p == 'inv_document_view') return ok(doc(key, status: status));
       return null;
     }
 
@@ -416,27 +423,26 @@ void main() {
     testWidgets('Submit for Approval saves then submits, and says stock has not changed', (t) async {
       final s = Fake((r) {
         final base = route(r);
-        if (r.method == 'POST' && r.url.path.endsWith('/act')) return ok(doc('adjustment_awaiting'));
-        if (r.method == 'POST') return ok(doc('adjustment_draft', version: 5));
+        if (fnOf(r) == 'inv_document_act') return ok(doc('adjustment_awaiting'));
+        if (isWrite(r)) return ok(doc('adjustment_draft', version: 5));
         return base;
       });
       await showTall(t, AdjustmentScreen(env: InvEnv(api: s.api)));
       await t.tap(find.text('Submit for Approval'));
       await t.pumpAndSettle();
-      final posts = s.requests.where((r) => r.method == 'POST').toList();
+      final posts = s.requests.where(isWrite).toList();
       expect(posts, hasLength(2));
       expect(s.body(posts[0])['lines'][0]['adjust_type'], 'decrease');
-      expect(s.body(posts[1]), {'action': 'submit', 'version': 5});
+      expect(s.body(posts[1]), allOf(containsPair('action', 'submit'), containsPair('version', 5)));
       expect(toast('Submitted for approval. Stock has not changed yet.'), findsOneWidget);
     });
 
     testWidgets('an approver sees Approve and Send Back', (t) async {
       final withApprove = doc('adjustment_awaiting', actions: ['approve', 'reject', 'cancel']);
       final s1 = Fake((r) {
-        final p = r.url.path;
-        if (r.method == 'GET' && p.endsWith('/documents')) return ok(docList('adjustment', [row(withApprove)]));
-        if (r.method == 'GET' && p.contains('/documents/')) return ok(withApprove);
-        if (r.method == 'POST') return ok(doc('adjustment_posted'));
+        if (fnOf(r) == 'inv_document_list') return ok(docList('adjustment', [row(withApprove)]));
+        if (fnOf(r) == 'inv_document_view') return ok(withApprove);
+        if (isWrite(r)) return ok(doc('adjustment_posted'));
         return null;
       });
       await showTall(t, AdjustmentScreen(env: InvEnv(api: s1.api)));
@@ -458,9 +464,9 @@ void main() {
 
   group('Transfer (Figma "Transfer")', () {
     http.Response? route(http.Request r, {String key = 'transfer_draft'}) {
-      final p = r.url.path.replaceFirst('/api/partner/inventory', '');
-      if (p == '/documents' && r.method == 'GET') return ok(docList('transfer', [row(doc(key))]));
-      if (p.startsWith('/documents/') && r.method == 'GET') return ok(doc(key));
+      final p = fnOf(r);
+      if (p == 'inv_document_list') return ok(docList('transfer', [row(doc(key))]));
+      if (p == 'inv_document_view') return ok(doc(key));
       return null;
     }
 
@@ -477,24 +483,24 @@ void main() {
     testWidgets('Review Transfer asks first, then saves and posts', (t) async {
       final s = Fake((r) {
         final base = route(r);
-        if (r.method == 'POST' && r.url.path.endsWith('/act')) return ok(doc('transfer_posted'));
-        if (r.method == 'POST') return ok(doc('transfer_draft', version: 7));
+        if (fnOf(r) == 'inv_document_act') return ok(doc('transfer_posted'));
+        if (isWrite(r)) return ok(doc('transfer_draft', version: 7));
         return base;
       });
       await showTall(t, TransferScreen(env: InvEnv(api: s.api)));
       await t.tap(find.text('Review Transfer'));
       await t.pumpAndSettle();
       expect(find.text('Post transfer?'), findsOneWidget);
-      expect(s.requests.where((r) => r.method == 'POST'), isEmpty, reason: 'nothing is sent before the person confirms');
+      expect(s.requests.where(isWrite), isEmpty, reason: 'nothing is sent before the person confirms');
       await t.tap(find.text('Post transfer'));
       await t.pumpAndSettle();
-      expect(s.body(s.lastPost), {'action': 'post', 'version': 7});
+      expect(s.body(s.lastPost), allOf(containsPair('action', 'post'), containsPair('version', 7)));
       expect(toast('Transfer posted.'), findsOneWidget);
     });
 
     testWidgets('an in-transit transfer offers Receive Transfer', (t) async {
       final s = Fake((r) {
-        if (r.method == 'POST') return ok(doc('transfer_posted'));
+        if (isWrite(r)) return ok(doc('transfer_posted'));
         return route(r, key: 'transfer_in_transit');
       });
       await showTall(t, TransferScreen(env: InvEnv(api: s.api)));
@@ -506,9 +512,9 @@ void main() {
 
   group('Stock audit (Figma "Stock Audit")', () {
     http.Response? route(http.Request r, {String key = 'audit_review'}) {
-      final p = r.url.path.replaceFirst('/api/partner/inventory', '');
-      if (p == '/documents' && r.method == 'GET') return ok(docList('audit', [row(doc(key))]));
-      if (p.startsWith('/documents/') && r.method == 'GET') return ok(doc(key));
+      final p = fnOf(r);
+      if (p == 'inv_document_list') return ok(docList('audit', [row(doc(key))]));
+      if (p == 'inv_document_view') return ok(doc(key));
       return null;
     }
 
@@ -526,24 +532,23 @@ void main() {
 
     testWidgets('in review with a variance: Create Adjustment Draft calls the server once and opens the adjustment', (t) async {
       final s = Fake((r) {
-        final p = r.url.path;
-        if (r.method == 'POST' && p.endsWith('/adjustment-draft')) return ok(doc('adjustment_from_audit'));
-        if (r.method == 'GET' && p.endsWith('/documents')) return ok(docList('audit', [row(doc('audit_review'))]));
-        if (r.method == 'GET' && p.contains('/documents/${(fx['adjustment_from_audit'] as Map)['id']}')) return ok(doc('adjustment_from_audit'));
-        if (r.method == 'GET' && p.contains('/documents/')) return ok(doc('audit_review'));
+        if (fnOf(r) == 'inv_audit_to_adjustment') return ok(doc('adjustment_from_audit'));
+        if (fnOf(r) == 'inv_document_list') return ok(docList('audit', [row(doc('audit_review'))]));
+        if (fnOf(r) == 'inv_document_view' && argsOf(r)['id'] == (fx['adjustment_from_audit'] as Map)['id']) return ok(doc('adjustment_from_audit'));
+        if (fnOf(r) == 'inv_document_view') return ok(doc('audit_review'));
         return null;
       });
       await showTall(t, AuditScreen(env: InvEnv(api: s.api)));
       await t.tap(find.text('Create Adjustment Draft'));
       await t.pumpAndSettle();
-      expect(s.where('POST', '/adjustment-draft'), hasLength(1));
-      expect(s.where('POST', '/adjustment-draft').single.headers['Idempotency-Key'], startsWith('inv-'));
+      expect(s.requests.where((r) => fnOf(r) == 'inv_audit_to_adjustment'), hasLength(1));
+      expect(s.requests.where((r) => fnOf(r) == 'inv_audit_to_adjustment').single.headers['Idempotency-Key'], startsWith('inv-'));
       expect(find.byType(AdjustmentScreen), findsOneWidget);
     });
 
     testWidgets('no count in progress: offer to start one', (t) async {
       final s = Fake((r) {
-        if (r.method == 'GET' && r.url.path.endsWith('/documents')) return ok(docList('audit', []));
+        if (fnOf(r) == 'inv_document_list') return ok(docList('audit', []));
         return null;
       });
       await showTall(t, AuditScreen(env: InvEnv(api: s.api)));
@@ -561,7 +566,7 @@ void main() {
         expect(find.text(x), findsWidgets, reason: x);
       }
       expect(find.textContaining('Sensitivity · next 7 days'), findsOneWidget);
-      expect(s.requests.last.url.queryParameters['days'], '7');
+      expect(argsOf(s.requests.last)['days'], 7);
     });
 
     testWidgets('a longer horizon and a what-if demand are sent to the server, never saved', (t) async {
@@ -569,14 +574,14 @@ void main() {
       await showTall(t, ForecastScreen(env: InvEnv(api: s.api), itemId: 'x'));
       await t.tap(find.byKey(const ValueKey('chip-14')));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['days'], '14');
+      expect(argsOf(s.requests.last)['days'], 14);
       await t.tap(find.text('Edit Assumptions'));
       await t.pumpAndSettle();
       await t.enterText(find.byType(TextField).last, '14');
       await t.tap(find.text('Apply'));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['demand_per_day'], '14');
-      expect(s.requests.where((r) => r.method == 'POST'), isEmpty);
+      expect(argsOf(s.requests.last)['demand_per_day'], 14);
+      expect(s.requests.where(isWrite), isEmpty);
     });
   });
 

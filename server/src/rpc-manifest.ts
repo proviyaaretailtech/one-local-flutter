@@ -17,6 +17,7 @@ import type { z } from 'zod';
 import { secureHandlers, withImageLinks, type SecureHandler } from './modules/secure/index.ts';
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
+import * as inv from './schemas/inventory.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -85,6 +86,20 @@ export const MANIFEST: Entry[] = [
   db('pos_refund', { args: 'passthrough', map: P, rate: 'money', idem: true, roles: 'manager roles only' }),
   db('pos_home_online', { args: 'passthrough', map: P, rate: 'read', roles: STAFF }),
   db('pos_home_channel', { args: 'passthrough', map: () => ({}), rate: 'read', roles: STAFF }),
+  // ---- store inventory, section H (0400-0403). Body = the function's `p` object (location_id, ids, filters); the database validates it and
+  //      checks organisation, location and role (inventory:read / record / approve). Writes carry the Idempotency-Key header.
+  db('inv_options', { args: inv.Options, map: P, rate: 'read', roles: 'staff who may see or record stock' }),
+  db('inv_dashboard', { args: inv.Dashboard, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('inv_stock_list', { args: inv.StockList, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('inv_stock_detail', { args: inv.StockDetail, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('inv_movement_list', { args: inv.MovementList, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('inv_movement_detail', { args: inv.MovementDetail, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('inv_document_list', { args: inv.DocumentList, map: P, rate: 'read', roles: 'staff with inventory:read or record' }),
+  db('inv_document_view', { args: inv.DocumentView, map: P, rate: 'read', roles: 'staff with inventory:read or record' }),
+  db('inv_forecast', { args: inv.Forecast, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
+  db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 
