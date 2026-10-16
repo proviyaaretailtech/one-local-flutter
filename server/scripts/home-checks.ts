@@ -1,4 +1,4 @@
-// VINII POS control centre (src/modules/home.ts, GET /api/partner/home and /home/feed) against the LOCAL Supabase from
+// One Local POS control centre (src/modules/home.ts, GET /api/partner/home and /home/feed) against the LOCAL Supabase from
 // .env. Covers: today's sales from bills only (cancelled excluded), top items, active orders with the One Local
 // delivery status and ETA, catalogue gaps, low stock, KOT made on a cancelled bill, goods received, the 7-day feed with the
 // previous period, and tenancy: another organisation sees none of it, a person assigned to one outlet sees only that outlet,

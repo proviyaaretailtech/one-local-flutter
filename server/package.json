@@ -1,8 +1,8 @@
 {
-  "name": "vinii-pos-server",
+  "name": "one-local-pos-server",
   "version": "0.1.0",
   "private": true,
-  "description": "VINII POS backend: one generic endpoint /rpc/<name>: authenticates the app's Supabase session and calls allowlisted database functions as the caller. No business rules live here.",
+  "description": "One Local POS backend: one generic endpoint /rpc/<name>: authenticates the app's Supabase session and calls allowlisted database functions as the caller. No business rules live here.",
   "type": "module",
   "engines": {
     "node": "22.x"

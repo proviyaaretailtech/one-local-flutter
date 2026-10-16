@@ -1,4 +1,4 @@
-// Every endpoint the VINII POS app calls. See ENDPOINTS.md for request/response and the Dart caller of each.
+// Every endpoint the One Local POS app calls. See ENDPOINTS.md for request/response and the Dart caller of each.
 import { add } from './router.ts';
 import { json } from './http.ts';
 import { requireSignedIn, requireStaff } from './staff.ts';

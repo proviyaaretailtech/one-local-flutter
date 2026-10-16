@@ -1,4 +1,4 @@
-// VINII POS section E: the counter bill, the order lifecycle after payment and the order history (spec: specs/pos-section-e-orders in the
+// One Local POS section E: the counter bill, the order lifecycle after payment and the order history (spec: specs/pos-section-e-orders in the
 // workspace root; database: migration 0370).
 //
 //   GET  /api/partner/pos-orders?filter=all|completed|pending|cancelled&q=   history          pos_order_history

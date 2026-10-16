@@ -1,4 +1,4 @@
-# Endpoints the VINII POS app calls
+# Endpoints the One Local POS app calls
 
 Base URL: `--dart-define=PARTNER_API_BASE_URL=http://<host>:8090`. Every call (except `/health` and the webhooks) sends `Authorization: Bearer <Supabase access token>`. No other key is in the app.
 Errors are always `{ "detail": "<sentence the app shows>", "code"?: "<machine reason>" }` with the HTTP status. 401 = not signed in, 403 = the database refused the person, 404 = not found / not on the list, 429 = rate limited (`Retry-After`).

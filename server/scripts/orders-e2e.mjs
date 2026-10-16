@@ -1,4 +1,4 @@
-// E2E: VINII POS section E over HTTP against the standalone POS server (routes /api/partner/pos-orders/*), as two real signed-in
+// E2E: One Local POS section E over HTTP against the standalone POS server (routes /api/partner/pos-orders/*), as two real signed-in
 // staff members of two different businesses. LOCAL ONLY. Tags its orders 'ZZ-TEST' and purges them, its users and its businesses at the end.
 // Usage (from new-mobile-flutter/server, server running):  node scripts/orders-e2e.mjs   (POS_API overrides the address; keys read from ./.env, never printed)
 import { readFileSync } from 'node:fs';

@@ -1,4 +1,4 @@
-# VINII POS server
+# One Local POS server
 
 The POS app's own small backend. Standalone: it imports nothing from the One Local customer app (OL-ui). Node + TypeScript, three dependencies (`@supabase/supabase-js`, `zod`, and `typescript` for type checks). Node 22.18+ runs the `.ts` files directly; there is no build step.
 

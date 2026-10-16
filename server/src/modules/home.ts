@@ -1,4 +1,4 @@
-// VINII POS control centre (Figma section D): the store dashboard and the owner's sales feed.
+// One Local POS control centre (Figma section D): the store dashboard and the owner's sales feed.
 // Read-only. Every query is scoped to the caller's organisation, and to the outlets they are
 // assigned to in org_user_locations when they have any assignment. Numbers come straight from the
 // source tables (Commerce = orders/order_items, Inventory = inventory_* / pos_raw_materials,

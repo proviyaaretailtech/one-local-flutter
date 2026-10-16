@@ -18,5 +18,5 @@ git init -q -b main
 git add -A
 GIT_AUTHOR_NAME=proviyaaretailtech GIT_AUTHOR_EMAIL=339435687+proviyaaretailtech@users.noreply.github.com \
 GIT_COMMITTER_NAME=proviyaaretailtech GIT_COMMITTER_EMAIL=339435687+proviyaaretailtech@users.noreply.github.com \
-git commit -q -m "VINII POS server: one generic /rpc endpoint, Vercel entry"
+git commit -q -m "One Local POS server: one generic /rpc endpoint, Vercel entry"
 echo "snapshot ready in $DEST (1 commit, author proviyaaretailtech). Create proviyaaretailtech/pos-server on GitHub and push it yourself."
