@@ -29,12 +29,13 @@ Future<void> _open(WidgetTester t, SetupApi api) async {
 void main() {
   tearDown(HomeNav.reset);
 
-  test('installRoutes plugs setup, home, orders and the bill into the control centre', () {
+  test('installRoutes plugs setup, home, orders, the bill and stock (list and one item) into the control centre', () {
     HomeNav.reset();
     installRoutes();
-    expect([HomeNav.home, HomeNav.setup, HomeNav.orders, HomeNav.orderHistory, HomeNav.bill], everyElement(isNotNull));
-    expect(HomeNav.items, isNotNull); // section G
-    expect(HomeNav.stock, isNull); // later phases still say "later release"
+    expect([HomeNav.home, HomeNav.setup, HomeNav.orders, HomeNav.orderHistory, HomeNav.bill, HomeNav.stock, HomeNav.stockItem, HomeNav.items], everyElement(isNotNull)); // sections E, F, G, H
+    HomeNav.reset();
+    expect(HomeNav.stockItem, isNull);
+    expect(HomeNav.items, isNull);
   });
 
   group('Continue to store', () {

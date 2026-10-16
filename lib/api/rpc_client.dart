@@ -34,7 +34,7 @@ class RpcClient {
     final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       final detail = decoded is Map ? decoded['detail'] as String? : null;
-      throw PartnerApiException(res.statusCode, detail ?? 'Something went wrong. Please try again.');
+      throw RpcException(res.statusCode, detail ?? 'Something went wrong. Please try again.', decoded is Map ? decoded['code'] as String? : null);
     }
     return decoded;
   }
@@ -44,4 +44,10 @@ class RpcClient {
     final r = await call(fn, args, idempotencyKey);
     return r is Map ? r.cast<String, dynamic>() : <String, dynamic>{};
   }
+}
+
+/// A [PartnerApiException] that also keeps the server's machine-readable `code` (for example `version_conflict`), so a screen can react to it.
+class RpcException extends PartnerApiException {
+  const RpcException(super.status, super.message, this.code);
+  final String? code;
 }
