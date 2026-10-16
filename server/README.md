@@ -45,7 +45,7 @@ src/auth.ts         verifies the Bearer token with Supabase Auth (cached 60 s)
 src/staff.ts        requireStaff (org_users + roles) / requireUser (onboarding, setup)
 src/db.ts           service-role client, userClient (as the caller), rpc, OL_* error -> HTTP status
 src/config.ts       env guard (local only), key lookup
-src/modules/        me, onboarding, setup, home, orders
+src/modules/        me, onboarding, setup, home, orders, catalogue, grn (pos_db.ts: call database functions as the caller)
 scripts/            home-checks.ts, orders-e2e.mjs   (the python walks are in ../tool/)
 tests/unit/         router, errors, limits, redaction (no database)
 ```

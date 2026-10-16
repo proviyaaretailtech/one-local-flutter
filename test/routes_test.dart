@@ -33,7 +33,8 @@ void main() {
     HomeNav.reset();
     installRoutes();
     expect([HomeNav.home, HomeNav.setup, HomeNav.orders, HomeNav.orderHistory, HomeNav.bill], everyElement(isNotNull));
-    expect(HomeNav.items, isNull); // later phases still say "later release"
+    expect(HomeNav.items, isNotNull); // section G
+    expect(HomeNav.stock, isNull); // later phases still say "later release"
   });
 
   group('Continue to store', () {
