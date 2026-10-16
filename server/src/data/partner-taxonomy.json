@@ -1,0 +1,468 @@
+{
+ "version": "2026-10-10",
+ "types": [
+  {
+   "id": "store",
+   "title": "Store",
+   "hint": "Groceries & retail"
+  },
+  {
+   "id": "restaurant",
+   "title": "Restaurant",
+   "hint": "Food & dining"
+  },
+  {
+   "id": "service",
+   "title": "Service",
+   "hint": "Home services"
+  },
+  {
+   "id": "logistic",
+   "title": "Logistic",
+   "hint": "Delivery partner"
+  }
+ ],
+ "store": {
+  "families": [
+   {
+    "name": "Shops",
+    "hint": "Retail and specialty shops",
+    "icon": "family-shops",
+    "categories": [
+     {
+      "name": "Fashion",
+      "icon": "shops-fashion",
+      "store": "shops-fashion",
+      "subcategories": [
+       "Men's wear",
+       "Women's western wear",
+       "Women's ethnic wear (sarees, kurtis, Paithani)",
+       "Kids' wear",
+       "Innerwear",
+       "Footwear",
+       "Bags and luggage"
+      ]
+     },
+     {
+      "name": "Accessories",
+      "icon": "shops-accessories",
+      "store": "shops-accessories",
+      "subcategories": [
+       "Watches",
+       "Eyewear / opticals",
+       "Artificial jewellery",
+       "Belts / wallets",
+       "Bag charms"
+      ]
+     },
+     {
+      "name": "Beauty and health",
+      "icon": "shops-beauty-and-health",
+      "store": "service-health",
+      "subcategories": [
+       "Cosmetics and personal care",
+       "Perfumes",
+       "Pharmacy / chemist",
+       "Ayurvedic / herbal",
+       "Surgical and medical devices",
+       "Wellness / supplements / gym nutrition"
+      ]
+     },
+     {
+      "name": "Electronics",
+      "icon": "shops-electronics",
+      "store": "shops-electronics",
+      "subcategories": [
+       "Mobiles",
+       "Mobile accessories",
+       "Electronics / home appliances",
+       "Computers and laptops",
+       "Printers / ink",
+       "CCTV / smart home",
+       "Electricals (bulbs, wires, fans)"
+      ]
+     },
+     {
+      "name": "Home",
+      "icon": "shops-home",
+      "store": "shops-home",
+      "subcategories": [
+       "Home décor",
+       "Furnishing (curtains, bedsheets)",
+       "Kitchenware / utensils",
+       "Crockery / steel",
+       "Furniture",
+       "Mattresses",
+       "Plastic and household items",
+       "Hardware and tools",
+       "Paint",
+       "Sanitary / plumbing items"
+      ]
+     },
+     {
+      "name": "Kids, school and office",
+      "icon": "shops-kids-school-and-office",
+      "store": "shops-kids-school-and-office",
+      "subcategories": [
+       "Toys and games",
+       "Stationery",
+       "Books",
+       "School uniforms",
+       "Office supplies",
+       "Gift shops",
+       "Art and craft"
+      ]
+     },
+     {
+      "name": "Pets and garden",
+      "icon": "shops-pets-and-garden",
+      "store": "service-pet-care",
+      "subcategories": [
+       "Pet store (food, accessories)",
+       "Aquarium / fish",
+       "Nursery / plants",
+       "Seeds and fertilisers"
+      ]
+     },
+     {
+      "name": "Puja and festive",
+      "icon": "shops-puja-and-festive",
+      "store": "shops-puja-and-festive",
+      "subcategories": [
+       "Puja items",
+       "Flowers / garlands",
+       "Rangoli / diyas / lights",
+       "Rakhi / festival seasonal items",
+       "Fireworks (seasonal, local rules apply)",
+       "Party supplies / balloons"
+      ]
+     },
+     {
+      "name": "Sports and hobby",
+      "icon": "shops-sports-and-hobby",
+      "store": "shops-sports-and-hobby",
+      "subcategories": [
+       "Sports goods",
+       "Gym equipment",
+       "Cycles",
+       "Musical instruments"
+      ]
+     },
+     {
+      "name": "Automotive",
+      "icon": "shops-automotive",
+      "store": "shops-automotive",
+      "subcategories": [
+       "Bike / car accessories",
+       "Spare parts",
+       "Helmets",
+       "Lubricants"
+      ]
+     },
+     {
+      "name": "Other",
+      "icon": "shops-other",
+      "store": "shops-other",
+      "subcategories": [
+       "Gift and flower bouquets",
+       "Photo frames / printing",
+       "Watch / mobile covers",
+       "Baby care store"
+      ]
+     }
+    ]
+   },
+   {
+    "name": "Grocery and daily needs",
+    "hint": "Food, essentials and daily supplies",
+    "icon": "family-grocery-and-daily-needs",
+    "categories": [
+     {
+      "name": "Grocery",
+      "icon": "groc-grocery",
+      "store": "grocery-and-daily-needs-grocery",
+      "subcategories": [
+       "Supermarket",
+       "Kirana / general store",
+       "Wholesale / bulk grocery",
+       "Organic store",
+       "Dry fruits and spices",
+       "Masala / flour mill (chakki)",
+       "FMCG"
+      ]
+     },
+     {
+      "name": "Fresh food",
+      "icon": "groc-fresh-food",
+      "store": "grocery-and-daily-needs-fresh-food",
+      "subcategories": [
+       "Fruits",
+       "Vegetables",
+       "Exotic fruits and vegetables",
+       "Flowers (daily puja)"
+      ]
+     },
+     {
+      "name": "Dairy",
+      "icon": "groc-dairy",
+      "store": "grocery-and-daily-needs-dairy",
+      "subcategories": [
+       "Milk",
+       "Curd",
+       "Paneer",
+       "Ghee / butter",
+       "Doodh dairy (daily milk subscription)"
+      ]
+     },
+     {
+      "name": "Meat",
+      "icon": "groc-meat",
+      "store": "grocery-and-daily-needs-meat",
+      "subcategories": [
+       "Poultry (chicken, eggs)",
+       "Mutton",
+       "Fish / seafood",
+       "Frozen non-veg"
+      ]
+     },
+     {
+      "name": "Bakery and sweets",
+      "icon": "groc-bakery-and-sweets",
+      "store": "grocery-and-daily-needs-bakery-and-sweets",
+      "subcategories": [
+       "Bakery (bread, khari, toast)",
+       "Cake shop",
+       "Sweet mart (mithai, farsan)",
+       "Namkeen / chivda",
+       "Chocolates"
+      ]
+     },
+     {
+      "name": "Ready to cook and eat",
+      "icon": "groc-ready-to-cook-and-eat",
+      "store": "grocery-and-daily-needs-ready-to-cook-and-eat",
+      "subcategories": [
+       "Frozen foods",
+       "Pickles / papad",
+       "Homemade snacks (Diwali faral)",
+       "Instant mixes"
+      ]
+     },
+     {
+      "name": "Drinks",
+      "icon": "groc-drinks",
+      "store": "grocery-and-daily-needs-drinks",
+      "subcategories": [
+       "Water cans / bottles",
+       "Cold drinks",
+       "Ice",
+       "Paan shop"
+      ]
+     },
+     {
+      "name": "Household essentials",
+      "icon": "groc-household-essentials",
+      "store": "grocery-and-daily-needs-household-essentials",
+      "subcategories": [
+       "Cleaning supplies",
+       "Toiletries",
+       "Baby products",
+       "Disposables (plates, cups)",
+       "Gas / stove items"
+      ]
+     },
+     {
+      "name": "Daily subscriptions",
+      "icon": "groc-daily-subscriptions",
+      "store": "grocery-and-daily-needs-dairy",
+      "subcategories": [
+       "Milk",
+       "Newspaper",
+       "Bread",
+       "Water can",
+       "Fruits / vegetables box"
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "restaurant": {
+  "types": [
+   {
+    "name": "Indian",
+    "icon": "rest-indian"
+   },
+   {
+    "name": "Biryani",
+    "icon": "rest-biryani"
+   },
+   {
+    "name": "Burger",
+    "icon": "rest-burger"
+   },
+   {
+    "name": "Pizza",
+    "icon": "rest-pizza"
+   },
+   {
+    "name": "South Indian",
+    "icon": "rest-south-indian"
+   },
+   {
+    "name": "Desserts & ice cream",
+    "icon": "rest-desserts-ice-cream"
+   },
+   {
+    "name": "Café",
+    "icon": "rest-cafe"
+   },
+   {
+    "name": "Bakery",
+    "icon": "rest-bakery"
+   },
+   {
+    "name": "Sweets",
+    "icon": "rest-sweets"
+   },
+   {
+    "name": "Late night",
+    "icon": "rest-late-night"
+   }
+  ]
+ },
+ "service": {
+  "categories": [
+   {
+    "name": "Beauty and personal care",
+    "icon": "svc-beauty-and-personal-care",
+    "store": null,
+    "subcategories": [
+     "Makeup artist (bridal / party)",
+     "Salon at home",
+     "Barber / men's grooming",
+     "Mehendi artist",
+     "Nail art"
+    ]
+   },
+   {
+    "name": "Repairs",
+    "icon": "svc-repairs",
+    "store": null,
+    "subcategories": [
+     "Mobile repair",
+     "Laptop / computer repair",
+     "AC repair",
+     "Fridge repair",
+     "Washing machine repair",
+     "RO / water purifier service",
+     "TV repair",
+     "Two-wheeler service",
+     "Car service / wash"
+    ]
+   },
+   {
+    "name": "Home skilled work",
+    "icon": "svc-home-skilled-work",
+    "store": null,
+    "subcategories": [
+     "Electrician",
+     "Plumber",
+     "Carpenter",
+     "Painter",
+     "Mason / tiles",
+     "Welder / fabrication",
+     "Locksmith / key maker",
+     "Glass / aluminium work",
+     "False ceiling / POP"
+    ]
+   },
+   {
+    "name": "Cleaning",
+    "icon": "svc-cleaning",
+    "store": null,
+    "subcategories": [
+     "Home deep cleaning",
+     "Bathroom / kitchen cleaning",
+     "Sofa / carpet cleaning",
+     "Pest control",
+     "Water tank cleaning"
+    ]
+   },
+   {
+    "name": "Daily help",
+    "icon": "svc-daily-help",
+    "store": null,
+    "subcategories": [
+     "Maid / cook",
+     "Driver on call",
+     "Laundry / dry cleaning / ironing",
+     "Tailor / alterations",
+     "Cobbler"
+    ]
+   },
+   {
+    "name": "Events",
+    "icon": "svc-events",
+    "store": null,
+    "subcategories": [
+     "Decorators (birthday, wedding)",
+     "Caterers",
+     "Photographer / videographer",
+     "Pandit / puja services",
+     "DJ / sound",
+     "Tent / mandap",
+     "Event planner"
+    ]
+   },
+   {
+    "name": "Education and fitness",
+    "icon": "svc-education-and-fitness",
+    "store": null,
+    "subcategories": [
+     "Home tutors",
+     "Coaching classes",
+     "Music / dance classes",
+     "Yoga / gym trainer"
+    ]
+   },
+   {
+    "name": "Professional",
+    "icon": "svc-professional",
+    "store": null,
+    "subcategories": [
+     "CA / tax filing",
+     "Insurance agent",
+     "Legal / notary",
+     "Real estate broker",
+     "Packers and movers",
+     "Courier",
+     "Printing / Xerox",
+     "Web / graphic design"
+    ]
+   },
+   {
+    "name": "Health",
+    "icon": "svc-health",
+    "store": "service-health",
+    "subcategories": [
+     "Doctor home visit",
+     "Nurse / caretaker",
+     "Physiotherapist",
+     "Lab test sample collection",
+     "Veterinary doctor"
+    ]
+   },
+   {
+    "name": "Pet care",
+    "icon": "svc-pet-care",
+    "store": "service-pet-care",
+    "subcategories": [
+     "Pet grooming",
+     "Pet boarding / walking",
+     "Pet training"
+    ]
+   }
+  ]
+ }
+}

@@ -4,7 +4,10 @@ import 'auth/auth_repository.dart';
 import 'auth/partner_api.dart';
 import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
+import 'inventory/inventory_dashboard.dart';
+import 'inventory/stock_detail_screen.dart';
 import 'orders/cart_screen.dart';
+import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
 import 'service/calendar_screen.dart';
 import 'setup/setup_api.dart';
@@ -16,6 +19,11 @@ void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
   HomeNav.orders = HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
   HomeNav.bill = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CartScreen(onNavigate: (id) => _tab(c, id))));
+  InvEnv inventoryEnv(BuildContext c) => InvEnv(
+      onNavigate: (id) => _tab(c, id),
+      onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
+  HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
+  HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
   HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Walks one test partner through all of onboarding against the LOCAL stack: sign in, 7 sections, upload, submit.
-Needs: local Supabase, the One Local dev server on :8092, .env.local, .phasea_test_pw. Prints PASS/FAIL lines only, never secrets."""
+Needs: local Supabase, the POS server on :8090 (new-mobile-flutter/server, `npm run dev`), .env.local, .phasea_test_pw. Prints PASS/FAIL lines only, never secrets."""
 import json, os, sys, urllib.request, urllib.error, uuid
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -9,9 +9,9 @@ def env(path, key):
         if l.startswith(key + '='): return l.split('=', 1)[1].strip()
 SB = 'http://127.0.0.1:54321'
 PK = env(os.path.join(ROOT, '.env.local'), 'SUPABASE_PUBLISHABLE_KEY')
-SRK = env(os.path.join(ROOT, '..', 'One Local Mobile App ', 'OL-ui', 'frontend', '.env.local'), 'SUPABASE_SERVICE_ROLE_KEY')
+SRK = env(os.path.join(ROOT, 'server', '.env'), 'SUPABASE_SERVICE_ROLE_KEY')  # the standalone POS server's own env file
 PW = open(os.path.join(ROOT, '.phasea_test_pw')).read().strip()
-API = 'http://localhost:8092'
+API = os.environ.get('POS_API', 'http://localhost:8090')  # the standalone POS server (new-mobile-flutter/server, `npm run dev`)
 EMAIL = 'phasea.onboard@test.local'
 results = []
 
@@ -40,9 +40,21 @@ for u in users.get('users', []):
 s, u = call('POST', f'{SB}/auth/v1/admin/users', {'email': EMAIL, 'password': PW, 'email_confirm': True, 'user_metadata': {'full_name': 'Onboard Tester'}}, admin)
 s, tok = call('POST', f'{SB}/auth/v1/token?grant_type=password', {'email': EMAIL, 'password': PW}, {'apikey': PK})
 H = {'Authorization': 'Bearer ' + tok['access_token']}
-def api(method, path, body=None): return call(method, API + path, body, H)
+# The walk keeps the screen-level call sites; each is sent through the one generic endpoint POST /rpc/<name>.
+RPC = {('GET', '/api/onboarding/application'): 'partner_app_get', ('GET', '/api/onboarding/taxonomy'): 'static_taxonomy',
+       ('PUT', '/api/onboarding/profile'): 'partner_app_save_profile', ('PUT', '/api/onboarding/plan'): 'partner_app_choose_plan',
+       ('PUT', '/api/onboarding/address'): 'partner_app_save_address', ('PUT', '/api/onboarding/tax'): 'partner_app_save_tax',
+       ('PUT', '/api/onboarding/identity'): 'partner_app_save_identity', ('PUT', '/api/onboarding/bank'): 'partner_app_save_bank',
+       ('PUT', '/api/onboarding/consents'): 'partner_app_save_consents', ('PUT', '/api/onboarding/agreement'): 'partner_app_accept_agreement',
+       ('POST', '/api/onboarding/submit'): 'partner_app_submit', ('POST', '/api/onboarding/documents/upload'): 'partner_app_document_slot',
+       ('POST', '/api/onboarding/documents'): 'partner_app_document_attach'}
+def api(method, path, body=None):
+    import re
+    m = re.match(r'/api/onboarding/documents/([a-z_]+)/preview$', path)
+    fn, args = ('partner_app_document_preview', {'kind': m.group(1)}) if m else (RPC[(method, path)], body or {})
+    return call('POST', f'{API}/rpc/{fn}', args, H)
 
-s, _ = call('GET', API + '/api/onboarding/application')
+s, _ = call('POST', API + '/rpc/partner_app_get', {})
 check('no token is refused (401)', s == 401)
 s, d = api('GET', '/api/onboarding/application'); check('a new login has no application yet', s == 200 and d.get('exists') is False)
 s, t = api('GET', '/api/onboarding/taxonomy'); check('lists: categories, states, banks', s == 200 and len(t['states']) > 30 and 'HDFC Bank' in t['banks'] and len(t['store']) > 5)
