@@ -7,6 +7,8 @@ import * as onboarding from './modules/onboarding.ts';
 import * as setup from './modules/setup.ts';
 import * as home from './modules/home.ts';
 import * as orders from './modules/orders.ts';
+import * as catalogue from './modules/catalogue.ts';
+import * as grn from './modules/grn.ts';
 
 add('GET', '/health', () => json({ ok: true }));
 
@@ -68,3 +70,23 @@ add('GET', `${O}/:id`, async (r, p) => { await requireStaff(r); return json(awai
 add('POST', `${O}/:id/pay`, async (r, p) => { await requireStaff(r); return json(await orders.pay(r, p.id)); });
 add('POST', `${O}/:id/cancel`, async (r, p) => { await requireStaff(r); return json(await orders.cancel(r, p.id)); });
 add('POST', `${O}/:id/act`, async (r, p) => json(await orders.actOn(r, await requireStaff(r), p.id)));
+
+// ---- section G: store catalogue and GRN matching (static paths first, then :id)
+const C = '/api/partner/catalogue';
+add('GET', C, async r => { await requireStaff(r); return json(await catalogue.list(r)); });
+add('GET', `${C}/search`, async r => { await requireStaff(r); return json(await catalogue.search(r)); });
+add('GET', `${C}/lookup`, async r => { await requireStaff(r); return json(await catalogue.lookup(r)); });
+add('POST', C, async r => { await requireStaff(r); return json(await catalogue.create(r)); });
+add('GET', `${C}/:id`, async (r, p) => { await requireStaff(r); return json(await catalogue.getOne(r, p.id)); });
+add('PUT', `${C}/:id`, async (r, p) => { await requireStaff(r); return json(await catalogue.update(r, p.id)); });
+
+const G = '/api/partner/grn';
+add('GET', G, async r => { await requireStaff(r); return json(await grn.list(r)); });
+add('POST', `${G}/open`, async r => { await requireStaff(r); return json(await grn.open(r)); });
+add('GET', `${G}/:id`, async (r, p) => { await requireStaff(r); return json(await grn.view(r, p.id)); });
+add('GET', `${G}/:id/matching`, async (r, p) => { await requireStaff(r); return json(await grn.matching(r, p.id)); });
+add('PUT', `${G}/:id/invoice`, async (r, p) => { await requireStaff(r); return json(await grn.saveInvoice(r, p.id)); });
+add('PUT', `${G}/:id/costs`, async (r, p) => { await requireStaff(r); return json(await grn.saveCosts(r, p.id)); });
+add('POST', `${G}/:id/resolve`, async (r, p) => { await requireStaff(r); return json(await grn.resolve(r, p.id)); });
+add('POST', `${G}/:id/request-approval`, async (r, p) => { await requireStaff(r); return json(await grn.requestApproval(r, p.id)); });
+add('POST', `${G}/:id/decide`, async (r, p) => { await requireStaff(r); return json(await grn.decide(r, p.id)); });

@@ -58,6 +58,7 @@ npm run dev                                   # in another terminal, then:
 python3 ../tool/onboarding_e2e.py             # 35 checks, section B
 python3 ../tool/setup_e2e.py                  # 36 checks, section C
 node scripts/orders-e2e.mjs                   # 44 checks, section E (two businesses, tenancy, idempotency, version conflicts)
+node scripts/catalogue-e2e.mjs                # 49 checks, section G (catalogue + GRN over HTTP; needs section H installed)
 BASE_URL=http://localhost:8090 node --env-file=.env scripts/home-checks.ts   # 36 checks, section D
 ```
 
