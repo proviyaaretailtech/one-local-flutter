@@ -1,0 +1,691 @@
+{
+ "t1": {
+  "id": "d2ae0659-070d-4e09-8d17-922f6a4cbe45",
+  "title": "Restock dairy shelf",
+  "due_at": "2026-10-17T07:57:29.147852+00:00",
+  "events": [
+   {
+    "at": "2026-10-17T05:57:29.147852+00:00",
+    "note": "",
+    "actor": "Olivia Owner",
+    "event": "created"
+   }
+  ],
+  "status": "assigned",
+  "overdue": false,
+  "version": 1,
+  "has_time": true,
+  "priority": "medium",
+  "checklist": [],
+  "created_at": "2026-10-17T05:57:29.147852+00:00",
+  "updated_at": "2026-10-17T05:57:29.147852+00:00",
+  "description": "",
+  "location_id": "44000000-0000-0000-0000-00000000010a",
+  "reviewed_at": null,
+  "reviewed_by": null,
+  "assignee_name": "Bina Biller",
+  "assignee_role": "Cashier",
+  "evidence_note": "",
+  "display_status": "assigned",
+  "failure_reason": "",
+  "photo_required": false,
+  "allowed_actions": [
+   "start",
+   "fail",
+   "reassign",
+   "edit",
+   "cancel"
+  ],
+  "created_by_name": "Olivia Owner",
+  "approval_required": true,
+  "assignee_staff_id": "44a00000-0000-0000-0000-000000000001"
+ },
+ "t3": {
+  "id": "aa8fb325-ae8b-4a18-a7af-35e0f19d65bd",
+  "title": "Cycle count - beverages",
+  "due_at": "2026-10-17T02:57:29.147852+00:00",
+  "events": [
+   {
+    "at": "2026-10-17T05:57:29.147852+00:00",
+    "note": "",
+    "actor": "Olivia Owner",
+    "event": "created"
+   }
+  ],
+  "status": "assigned",
+  "overdue": true,
+  "version": 1,
+  "has_time": true,
+  "priority": "medium",
+  "checklist": [],
+  "created_at": "2026-10-17T05:57:29.147852+00:00",
+  "updated_at": "2026-10-17T05:57:29.147852+00:00",
+  "description": "",
+  "location_id": "44000000-0000-0000-0000-00000000020a",
+  "reviewed_at": null,
+  "reviewed_by": null,
+  "assignee_name": "Ankit Verma",
+  "assignee_role": "Cashier",
+  "evidence_note": "",
+  "display_status": "overdue",
+  "failure_reason": "",
+  "photo_required": false,
+  "allowed_actions": [
+   "start",
+   "fail",
+   "reassign",
+   "edit",
+   "cancel"
+  ],
+  "created_by_name": "Olivia Owner",
+  "approval_required": false,
+  "assignee_staff_id": "44a00000-0000-0000-0000-000000000002"
+ },
+ "role": {
+  "name": "Manager",
+  "note": "Role permissions are set by Proviyaa for every business. Ask support to change them.",
+  "slug": "manager",
+  "editable": false,
+  "description": "Operational oversight, configuration and analytics.",
+  "capabilities": [
+   {
+    "key": "view_orders",
+    "title": "View orders",
+    "enabled": true,
+    "subtitle": "See customer and POS orders"
+   },
+   {
+    "key": "accept_orders",
+    "title": "Accept orders",
+    "enabled": true,
+    "subtitle": "Accept, reject, and update status"
+   },
+   {
+    "key": "manage_catalogue",
+    "title": "Manage catalogue",
+    "enabled": true,
+    "subtitle": "Edit products and availability"
+   },
+   {
+    "key": "manage_team",
+    "title": "Manage team",
+    "enabled": false,
+    "subtitle": "Invite staff and change roles"
+   },
+   {
+    "key": "view_finance",
+    "title": "View finance",
+    "enabled": true,
+    "subtitle": "Sales and settlement summaries"
+   }
+  ],
+  "location_bound": true,
+  "permission_count": 69
+ },
+ "task": {
+  "id": "d2ae0659-070d-4e09-8d17-922f6a4cbe45",
+  "title": "Restock dairy shelf",
+  "due_at": "2026-10-17T07:57:29.147852+00:00",
+  "events": [
+   {
+    "at": "2026-10-17T05:57:29.147852+00:00",
+    "note": "",
+    "actor": "Olivia Owner",
+    "event": "created"
+   }
+  ],
+  "status": "assigned",
+  "overdue": false,
+  "version": 1,
+  "has_time": true,
+  "priority": "medium",
+  "checklist": [],
+  "created_at": "2026-10-17T05:57:29.147852+00:00",
+  "updated_at": "2026-10-17T05:57:29.147852+00:00",
+  "description": "",
+  "location_id": "44000000-0000-0000-0000-00000000010a",
+  "reviewed_at": null,
+  "reviewed_by": null,
+  "assignee_name": "Bina Biller",
+  "assignee_role": "Cashier",
+  "evidence_note": "",
+  "display_status": "assigned",
+  "failure_reason": "",
+  "photo_required": false,
+  "allowed_actions": [
+   "start",
+   "fail",
+   "reassign",
+   "edit",
+   "cancel"
+  ],
+  "created_by_name": "Olivia Owner",
+  "approval_required": true,
+  "assignee_staff_id": "44a00000-0000-0000-0000-000000000001"
+ },
+ "tasks": {
+  "as_of": "2026-10-17T05:57:29.147852+00:00",
+  "items": [
+   {
+    "id": "aa8fb325-ae8b-4a18-a7af-35e0f19d65bd",
+    "title": "Cycle count - beverages",
+    "due_at": "2026-10-17T02:57:29.147852+00:00",
+    "status": "assigned",
+    "overdue": true,
+    "version": 1,
+    "has_time": true,
+    "priority": "medium",
+    "updated_at": "2026-10-17T05:57:29.147852+00:00",
+    "description": "",
+    "location_id": "44000000-0000-0000-0000-00000000020a",
+    "assignee_name": "Ankit Verma",
+    "assignee_role": "Cashier",
+    "display_status": "overdue",
+    "photo_required": false,
+    "approval_required": false,
+    "assignee_staff_id": "44a00000-0000-0000-0000-000000000002"
+   },
+   {
+    "id": "d2ae0659-070d-4e09-8d17-922f6a4cbe45",
+    "title": "Restock dairy shelf",
+    "due_at": "2026-10-17T07:57:29.147852+00:00",
+    "status": "assigned",
+    "overdue": false,
+    "version": 1,
+    "has_time": true,
+    "priority": "medium",
+    "updated_at": "2026-10-17T05:57:29.147852+00:00",
+    "description": "",
+    "location_id": "44000000-0000-0000-0000-00000000010a",
+    "assignee_name": "Bina Biller",
+    "assignee_role": "Cashier",
+    "display_status": "assigned",
+    "photo_required": false,
+    "approval_required": true,
+    "assignee_staff_id": "44a00000-0000-0000-0000-000000000001"
+   }
+  ],
+  "counts": {
+   "all": 2,
+   "done": 0,
+   "overdue": 1,
+   "in_progress": 0
+  },
+  "can_create": true
+ },
+ "invite": {
+  "id": "dcab5fb9-8286-4020-bf99-9ee3518ce253",
+  "kind": "invitation",
+  "name": "Pooja Nair",
+  "role": {
+   "name": "Cashier",
+   "slug": "biller"
+  },
+  "email": "pooja.nair@example.com",
+  "mobile": "9876543210",
+  "resent": false,
+  "status": "invited",
+  "created": true,
+  "sent_at": "2026-10-17T05:57:29.147852+00:00",
+  "delivery": "pending",
+  "initials": "PN",
+  "place_ids": [
+   "44000000-0000-0000-0000-00000000010a"
+  ],
+  "expires_at": "2026-10-31T05:57:29.147852+00:00",
+  "place_text": "Hollow Center",
+  "send_count": 1
+ },
+ "member": {
+  "id": "ed6a1c73-0e88-43f3-a208-eab287f4a493",
+  "kind": "member",
+  "name": "Bina Biller",
+  "role": {
+   "name": "Cashier",
+   "slug": "biller"
+  },
+  "email": "bina440@t",
+  "mobile": "+91 90000 11111",
+  "places": [
+   {
+    "id": "44000000-0000-0000-0000-00000000010a",
+    "name": "Hollow Center"
+   }
+  ],
+  "status": "active",
+  "is_self": false,
+  "user_id": "44000000-0000-0000-0000-000000000003",
+  "initials": "BB",
+  "on_shift": true,
+  "staff_id": "44a00000-0000-0000-0000-000000000001",
+  "place_ids": [
+   "44000000-0000-0000-0000-00000000010a"
+  ],
+  "place_text": "Hollow Center",
+  "designation": "Cashier",
+  "last_active": null,
+  "allowed_actions": [
+   "set_role",
+   "set_locations",
+   "suspend"
+  ],
+  "permission_count": 6
+ },
+ "options": {
+  "roles": [
+   {
+    "name": "Owner",
+    "slug": "org_owner",
+    "members": 2,
+    "assignable": true,
+    "description": "",
+    "location_bound": false,
+    "permission_count": 93
+   },
+   {
+    "name": "Admin",
+    "slug": "org_admin",
+    "members": 1,
+    "assignable": true,
+    "description": "Full control of the organization: users, roles, configuration.",
+    "location_bound": false,
+    "permission_count": 93
+   },
+   {
+    "name": "Manager",
+    "slug": "manager",
+    "members": 1,
+    "assignable": true,
+    "description": "Operational oversight, configuration and analytics.",
+    "location_bound": true,
+    "permission_count": 69
+   },
+   {
+    "name": "Cashier",
+    "slug": "biller",
+    "members": 1,
+    "assignable": true,
+    "description": "Creates and manages orders, billing and payments.",
+    "location_bound": true,
+    "permission_count": 6
+   },
+   {
+    "name": "Kitchen",
+    "slug": "kitchen",
+    "members": 1,
+    "assignable": true,
+    "description": "Receives orders, prepares them, marks ready, raises stock alerts.",
+    "location_bound": true,
+    "permission_count": 2
+   },
+   {
+    "name": "Inventory",
+    "slug": "inventory_manager",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": true,
+    "permission_count": 19
+   },
+   {
+    "name": "Accountant",
+    "slug": "accountant",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": false,
+    "permission_count": 14
+   },
+   {
+    "name": "Analyst / Reporting User",
+    "slug": "analyst",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": false,
+    "permission_count": 1
+   },
+   {
+    "name": "Location manager",
+    "slug": "location_manager",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": true,
+    "permission_count": 67
+   },
+   {
+    "name": "Business Manager",
+    "slug": "business_manager",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": false,
+    "permission_count": 90
+   },
+   {
+    "name": "Captain",
+    "slug": "captain",
+    "members": 0,
+    "assignable": true,
+    "description": "Mobile-first table ordering and order status.",
+    "location_bound": true,
+    "permission_count": 3
+   },
+   {
+    "name": "Finance Manager",
+    "slug": "finance_manager",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": false,
+    "permission_count": 24
+   },
+   {
+    "name": "HR / Staff Manager",
+    "slug": "hr_manager",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": false,
+    "permission_count": 10
+   },
+   {
+    "name": "Marketing Manager",
+    "slug": "marketing_manager",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": false,
+    "permission_count": 10
+   },
+   {
+    "name": "Operations Manager",
+    "slug": "operations_manager",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": false,
+    "permission_count": 54
+   },
+   {
+    "name": "Procurement Manager",
+    "slug": "procurement_manager",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": false,
+    "permission_count": 8
+   },
+   {
+    "name": "Staff User",
+    "slug": "staff_user",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": true,
+    "permission_count": 0
+   },
+   {
+    "name": "Viewer",
+    "slug": "viewer",
+    "members": 0,
+    "assignable": true,
+    "description": "",
+    "location_bound": false,
+    "permission_count": 1
+   }
+  ],
+  "staff": [
+   {
+    "id": "44a00000-0000-0000-0000-000000000002",
+    "name": "Ankit Verma",
+    "designation": "Cashier",
+    "location_id": "44000000-0000-0000-0000-00000000020a"
+   },
+   {
+    "id": "44a00000-0000-0000-0000-000000000001",
+    "name": "Bina Biller",
+    "designation": "Cashier",
+    "location_id": "44000000-0000-0000-0000-00000000010a"
+   }
+  ],
+  "locations": [
+   {
+    "id": "44000000-0000-0000-0000-00000000020a",
+    "name": "Central Market"
+   },
+   {
+    "id": "44000000-0000-0000-0000-00000000010a",
+    "name": "Hollow Center"
+   }
+  ],
+  "can_invite": true,
+  "can_manage_tasks": true
+ },
+ "activity": {
+  "as_of": "2026-10-17T05:57:29.147852+00:00",
+  "items": [
+   {
+    "at": "2026-10-17T05:57:29.147852+00:00",
+    "area": "Team",
+    "text": "Invited Pooja Nair",
+    "actor": "Olivia Owner",
+    "place": "All locations",
+    "source": "audit",
+    "initials": "OO"
+   },
+   {
+    "at": "2026-10-17T05:57:29.147852+00:00",
+    "area": "Tasks",
+    "text": "Created task Restock dairy shelf",
+    "actor": "Olivia Owner",
+    "place": "All locations",
+    "source": "task",
+    "initials": "OO"
+   },
+   {
+    "at": "2026-10-17T05:57:29.147852+00:00",
+    "area": "Tasks",
+    "text": "Created task Cycle count - beverages",
+    "actor": "Olivia Owner",
+    "place": "All locations",
+    "source": "task",
+    "initials": "OO"
+   }
+  ],
+  "range": "today"
+ },
+ "dashboard": {
+  "as_of": "2026-10-17T05:57:29.147852+00:00",
+  "place": "Hollow Center",
+  "members": 6,
+  "on_shift": [
+   {
+    "id": "44a00000-0000-0000-0000-000000000002",
+    "name": "Ankit Verma",
+    "place": "Central Market",
+    "status": "active",
+    "initials": "AV",
+    "designation": "Cashier"
+   },
+   {
+    "id": "44a00000-0000-0000-0000-000000000001",
+    "name": "Bina Biller",
+    "place": "Hollow Center",
+    "status": "active",
+    "initials": "BB",
+    "designation": "Cashier"
+   }
+  ],
+  "locations": 2,
+  "tasks_due": 0,
+  "active_now": 2,
+  "can_invite": true,
+  "invitations": 0
+ },
+ "user_list": {
+  "items": [
+   {
+    "id": "5c74e27f-c14f-4eee-b8c3-b72f8b4672bd",
+    "kind": "member",
+    "name": "Adam Admin",
+    "role": {
+     "name": "Admin",
+     "slug": "org_admin"
+    },
+    "email": "adam440@t",
+    "status": "active",
+    "is_self": false,
+    "user_id": "44000000-0000-0000-0000-000000000002",
+    "initials": "AA",
+    "place_ids": [],
+    "place_text": "All locations"
+   },
+   {
+    "id": "ed6a1c73-0e88-43f3-a208-eab287f4a493",
+    "kind": "member",
+    "name": "Bina Biller",
+    "role": {
+     "name": "Cashier",
+     "slug": "biller"
+    },
+    "email": "bina440@t",
+    "status": "active",
+    "is_self": false,
+    "user_id": "44000000-0000-0000-0000-000000000003",
+    "initials": "BB",
+    "place_ids": [
+     "44000000-0000-0000-0000-00000000010a"
+    ],
+    "place_text": "Hollow Center"
+   },
+   {
+    "id": "4f9ea7dc-0bd5-49ae-a57c-a4e70316dc47",
+    "kind": "member",
+    "name": "Mia Manager",
+    "role": {
+     "name": "Manager",
+     "slug": "manager"
+    },
+    "email": "mia440@t",
+    "status": "active",
+    "is_self": false,
+    "user_id": "44000000-0000-0000-0000-000000000004",
+    "initials": "MM",
+    "place_ids": [
+     "44000000-0000-0000-0000-00000000020a"
+    ],
+    "place_text": "Central Market"
+   },
+   {
+    "id": "a6916476-68ea-4adb-a406-eb5ca75cd76f",
+    "kind": "member",
+    "name": "Olivia Owner",
+    "role": {
+     "name": "Owner",
+     "slug": "org_owner"
+    },
+    "email": "olivia440@t",
+    "status": "active",
+    "is_self": true,
+    "user_id": "44000000-0000-0000-0000-000000000001",
+    "initials": "OO",
+    "place_ids": [],
+    "place_text": "All locations"
+   },
+   {
+    "id": "44f2313f-1558-4184-b72f-5ba5bdb9c063",
+    "kind": "member",
+    "name": "Oscar Owner",
+    "role": {
+     "name": "Owner",
+     "slug": "org_owner"
+    },
+    "email": "oscar440@t",
+    "status": "active",
+    "is_self": false,
+    "user_id": "44000000-0000-0000-0000-000000000008",
+    "initials": "OO",
+    "place_ids": [],
+    "place_text": "All locations"
+   },
+   {
+    "id": "7a5c2b00-dc71-46b2-8626-9b40b20a2e17",
+    "kind": "member",
+    "name": "Ravi Kitchen",
+    "role": {
+     "name": "Kitchen",
+     "slug": "kitchen"
+    },
+    "email": "ravi440@t",
+    "status": "active",
+    "is_self": false,
+    "user_id": "44000000-0000-0000-0000-000000000006",
+    "initials": "RK",
+    "place_ids": [
+     "44000000-0000-0000-0000-00000000010a"
+    ],
+    "place_text": "Hollow Center"
+   },
+   {
+    "id": "dcab5fb9-8286-4020-bf99-9ee3518ce253",
+    "kind": "invitation",
+    "name": "Pooja Nair",
+    "role": {
+     "name": "Cashier",
+     "slug": "biller"
+    },
+    "email": "pooja.nair@example.com",
+    "mobile": "9876543210",
+    "status": "invited",
+    "sent_at": "2026-10-17T05:57:29.147852+00:00",
+    "initials": "PN",
+    "place_ids": [
+     "44000000-0000-0000-0000-00000000010a"
+    ],
+    "expires_at": "2026-10-31T05:57:29.147852+00:00",
+    "place_text": "Hollow Center",
+    "send_count": 1
+   }
+  ],
+  "counts": {
+   "all": 7,
+   "active": 6,
+   "paused": 0,
+   "invited": 1
+  },
+  "can_invite": true
+ },
+ "invitation": {
+  "id": "dcab5fb9-8286-4020-bf99-9ee3518ce253",
+  "kind": "invitation",
+  "name": "Pooja Nair",
+  "role": {
+   "name": "Cashier",
+   "slug": "biller"
+  },
+  "email": "pooja.nair@example.com",
+  "mobile": "9876543210",
+  "places": [
+   {
+    "id": "44000000-0000-0000-0000-00000000010a",
+    "name": "Hollow Center"
+   }
+  ],
+  "status": "invited",
+  "sent_at": "2026-10-17T05:57:29.147852+00:00",
+  "initials": "PN",
+  "place_ids": [
+   "44000000-0000-0000-0000-00000000010a"
+  ],
+  "expires_at": "2026-10-31T05:57:29.147852+00:00",
+  "place_text": "Hollow Center",
+  "send_count": 1,
+  "allowed_actions": [
+   "resend",
+   "revoke"
+  ],
+  "permission_count": 6
+ }
+}

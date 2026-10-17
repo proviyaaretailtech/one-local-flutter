@@ -285,6 +285,7 @@ class _QuickLinks extends StatelessWidget {
       (LucideIcons.history, 'Order history', () => HomeNav.go(context, HomeNav.orderHistory, 'Order history')),
       (LucideIcons.triangleAlert, 'Complaints', () => HomeNav.go(context, HomeNav.complaints, 'Complaints')),
       (LucideIcons.star, 'Reviews', () => HomeNav.go(context, HomeNav.reviews, 'Reviews')),
+      (LucideIcons.users, 'Team', () => HomeNav.go(context, HomeNav.team, 'Team')),
       (LucideIcons.settings, 'Settings', () => HomeNav.go(context, HomeNav.setup, 'Settings')),
       (LucideIcons.info, 'Outlet info', () => HomeNav.go(context, HomeNav.setup, 'Outlet info')),
       (LucideIcons.layoutGrid, 'Show all', () => HomeNav.go(context, null, 'The full list')),

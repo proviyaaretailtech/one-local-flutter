@@ -14,9 +14,11 @@ import 'sell/sell_env.dart';
 import 'sell/sell_screen.dart';
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
+import 'team/team_screens.dart';
+import 'team/team_widgets.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
-/// workspace setup (C), the control centre (D), orders (E) and the catalogue and GRN (G) into the [HomeNav] hooks.
+/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G) and the team (L) into the [HomeNav] hooks.
 void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
   HomeNav.orders = HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
@@ -29,6 +31,7 @@ void installRoutes() {
       onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
   HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
   HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
+  HomeNav.team = (c) => Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id))));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
