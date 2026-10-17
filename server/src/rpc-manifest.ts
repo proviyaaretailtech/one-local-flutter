@@ -18,6 +18,7 @@ import { secureHandlers, withImageLinks, type SecureHandler } from './modules/se
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
+import * as nt from './schemas/notices.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -100,6 +101,19 @@ export const MANIFEST: Entry[] = [
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  // ---- customer communication, section N (0460). Notices and announcements are for any signed-in staff (the database filters by role and place);
+  //      customer messages are RECORDED AND QUEUED only (nothing is sent); the database checks pos_campaigns:read / send and pos_customer_feedback:read / respond.
+  db('notice_list', { args: nt.NoticeList, map: P, rate: 'read', roles: STAFF }),
+  db('notice_mark_read', { args: nt.NoticeMarkRead, map: P, rate: 'write', roles: STAFF }),
+  db('announce_list', { args: nt.AnnounceList, map: P, rate: 'read', roles: STAFF }),
+  db('announce_mark_read', { args: nt.AnnounceMarkRead, map: P, rate: 'write', roles: STAFF }),
+  db('comm_options', { args: nt.CommOptions, map: P, rate: 'read', roles: 'staff with pos_campaigns:read' }),
+  db('comm_audience', { args: nt.CommAudience, map: P, rate: 'read', roles: 'staff with pos_campaigns:read' }),
+  db('comm_queue', { args: nt.CommQueue, map: P, rate: 'write', idem: true, roles: 'staff with pos_campaigns:send' }),
+  db('comm_list', { args: nt.CommList, map: P, rate: 'read', roles: 'staff with pos_campaigns:read' }),
+  db('comm_cancel', { args: nt.CommCancel, map: P, rate: 'write', roles: 'staff with pos_campaigns:send' }),
+  db('comm_feedback_list', { args: nt.FeedbackList, map: P, rate: 'read', roles: 'staff with pos_customer_feedback:read' }),
+  db('comm_feedback_respond', { args: nt.FeedbackRespond, map: P, rate: 'write', roles: 'staff with pos_customer_feedback:respond' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 
