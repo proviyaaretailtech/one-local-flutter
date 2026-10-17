@@ -180,6 +180,9 @@ try {
   const tr1 = await rpc(A, 'tbl_reserve', res, rk), tr2 = await rpc(A, 'tbl_reserve', res, rk);
   ok('tables: reserve works and a retry with the same key is the same reservation', tr1.s === 200 && tr2.s === 200 && tr2.j.replayed === true && tr1.j.reservation.id === tr2.j.reservation.id, [tr1, tr2]);
   ok('tables: capacity is a 422 with a sentence', await (async () => { const r = await rpc(A, 'tbl_reserve', { ...res, table_id: tA2, guests: 9 }, `gw-tbl-${randomUUID()}`); return r.s === 422 && r.j.code === 'capacity'; })());
+  const d3 = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+  ok('tables: a booking in the store wall clock works; an instant without its zone is a 400', (await rpc(A, 'tbl_reserve', { table_id: tA2, guest_name: 'ZZ Local', phone: '5550101', guests: 2, local_date: d3, local_time: '19:30' }, `gw-tbl-${randomUUID()}`)).s === 200
+    && (await rpc(A, 'tbl_reserve', { table_id: tA2, guest_name: 'ZZ NoZone', phone: '5550101', guests: 2, scheduled_at: `${d3}T12:00:00` }, `gw-tbl-${randomUUID()}`)).s === 400);
   ok('tables: transfer from an empty table is a 409', (await rpc(A, 'tbl_transfer', { from_table_id: tA1, to_table_id: tA2 })).s === 409);
   const mg = await rpc(A, 'tbl_merge', { table_ids: [tA2, tA3] });
   ok('tables: A merges two tables', mg.s === 200 && mg.j.combined_seats === 8, mg);

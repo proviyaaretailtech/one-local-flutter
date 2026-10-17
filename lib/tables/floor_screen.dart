@@ -60,9 +60,18 @@ class _FloorScreenState extends State<FloorScreen> {
     if (t.s('status') == 'occupied') {
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ActionsScreen(env: env, tableId: t.s('id'))));
     } else {
-      await showTableSheet(context, env, t);
+      await showTableSheet(context, env, t, storeNow: _storeNow());
     }
     if (mounted) _load();
+  }
+
+  /// The store's wall clock now (the server's local_today + local_time), so "Today" and the default time follow the store's zone, not the phone's.
+  DateTime Function()? _storeNow() {
+    final today = _d?.so('local_today'), hm = _d?.so('local_time');
+    final base = today == null || hm == null ? null : DateTime.tryParse('${today}T$hm:00');
+    if (base == null) return null;
+    final at = DateTime.now();
+    return () => base.add(DateTime.now().difference(at));
   }
 
   @override
@@ -123,20 +132,21 @@ class _FloorScreenState extends State<FloorScreen> {
 }
 
 /// The bottom sheet of a table that is not occupied: "Table T4 / 4 Pax • Available", Start New Order, Reserve Table, View History.
-Future<void> showTableSheet(BuildContext context, TablesEnv env, Facts t) {
+Future<void> showTableSheet(BuildContext context, TablesEnv env, Facts t, {DateTime Function()? storeNow}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.white,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-    builder: (_) => _TableSheet(env: env, table: t),
+    builder: (_) => _TableSheet(env: env, table: t, storeNow: storeNow),
   );
 }
 
 class _TableSheet extends StatefulWidget {
-  const _TableSheet({required this.env, required this.table});
+  const _TableSheet({required this.env, required this.table, this.storeNow});
   final TablesEnv env;
   final Facts table;
+  final DateTime Function()? storeNow;
   @override
   State<_TableSheet> createState() => _TableSheetState();
 }
@@ -217,7 +227,7 @@ class _TableSheetState extends State<_TableSheet> {
           if (allowed.contains('reserve')) ...[
             OutlineButtonT('Reserve Table', icon: LucideIcons.calendar, dark: true, height: 56, onPressed: () async {
               nav.pop();
-              await nav.push(MaterialPageRoute(builder: (_) => ReserveScreen(env: widget.env, table: v!.m('table'))));
+              await nav.push(MaterialPageRoute(builder: (_) => ReserveScreen(env: widget.env, table: v!.m('table'), now: widget.storeNow)));
             }),
           ],
           if (allowed.contains('history'))

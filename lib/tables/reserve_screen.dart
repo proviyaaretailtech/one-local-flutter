@@ -14,7 +14,7 @@ class ReserveScreen extends StatefulWidget {
   final TablesEnv env;
   final Facts table;
 
-  /// Clock for tests.
+  /// The store's wall clock (the phone's own only when the server did not send one; also the clock for tests).
   final DateTime Function()? now;
   @override
   State<ReserveScreen> createState() => _ReserveScreenState();
@@ -73,7 +73,8 @@ class _ReserveScreenState extends State<ReserveScreen> {
         guestName: _name.text,
         phone: _phone.text,
         guests: _pax,
-        scheduledAt: _at,
+        localDate: '${_date.year.toString().padLeft(4, '0')}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
+        localTime: '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}',
         notes: _notes.text,
         key: _key!,
       );

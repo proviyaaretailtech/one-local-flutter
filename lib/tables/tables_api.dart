@@ -46,13 +46,15 @@ class TablesApi {
 
   Future<List<Facts>> history(String tableId, {int limit = 20}) async => Facts(await _call('tbl_history', {'table_id': tableId, 'limit': limit})).l('entries');
 
-  /// "Confirm Reservation". [scheduledAt] is sent in UTC; [key] makes a retry of the same tap return the same booking.
+  /// "Confirm Reservation". The date and time are the STORE's wall clock ([localDate] yyyy-MM-dd, [localTime] HH:mm); the database reads them in the
+  /// store's time zone and checks the store's hours. [key] makes a retry of the same tap return the same booking.
   Future<Facts> reserve({
     required String tableId,
     required String guestName,
     required String phone,
     required int guests,
-    required DateTime scheduledAt,
+    required String localDate,
+    required String localTime,
     String notes = '',
     required String key,
   }) async =>
@@ -61,12 +63,15 @@ class TablesApi {
         'guest_name': guestName.trim(),
         'phone': phone.trim(),
         'guests': guests,
-        'scheduled_at': scheduledAt.toUtc().toIso8601String(),
+        'local_date': localDate,
+        'local_time': localTime,
         'notes': notes.trim(),
         'idempotency_key': key,
       }, key: key));
 
-  Future<Facts> cancelReservation(String reservationId) async => Facts(await _call('tbl_reserve_cancel', {'id': reservationId}));
+  /// [outcome] is cancelled, or no_show once the booking time has passed.
+  Future<Facts> cancelReservation(String reservationId, {String outcome = 'cancelled'}) async =>
+      Facts(await _call('tbl_reserve_cancel', {'id': reservationId, if (outcome != 'cancelled') 'outcome': outcome}));
 
   /// "Confirm Transfer": the open orders and the guests' session move to [toTableId].
   Future<Facts> transfer(String fromTableId, String toTableId) async => Facts(await _call('tbl_transfer', {'from_table_id': fromTableId, 'to_table_id': toTableId}));

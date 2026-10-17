@@ -5,7 +5,7 @@
     "tables": [
       {"id": "t1", "label": "T1", "seats": 4, "own_seats": 4, "area_id": "area-g", "area_name": "Ground Floor", "status": "available", "since": null, "elapsed_minutes": null, "reserved_at": null, "reservation_id": null, "merge": null},
       {"id": "t2", "label": "T2", "seats": 2, "own_seats": 2, "area_id": "area-g", "area_name": "Ground Floor", "status": "occupied", "since": "2026-10-17T05:00:00+00:00", "elapsed_minutes": 75, "reserved_at": null, "reservation_id": null, "merge": null},
-      {"id": "t3", "label": "T3", "seats": 4, "own_seats": 4, "area_id": "area-g", "area_name": "Ground Floor", "status": "reserved", "since": null, "elapsed_minutes": null, "reserved_at": "2026-10-17T14:00:00+00:00", "reservation_id": "res-1", "merge": null},
+      {"id": "t3", "label": "T3", "seats": 4, "own_seats": 4, "area_id": "area-g", "area_name": "Ground Floor", "status": "reserved", "since": null, "elapsed_minutes": null, "reserved_at": "2026-10-17T14:00:00+00:00", "reserved_local": "19:30", "reservation_id": "res-1", "merge": null},
       {"id": "t4", "label": "T4", "seats": 4, "own_seats": 4, "area_id": "area-g", "area_name": "Ground Floor", "status": "available", "since": null, "elapsed_minutes": null, "reserved_at": null, "reservation_id": null, "merge": null},
       {"id": "t5", "label": "T5", "seats": 6, "own_seats": 6, "area_id": "area-g", "area_name": "Ground Floor", "status": "cleaning", "since": null, "elapsed_minutes": null, "reserved_at": null, "reservation_id": null, "merge": null},
       {"id": "t12", "label": "T12", "seats": 8, "own_seats": 4, "area_id": "area-g", "area_name": "Ground Floor", "status": "available", "merge": {"id": "m-1", "primary": true, "primary_table_id": "t12", "labels": ["T12", "T13"], "combined_seats": 8}},
@@ -14,7 +14,7 @@
     "counts": {"all": 7, "available": 4, "occupied": 1, "reserved": 1, "cleaning": 1},
     "rule": {"merge": "Tables must be in the same dining area to combine.", "merge_min": 2, "merge_max": 8},
     "can": {"reserve": true, "manage": true, "order": true},
-    "now": "2026-10-17T06:15:00+00:00"
+    "now": "2026-10-17T06:15:00+00:00", "timezone": "Asia/Kolkata", "local_today": "2026-10-17", "local_time": "11:45"
   },
   "view_available": {
     "table": {"id": "t4", "label": "T4", "seats": 4, "own_seats": 4, "min_capacity": 1, "area_id": "area-g", "area_name": "Ground Floor", "main_table_id": "t4"},

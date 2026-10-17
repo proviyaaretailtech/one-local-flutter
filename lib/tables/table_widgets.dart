@@ -64,6 +64,13 @@ String clock12(DateTime d) {
   return '$h:${d.minute.toString().padLeft(2, '0')} ${d.hour >= 12 ? 'PM' : 'AM'}';
 }
 
+/// "19:30" (the store's wall clock, as the server sends it) to "7:30 PM".
+String clockFromHm(String hm) {
+  final p = hm.split(':');
+  if (p.length < 2) return hm;
+  return clock12(DateTime(2000, 1, 1, int.tryParse(p[0]) ?? 0, int.tryParse(p[1]) ?? 0));
+}
+
 /// "07:30 PM" (the reserve form's time box).
 String clock12Padded(DateTime d) => clock12(d).padLeft(8, '0');
 
@@ -203,6 +210,7 @@ class TableCard extends StatelessWidget {
     if (selected) (label, border, bg, text) = ('SELECTED', kAvailBorder, kAvailBg, kAvailText);
     final sub = switch (status) {
       'occupied' when table.no('elapsed_minutes') != null => elapsed(table.n('elapsed_minutes')),
+      'reserved' when table.so('reserved_local') != null => clockFromHm(table.s('reserved_local')),
       'reserved' when table.t('reserved_at') != null => clock12(table.t('reserved_at')!),
       _ => null,
     };

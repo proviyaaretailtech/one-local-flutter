@@ -43,7 +43,7 @@ const STATUS: Record<string, number> = {
   TOO_FAR: 422, PICKUP_MISMATCH: 422, CASH_MISMATCH: 422, IDEMPOTENCY: 422, IDEMPOTENCY_MISMATCH: 422, UNDERPAID: 422, OVERPAY: 422,
   SHORT: 409, ALLOCATION: 409, CAPACITY: 422, STORAGE: 422, TENANT: 403,                                   // inventory (section H)
   CONFLICT: 409, SCOPE: 403,                                                                                     // purchase suggestions (section J), tables (H)
-  MERGED: 409, NOT_OCCUPIED: 409, BUSY: 409,                                                                       // tables and floor (section H)
+  MERGED: 409, NOT_OCCUPIED: 409, BUSY: 409, CLOSED: 422,                                                                   // tables and floor (section H)
   COUPON_UNKNOWN: 422, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
 };
 const CODE: Record<string, string> = {

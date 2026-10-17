@@ -11,7 +11,6 @@ import 'package:vinii_pos/inventory/inventory_api.dart';
 import 'package:vinii_pos/tables/actions_screen.dart';
 import 'package:vinii_pos/tables/floor_screen.dart';
 import 'package:vinii_pos/tables/merge_screen.dart';
-import 'package:vinii_pos/tables/reserve_screen.dart';
 import 'package:vinii_pos/tables/table_order_screen.dart';
 import 'package:vinii_pos/tables/table_widgets.dart';
 import 'package:vinii_pos/tables/tables_api.dart';
@@ -112,14 +111,13 @@ void main() {
       expect(d.m('counts').n('all'), 7);
     });
 
-    test('reserve sends the booking in UTC with one key in the header and the body', () async {
+    test('reserve sends the store wall-clock date and time with one key in the header and the body', () async {
       final s = Fake();
-      final at = DateTime.utc(2026, 10, 17, 14, 0);
-      final r = await s.api.reserve(tableId: 't4', guestName: ' John Doe ', phone: ' +1 (555) 019-2834 ', guests: 4, scheduledAt: at, notes: ' Window seat ', key: 'k1');
+      final r = await s.api.reserve(tableId: 't4', guestName: ' John Doe ', phone: ' +1 (555) 019-2834 ', guests: 4, localDate: '2026-10-17', localTime: '19:30', notes: ' Window seat ', key: 'k1');
       final q = s.requests.single;
       expect(q.url.path, '/rpc/tbl_reserve');
       expect(q.headers['Idempotency-Key'], 'k1');
-      expect(argsOf(q), {'table_id': 't4', 'guest_name': 'John Doe', 'phone': '+1 (555) 019-2834', 'guests': 4, 'scheduled_at': '2026-10-17T14:00:00.000Z', 'notes': 'Window seat', 'idempotency_key': 'k1'});
+      expect(argsOf(q), {'table_id': 't4', 'guest_name': 'John Doe', 'phone': '+1 (555) 019-2834', 'guests': 4, 'local_date': '2026-10-17', 'local_time': '19:30', 'notes': 'Window seat', 'idempotency_key': 'k1'});
       expect(r.m('reservation').s('status'), 'confirmed');
     });
 
@@ -133,6 +131,7 @@ void main() {
       await s.api.history('t4', limit: 5);
       await s.api.orderView('t2');
       await s.api.cancelReservation('res-1');
+      await s.api.cancelReservation('res-2', outcome: 'no_show');
       await s.api.setOrderStatus('o-1', 'awaiting_payment', expectedUpdatedAt: 'ts');
       expect(s.requests.map((r) => '${fnOf(r)} ${jsonEncode(argsOf(r))}').toList(), [
         'tbl_transfer {"from_table_id":"a","to_table_id":"b"}',
@@ -143,6 +142,7 @@ void main() {
         'tbl_history {"table_id":"t4","limit":5}',
         'tbl_order_view {"table_id":"t2"}',
         'tbl_reserve_cancel {"id":"res-1"}',
+        'tbl_reserve_cancel {"id":"res-2","outcome":"no_show"}',
         'pos_set_order_status {"order_id":"o-1","to":"awaiting_payment","expected_updated_at":"ts"}',
       ]);
     });
@@ -150,7 +150,7 @@ void main() {
     test('a refusal keeps the server sentence, status and code', () async {
       final s = Fake((r) => err(409, 'This table is already reserved around that time.', 'conflict'));
       await expectLater(
-        s.api.reserve(tableId: 't4', guestName: 'x', phone: '5550100', guests: 2, scheduledAt: DateTime.utc(2026, 10, 18), key: 'k'),
+        s.api.reserve(tableId: 't4', guestName: 'x', phone: '5550100', guests: 2, localDate: '2026-10-18', localTime: '12:00', key: 'k'),
         throwsA(isA<TablesApiException>().having((e) => e.message, 'message', 'This table is already reserved around that time.').having((e) => e.status, 'status', 409).having((e) => e.code, 'code', 'conflict')),
       );
     });
@@ -167,6 +167,8 @@ void main() {
       expect(elapsed(45), '45m');
       expect(elapsed(120), '2h');
       expect(clock12(DateTime(2026, 10, 17, 19, 30)), '7:30 PM');
+      expect(clockFromHm('19:30'), '7:30 PM');
+      expect(clockFromHm('09:05'), '9:05 AM');
       expect(clock12(DateTime(2026, 10, 17, 0, 5)), '12:05 AM');
       expect(clock12Padded(DateTime(2026, 10, 17, 19, 30)), '07:30 PM');
       expect(rupees(1302), '₹1,302');
@@ -188,7 +190,7 @@ void main() {
       expect(find.text('RESERVED'), findsOneWidget);
       expect(find.text('CLEANING'), findsOneWidget);
       expect(find.text('1h 15m'), findsOneWidget);
-      expect(find.text(clock12(DateTime.parse('2026-10-17T14:00:00+00:00').toLocal())), findsOneWidget);
+      expect(find.text('7:30 PM'), findsOneWidget); // the store's wall clock from the server (reserved_local 19:30), not the phone's zone
       expect(find.text('All Tables (7)'), findsOneWidget);
       expect(find.text('Occupied (1)'), findsOneWidget);
       expect(find.text('Reserved (1)'), findsOneWidget);
@@ -301,7 +303,9 @@ void main() {
       expect(a['phone'], '+1 (555) 019-2834');
       expect(a['guests'], 6);
       expect(a['notes'], 'Window seat preferred.');
-      expect(DateTime.parse(a['scheduled_at'] as String).isUtc, isTrue);
+      expect(a['local_date'], matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));
+      expect(a['local_time'], matches(RegExp(r'^\d{2}:\d{2}$')));
+      expect(a.containsKey('scheduled_at'), isFalse);
       expect(q.headers['Idempotency-Key'], a['idempotency_key']);
       expect(find.text('Reserve Table T4'), findsNothing);
       expect(find.byKey(const ValueKey('table-T1')), findsOneWidget);
