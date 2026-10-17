@@ -9,8 +9,9 @@ import 'backoffice_api.dart';
 import 'backoffice_widgets.dart';
 
 /// Figma "OneLocal · Purchase Suggestions" (section J): open suggestions recorded for low items. The person ticks items, keeps or
-/// changes the quantity, and drafts a purchase order. Typed quantities stay on the phone until "Create Purchase Order"; they never
-/// change posted stock. Opening the screen asks the server to record suggestions for items that are low now.
+/// changes the quantity, and marks them ordered under the purchase order number the person placed with the supplier (One Local has no
+/// purchase-order record yet: the number is kept as text). Typed quantities stay on the phone until "Mark as Ordered"; they never change
+/// posted stock. Opening the screen asks the server to record suggestions for items that are low now (nothing for goods already on the way).
 class PurchaseSuggestionsScreen extends StatefulWidget {
   const PurchaseSuggestionsScreen({super.key, this.api, this.onNavigate, this.onMenu, this.onItems});
   final BackofficeApi? api;
@@ -27,7 +28,7 @@ class _PurchaseSuggestionsScreenState extends State<PurchaseSuggestionsScreen> {
   final _selected = <String>{};
   final _qty = <String, TextEditingController>{};
   bool _busy = false;
-  String? _poKey; // one key per "Create Purchase Order" intent; kept for a retry of the same selection
+  String? _poKey; // one key per "Mark as Ordered" intent; kept for a retry of the same selection
 
   @override
   void initState() {
@@ -104,7 +105,9 @@ class _PurchaseSuggestionsScreenState extends State<PurchaseSuggestionsScreen> {
     return rupees(c.fold<num>(0, (sum, s) => sum + (_typed(s) ?? 0) * s.estimatedUnitCost!));
   }
 
-  Future<void> _createPo() async {
+  Future<String?> _askReference() => showDialog<String>(context: context, builder: (_) => const _ReferenceDialog());
+
+  Future<void> _markOrdered() async {
     final c = _chosen;
     if (c.isEmpty) {
       showToast(context, 'Select items to include.');
@@ -114,14 +117,20 @@ class _PurchaseSuggestionsScreenState extends State<PurchaseSuggestionsScreen> {
       showToast(context, 'Enter a quantity before including this item.');
       return;
     }
+    final ref = await _askReference();
+    if (!mounted || ref == null) return;
+    if (ref.isEmpty) {
+      showToast(context, 'Enter the purchase order number.');
+      return;
+    }
     _poKey ??= BackofficeApi.newKey();
     setState(() => _busy = true);
     try {
-      final ref = await _api.createPurchaseOrder([for (final s in c) PoLine(s.id, _typed(s)!)], key: _poKey!);
+      await _api.markOrdered({for (final s in c) s.id: _typed(s)!}, reference: ref, key: _poKey!);
       if (!mounted) return;
       _poKey = null;
       _selected.clear();
-      showToast(context, ref.isEmpty ? 'Purchase order drafted.' : 'Purchase order $ref drafted.');
+      showToast(context, 'Marked as ordered under $ref.');
       await _load();
     } catch (e) {
       if (mounted) showToast(context, e.toString());
@@ -159,7 +168,7 @@ class _PurchaseSuggestionsScreenState extends State<PurchaseSuggestionsScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Review items and suggested quantities before creating a purchase order.', style: inter(11.5, 400, color: kMuted, height: 1.4)),
+                    Text('Review items and quantities, then mark them ordered with your purchase order number.', style: inter(11.5, 400, color: kMuted, height: 1.4)),
                     const SizedBox(height: 8),
                     Text('Select items to include. Quantities are recorded suggestions, not calculated shortfalls.', style: inter(9.5, 400, color: kMuted, height: 1.4)),
                     const SizedBox(height: 8),
@@ -171,7 +180,7 @@ class _PurchaseSuggestionsScreenState extends State<PurchaseSuggestionsScreen> {
                       Text('Estimated total: ${_estimate()}', style: inter(9.5, 400, color: kMuted)),
                     ],
                     const SizedBox(height: 8),
-                    LimeCta(label: 'Create Purchase Order', busy: _busy, onPressed: v == null || v.suggestions.isEmpty ? null : _createPo),
+                    LimeCta(label: 'Mark as Ordered', busy: _busy, onPressed: v == null || v.suggestions.isEmpty ? null : _markOrdered),
                     const SizedBox(height: 8),
                     Text(snapshotFootnote(v?.snapshot.at), style: inter(9.5, 400, color: kMuted, height: 1.4)),
                   ]),
@@ -346,4 +355,37 @@ class _QtyBox extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// Asks for the purchase order number the person placed with the supplier. Owns its text controller, so it is released with the dialog.
+class _ReferenceDialog extends StatefulWidget {
+  const _ReferenceDialog();
+  @override
+  State<_ReferenceDialog> createState() => _ReferenceDialogState();
+}
+
+class _ReferenceDialogState extends State<_ReferenceDialog> {
+  final _c = TextEditingController();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text('Purchase order number', style: inter(15, 600)),
+        content: TextField(
+          controller: _c,
+          autofocus: true,
+          maxLength: 80,
+          decoration: const InputDecoration(hintText: 'The number on the order you placed'),
+          onSubmitted: (v) => Navigator.of(context).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(context).pop(_c.text.trim()), child: const Text('Mark as ordered')),
+        ],
+      );
 }

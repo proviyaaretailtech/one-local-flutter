@@ -18,6 +18,7 @@ import { secureHandlers, withImageLinks, type SecureHandler } from './modules/se
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
+import * as bo from './schemas/backoffice.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -100,6 +101,12 @@ export const MANIFEST: Entry[] = [
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  // ---- back office, section J (0420): Low Stock and Purchase Suggestions, read from section H's stock numbers. Body = the function's `p`
+  //      object; no location_id = the whole business, which the database allows only for a business-wide person.
+  db('backoffice_low_stock', { args: bo.LowStock, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('purchase_suggestions_list', { args: bo.SuggestionsList, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('purchase_suggestions_refresh', { args: bo.SuggestionsRefresh, map: P, rate: 'write', roles: 'owner, managers, inventory and procurement roles' }),
+  db('purchase_suggestions_close', { args: bo.SuggestionsClose, map: P, rate: 'write', idem: true, roles: 'owner, managers, inventory and procurement roles' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 

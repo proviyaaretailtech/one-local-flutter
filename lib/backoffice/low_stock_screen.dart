@@ -226,6 +226,7 @@ class LowStockCard extends StatelessWidget {
         const SizedBox(height: 8),
         BoRow('Minimum / reorder level', i.reorderLevel == null ? 'Not set' : withUnit(i.reorderLevel!, i.unit)),
         BoRow('Quantity short', i.quantityShort == null ? 'Not recorded' : withUnit(i.quantityShort!, i.unit)),
+        BoRow('To buy (after stock on the way)', i.suggestedQty == null ? 'Nothing: covered' : withUnit(i.suggestedQty!, i.unit)),
         const SizedBox(height: 6),
         Text(
           'Supplier: ${i.supplierName ?? 'Not recorded'} · Last purchase price: ${i.lastPurchasePrice == null ? 'Not recorded' : rupees(i.lastPurchasePrice!)}',

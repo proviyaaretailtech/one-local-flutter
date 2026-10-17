@@ -1,9 +1,8 @@
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
 
 num? _num(Object? v) => v == null ? null : (v is num ? v : num.tryParse('$v'));
@@ -19,7 +18,7 @@ class Snapshot {
   final String? locationName, viewerName;
 }
 
-/// One row of the Low Stock list (`GET /api/partner/backoffice/low-stock`). Levels, cover and shortfalls are decided by the server.
+/// One row of the Low Stock list (`backoffice_low_stock`). Levels, cover and shortfalls are decided by the server.
 class LowStockItem {
   LowStockItem(Map<String, dynamic> j)
       : id = '${j['id'] ?? ''}',
@@ -29,6 +28,7 @@ class LowStockItem {
         level = '${j['level'] ?? 'low'}',
         reorderLevel = _num(j['reorder_level']),
         quantityShort = _num(j['quantity_short']),
+        suggestedQty = _num(j['suggested_qty']),
         daysCover = _num(j['days_cover']),
         inboundQty = _num(j['inbound_qty']),
         inboundEta = DateTime.tryParse('${j['inbound_eta'] ?? ''}'),
@@ -36,7 +36,7 @@ class LowStockItem {
         lastPurchasePrice = _num(j['last_purchase_price']);
   final String id, name, unit, level;
   final num available;
-  final num? reorderLevel, quantityShort, daysCover, inboundQty, lastPurchasePrice;
+  final num? reorderLevel, quantityShort, suggestedQty, daysCover, inboundQty, lastPurchasePrice;
   final DateTime? inboundEta;
   final String? supplierName;
   bool get critical => level == 'critical';
@@ -55,7 +55,7 @@ class LowStockView {
   final List<LowStockItem> items;
 }
 
-/// One open purchase suggestion (`GET /api/partner/backoffice/purchase-suggestions`). `suggestedQty` is what was recorded, not a calculation.
+/// One open purchase suggestion (`purchase_suggestions_list`). `suggestedQty` is what was recorded, not a calculation.
 class Suggestion {
   Suggestion(Map<String, dynamic> j)
       : id = '${j['id'] ?? ''}',
@@ -88,65 +88,78 @@ class SuggestionsView {
   final List<Suggestion> suggestions;
 }
 
-/// A line the person ticked for the purchase order (draft on the phone until sent).
-class PoLine {
-  const PoLine(this.suggestionId, this.qty);
-  final String suggestionId;
-  final num qty;
-  Map<String, dynamic> toJson() => {'suggestion_id': suggestionId, 'qty': qty};
-}
-
-/// Calls One Local's server (`/api/partner/backoffice/*`, contract in specs/pos-section-j/spec.md). The Supabase session token is the only
-/// credential; the database checks the business, the location and the role again. Writes carry an Idempotency-Key.
+/// Back office calls through the one generic door, `POST /rpc/<function>` ([RpcClient]); the database functions of migration 0420 do the
+/// work on section H's stock numbers and check the business, the store, the role and every rule. The Supabase session token is the only
+/// credential. Writes carry an Idempotency-Key so a retried tap never doubles.
 class BackofficeApi {
-  BackofficeApi({http.Client? client, String? baseUrl, String? Function()? accessToken, this.locationId})
-      : _http = client ?? http.Client(),
-        _token = accessToken ?? (() => Supabase.instance.client.auth.currentSession?.accessToken),
-        _base = (baseUrl ?? const String.fromEnvironment('PARTNER_API_BASE_URL')).replaceAll(RegExp(r'/+$'), '');
+  BackofficeApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc, this.locationId})
+      : _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken);
 
-  final http.Client _http;
-  final String? Function() _token;
-  final String _base;
+  final RpcClient _rpc;
 
-  /// The location to look at; null = every location the person may see.
-  final String? locationId;
+  /// The store to look at; null = the whole business. Only a business-wide person may see the whole business: for someone who works at
+  /// some stores the database answers 403 `store_scope`, and the client then switches to the person's own store (from `inv_options`)
+  /// and asks again. Any other refusal is passed on as it is.
+  String? locationId;
 
   static final _rand = Random.secure();
   static String newKey() => 'bo-${List.generate(16, (_) => _rand.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
 
-  Future<Map<String, dynamic>> _send(String method, String path, {Object? body, String? key, Map<String, String>? query}) async {
-    final token = _token();
-    if (token == null) throw const PartnerApiException(401, 'Sign in to continue.');
-    final q = {'location_id': ?locationId, ...?query};
-    var uri = Uri.parse('$_base/api/partner/backoffice$path');
-    if (q.isNotEmpty) uri = uri.replace(queryParameters: q);
-    final headers = {
-      'Authorization': 'Bearer $token',
-      if (body != null) 'Content-Type': 'application/json',
-      'Idempotency-Key': ?key,
-    };
-    final res = await (method == 'GET' ? _http.get(uri, headers: headers) : _http.post(uri, headers: headers, body: body == null ? null : jsonEncode(body)))
-        .timeout(const Duration(seconds: 30));
-    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
-    final map = decoded is Map ? decoded.cast<String, dynamic>() : <String, dynamic>{};
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw BackofficeApiException(res.statusCode, (map['detail'] as String?) ?? 'Something went wrong. Please try again.', map['code'] as String?);
+  Future<Map<String, dynamic>> _call(String fn, Map<String, Object?> args, {String? key}) async {
+    Map<String, dynamic> body() => <String, dynamic>{
+          if (locationId != null && locationId!.isNotEmpty) 'location_id': locationId,
+          ...args,
+        }..removeWhere((_, v) => v == null);
+    try {
+      return await _rpc.callMap(fn, body(), key);
+    } on RpcException catch (e) {
+      if (e.code != 'store_scope' || (locationId != null && locationId!.isNotEmpty)) throw _wrap(e);
+      final own = await _ownStore();
+      if (own == null) throw _wrap(e);
+      locationId = own;
+      try {
+        return await _rpc.callMap(fn, body(), key);
+      } on RpcException catch (e2) {
+        throw _wrap(e2);
+      }
     }
-    return map;
   }
 
+  Future<String?> _ownStore() async {
+    try {
+      final o = await _rpc.callMap('inv_options');
+      final id = (o['location'] as Map?)?['id'];
+      return id == null || '$id'.isEmpty ? null : '$id';
+    } on PartnerApiException {
+      return null;
+    }
+  }
+
+  static BackofficeApiException _wrap(RpcException e) => BackofficeApiException(e.status, e.message, e.code);
+
   Future<LowStockView> lowStock({String filter = 'all', String q = ''}) async =>
-      LowStockView(await _send('GET', '/low-stock', query: {'filter': filter, if (q.trim().isNotEmpty) 'q': q.trim()}));
+      LowStockView(await _call('backoffice_low_stock', {'filter': filter, if (q.trim().isNotEmpty) 'q': q.trim()}));
 
-  /// Records suggestions for the items low now, then answers the open suggestions.
-  Future<SuggestionsView> refreshSuggestions({required String key}) async => SuggestionsView(await _send('POST', '/purchase-suggestions/refresh', key: key, body: const {}));
+  /// Records suggestions for the items low now (nothing for goods already on the way), then answers the open suggestions.
+  Future<SuggestionsView> refreshSuggestions({required String key}) async {
+    await _call('purchase_suggestions_refresh', const {}, key: key);
+    return suggestions();
+  }
 
-  Future<SuggestionsView> suggestions() async => SuggestionsView(await _send('GET', '/purchase-suggestions'));
+  Future<SuggestionsView> suggestions() async => SuggestionsView(await _call('purchase_suggestions_list', const {}));
 
-  /// Drafts a purchase order from the ticked suggestions. Answers the purchase order reference.
-  Future<String> createPurchaseOrder(List<PoLine> lines, {required String key}) async {
-    final r = await _send('POST', '/purchase-suggestions/create-po', key: key, body: {'lines': lines.map((l) => l.toJson()).toList()});
-    return '${r['purchase_order_ref'] ?? ''}';
+  /// Marks the ticked suggestions as ordered under the person's own purchase order reference (free text: there is no purchase-order
+  /// record in One Local yet). [quantities] maps suggestion id -> quantity ordered. Answers how many were closed.
+  Future<int> markOrdered(Map<String, num> quantities, {required String reference, required String key}) async {
+    final r = await _call('purchase_suggestions_close',
+        {'ids': quantities.keys.toList(), 'outcome': 'ordered', 'purchase_order_ref': reference.trim(), 'quantities': quantities}, key: key);
+    return (r['closed'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Dismisses suggestions (not needed). Answers how many were closed.
+  Future<int> dismiss(List<String> ids, {required String key}) async {
+    final r = await _call('purchase_suggestions_close', {'ids': ids, 'outcome': 'dismissed'}, key: key);
+    return (r['closed'] as num?)?.toInt() ?? 0;
   }
 }
 

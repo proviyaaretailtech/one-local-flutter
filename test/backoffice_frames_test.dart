@@ -24,7 +24,7 @@ Future<void> _font(String family, String asset) async {
 final _api = BackofficeApi(
   baseUrl: 'http://frames.local',
   accessToken: () => 'frames',
-  client: MockClient((r) async => http.Response(jsonEncode(r.url.path.endsWith('/low-stock') ? lowStockJson() : suggestionsJson()), 200,
+  client: MockClient((r) async => http.Response(jsonEncode(r.url.path == '/rpc/backoffice_low_stock' ? lowStockJson() : suggestionsJson()), 200,
       headers: {'content-type': 'application/json; charset=utf-8'})),
 );
 

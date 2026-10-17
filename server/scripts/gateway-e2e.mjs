@@ -167,6 +167,37 @@ try {
   ok('inventory: A document untouched after all of that', sql(`select status||':'||version from inventory_documents where id='${docId}'`) === 'draft:' + d1.j.version && sql(`select count(*) from stock_movements where organization_id='${orgA}'`) === '1');
   ok('inventory: A viewer can read stock but not create documents', (await rpc(V, 'inv_dashboard')).s === 200 && (await rpc(V, 'inv_document_save', draft, `gw-inv-${randomUUID()}`)).s === 403);
   ok('inventory: applicant with no business gets nothing', refused(await rpc(P1, 'inv_dashboard')) && refused(await rpc(P1, 'inv_stock_detail', { item_id: itemA })));
+  // ---- back office, section J (0420): low stock and purchase suggestions, A's against B's token and against a manager bound to one store
+  sql(`update inventory_items set reorder_level = 20 where id = '${itemA}'`);
+  const locA2 = sql(`insert into locations(organization_id,name,code) values ('${orgA}','ZZ GW Second ${run}','ZZ2-${run}') returning id`).split('\n')[0];
+  const L = await person('mgr-l2-a', orgA, 'manager');
+  const lUser = users[users.length - 1];
+  sql(`update org_users set location_id = '${locA2}' where user_id = '${lUser}' and organization_id = '${orgA}'`);
+  ok('backoffice: no token is 401, helpers are not on the allowlist', (await rpc(null, 'backoffice_low_stock')).s === 401
+    && (await rpc(A, 'backoffice_low_stock_rows')).s === 404 && (await rpc(A, 'backoffice_org_wide')).s === 404 && (await rpc(A, 'purchase_suggestions_create_po')).s === 404);
+  const boA = await rpc(A, 'backoffice_low_stock', { location_id: locA });
+  ok('backoffice: A sees its item low at its store (10 <= 20; buy 20 - 10 - what the open draft receipt above brings)', boA.s === 200
+    && boA.j.items.some(i => i.id === itemA && i.level === 'low' && Number(i.inbound_qty) > 0 && Number(i.suggested_qty) === 20 - 10 - Number(i.inbound_qty)), boA);
+  ok('backoffice: bad shape is a 400', (await rpc(A, 'backoffice_low_stock', { filter: 'zomato' })).s === 400);
+  const refA = await rpc(A, 'purchase_suggestions_refresh', { location_id: locA }, `gw-bo-${randomUUID()}`);
+  ok('backoffice: A records suggestions', refA.s === 200 && refA.j.recorded >= 1, refA);
+  const listA = await rpc(A, 'purchase_suggestions_list', { location_id: locA });
+  const sA = listA.j?.suggestions?.find(x => x.item_id === itemA)?.id;
+  ok('backoffice: A lists its suggestion', listA.s === 200 && !!sA, listA);
+  ok('backoffice: B cannot read or refresh at A store', refused(await rpc(B, 'backoffice_low_stock', { location_id: locA })) && refused(await rpc(B, 'purchase_suggestions_list', { location_id: locA }))
+    && refused(await rpc(B, 'purchase_suggestions_refresh', { location_id: locA }, `gw-bo-${randomUUID()}`)));
+  ok('backoffice: B own views hold nothing of A', !JSON.stringify((await rpc(B, 'backoffice_low_stock')).j).includes(itemA) && !JSON.stringify((await rpc(B, 'purchase_suggestions_list')).j).includes(sA ?? 'none'));
+  ok('backoffice: B cannot close A suggestion', (await rpc(B, 'purchase_suggestions_close', { ids: [sA], outcome: 'dismissed' }, `gw-bo-${randomUUID()}`)).s === 404);
+  ok('backoffice J-2: manager bound to one store gets 403 store_scope for the whole business (read, list, refresh)', await (async () => { const r = await rpc(L, 'backoffice_low_stock'); return r.s === 403 && r.j.code === 'store_scope'; })()
+    && (await rpc(L, 'purchase_suggestions_list')).s === 403 && (await rpc(L, 'purchase_suggestions_refresh', {}, `gw-bo-${randomUUID()}`)).s === 403);
+  ok('backoffice J-2: bound manager cannot open or close the other store', (await rpc(L, 'backoffice_low_stock', { location_id: locA })).s === 404
+    && (await rpc(L, 'purchase_suggestions_close', { ids: [sA], outcome: 'dismissed' }, `gw-bo-${randomUUID()}`)).s === 404);
+  ok('backoffice J-2: bound manager reads own store', (await rpc(L, 'backoffice_low_stock', { location_id: locA2 })).s === 200);
+  const ck = `gw-bo-${randomUUID()}`;
+  const cl = await rpc(A, 'purchase_suggestions_close', { ids: [sA], outcome: 'ordered', purchase_order_ref: 'ZZ-PO-1' }, ck);
+  ok('backoffice: A marks its suggestion ordered with its own reference', cl.s === 200 && cl.j.closed === 1, cl);
+  ok('backoffice: the same close again is answered, nothing changes', (await rpc(A, 'purchase_suggestions_close', { ids: [sA], outcome: 'ordered', purchase_order_ref: 'ZZ-PO-1' }, ck)).j?.closed === 0);
+  ok('backoffice: A suggestion untouched by B and the bound manager', sql(`select status||':'||purchase_order_ref||':'||(closed_by = (select user_id from org_users where organization_id='${orgA}' and role_id=(select id from roles where slug='manager') and location_id is null limit 1)) from purchase_suggestions where id='${sA}'`) === 'ordered:ZZ-PO-1:true');
   ok('payment webhook hook answers 501 (not connected)', (await fetch(`${API}/webhooks/razorpay`, { method: 'POST' })).status === 501);
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.stack?.slice(0, 600));
