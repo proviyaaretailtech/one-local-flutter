@@ -29,11 +29,17 @@ class HomeNav {
   // Section H: tables and floor (the POS tab).
   static HomeRoute? tables;
   static HomeRoute? bill;
+  // Section I: the Service POS calendar, used instead of `bill` by service partners (partner_type 'service').
+  static HomeRoute? service;
+  static String? partnerType;
   static HomeRoute? money;
   static HomeRoute? notifications;
   static HomeRoute? complaints;
   static HomeRoute? reviews;
   static HomeRoute? support;
+
+  // Section J: low stock and purchase suggestions ("view item" uses section H's [stockItem]).
+  static HomeRoute? lowStock;
 
   /// Opens [route], or tells the person that [what] is not available yet.
   static void go(BuildContext context, HomeRoute? route, String what) {
@@ -46,7 +52,8 @@ class HomeNav {
 
   /// Clears every hook (tests).
   static void reset() {
+    home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = lowStock = null;
     stockItem = null;
-    home = orders = orderHistory = setup = items = stock = tables = bill = money = notifications = complaints = reviews = support = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = null;
   }
 }

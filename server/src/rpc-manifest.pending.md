@@ -28,7 +28,7 @@ grn_open, grn_list, grn_view, grn_matching_view, grn_invoice_save, grn_costs_sav
 Section H (inventory): now in the manifest (all twelve inv_ functions), audited and in the cross-tenant e2e.
 Section H (tables and floor, 0404): now in the manifest (all nine tbl_ functions), audited and in the cross-tenant e2e.
 Section I (services): svc_catalogue, svc_quote, svc_calendar, svc_slots, svc_book, svc_appointment_view, svc_appointment_act, svc_bill, svc_history.
-Section J (back office): backoffice_low_stock, purchase_suggestions_refresh, purchase_suggestions_list, purchase_suggestions_close.
+Section J (back office): now in the manifest (backoffice_low_stock, purchase_suggestions_refresh / list / close), audited and in the cross-tenant e2e.
 
 ## Never through the gateway (service role or a third party)
 ol_partner_act (replaced by gw_online_order_act), pos_start_online_payment, pos_online_payment_status, partner_app_save_tax / save_bank / attach_document /
