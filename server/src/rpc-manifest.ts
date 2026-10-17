@@ -18,6 +18,7 @@ import { secureHandlers, withImageLinks, type SecureHandler } from './modules/se
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
+import * as team from './schemas/team.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -100,6 +101,21 @@ export const MANIFEST: Entry[] = [
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  // ---- team, section L (0440). Body = the function's `p` object; the database checks organisation, place and role (owner/admin invite and change people;
+  //      managers read and run tasks; the assigned person starts and submits their own). Roles are read-only here. No pay or bank data is ever returned.
+  db('team_options', { args: team.Options, map: P, rate: 'read', roles: 'staff who may open the team (pos_staff:read or org_invitations:manage)' }),
+  db('team_dashboard', { args: team.Dashboard, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_user_list', { args: team.UserList, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_user_view', { args: team.UserView, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_role_view', { args: team.RoleView, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_activity', { args: team.Activity, map: P, rate: 'read', roles: 'audit_logs:read or pos_audit_log:read or org_invitations:manage' }),
+  db('team_task_list', { args: team.TaskList, map: P, rate: 'read', roles: 'task managers (all tasks); the assigned person (own tasks)' }),
+  db('team_task_view', { args: team.TaskView, map: P, rate: 'read', roles: 'task managers; the assigned person' }),
+  db('team_invite', { args: team.Invite, map: P, rate: 'write', roles: 'owner or admin (org_invitations:manage); only an owner invites an owner or admin' }),
+  db('team_invite_act', { args: team.InviteAct, map: P, rate: 'write', roles: 'owner or admin (org_invitations:manage)' }),
+  db('team_user_act', { args: team.UserAct, map: P, rate: 'write', roles: 'owner or admin (org_invitations:manage); never on yourself' }),
+  db('team_task_save', { args: team.TaskSave, map: P, rate: 'write', idem: true, roles: 'task managers (owner, admin, manager, business / operations / location manager)' }),
+  db('team_task_act', { args: team.TaskAct, map: P, rate: 'write', roles: 'task managers; the assigned person may start and submit' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 
