@@ -8,6 +8,8 @@ import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
 import 'inventory/inventory_dashboard.dart';
 import 'inventory/stock_detail_screen.dart';
+import 'money/money_env.dart';
+import 'money/money_home.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
 import 'sell/sell_env.dart';
@@ -16,7 +18,7 @@ import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
-/// workspace setup (C), the control centre (D), orders (E) and the catalogue and GRN (G) into the [HomeNav] hooks.
+/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G) and money (K) into the [HomeNav] hooks.
 void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
   HomeNav.orders = HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
@@ -29,6 +31,8 @@ void installRoutes() {
       onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
   HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
   HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
+  // Section K: money. The server says which screens this person may open; the bottom bar's other tabs go back through _tab.
+  HomeNav.money = (c) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
