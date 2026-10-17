@@ -202,6 +202,10 @@ try {
   ok('GRN: A review untouched after all of that', sql(`select status||':'||version from grn_reviews where receipt_document_id='${gr.j.id}'`) === 'matching:' + gi.j.version);
   const grc = await rpc(A, 'inv_document_act', { id: gr.j.id, action: 'cancel', version: grs.j.version }, `gw-grn-${randomUUID()}`);
   ok('GRN: cancelling the receipt closes its GRN', grc.s === 200 && (await rpc(A, 'grn_view', R)).j?.status === 'cancelled', grc);
+  ok('GRN: the older one-call receipt (inventory_record over PostgREST, not on the allowlist) is refused too', await (async () => {
+    const r = await fetch(`${U}/rest/v1/rpc/inventory_record`, { method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${A}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p: { organization_id: orgA, kind: 'receipt', quantity: 50, inventory_item_id: c1.j.inventory_item_id } }) });
+    return r.status >= 400 && /GRN_NOT_APPROVED/.test(await r.text()); })());
   ok('GRN: no stock moved for the test receipt', sql(`select count(*) from stock_movements where inventory_item_id='${c1.j.inventory_item_id}'`) === '0');
   ok('payment webhook hook answers 501 (not connected)', (await fetch(`${API}/webhooks/razorpay`, { method: 'POST' })).status === 501);
 } catch (e) {
