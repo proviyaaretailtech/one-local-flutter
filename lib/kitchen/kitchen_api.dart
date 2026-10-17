@@ -7,7 +7,7 @@ import '../auth/partner_api.dart';
 import '../inventory/inventory_api.dart' show Facts;
 
 /// Kitchen stations and the Kitchen Display System through the one generic door, `POST /rpc/<function>` ([RpcClient]); the database functions of
-/// migrations 0430-0431 do the work and check the business, the location, the role and every rule. Writes carry an Idempotency-Key so a retried tap
+/// migrations 0480-0481 do the work and check the business, the location, the role and every rule. Writes carry an Idempotency-Key so a retried tap
 /// never doubles; ticket actions carry the `updated_at` the person saw so a screen that is out of date is refused.
 class KitchenApi {
   KitchenApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc})

@@ -15,7 +15,7 @@ import 'package:vinii_pos/kitchen/station_detail_screen.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart' show Facts;
 import 'package:vinii_pos/ui/theme.dart';
 
-/// Answers captured from the real local database (database/tests/430_kitchen.sql story): the screens are built against what the server sends.
+/// Answers captured from the real local database (database/tests/480_kitchen.sql story): the screens are built against what the server sends.
 final Map<String, dynamic> fx = jsonDecode(File('test/fixtures/kitchen_server.json').readAsStringSync()) as Map<String, dynamic>;
 
 http.Response ok(Object body) => http.Response(jsonEncode(body), 200, headers: {'content-type': 'application/json; charset=utf-8'});

@@ -1,0 +1,29 @@
+// Request shapes for the store catalogue functions (database: migration 0390, section G). A friendly first check of the shape of the
+// request; every rule (unique SKU and barcode, price not above MRP, GST slabs, tax needed unless draft, stale version, linking a stock item,
+// permissions, tenancy) is checked again in the database. Money is in minor units (paise).
+import { z } from 'zod';
+import { UUID } from '../validate.ts';
+
+const id = z.string({ message: 'Not a valid id.' }).regex(UUID, 'Not a valid id.');
+const money = z.number().int().min(0).max(100_000_000_000);
+const opt = <T extends z.ZodType>(t: T) => t.nullish();
+const loc = { location_id: id.nullish() };
+
+// list and search: the sell screen's search is this same call with status 'active' (no second alias)
+export const List = z.object({
+  ...loc, q: opt(z.string().max(60)), status: z.enum(['all', 'active', 'inactive', 'draft', 'out', 'combo'], { message: 'Unknown filter.' }).optional(),
+  category: opt(z.string().max(60)), page: z.number().int().min(1).max(10_000).optional(), page_size: z.number().int().min(1).max(100).optional(),
+}).strict();
+export const View = z.object({ ...loc, id }).strict();
+export const Lookup = z.object({ ...loc, code: z.string().trim().min(1, 'Enter the code text.').max(80) }).strict();
+// create (no id; the Idempotency-Key header becomes idempotency_key) or change (id + version)
+export const Save = z.object({
+  id: id.optional(), version: z.number().int().min(1).optional(), idempotency_key: z.string().trim().max(100).optional(),
+  mode: z.enum(['quick', 'full']).optional(), draft: z.boolean().optional(),
+  name: z.string().max(120).optional(), sku: z.string().max(40).optional(), category: opt(z.string().max(60)), brand: opt(z.string().max(60)),
+  barcode: opt(z.string().max(48)), price_minor: money.optional(), mrp_minor: opt(money), cost_minor: opt(money),
+  hsn: opt(z.string().max(8)), gst_pct: opt(z.number().min(0).max(100)),
+  selling_unit: z.enum(['pc', 'pack', 'kg', 'g', 'l', 'ml', 'dozen', 'box']).optional(),
+  net_qty: opt(z.number().positive().max(1_000_000)), net_qty_unit: opt(z.enum(['g', 'kg', 'ml', 'l', 'pc'])),
+  unit_description: opt(z.string().max(40)), purchase_pack_units: opt(z.number().positive().max(1_000_000)), storage: opt(z.string().max(40)),
+}).strict().refine(b => !b.id || b.version, { message: 'Refresh the item and try again.', path: ['version'] });

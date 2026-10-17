@@ -19,15 +19,12 @@ by this work** (the audit script does it the moment they are listed). `anon` mus
 | GET/POST coupons | (list: check sell.ts), pos_coupon_save | write | |
 | GET catalog | table read of menu_items in the old route | — | needs a function (invoker, RLS) before it can use the gateway |
 
-## Section G, catalogue and goods received (branch claude/section-g-catalogue-2079b3, routes /api/partner/catalogue*, /api/partner/grn*)
-cat_item_list, cat_item_lookup, cat_item_view, cat_item_save,
-grn_open, grn_list, grn_view, grn_matching_view, grn_invoice_save, grn_costs_save, grn_resolve, grn_request_approval, grn_decide.
-(grn_decide posts the receipt through section H's inv_document_act.) Errors use prefixes GRN_, POS_, INV_: all already mapped in db.ts.
-
 ## Seen on the local database from other sections (not in the two branches above)
 Section H (inventory): now in the manifest (all twelve inv_ functions), audited and in the cross-tenant e2e.
+Section G (catalogue, GRN): now in the manifest (four cat_item_ and nine grn_ functions), audited and in the cross-tenant e2e.
+Section H (tables and floor, 0404): now in the manifest (all nine tbl_ functions), audited and in the cross-tenant e2e.
 Section I (services): svc_catalogue, svc_quote, svc_calendar, svc_slots, svc_book, svc_appointment_view, svc_appointment_act, svc_bill, svc_history.
-Section J (back office): backoffice_low_stock, purchase_suggestions_refresh, purchase_suggestions_list, purchase_suggestions_close.
+Section J (back office): now in the manifest (backoffice_low_stock, purchase_suggestions_refresh / list / close), audited and in the cross-tenant e2e.
 
 ## Never through the gateway (service role or a third party)
 ol_partner_act (replaced by gw_online_order_act), pos_start_online_payment, pos_online_payment_status, partner_app_save_tax / save_bank / attach_document /

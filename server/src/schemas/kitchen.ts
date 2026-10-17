@@ -1,4 +1,4 @@
-// Request shapes for the kitchen functions (database: migrations 0430 setup and 0431 display, section H). A friendly first check of the
+// Request shapes for the kitchen functions (database: migrations 0480 setup and 0481 display, section H). A friendly first check of the
 // shape of the request; every rule (organisation, location, role, state, names, references) is checked again in the database. Extra keys
 // are kept (`loose`) because the database functions read their own fields from the same object.
 import { z } from 'zod';

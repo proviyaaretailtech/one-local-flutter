@@ -167,7 +167,7 @@ try {
   ok('inventory: A document untouched after all of that', sql(`select status||':'||version from inventory_documents where id='${docId}'`) === 'draft:' + d1.j.version && sql(`select count(*) from stock_movements where organization_id='${orgA}'`) === '1');
   ok('inventory: A viewer can read stock but not create documents', (await rpc(V, 'inv_dashboard')).s === 200 && (await rpc(V, 'inv_document_save', draft, `gw-inv-${randomUUID()}`)).s === 403);
   ok('inventory: applicant with no business gets nothing', refused(await rpc(P1, 'inv_dashboard')) && refused(await rpc(P1, 'inv_stock_detail', { item_id: itemA })));
-  // ---- kitchen stations and display (section H, 0430-0431): A's kitchen against B's token
+  // ---- kitchen stations and display (section H, 0480-0481): A's kitchen against B's token
   ok('kitchen: no token is 401', (await rpc(null, 'kds_queue')).s === 401 && (await rpc(null, 'kitchen_config')).s === 401);
   const kcfg = await rpc(A, 'kitchen_config');
   ok('kitchen: A manager sees Main Kitchen and may configure', kcfg.s === 200 && kcfg.j.stations.some(s => s.key === 'main') && kcfg.j.can.configure === true, kcfg);
@@ -194,6 +194,109 @@ try {
   ok('kitchen: A starts its ticket', kst.s === 200 && kst.j.status === 'preparing', kst);
   ok('kitchen: a stale screen is a 409 version_conflict', await (async () => { const r = await rpc(A, 'kds_ticket_act', { ticket_id: tkA, action: 'print', expected_updated_at: '2000-01-01T00:00:00Z' }, `gw-kit-${randomUUID()}`); return r.s === 409 && r.j.code === 'version_conflict'; })());
   ok('kitchen: applicant with no business gets nothing', refused(await rpc(P1, 'kds_queue')) && refused(await rpc(P1, 'kitchen_config')));
+  // ---- tables and floor (section H, 0404): A's tables, reservations and merges against B's token
+  const tbl = l => sql(`insert into dining_tables(organization_id,location_id,label,seats,sort_order) values ('${orgA}','${locA}','${l}',4,1) returning id`).split('\n')[0];
+  const tA1 = tbl('ZT1'), tA2 = tbl('ZT2'), tA3 = tbl('ZT3');
+  const tB1 = sql(`insert into dining_tables(organization_id,location_id,label,seats) values ('${orgB}','${locB}','ZB1',4) returning id`).split('\n')[0];
+  const soon = new Date(Date.now() + 86400000).toISOString();
+  ok('tables: no token is 401; helpers are not on the allowlist', (await rpc(null, 'tbl_floor')).s === 401 && (await rpc(A, 'tbl_states')).s === 404 && (await rpc(A, 'tbl_guard')).s === 404);
+  const fA = await rpc(A, 'tbl_floor');
+  ok('tables: A sees its own three tables, all available', fA.s === 200 && fA.j.tables.filter(t => t.label.startsWith('ZT') && t.status === 'available').length === 3, fA);
+  ok('tables: bad shape is a 400 with a sentence', await (async () => { const r = await rpc(A, 'tbl_view', { table_id: 'nope' }); return r.s === 400 && r.j.code === 'validation'; })());
+  const rk = `gw-tbl-${randomUUID()}`, res = { table_id: tA1, guest_name: 'ZZ Guest', phone: '5550100', guests: 4, scheduled_at: soon };
+  const tr1 = await rpc(A, 'tbl_reserve', res, rk), tr2 = await rpc(A, 'tbl_reserve', res, rk);
+  ok('tables: reserve works and a retry with the same key is the same reservation', tr1.s === 200 && tr2.s === 200 && tr2.j.replayed === true && tr1.j.reservation.id === tr2.j.reservation.id, [tr1, tr2]);
+  ok('tables: capacity is a 422 with a sentence', await (async () => { const r = await rpc(A, 'tbl_reserve', { ...res, table_id: tA2, guests: 9 }, `gw-tbl-${randomUUID()}`); return r.s === 422 && r.j.code === 'capacity'; })());
+  const d3 = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+  ok('tables: a booking in the store wall clock works; an instant without its zone is a 400', (await rpc(A, 'tbl_reserve', { table_id: tA2, guest_name: 'ZZ Local', phone: '5550101', guests: 2, local_date: d3, local_time: '19:30' }, `gw-tbl-${randomUUID()}`)).s === 200
+    && (await rpc(A, 'tbl_reserve', { table_id: tA2, guest_name: 'ZZ NoZone', phone: '5550101', guests: 2, scheduled_at: `${d3}T12:00:00` }, `gw-tbl-${randomUUID()}`)).s === 400);
+  ok('tables: transfer from an empty table is a 409', (await rpc(A, 'tbl_transfer', { from_table_id: tA1, to_table_id: tA2 })).s === 409);
+  const mg = await rpc(A, 'tbl_merge', { table_ids: [tA2, tA3] });
+  ok('tables: A merges two tables', mg.s === 200 && mg.j.combined_seats === 8, mg);
+  const bFloor = await rpc(B, 'tbl_floor');
+  ok('tables: B floor has only its own table', bFloor.s === 200 && bFloor.j.tables.length === 1 && bFloor.j.tables[0].label === 'ZB1' && !JSON.stringify(bFloor.j).includes(tA1), bFloor);
+  ok('tables: B cannot view, read the order of, or read the history of A tables', (await rpc(B, 'tbl_view', { table_id: tA1 })).s === 404 && (await rpc(B, 'tbl_order_view', { table_id: tA1 })).s === 404 && (await rpc(B, 'tbl_history', { table_id: tA1 })).s === 404);
+  ok('tables: B cannot reserve, transfer, merge, cancel or split anything of A', (await rpc(B, 'tbl_reserve', { ...res, guest_name: 'ZZ Intruder' }, `gw-tbl-${randomUUID()}`)).s === 404
+    && (await rpc(B, 'tbl_transfer', { from_table_id: tA1, to_table_id: tB1 })).s === 404 && (await rpc(B, 'tbl_transfer', { from_table_id: tB1, to_table_id: tA1 })).s === 404
+    && (await rpc(B, 'tbl_merge', { table_ids: [tA2, tA3] })).s === 404 && (await rpc(B, 'tbl_reserve_cancel', { id: tr1.j.reservation.id })).s === 404
+    && (await rpc(B, 'tbl_split', { merge_id: mg.j.merge_id })).s === 404);
+  ok('tables: B cannot open the A store, and A rows are untouched', refused(await rpc(B, 'tbl_floor', { location_id: locA }))
+    && sql(`select count(*) from pos_reservations where organization_id='${orgA}' and guest_name='ZZ Intruder'`) === '0'
+    && sql(`select count(*) from table_merge_members where merge_id='${mg.j.merge_id}' and released_at is null`) === '2'
+    && sql(`select status from pos_reservations where row_id='${tr1.j.reservation.id}'`) === 'confirmed');
+  ok('tables: A viewer (no order rights) is refused; applicant with no business gets nothing', (await rpc(V, 'tbl_floor')).s === 403 && refused(await rpc(P1, 'tbl_floor')) && refused(await rpc(P1, 'tbl_view', { table_id: tA1 })));
+  ok('tables: A splits its merge', (await rpc(A, 'tbl_split', { merge_id: mg.j.merge_id })).s === 200);
+  // ---- back office, section J (0420): low stock and purchase suggestions, A's against B's token and against a manager bound to one store
+  sql(`update inventory_items set reorder_level = 20 where id = '${itemA}'`);
+  const locA2 = sql(`insert into locations(organization_id,name,code) values ('${orgA}','ZZ GW Second ${run}','ZZ2-${run}') returning id`).split('\n')[0];
+  const L = await person('mgr-l2-a', orgA, 'manager');
+  const lUser = users[users.length - 1];
+  sql(`update org_users set location_id = '${locA2}' where user_id = '${lUser}' and organization_id = '${orgA}'`);
+  ok('backoffice: no token is 401, helpers are not on the allowlist', (await rpc(null, 'backoffice_low_stock')).s === 401
+    && (await rpc(A, 'backoffice_low_stock_rows')).s === 404 && (await rpc(A, 'backoffice_org_wide')).s === 404 && (await rpc(A, 'purchase_suggestions_create_po')).s === 404);
+  const boA = await rpc(A, 'backoffice_low_stock', { location_id: locA });
+  ok('backoffice: A sees its item low at its store (10 <= 20; buy 20 - 10 - what the open draft receipt above brings)', boA.s === 200
+    && boA.j.items.some(i => i.id === itemA && i.level === 'low' && Number(i.inbound_qty) > 0 && Number(i.suggested_qty) === 20 - 10 - Number(i.inbound_qty)), boA);
+  ok('backoffice: bad shape is a 400', (await rpc(A, 'backoffice_low_stock', { filter: 'zomato' })).s === 400);
+  const refA = await rpc(A, 'purchase_suggestions_refresh', { location_id: locA }, `gw-bo-${randomUUID()}`);
+  ok('backoffice: A records suggestions', refA.s === 200 && refA.j.recorded >= 1, refA);
+  const listA = await rpc(A, 'purchase_suggestions_list', { location_id: locA });
+  const sA = listA.j?.suggestions?.find(x => x.item_id === itemA)?.id;
+  ok('backoffice: A lists its suggestion', listA.s === 200 && !!sA, listA);
+  ok('backoffice: B cannot read or refresh at A store', refused(await rpc(B, 'backoffice_low_stock', { location_id: locA })) && refused(await rpc(B, 'purchase_suggestions_list', { location_id: locA }))
+    && refused(await rpc(B, 'purchase_suggestions_refresh', { location_id: locA }, `gw-bo-${randomUUID()}`)));
+  ok('backoffice: B own views hold nothing of A', !JSON.stringify((await rpc(B, 'backoffice_low_stock')).j).includes(itemA) && !JSON.stringify((await rpc(B, 'purchase_suggestions_list')).j).includes(sA ?? 'none'));
+  ok('backoffice: B cannot close A suggestion', (await rpc(B, 'purchase_suggestions_close', { ids: [sA], outcome: 'dismissed' }, `gw-bo-${randomUUID()}`)).s === 404);
+  ok('backoffice J-2: manager bound to one store gets 403 store_scope for the whole business (read, list, refresh)', await (async () => { const r = await rpc(L, 'backoffice_low_stock'); return r.s === 403 && r.j.code === 'store_scope'; })()
+    && (await rpc(L, 'purchase_suggestions_list')).s === 403 && (await rpc(L, 'purchase_suggestions_refresh', {}, `gw-bo-${randomUUID()}`)).s === 403);
+  ok('backoffice J-2: bound manager cannot open or close the other store', (await rpc(L, 'backoffice_low_stock', { location_id: locA })).s === 404
+    && (await rpc(L, 'purchase_suggestions_close', { ids: [sA], outcome: 'dismissed' }, `gw-bo-${randomUUID()}`)).s === 404);
+  ok('backoffice J-2: bound manager reads own store', (await rpc(L, 'backoffice_low_stock', { location_id: locA2 })).s === 200);
+  const ck = `gw-bo-${randomUUID()}`;
+  const cl = await rpc(A, 'purchase_suggestions_close', { ids: [sA], outcome: 'ordered', purchase_order_ref: 'ZZ-PO-1' }, ck);
+  ok('backoffice: A marks its suggestion ordered with its own reference', cl.s === 200 && cl.j.closed === 1, cl);
+  ok('backoffice: the same close again is answered, nothing changes', (await rpc(A, 'purchase_suggestions_close', { ids: [sA], outcome: 'ordered', purchase_order_ref: 'ZZ-PO-1' }, ck)).j?.closed === 0);
+  ok('backoffice: A suggestion untouched by B and the bound manager', sql(`select status||':'||purchase_order_ref||':'||(closed_by = (select user_id from org_users where organization_id='${orgA}' and role_id=(select id from roles where slug='manager') and location_id is null limit 1)) from purchase_suggestions where id='${sA}'`) === 'ordered:ZZ-PO-1:true');
+
+  // ---- catalogue and GRN (section G, 0390/0391/0409): A's items and GRNs, touched with B's token by every G function
+  const cck = `gw-cat-${randomUUID()}`, sku = `ZZG${run}`.toUpperCase().slice(0, 20);
+  const c1 = await rpc(A, 'cat_item_save', { mode: 'quick', name: 'ZZ Cola', sku, price_minor: 4000, mrp_minor: 4500, barcode: `ZZB${run}` }, cck);
+  ok('catalogue: A quick-adds an item (Idempotency-Key header)', c1.s === 200 && c1.j.sku === sku && c1.j.price_minor === 4000, c1);
+  ok('catalogue: replay with the same key returns the same item', (await rpc(A, 'cat_item_save', { mode: 'quick', name: 'ZZ Cola', sku, price_minor: 4000 }, cck)).j?.id === c1.j.id);
+  ok('catalogue: price above MRP is a 400 with a sentence', await (async () => { const r = await rpc(A, 'cat_item_save', { id: c1.j.id, version: c1.j.version, mode: 'quick', price_minor: 9900 }); return r.s === 400 && /MRP/.test(r.j.error ?? r.j.message ?? JSON.stringify(r.j)); })());
+  ok('catalogue: search is cat_item_list with status active', await (async () => { const r = await rpc(A, 'cat_item_list', { q: sku, status: 'active' }); return r.s === 200 && r.j.items.some(i => i.id === c1.j.id); })());
+  ok('catalogue: A views and looks up its item', (await rpc(A, 'cat_item_view', { id: c1.j.id })).s === 200 && (await rpc(A, 'cat_item_lookup', { code: `ZZB${run}` })).j?.id === c1.j.id);
+  ok('catalogue: bad shape is a 400', (await rpc(A, 'cat_item_view', { id: 'nope' })).s === 400 && (await rpc(A, 'cat_item_save', { id: c1.j.id, name: 'no version' })).s === 400);
+  ok('catalogue: helpers are not on the allowlist', (await rpc(A, 'cat_stock_map')).s === 404 && (await rpc(A, 'grn_rows')).s === 404 && (await rpc(A, 'grn_post_gate')).s === 404);
+  ok('catalogue: B list has none of A', await (async () => { const r = await rpc(B, 'cat_item_list', {}); return r.s === 200 && !JSON.stringify(r.j).includes(c1.j.id); })());
+  ok('catalogue: B cannot view, look up or change A item', (await rpc(B, 'cat_item_view', { id: c1.j.id })).s === 404 && (await rpc(B, 'cat_item_lookup', { code: `ZZB${run}` })).s === 404
+    && (await rpc(B, 'cat_item_save', { id: c1.j.id, version: c1.j.version, mode: 'quick', name: 'Hacked' })).s === 404);
+  ok('catalogue: viewer of A cannot add items', (await rpc(V, 'cat_item_save', { mode: 'quick', name: 'V', sku: `V${sku}`.slice(0, 20), price_minor: 1 }, `gw-cat-${randomUUID()}`)).s === 403);
+  const gr = await rpc(A, 'inv_document_save', { doc_type: 'receipt', supplier_name: 'ZZ Supplier', lines: [{ inventory_item_id: c1.j.inventory_item_id, qty: 5 }] }, `gw-grn-${randomUUID()}`);
+  const grs = await rpc(A, 'inv_document_act', { id: gr.j.id, action: 'submit', version: gr.j.version }, `gw-grn-${randomUUID()}`);
+  ok('GRN: posting a receipt with no approved GRN is a 409 (the gate)', await (async () => { const r = await rpc(A, 'inv_document_act', { id: gr.j.id, action: 'post', version: grs.j.version }, `gw-grn-${randomUUID()}`); return r.s === 409 && /GRN/.test(JSON.stringify(r.j)); })());
+  const g1 = await rpc(A, 'grn_open', { receipt_document_id: gr.j.id });
+  ok('GRN: A opens the GRN of its receipt', g1.s === 200 && g1.j.status === 'matching', g1);
+  const gi = await rpc(A, 'grn_invoice_save', { receipt_document_id: gr.j.id, supplier_name: 'ZZ Supplier', invoice_no: `ZZ-${run}`, invoice_date: '2026-10-10',
+    lines: [{ inventory_item_id: c1.j.inventory_item_id, product_name: 'ZZ Cola', qty: 3, unit_price_minor: 3000 }, { inventory_item_id: c1.j.inventory_item_id, product_name: 'ZZ Cola', qty: 2, unit_price_minor: 2000 }] });
+  ok('GRN: two lines of one item total 13000 and show a price difference', gi.s === 200 && gi.j.totals.invoice_amount_minor === 13000 && gi.j.invoice_total_minor === 13000 && gi.j.rows[0].state === 'price_diff', gi);
+  const R = { receipt_document_id: gr.j.id };
+  ok('GRN: B queue has none of A', await (async () => { const r = await rpc(B, 'grn_list', {}); return r.s === 200 && !JSON.stringify(r.j).includes(gr.j.id); })());
+  ok('GRN: B cannot open, view or read the matching of A receipt', (await rpc(B, 'grn_open', R)).s === 404 && (await rpc(B, 'grn_view', R)).s === 404 && (await rpc(B, 'grn_matching_view', R)).s === 404);
+  ok('GRN: B cannot enter an invoice, prices, a resolution, a request or a decision on A receipt',
+    (await rpc(B, 'grn_invoice_save', { ...R, supplier_name: 'X', invoice_no: 'X1', invoice_date: '2026-10-10', lines: [{ product_name: 'x', qty: 1, unit_price_minor: 1 }] })).s === 404
+    && (await rpc(B, 'grn_costs_save', { ...R, costs: [{ line_id: randomUUID(), unit_cost_minor: 1 }] })).s === 404
+    && (await rpc(B, 'grn_resolve', { ...R, version: gi.j.version, resolution: 'accept_as_received', note: 'zz' })).s === 404
+    && (await rpc(B, 'grn_request_approval', { ...R, version: gi.j.version })).s === 404
+    && (await rpc(B, 'grn_decide', { ...R, version: gi.j.version, decision: 'approve' })).s === 404);
+  ok('GRN: A review untouched after all of that', sql(`select status||':'||version from grn_reviews where receipt_document_id='${gr.j.id}'`) === 'matching:' + gi.j.version);
+  const grc = await rpc(A, 'inv_document_act', { id: gr.j.id, action: 'cancel', version: grs.j.version }, `gw-grn-${randomUUID()}`);
+  ok('GRN: cancelling the receipt closes its GRN', grc.s === 200 && (await rpc(A, 'grn_view', R)).j?.status === 'cancelled', grc);
+  ok('GRN: the older one-call receipt (inventory_record over PostgREST, not on the allowlist) is refused too', await (async () => {
+    const r = await fetch(`${U}/rest/v1/rpc/inventory_record`, { method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${A}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p: { organization_id: orgA, kind: 'receipt', quantity: 50, inventory_item_id: c1.j.inventory_item_id } }) });
+    return r.status >= 400 && /GRN_NOT_APPROVED/.test(await r.text()); })());
+  ok('GRN: no stock moved for the test receipt', sql(`select count(*) from stock_movements where inventory_item_id='${c1.j.inventory_item_id}'`) === '0');
   ok('payment webhook hook answers 501 (not connected)', (await fetch(`${API}/webhooks/razorpay`, { method: 'POST' })).status === 501);
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.stack?.slice(0, 600));
@@ -203,6 +306,7 @@ try {
   try { sql(`update orders set notes='ZZ-TEST gw' where organization_id in ('${orgA}','${orgB}') and coalesce(notes,'') not like 'ZZ-TEST%'`); } catch {}
   sql(`delete from org_bill_settings where organization_id in ('${orgA}','${orgB}')`);
   sql(`delete from org_counters where organization_id in ('${orgA}','${orgB}')`);
+  try { sql(`delete from table_merge_members where organization_id in ('${orgA}','${orgB}')`); sql(`delete from pos_reservations where organization_id in ('${orgA}','${orgB}')`); sql(`delete from dining_tables where organization_id in ('${orgA}','${orgB}')`); } catch {}
   try { sql(`delete from inventory_bins where organization_id in ('${orgA}','${orgB}')`); } catch {}
   try { console.log(execSync('../../database/purge_test_orders.sh', { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { console.log('purge:', e.message.slice(0, 120)); }
   console.log('leftover test businesses: ' + sql(`select count(*) from organizations where id in ('${orgA}','${orgB}')`));

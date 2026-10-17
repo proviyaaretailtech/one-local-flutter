@@ -19,6 +19,11 @@ import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
 import * as kit from './schemas/kitchen.ts';
+import * as cat from './schemas/catalogue.ts';
+import * as grn from './schemas/grn.ts';
+import * as tbl from './schemas/tables.ts';
+import * as bo from './schemas/backoffice.ts';
+import * as svc from './schemas/service.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -101,13 +106,71 @@ export const MANIFEST: Entry[] = [
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
-  // ---- kitchen stations and the kitchen display, section H (0430, 0431). Body = the function's `p` object; the database checks organisation,
+  // ---- kitchen stations and the kitchen display, section H (0480, 0481). Body = the function's `p` object; the database checks organisation,
   //      location and role (kitchen:view / kitchen:configure; order.update_status to act on a ticket). Writes carry the Idempotency-Key header.
   db('kitchen_config', { args: kit.Config, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
   db('kitchen_station_view', { args: kit.StationView, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
   db('kitchen_station_save', { args: kit.StationSave, map: P, rate: 'write', idem: true, roles: 'staff with kitchen:configure' }),
   db('kds_queue', { args: kit.Queue, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
   db('kds_ticket_act', { args: kit.TicketAct, map: P, rate: 'write', idem: true, roles: 'staff with order.update_status' }),
+  // ---- store catalogue and goods-received (GRN) matching, section G (0390, 0391, 0409). Body = the function's `p` object; the database
+  //      checks organisation, location and role (menu:create / menu:update, inventory:record / inventory:approve). The sell screen's search
+  //      is cat_item_list with status 'active'. Helpers (cat_stock_map, cat_location, cat_item_json, grn_rows, grn_totals, grn_signature,
+  //      grn_person, grn_receipt, the triggers) are not executable by `authenticated` and stay off this list.
+  db('cat_item_list', { args: cat.List, map: P, rate: 'read', roles: STAFF }),
+  db('cat_item_view', { args: cat.View, map: P, rate: 'read', roles: STAFF }),
+  db('cat_item_lookup', { args: cat.Lookup, map: P, rate: 'read', roles: STAFF }),
+  db('cat_item_save', { args: cat.Save, map: P, rate: 'write', idem: true, roles: 'staff with menu:create (new) or menu:update (change)' }),
+  db('grn_list', { args: grn.List, map: P, rate: 'read', roles: STAFF }),
+  db('grn_view', { args: grn.Receipt, map: P, rate: 'read', roles: STAFF }),
+  db('grn_matching_view', { args: grn.Receipt, map: P, rate: 'read', roles: STAFF }),
+  db('grn_open', { args: grn.Receipt, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('grn_invoice_save', { args: grn.Invoice, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('grn_costs_save', { args: grn.Costs, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('grn_resolve', { args: grn.Resolve, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('grn_request_approval', { args: grn.RequestApproval, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('grn_decide', { args: grn.Decide, map: P, rate: 'write', roles: 'inventory:approve; approving posts the receipt through section H' }),
+  // ---- tables and floor, section H (0404). Body = the function's `p` object (location_id, table ids); the database validates it and checks
+  //      organisation, store and role (order:place for reserving; order:place + order:update_status or dining_tables:manage for transfer / merge / split).
+  db('tbl_floor', { args: tbl.Floor, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  db('tbl_view', { args: tbl.TableRef, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_order_view', { args: tbl.TableRef, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_history', { args: tbl.History, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_reserve', { args: tbl.Reserve, map: P, rate: 'write', idem: true, roles: 'staff with order:place (or table manager)' }),
+  db('tbl_reserve_cancel', { args: tbl.ReserveCancel, map: P, rate: 'write', roles: 'staff with order:place (or table manager)' }),
+  db('tbl_transfer', { args: tbl.Transfer, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
+  db('tbl_merge', { args: tbl.Merge, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
+  db('tbl_split', { args: tbl.Split, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
+  // ---- back office, section J (0420): Low Stock and Purchase Suggestions, read from section H's stock numbers. Body = the function's `p`
+  //      object; no location_id = the whole business, which the database allows only for a business-wide person.
+  db('backoffice_low_stock', { args: bo.LowStock, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('purchase_suggestions_list', { args: bo.SuggestionsList, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('purchase_suggestions_refresh', { args: bo.SuggestionsRefresh, map: P, rate: 'write', roles: 'owner, managers, inventory and procurement roles' }),
+  db('purchase_suggestions_close', { args: bo.SuggestionsClose, map: P, rate: 'write', idem: true, roles: 'owner, managers, inventory and procurement roles' }),
+  // ---- Service POS, section I (0410-0413). Body = the function's `p` object; the database checks organisation, location and role
+  //      (book: owner/admin/manager/biller/captain/...; manage: owner/admin/manager). Writes carry the Idempotency-Key header and the
+  //      database refuses a replayed key with a different body (OL_IDEMPOTENCY_MISMATCH).
+  db('svc_catalogue', { args: svc.Catalogue, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_calendar', { args: svc.Calendar, map: P, rate: 'read', roles: STAFF }),
+  db('svc_quote', { args: svc.Quote, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_slots', { args: svc.Slots, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_appointment_view', { args: svc.View, map: P, rate: 'read', roles: STAFF }),
+  db('svc_history', { args: svc.History, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_service_list', { args: svc.ServiceList, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_service_detail', { args: svc.View, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_staff_list', { args: svc.StaffList, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_schedule', { args: svc.Schedule, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_plan_list', { args: svc.PlanList, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_entitlements_for', { args: svc.EntitlementsFor, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_book', { args: svc.Book, map: P, rate: 'money', idem: true, roles: 'staff who may book' }),
+  db('svc_appointment_act', { args: svc.Act, map: P, rate: 'money', idem: true, roles: 'staff who may book (keeping an advance: manager)' }),
+  db('svc_job_update', { args: svc.JobUpdate, map: P, rate: 'write', idem: true, roles: 'staff who may book' }),
+  db('svc_bill', { args: svc.Bill, map: P, rate: 'money', idem: true, roles: 'staff who may book' }),
+  db('svc_entitlement_sell', { args: svc.Sell, map: P, rate: 'money', idem: true, roles: 'staff who may book' }),
+  db('svc_service_save', { args: svc.ServiceSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
+  db('svc_provider_save', { args: svc.ProviderSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
+  db('svc_schedule_save', { args: svc.ScheduleSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
+  db('svc_plan_save', { args: svc.PlanSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 
