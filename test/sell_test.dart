@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:vinii_pos/app_routes.dart';
 import 'package:vinii_pos/home/home_nav.dart';
+import 'package:vinii_pos/auth/partner_api.dart' show PartnerApiException;
 import 'package:vinii_pos/orders/orders_api.dart';
 import 'package:vinii_pos/sell/carts_screen.dart';
 import 'package:vinii_pos/sell/history_screen.dart';
@@ -41,7 +42,8 @@ void main() {
       final t = Till();
       final c = await t.env().sell.catalog(q: 'butter', category: 'Dairy', availableOnly: true, sort: 'price_desc');
       final r = t.calls.single;
-      expect(r.url.queryParameters, {'q': 'butter', 'category': 'Dairy', 'available': '1', 'sort': 'price_desc'});
+      expect(r.url.path, '/rpc/pos_sell_catalog');
+      expect(jsonDecode(r.body), {'q': 'butter', 'category': 'Dairy', 'available': true, 'sort': 'price_desc'});
       expect(r.headers['Authorization'], 'Bearer tok');
       expect(c.items.first.sku, 'AB500');
       expect(c.categories, ['Beverages', 'Dairy', 'Snacks']);
@@ -50,10 +52,11 @@ void main() {
     test('split pay sends the key, the version and the parts as given', () async {
       final t = Till();
       await t.env().sell.splitPay('o1', [{'method': 'cash', 'amount': 300, 'tendered': 500}, {'method': 'upi', 'amount': 330}], version: 'v1', key: 'pos-key-1');
-      final r = t.calls.single;
-      expect(r.url.path, '/api/partner/sell/orders/o1/split-pay');
+      final r = t.calls.first;
+      expect(r.url.path, '/rpc/pos_split_pay');
       expect(r.headers['Idempotency-Key'], 'pos-key-1');
-      expect(jsonDecode(r.body), {'payments': [{'method': 'cash', 'amount': 300, 'tendered': 500}, {'method': 'upi', 'amount': 330}], 'version': 'v1'});
+      expect(jsonDecode(r.body), {'order_id': 'o1', 'payments': [{'method': 'cash', 'amount': 300, 'tendered': 500}, {'method': 'upi', 'amount': 330}], 'expected_updated_at': 'v1'});
+      expect(t.calls.last.url.path, '/api/partner/pos-orders/o1'); // the shaped order comes back through section E's read
     });
 
     test('a refusal keeps its message and code (manager only, too much refunded)', () async {
@@ -65,7 +68,7 @@ void main() {
     test('no session: nothing is sent', () async {
       final t = Till();
       final api = SellApi(baseUrl: 'http://pos.test', accessToken: () => null, client: t.client);
-      await expectLater(api.catalog(), throwsA(isA<OrdersApiException>()));
+      await expectLater(api.catalog(), throwsA(isA<PartnerApiException>()));
       expect(t.calls, isEmpty);
     });
   });
@@ -130,7 +133,7 @@ void main() {
     testWidgets('the catalogue failing says so and Retry asks again', (t) async {
       final till = Till();
       var fail = true;
-      till.override = (r) => r.url.path.endsWith('/catalog') && fail ? err(500, 'Something went wrong. Please try again.') : null;
+      till.override = (r) => r.url.path.endsWith('/pos_sell_catalog') && fail ? err(500, 'Something went wrong. Please try again.') : null;
       await tall(t, SellScreen(env: till.env()));
       expect(find.text('Items could not load'), findsOneWidget);
       fail = false;
@@ -174,7 +177,7 @@ void main() {
     testWidgets('a failed request keeps the query and Retry works', (t) async {
       final till = Till();
       var fail = true;
-      till.override = (r) => r.url.path.endsWith('/catalog') && r.url.queryParameters.containsKey('q') && fail ? err(503, 'The server is busy.') : null;
+      till.override = (r) => r.url.path.endsWith('/pos_sell_catalog') && jsonDecode(r.body).containsKey('q') && fail ? err(503, 'The server is busy.') : null;
       await tall(t, SearchScreen(env: till.env(), initialQuery: '500'));
       expect(find.text('Search couldn\'t load'), findsOneWidget);
       expect((t.widget(find.byType(TextField).first) as TextField).controller!.text, '500');
@@ -195,7 +198,7 @@ void main() {
       await t.tap(find.text('Apply filters'));
       await t.pumpAndSettle();
       expect(find.text('Filters · 1'), findsOneWidget);
-      expect(till.calls.last.url.queryParameters['available'], '1');
+      expect(jsonDecode(till.calls.last.body)['available'], true);
       expect(find.text('Cadbury Dairy Milk'), findsNothing);
       expect(find.text('Amul Butter 500g'), findsOneWidget);
       await t.tap(find.text('Clear filters').last);
@@ -303,7 +306,7 @@ void main() {
       expect(find.text('₹70 too much'), findsOneWidget);
       await t.tap(find.text('Pay ₹630'));
       await t.pumpAndSettle();
-      expect(till.where('POST', '/split-pay'), isEmpty);
+      expect(till.where('POST', '/pos_split_pay'), isEmpty);
       expect(till.where('POST', '/hold'), isEmpty);
       await t.enterText(find.byKey(const ValueKey('split-amount-1')), '330');
       await t.pumpAndSettle();
@@ -311,8 +314,8 @@ void main() {
       await t.tap(find.text('Pay ₹630'));
       await t.pumpAndSettle();
       expect(till.where('POST', '/hold'), hasLength(1));
-      final r = till.where('POST', '/split-pay').single;
-      expect(r.url.path, contains(orderId));
+      final r = till.where('POST', '/pos_split_pay').single;
+      expect(jsonDecode(r.body)['order_id'], orderId);
       expect(jsonDecode(r.body)['payments'], [{'method': 'cash', 'amount': 300}, {'method': 'upi', 'amount': 330}]);
       expect(find.text('Transaction Successful'), findsOneWidget);
     });
@@ -320,7 +323,7 @@ void main() {
     testWidgets('a split the database refuses shows its sentence and keeps the same key for the retry', (t) async {
       final till = Till();
       var refuse = true;
-      till.override = (r) => r.url.path.endsWith('/split-pay') && refuse ? err(400, 'The parts add up to 600 but 630 is due.', 'bad_request') : null;
+      till.override = (r) => r.url.path.endsWith('/pos_split_pay') && refuse ? err(400, 'The parts add up to 600 but 630 is due.', 'bad_request') : null;
       final env = till.env();
       final cart = cartWith(env.carts);
       await tall(t, PayScreen(env: env, cart: cart));
@@ -334,7 +337,7 @@ void main() {
       refuse = false;
       await t.tap(find.text('Pay ₹1,840')); // the bill is saved now, so the button shows the held bill's total
       await t.pumpAndSettle();
-      final keys = till.where('POST', '/split-pay').map((r) => r.headers['Idempotency-Key']).toSet();
+      final keys = till.where('POST', '/pos_split_pay').map((r) => r.headers['Idempotency-Key']).toSet();
       expect(keys, hasLength(1));
       expect(till.where('POST', '/hold'), hasLength(1)); // the bill was saved once, not twice
     });
@@ -348,7 +351,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Payment did not go through'));
       await t.pumpAndSettle();
-      expect(jsonDecode(till.where('POST', '/attempts').single.body), {'method': 'card', 'status': 'declined', 'code': 'declined', 'message': 'Declined at the terminal'});
+      expect(jsonDecode(till.where('POST', '/pos_payment_attempt_record').single.body), {'order_id': orderId, 'method': 'card', 'status': 'declined', 'code': 'declined', 'message': 'Declined at the terminal'});
       expect(find.text('Transaction Failed'), findsOneWidget);
       expect(find.text('Card payment declined'), findsOneWidget);
       expect(find.text('Declined · Not charged'), findsOneWidget);
@@ -401,8 +404,8 @@ void main() {
       await t.enterText(find.widgetWithText(TextField, 'customer@okaxis'), 'customer@okaxis');
       await t.tap(find.text('Pay ₹1,840.00'));
       await t.pumpAndSettle();
-      expect(till.where('POST', '/online-checkout'), hasLength(1));
-      final a = jsonDecode(till.where('POST', '/attempts').single.body);
+      expect(till.where('POST', '/pos_online_checkout'), hasLength(1));
+      final a = jsonDecode(till.where('POST', '/pos_payment_attempt_record').single.body);
       expect(a['method'], 'online');
       expect(a['code'], 'provider_not_configured');
       expect(find.text('Transaction Failed'), findsOneWidget);
@@ -460,14 +463,14 @@ void main() {
       expect(find.text('2×'), findsOneWidget);
       expect(find.text('Discount · WELCOME10'), findsOneWidget);
       expect(find.text('Total Amount'), findsOneWidget);
-      final q = till.where('GET', '/receipts').single.url.queryParameters;
+      final q = jsonDecode(till.where('POST', '/pos_receipt_list').single.body);
       expect(q['from'], q['to']);
     });
 
     testWidgets('refund: the server\'s refusal is shown (manager only); a good refund asks with a key and reloads', (t) async {
       final till = Till();
       var allow = false;
-      till.override = (r) => r.url.path.endsWith('/refund') ? (allow ? ok(view('completed')) : err(403, 'Only a manager can give a refund.', 'forbidden')) : null;
+      till.override = (r) => r.url.path.endsWith('/pos_refund') ? (allow ? ok(view('completed')) : err(403, 'Only a manager can give a refund.', 'forbidden')) : null;
       await tall(t, HistoryScreen(env: till.env()));
       await t.tap(find.text('View card').first);
       await t.pumpAndSettle();
@@ -486,9 +489,9 @@ void main() {
       await t.enterText(find.widgetWithText(TextField, 'Reason'), 'Goodwill');
       await t.tap(find.text('Give refund'));
       await t.pumpAndSettle();
-      final last = till.where('POST', '/refund').last;
+      final last = till.where('POST', '/pos_refund').last;
       expect(last.headers['Idempotency-Key'], startsWith('pos-'));
-      expect(jsonDecode(last.body), {'amount': 50, 'method': 'cash', 'kind': 'goodwill', 'reason': 'Goodwill'});
+      expect(jsonDecode(last.body), {'order_id': 'r1', 'amount': 50, 'method': 'cash', 'kind': 'goodwill', 'reason': 'Goodwill'});
     });
 
     testWidgets('nothing that day: a plain message; a failure has Retry', (t) async {
@@ -542,7 +545,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Refunded'));
       await t.pumpAndSettle();
-      expect(till.where('GET', '/receipts').last.url.queryParameters['status'], 'refunded');
+      expect(jsonDecode(till.where('POST', '/pos_receipt_list').last.body)['status'], 'refunded');
       await t.tap(find.text('Purchases'));
       await t.pumpAndSettle();
       expect(find.text('No purchase invoices here yet'), findsOneWidget);
@@ -563,7 +566,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Approve'));
       await t.pumpAndSettle();
-      expect(jsonDecode(till.where('POST', '/decide').single.body), {'decision': 'approve', 'note': ''});
+      expect(jsonDecode(till.where('POST', '/pos_return_decide').single.body), {'return_id': 't1', 'decision': 'approve', 'note': ''});
       await t.tap(find.text('Supplier Returns'));
       await t.pumpAndSettle();
       expect(find.text('Supplier returns come later'), findsOneWidget);
@@ -572,7 +575,7 @@ void main() {
 
     testWidgets('an approved return is refunded with a key; the database\'s refusal is shown', (t) async {
       final till = Till()..returns = [retRow('t1', 'RET-0001', 'approved')];
-      till.override = (r) => r.url.path.endsWith('/refund') ? err(403, 'Only a manager can give a refund.', 'forbidden') : null;
+      till.override = (r) => r.url.path.endsWith('/pos_return_issue_refund') ? err(403, 'Only a manager can give a refund.', 'forbidden') : null;
       await tall(t, ReturnsScreen(env: till.env()));
       await t.tap(find.text('View details'));
       await t.pumpAndSettle();
@@ -580,10 +583,10 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Cash'));
       await t.pumpAndSettle();
-      final r = till.where('POST', '/refund').single;
-      expect(r.url.path, '/api/partner/sell/returns/t1/refund');
+      final r = till.where('POST', '/pos_return_issue_refund').single;
+      expect(r.url.path, '/rpc/pos_return_issue_refund');
       expect(r.headers['Idempotency-Key'], startsWith('pos-'));
-      expect(jsonDecode(r.body), {'method': 'cash'});
+      expect(jsonDecode(r.body), {'return_id': 't1', 'method': 'cash'});
       expect(find.text('Only a manager can give a refund.'), findsOneWidget);
     });
 
@@ -597,7 +600,7 @@ void main() {
       await t.enterText(find.widgetWithText(TextField, 'Why is it rejected?'), 'Not eligible');
       await t.tap(find.text('Reject return'));
       await t.pumpAndSettle();
-      expect(jsonDecode(till.where('POST', '/decide').single.body), {'decision': 'reject', 'note': 'Not eligible'});
+      expect(jsonDecode(till.where('POST', '/pos_return_decide').single.body), {'return_id': 't1', 'decision': 'reject', 'note': 'Not eligible'});
     });
 
     testWidgets('a new return: choose the bill, the quantity, the reason; the server\'s amount comes back', (t) async {
@@ -611,7 +614,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Record return'));
       await t.pumpAndSettle();
-      final r = till.where('POST', '/returns').single;
+      final r = till.where('POST', '/pos_return_create').single;
       expect(r.headers['Idempotency-Key'], startsWith('pos-'));
       expect(jsonDecode(r.body), {'order_id': 'r1', 'lines': [{'order_item_id': 'i1', 'qty': 1}], 'reason': 'Damaged seal', 'note': ''});
       expect(find.text('Return recorded. A manager approves it next.'), findsOneWidget);
@@ -627,7 +630,7 @@ void main() {
       await t.tap(find.text('Record return'));
       await t.pumpAndSettle();
       expect(find.text('Choose the items being returned.'), findsOneWidget);
-      expect(till.where('POST', '/returns'), isEmpty);
+      expect(till.where('POST', '/pos_return_create'), isEmpty);
     });
   });
 

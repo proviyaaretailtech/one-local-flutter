@@ -23,18 +23,19 @@ const sellItems = [
 ];
 
 Map<String, dynamic> receipt(String id, String no, String name, num total, {String status = 'paid', String label = 'Paid · UPI', num paid = -1, num refunded = 0, List<Map<String, dynamic>>? items, String? coupon, num discount = 0}) => {
-      'id': id, 'display_no': no, 'customer': name, 'customer_phone': null, 'created_at': '2026-10-09T12:53:00Z', 'when': '9 Oct 2026 · 6:23 PM',
-      'paid_at_label': status == 'paid' ? 'Paid at 6:23 PM' : null, 'status': status, 'status_label': label, 'payment_mode': 'UPI', 'channel': 'pickup',
-      'total': total, 'paid': paid < 0 ? total : paid, 'refunded': refunded, 'balance_due': status == 'unpaid' ? total : 0, 'units': 3, 'lines': 2, 'counts': '2 lines · 3 units',
+      // a row of pos_receipt_list as the database returns it
+      'id': id, 'display_no': no, 'customer_name': name, 'customer_phone': null, 'created_at': '2026-10-09T12:53:00Z', 'paid_at': status == 'paid' ? '2026-10-09T12:53:00Z' : null,
+      'order_status': status == 'paid' ? 'paid' : 'awaiting_payment', 'status': status, 'channel': 'pickup', 'total': total, 'paid': paid < 0 ? total : paid, 'refunded': refunded,
+      'methods': status == 'unpaid' ? [] : [label.contains('Card') ? 'card' : 'upi'], 'units': 3, 'lines': 2,
       'items': items ?? [{'order_item_id': 'i1', 'name': 'Amul Butter 500g', 'qty': 2, 'amount': 560}, {'order_item_id': 'i2', 'name': 'Coca-Cola 500ml', 'qty': 1, 'amount': 40}],
-      'subtotal': 600, 'discount': discount, 'coupon_code': coupon, 'gst_pct': 5, 'gst_amount': 30, 'service_charge': 0, 'round_off': 0, 'tax_and_charges': 30,
-      'kind_label': 'Sales receipt', 'receipt_text': 'Receipt $no\nTotal ₹$total',
+      'subtotal': 600, 'discount': discount, 'coupon_code': coupon, 'gst_pct': 5, 'gst_amount': 30, 'service_charge': 0, 'round_off': 0,
     };
 
 Map<String, dynamic> retRow(String id, String no, String status, {num amount = 320}) => {
-      'id': id, 'return_no': no, 'status': status, 'status_label': {'requested': 'Requested', 'approved': 'Approved', 'rejected': 'Rejected', 'refunded': 'Refunded'}[status],
-      'date': '9 Oct 2026', 'customer': 'Rahul Patil', 'order_no': 'P-00087', 'order_id': orderId, 'reason': 'Damaged seal', 'note': 'Seal broken',
-      'status_note': status == 'requested' ? 'Awaiting a manager' : 'Approved · refund not issued', 'amount': amount, 'lines': [{'name': 'Horlicks 500g', 'qty': 1, 'amount': amount}],
+      // a row of pos_return_list as the database returns it
+      'id': id, 'return_no': no, 'status': status, 'reason': 'Damaged seal', 'note': 'Seal broken', 'amount': amount, 'created_at': '2026-10-09T09:00:00Z', 'decided_at': null,
+      'decision_note': null, 'order_id': orderId, 'order_no': 'P-00087', 'customer_name': 'Rahul Patil', 'refund_method': null,
+      'lines': [{'name': 'Horlicks 500g', 'qty': 1, 'amount': amount}],
     };
 
 /// A fake POS server for the till screens: answers section E's and section F's routes and records every request.
@@ -50,12 +51,13 @@ class Till {
     if (o != null) return o;
     final p = r.url.path, m = r.method;
     Map<String, dynamic> body() => r.body.isEmpty ? {} : jsonDecode(r.body) as Map<String, dynamic>;
-    if (p.endsWith('/sell/catalog')) {
-      final q = (r.url.queryParameters['q'] ?? '').toLowerCase(), cat = r.url.queryParameters['category'] ?? '';
+    if (p.endsWith('/rpc/pos_sell_catalog')) {
+      final b = body();
+      final q = '${b['q'] ?? ''}'.toLowerCase(), cat = '${b['category'] ?? ''}';
       var list = [...sellItems];
       if (q.isNotEmpty) list = list.where((i) => '${i['name']}'.toLowerCase().contains(q) || '${i['sku']}'.toLowerCase().contains(q)).toList();
       if (cat.isNotEmpty) list = list.where((i) => i['category'] == cat).toList();
-      if (r.url.queryParameters['available'] == '1') list = list.where((i) => i['available'] == true).toList();
+      if (b['available'] == true) list = list.where((i) => i['available'] == true).toList();
       return ok({'items': list, 'categories': ['Beverages', 'Dairy', 'Snacks']});
     }
     if (p.endsWith('/pos-orders/quote')) {
@@ -70,24 +72,23 @@ class Till {
     }
     if (p.endsWith('/pos-orders/checkout')) return ok(view('pending'));
     if (p.endsWith('/pos-orders/hold')) return ok(view('checkout'));
-    if (p.endsWith('/split-pay')) return ok(view('pending'));
-    if (p.endsWith('/pay')) return ok(view('pending'));
+    if (p.endsWith('/rpc/pos_split_pay')) return ok({'order_id': orderId, 'replayed': false, 'parts': 2});
+    if (p.endsWith('/pos-orders/' + orderId + '/pay')) return ok(view('pending'));
     if (p.endsWith('/cancel')) return ok(view('cancelled'));
-    if (p.endsWith('/attempts')) {
+    if (p.endsWith('/rpc/pos_payment_attempt_record')) {
       final b = body();
-      return ok({'order_id': orderId, 'display_no': 'P-01087', 'method': b['method'], 'status': b['status'], 'code': b['code'], 'message': b['message'],
-        'headline': b['method'] == 'card' ? 'Card payment declined' : 'Online payment failed', 'detail': 'This payment was ${b['status']}. Your cart is still saved.', 'amount_due': 630, 'charged': false});
+      return ok({'order_id': orderId, 'display_no': 'P-01087', 'method': b['method'], 'status': b['status'], 'code': b['code'], 'message': b['message'], 'amount_due': 630, 'charged': false});
     }
-    if (p.endsWith('/online-checkout')) return err(503, 'Online payment is not switched on for this shop yet.', 'provider_not_configured');
-    if (p.endsWith('/sell/receipts')) {
-      final status = r.url.queryParameters['status'] ?? 'all';
-      return ok({'receipts': receipts.where((x) => status == 'all' || x['status'] == status).toList()});
+    if (p.endsWith('/rpc/pos_online_checkout')) return err(503, 'Online payment is not switched on for this shop yet.', 'provider_not_configured');
+    if (p.endsWith('/rpc/pos_receipt_list')) {
+      final status = body()['status'] ?? 'all';
+      return ok(receipts.where((x) => status == 'all' || x['status'] == status).toList());
     }
-    if (p.endsWith('/sell/returns') && m == 'GET') return ok({'returns': returns});
-    if (p.endsWith('/sell/returns') && m == 'POST') return ok({'return_id': 't9', 'return_no': 'RET-0009', 'amount': 269.5, 'status': 'requested'});
-    if (p.endsWith('/decide')) return ok({'return_id': 't1', 'status': body()['decision'] == 'approve' ? 'approved' : 'rejected'});
-    if (p.endsWith('/refund') && p.contains('/returns/')) return ok({'return_id': 't1', 'status': 'refunded'});
-    if (p.endsWith('/refund')) return ok(view('completed'));
+    if (p.endsWith('/rpc/pos_return_list')) return ok(returns);
+    if (p.endsWith('/rpc/pos_return_create')) return ok({'return_id': 't9', 'return_no': 'RET-0009', 'amount': 269.5, 'status': 'requested'});
+    if (p.endsWith('/rpc/pos_return_decide')) return ok({'return_id': 't1', 'status': body()['decision'] == 'approve' ? 'approved' : 'rejected'});
+    if (p.endsWith('/rpc/pos_return_issue_refund')) return ok({'return_id': 't1', 'status': 'refunded'});
+    if (p.endsWith('/rpc/pos_refund')) return ok({'refund_id': 'f1', 'order_id': orderId, 'amount': 50});
     if (p.contains('/pos-orders/') && m == 'GET') return ok(view('checkout'));
     return err(404, 'unexpected ${r.method} $p');
   });

@@ -93,6 +93,29 @@ try {
   const r10 = await rpc(B, 'pos_checkout', { lines: [{ menu_item_id: bItem, qty: 1 }], method: 'cash', tendered: 200, hold: false, notes: 'ZZ-TEST gw' }, `gw-${randomUUID()}`);
   ok('B sells its own item (control)', r10.s === 200, r10);
   ok('A cannot view B order', (await rpc(A, 'pos_order_view', { order_id: r10.j.order_id })).s === 404);
+  // ---- section F (the till): B against A's bill, returns, receipts, coupons; and A's own control calls
+  const fCoupon = await rpc(A, 'pos_coupon_save', { code: 'GWTEST5', kind: 'flat', value: 5 });
+  ok('F: A (manager) creates a coupon', fCoupon.s === 200, fCoupon);
+  ok('F: B does not see A coupons', (await x('pos_coupon_list', {})).j?.coupons?.length === 0);
+  ok('F: B cannot use A coupon', refused(await x('pos_quote_order', { lines: [{ menu_item_id: bItem, qty: 1 }], coupon_code: 'GWTEST5' })));
+  ok('F: B catalogue has none of A items', (await x('pos_sell_catalog', {})).j?.items?.every(i => i.name === 'B item'));
+  ok('F: B receipts have none of A bills', !(await x('pos_receipt_list', {})).j?.some(r => r.id === oid));
+  ok('F: B cannot split-pay, log an attempt on, or start online checkout for A bill',
+    (await x('pos_split_pay', { order_id: oid, payments: [{ method: 'cash', amount: 1 }, { method: 'upi', amount: 1 }] }, `gw-${randomUUID()}`)).s === 404
+    && (await x('pos_payment_attempt_record', { order_id: oid, method: 'card' })).s === 404 && (await x('pos_online_checkout', { order_id: oid })).s === 404);
+  const fItem = sql(`select id from order_items where order_id='${oid}' limit 1`);
+  const fRet = await rpc(A, 'pos_return_create', { order_id: oid, reason: 'gw test', lines: [{ order_item_id: fItem, qty: 1 }] }, `gw-${randomUUID()}`);
+  ok('F: A records a return on its own bill', fRet.s === 200 && fRet.j.status === 'requested', fRet);
+  ok('F: B cannot return against A bill, see, approve or refund A return',
+    (await x('pos_return_create', { order_id: oid, reason: 'gw test', lines: [{ order_item_id: fItem, qty: 1 }] }, `gw-${randomUUID()}`)).s === 404
+    && (await x('pos_return_list', {})).j?.length === 0
+    && (await x('pos_return_decide', { return_id: fRet.j.return_id, decision: 'approve' })).s === 404
+    && (await x('pos_return_issue_refund', { return_id: fRet.j.return_id, method: 'cash' }, `gw-${randomUUID()}`)).s === 404);
+  ok('F: a viewer in A cannot record a return, take payment or save a coupon',
+    (await rpc(V, 'pos_return_create', { order_id: oid, reason: 'gw test', lines: [{ order_item_id: fItem, qty: 1 }] }, `gw-${randomUUID()}`)).s === 403
+    && (await rpc(V, 'pos_split_pay', { order_id: oid, payments: [{ method: 'cash', amount: 1 }, { method: 'upi', amount: 1 }] }, `gw-${randomUUID()}`)).s === 403
+    && (await rpc(V, 'pos_coupon_save', { code: 'NOPE5', kind: 'flat', value: 5 })).s === 403);
+  ok('F: an applicant with no business is refused', refused(await rpc(P1, 'pos_sell_catalog', {})) && refused(await rpc(P1, 'pos_receipt_list', {})) && refused(await rpc(P1, 'pos_return_list', {})));
   // a viewer in A can read but not sell
   const rv = await rpc(V, 'pos_checkout', { lines, method: 'cash', tendered: 500, hold: false }, `gw-${randomUUID()}`);
   ok('viewer role in A cannot sell', rv.s === 403, rv);
@@ -202,6 +225,8 @@ try {
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.stack?.slice(0, 600));
 } finally {
+  for (const t of ['sell_return_lines', 'sell_returns', 'sell_payment_attempts']) { try { sql(`alter table ${t} disable trigger user`); sql(`delete from ${t} where organization_id in ('${orgA}','${orgB}')`); sql(`alter table ${t} enable trigger user`); } catch { /* table absent */ } }
+  try { sql(`delete from sell_coupons where organization_id in ('${orgA}','${orgB}')`); } catch { /* table absent */ }
   try { sql(`delete from ol_partner_applications where business_name='ZZ GW Cafe ${run}'`); } catch (e) { console.log('note: application cleanup', e.message.slice(0, 120)); }
   for (const id of users) { try { sql(`delete from org_users where user_id='${id}'`); sql(`delete from auth.users where id='${id}'`); } catch { /* kept rows are test users */ } }
   try { sql(`update orders set notes='ZZ-TEST gw' where organization_id in ('${orgA}','${orgB}') and coalesce(notes,'') not like 'ZZ-TEST%'`); } catch {}

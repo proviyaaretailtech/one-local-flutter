@@ -74,24 +74,23 @@ Staff only. Every database call runs AS the signed-in staff member (their token 
 
 `/api/partner/outlet`, `/items`, `/orders`, `/payments`, `/devices`, `/test-order`, `/account/*`. The new POS has no Dart caller for them. If a future screen needs one, port it here against the same database functions rather than calling the customer app.
 
-## Section F: the till on top of E (search, split payment, receipts, returns, coupons) — `lib/sell/sell_api.dart`, `modules/sell.ts`, migrations 0380 to 0382
+## Section F: the till on top of E (search, split payment, receipts, returns, coupons) — `lib/sell/sell_api.dart`, `src/schemas/sell.ts`, migrations 0380 to 0383
 
-Staff only; every database call runs AS the signed-in staff member, like section E. Manager-only rules (refund, approve a return, coupons) are the database's: anyone else gets 403 with the database's sentence. `Idempotency-Key` header required where marked. `POST /pos-orders/quote | checkout | hold` now also take `coupon_code` (checkout and hold also `customer_name`, `customer_phone`); the discount is worked out by `pos_place_order` (0380).
+Through the generic endpoint `POST /rpc/<name>` (body = the function's `p` object; zod shape in `src/schemas/sell.ts`; the database checks organisation, store, role and every amount again). Money calls carry `Idempotency-Key` (copied into the body). Manager-only rules (refund, approve a return, coupons) answer 403 for anyone else. The per-feature `/api/partner/sell/*` routes no longer exist. `POST /api/partner/pos-orders/quote | checkout | hold` (section E) also take `coupon_code` (checkout and hold also `customer_name`, `customer_phone`); the discount is worked out by `pos_place_order` (0380).
 
-| Method | Path | Request | Database function |
-|---|---|---|---|
-| GET | `/api/partner/sell/catalog` | `q?` (name or SKU), `category?`, `available=1?`, `sort=name\|price_asc\|price_desc` | `menu_items` (RLS) → `{items:[{id,name,sku,price,category,image_url,available}], categories}`; unavailable items are listed, flagged |
-| POST | `/api/partner/sell/orders/:id/split-pay` (key) | `{payments:[{method:cash\|card\|upi, amount, tendered?, reference?}] (2 to 4, must add up to the amount due), version}` | `pos_split_pay` |
-| POST | `/api/partner/sell/orders/:id/refund` (key) | `{amount, method:cash\|upi\|card\|other, kind?:goodwill\|cancel\|missing_items, reason}` | `pos_refund` (manager only, capped to money taken) |
-| POST | `/api/partner/sell/orders/:id/attempts` | `{method:cash\|upi\|card\|online, status?:declined\|failed\|cancelled, code?, message?}` → failure card, `charged:false` | `pos_payment_attempt_record` (moves no money) |
-| POST | `/api/partner/sell/orders/:id/online-checkout` | `{}` | none yet: **503 `provider_not_configured`** until a payment provider (Razorpay, test mode) is set up on this server |
-| GET | `/api/partner/sell/receipts` | `q?`, `status=all\|paid\|part_paid\|unpaid\|refunded\|cancelled`, `from?`, `to?` (2026-10-09, India time), `before?` | `pos_receipt_list` → bills with lines, totals, status words, `receipt_text` |
-| GET | `/api/partner/sell/returns` | `status?`, `q?` | `pos_return_list` |
-| POST | `/api/partner/sell/returns` (key) | `{order_id, lines:[{order_item_id, qty}], reason, note?}` | `pos_return_create` (amount = the items' share of the bill, set by the database) |
-| POST | `/api/partner/sell/returns/:id/decide` | `{decision:approve\|reject, note?}` (reject needs a note) | `pos_return_decide` (manager only) |
-| POST | `/api/partner/sell/returns/:id/refund` (key) | `{method}` | `pos_return_issue_refund` → `pos_refund` (manager only) |
-| GET | `/api/partner/sell/coupons` | – | `sell_coupons` (RLS) |
-| POST | `/api/partner/sell/coupons` | `{code, label?, kind:percent\|flat, value, min_order?, max_discount?, active?, starts_at?, ends_at?}` | `pos_coupon_save` (manager only) |
+| Name | Request (`p`) | Answer | Rate / key | Who |
+|---|---|---|---|---|
+| `pos_sell_catalog` | `q?` (name or SKU), `category?`, `available?`, `sort?: name\|price_asc\|price_desc` | `{items:[{id,name,sku,price,category,image_url,available}], categories}`; unavailable items are listed, flagged | read | staff |
+| `pos_split_pay` | `{order_id, payments:[{method: cash\|card\|upi, amount, tendered?, reference?}] (2 to 4, must add up to the amount due), expected_updated_at?}` | `{order_id, replayed, parts}` (read the bill with `GET /pos-orders/:id`) | money, key | staff who take payment |
+| `pos_refund` (0371) | `{order_id, amount, method: cash\|upi\|card\|other, kind?: goodwill\|cancel\|missing_items, reason}` | refund record | money, key | managers; capped to money taken |
+| `pos_payment_attempt_record` | `{order_id, method: cash\|upi\|card\|online, status?: declined\|failed\|cancelled, code?, message?}` | `{attempt_id, order_id, display_no, method, status, code, message, amount_due, charged:false}`; moves no money | write | staff who take payment |
+| `pos_online_checkout` | `{order_id}` | always **503 `provider_not_configured`** for the caller's own bill (404 for anyone else's) until a payment provider (Razorpay, test mode) is wired here | money | staff who take payment |
+| `pos_receipt_list` | `q?`, `status?: all\|paid\|part_paid\|unpaid\|refunded\|cancelled`, `from?`, `to?` (2026-10-09, India time), `before?` | array of bills with lines (`items[].order_item_id`), money, methods, status | read | staff |
+| `pos_return_list` | `status?`, `q?` | array of returns with lines and refund method | read | staff |
+| `pos_return_create` | `{order_id, lines:[{order_item_id, qty}], reason, note?}` | `{return_id, return_no, amount, status, replayed}`; amount = the items' share of the bill, set by the database | write, key | staff who take payment |
+| `pos_return_decide` | `{return_id, decision: approve\|reject, note?}` (reject needs a note) | `{return_id, status}` | write | managers |
+| `pos_return_issue_refund` | `{return_id, method}` | `{return_id, status:'refunded', amount, refund_id, replayed}`; calls `pos_refund` | money, key | managers |
+| `pos_coupon_list` | `{}` | `{coupons:[...]}` | read | staff |
+| `pos_coupon_save` | `{code, label?, kind: percent\|flat, value, min_order?, max_discount?, active?, starts_at?, ends_at?}` | the coupon | write | managers |
 
-New error codes: `coupon_minimum`, `over_refund`, `over_return`, `idempotency_mismatch` (422). Tests: `node scripts/sell-e2e.mjs` (70 checks: two businesses, tenancy, roles, idempotency, caps).
-
+New error codes: `coupon_minimum`, `over_refund`, `over_return` (422), `provider_not_configured` (503). Tests: `node scripts/sell-e2e.mjs` (74 checks, through the gateway) and the F block in `scripts/gateway-e2e.mjs` (cross-tenant: B against A's bill, returns, receipts, coupons; viewer and applicant refused); `node scripts/manifest-audit.mjs` must PASS.

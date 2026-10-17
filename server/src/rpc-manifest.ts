@@ -20,6 +20,7 @@ import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
 import * as bo from './schemas/backoffice.ts';
 import * as svc from './schemas/service.ts';
+import * as sell from './schemas/sell.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -86,6 +87,19 @@ export const MANIFEST: Entry[] = [
   db('pos_set_order_status', { args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
   db('pos_fulfilment_act', { args: 'passthrough', map: P, rate: 'write', idem: true, roles: 'staff with order.update_status' }),
   db('pos_refund', { args: 'passthrough', map: P, rate: 'money', idem: true, roles: 'manager roles only' }),
+  // ---- the till on top of the counter bill, section F (0380-0383). Body = the function's `p` object; the database checks organisation,
+  //      store, role and every amount. Money calls carry the Idempotency-Key header; manager-only rules answer 403 for anyone else.
+  db('pos_sell_catalog', { args: sell.Catalog, map: P, rate: 'read', roles: STAFF }),
+  db('pos_receipt_list', { args: sell.Receipts, map: P, rate: 'read', roles: STAFF }),
+  db('pos_split_pay', { args: sell.SplitPay, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_payment_attempt_record', { args: sell.Attempt, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
+  db('pos_online_checkout', { args: sell.OnlineCheckout, map: P, rate: 'money', roles: 'staff allowed to take payment' }),
+  db('pos_return_list', { args: sell.ReturnList, map: P, rate: 'read', roles: STAFF }),
+  db('pos_return_create', { args: sell.ReturnCreate, map: P, rate: 'write', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_return_decide', { args: sell.ReturnDecide, map: P, rate: 'write', roles: 'manager roles only' }),
+  db('pos_return_issue_refund', { args: sell.ReturnRefund, map: P, rate: 'money', idem: true, roles: 'manager roles only' }),
+  db('pos_coupon_list', { args: sell.CouponList, map: P, rate: 'read', roles: STAFF }),
+  db('pos_coupon_save', { args: sell.CouponSave, map: P, rate: 'write', roles: 'manager roles only' }),
   db('pos_home_online', { args: 'passthrough', map: P, rate: 'read', roles: STAFF }),
   db('pos_home_channel', { args: 'passthrough', map: () => ({}), rate: 'read', roles: STAFF }),
   // ---- store inventory, section H (0400-0403). Body = the function's `p` object (location_id, ids, filters); the database validates it and
