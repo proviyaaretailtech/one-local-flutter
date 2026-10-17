@@ -247,7 +247,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
       children: [
         if (!c.canPublish) const SfNote('Your role can edit the page but cannot publish it. Ask the owner or a manager to publish.', icon: LucideIcons.info),
         SfLoader<Facts>(
-          load: () async => facts = await widget.api.preview(),
+          load: () async {
+            final f = await widget.api.preview();
+            if (mounted) setState(() => facts = f);
+            return f;
+          },
           builder: (ctx, f, _) => Container(
             margin: const EdgeInsets.only(top: 8),
             decoration: BoxDecoration(border: Border.all(color: kInk, width: 3), borderRadius: BorderRadius.circular(22)),

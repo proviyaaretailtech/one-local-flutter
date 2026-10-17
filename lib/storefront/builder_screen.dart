@@ -77,8 +77,9 @@ class BuilderController extends ChangeNotifier {
       error = null;
       return true;
     } on StorefrontException catch (e) {
-      error = e.stale ? 'This page was changed on another device. It has been reloaded; please make your change again.' : e.message;
+      final msg = e.stale ? 'This page was changed on another device. It has been reloaded; please make your change again.' : e.message;
       if (e.stale) await load();
+      error = msg;
       return false;
     } catch (e) {
       error = sfMessage(e);
