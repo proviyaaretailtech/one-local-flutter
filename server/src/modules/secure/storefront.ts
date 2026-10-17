@@ -42,7 +42,8 @@ export async function withStorefrontLinks<T>(result: T): Promise<T> {
     if (Array.isArray(v)) { for (const x of v) walk(x, depth + 1); return; }
     const o = v as Record<string, unknown>;
     for (const key of Object.keys(o)) {
-      if (key.endsWith('_path') && typeof o[key] === 'string') holders.push({ o, key, path: o[key] as string });
+      if (key.endsWith('_path') && o[key] === null) { delete o[key]; o[key.replace(/_path$/, '_url')] = null; }
+      else if (key.endsWith('_path') && typeof o[key] === 'string') holders.push({ o, key, path: o[key] as string });
       else walk(o[key], depth + 1);
     }
   };
