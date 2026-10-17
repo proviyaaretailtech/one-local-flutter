@@ -20,6 +20,8 @@ import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
 import * as cat from './schemas/catalogue.ts';
 import * as grn from './schemas/grn.ts';
+import * as bo from './schemas/backoffice.ts';
+import * as svc from './schemas/service.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -119,6 +121,36 @@ export const MANIFEST: Entry[] = [
   db('grn_resolve', { args: grn.Resolve, map: P, rate: 'write', roles: 'staff with inventory:record' }),
   db('grn_request_approval', { args: grn.RequestApproval, map: P, rate: 'write', roles: 'staff with inventory:record' }),
   db('grn_decide', { args: grn.Decide, map: P, rate: 'write', roles: 'inventory:approve; approving posts the receipt through section H' }),
+  // ---- back office, section J (0420): Low Stock and Purchase Suggestions, read from section H's stock numbers. Body = the function's `p`
+  //      object; no location_id = the whole business, which the database allows only for a business-wide person.
+  db('backoffice_low_stock', { args: bo.LowStock, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('purchase_suggestions_list', { args: bo.SuggestionsList, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('purchase_suggestions_refresh', { args: bo.SuggestionsRefresh, map: P, rate: 'write', roles: 'owner, managers, inventory and procurement roles' }),
+  db('purchase_suggestions_close', { args: bo.SuggestionsClose, map: P, rate: 'write', idem: true, roles: 'owner, managers, inventory and procurement roles' }),
+  // ---- Service POS, section I (0410-0413). Body = the function's `p` object; the database checks organisation, location and role
+  //      (book: owner/admin/manager/biller/captain/...; manage: owner/admin/manager). Writes carry the Idempotency-Key header and the
+  //      database refuses a replayed key with a different body (OL_IDEMPOTENCY_MISMATCH).
+  db('svc_catalogue', { args: svc.Catalogue, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_calendar', { args: svc.Calendar, map: P, rate: 'read', roles: STAFF }),
+  db('svc_quote', { args: svc.Quote, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_slots', { args: svc.Slots, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_appointment_view', { args: svc.View, map: P, rate: 'read', roles: STAFF }),
+  db('svc_history', { args: svc.History, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_service_list', { args: svc.ServiceList, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_service_detail', { args: svc.View, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_staff_list', { args: svc.StaffList, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_schedule', { args: svc.Schedule, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_plan_list', { args: svc.PlanList, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_entitlements_for', { args: svc.EntitlementsFor, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_book', { args: svc.Book, map: P, rate: 'money', idem: true, roles: 'staff who may book' }),
+  db('svc_appointment_act', { args: svc.Act, map: P, rate: 'money', idem: true, roles: 'staff who may book (keeping an advance: manager)' }),
+  db('svc_job_update', { args: svc.JobUpdate, map: P, rate: 'write', idem: true, roles: 'staff who may book' }),
+  db('svc_bill', { args: svc.Bill, map: P, rate: 'money', idem: true, roles: 'staff who may book' }),
+  db('svc_entitlement_sell', { args: svc.Sell, map: P, rate: 'money', idem: true, roles: 'staff who may book' }),
+  db('svc_service_save', { args: svc.ServiceSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
+  db('svc_provider_save', { args: svc.ProviderSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
+  db('svc_schedule_save', { args: svc.ScheduleSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
+  db('svc_plan_save', { args: svc.PlanSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 
