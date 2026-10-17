@@ -1,12 +1,11 @@
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
 
-/// Error from the service endpoints: the server's own message plus its code (`version_conflict` = changed on another device).
+/// Error from the service functions: the server's own message plus its code (`version_conflict` = changed on another device).
 class ServiceApiException extends PartnerApiException {
   const ServiceApiException(super.status, super.message, this.code);
   final String? code;
@@ -14,30 +13,60 @@ class ServiceApiException extends PartnerApiException {
 }
 
 Map<String, dynamic> _map(Object? v) => (v as Map?)?.cast<String, dynamic>() ?? const {};
-List<Map<String, dynamic>> _list(Object? v) => ((v as List?) ?? const []).map(_map).toList();
+List<Map<String, dynamic>> _list(Object? v) => ((v as List?) ?? const []).whereType<Map>().map(_map).toList();
 String _s(Map<String, dynamic> m, String k) => (m[k] ?? '').toString();
-num _n(Object? v) => num.tryParse('${v ?? 0}') ?? 0;
+num _n(Object? v) => v is num ? v : (num.tryParse('${v ?? 0}') ?? 0);
 
-/// One appointment as the server describes it. The status, labels, bill and allowed actions all come from the server; the app only draws them.
-class AppointmentView {
-  AppointmentView(this.raw);
+/// A server answer read as typed fields. Every number, label, status and permission comes from the server; the app only draws them.
+class SvcData {
+  const SvcData(this.raw);
   final Map<String, dynamic> raw;
-  String get id => _s(raw, 'id');
-  String get displayNo => _s(raw, 'display_no');
-  String get status => _s(raw, 'status');
-  String get statusLabel => _s(raw, 'status_label');
-  String get tone => _s(raw, 'tone');
-  String get timeLabel => _s(raw, 'time_label');
-  String get title => _s(raw, 'title');
-  String get customer => raw['customer'] is Map ? _s(_map(raw['customer']), 'name') : _s(raw, 'customer');
-  String get provider => raw['provider'] is Map ? _s(_map(raw['provider']), 'name') : _s(raw, 'provider');
-  String? get resource => raw['resource'] is Map ? _s(_map(raw['resource']), 'name') : (raw['resource'] as String?);
-  int get version => (raw['version'] as num?)?.toInt() ?? 1;
-  Map<String, dynamic> get bill => _map(raw['bill']);
-  List<String> get actions => ((raw['actions'] as List?) ?? const []).map((e) => '$e').toList();
+  String s(String k) => _s(raw, k);
+  String? so(String k) => raw[k] == null ? null : '${raw[k]}';
+  num n(String k) => _n(raw[k]);
+  int i(String k) => _n(raw[k]).toInt();
+  bool b(String k) => raw[k] == true;
+  SvcData m(String k) => SvcData(_map(raw[k]));
+  List<SvcData> l(String k) => _list(raw[k]).map(SvcData.new).toList();
+  List<String> ls(String k) => ((raw[k] as List?) ?? const []).map((e) => '$e').toList();
 }
 
-/// One day or week of the calendar (`GET /calendar`).
+/// One appointment as the server describes it. The status, labels, bill and allowed actions all come from the server; the app only draws them.
+class AppointmentView extends SvcData {
+  const AppointmentView(super.raw);
+  String get id => s('id');
+  String get displayNo => s('display_no');
+  String get status => s('status');
+  String get statusLabel => s('status_label');
+  String get tone => s('tone');
+  String get timeLabel => s('time_label');
+  String get dateLabel => s('date_label');
+  String get title => s('title');
+  String get fulfilment => raw['fulfilment'] == null ? 'appointment' : s('fulfilment');
+  bool get onLocation => fulfilment == 'on_location';
+  String get customer => raw['customer'] is Map ? _s(_map(raw['customer']), 'name') : s('customer');
+  String get customerPhone => raw['customer'] is Map ? _s(_map(raw['customer']), 'phone') : '';
+  String get provider => raw['provider'] is Map ? _s(_map(raw['provider']), 'name') : s('provider');
+  String? get resource => raw['resource'] is Map ? _s(_map(raw['resource']), 'name') : (raw['resource'] as String?);
+  String get location => m('location').s('name');
+  int get version => raw['version'] == null ? 1 : i('version');
+  int get durationMin => i('duration_min');
+  int get bufferMin => i('buffer_min');
+  Map<String, dynamic> get bill => _map(raw['bill']);
+  SvcData get billData => m('bill');
+  List<SvcData> get lines => l('lines');
+  List<SvcData> get extras => l('extras');
+  List<SvcData> get checklist => l('checklist');
+  List<SvcData> get payments => l('payments');
+  List<SvcData> get events => l('events');
+  List<SvcData> get credits => l('credits');
+  String? get arrivalCode => so('arrival_code');
+  List<String> get actions => ls('actions');
+  bool can(String action) => actions.contains(action);
+  bool get replayed => b('replayed');
+}
+
+/// One day or week of the calendar (`svc_calendar`).
 class CalendarData {
   CalendarData(this.raw);
   final Map<String, dynamic> raw;
@@ -45,6 +74,7 @@ class CalendarData {
   String get locationName => _s(_map(raw['location']), 'name');
   String get city => _s(_map(raw['location']), 'city');
   String get business => _s(raw, 'business');
+  String? get closed => raw['closed'] as String?;
   int get appointments => (_map(raw['counts'])['appointments'] as num?)?.toInt() ?? 0;
   int get availableSlots => (_map(raw['counts'])['available_slots'] as num?)?.toInt() ?? 0;
   int get providerCount => (_map(raw['counts'])['providers'] as num?)?.toInt() ?? 0;
@@ -53,7 +83,7 @@ class CalendarData {
   List<AppointmentView> get items => _list(raw['appointments']).map(AppointmentView.new).toList();
 }
 
-/// A service the booking form can pick (`GET /catalogue`).
+/// A service the booking form can pick (`svc_catalogue`).
 class ServiceOption {
   ServiceOption(this.raw);
   final Map<String, dynamic> raw;
@@ -61,6 +91,7 @@ class ServiceOption {
   String get name => _s(raw, 'name');
   num get price => _n(raw['price']);
   int get durationMin => (raw['duration_min'] as num?)?.toInt() ?? 0;
+  String get fulfilment => raw['fulfilment'] == null ? 'appointment' : _s(raw, 'fulfilment');
   List<Map<String, dynamic>> get addons => _list(raw['addons']);
   List<String> get staffIds => ((raw['staff_ids'] as List?) ?? const []).map((e) => '$e').toList();
 }
@@ -80,11 +111,13 @@ class Catalogue {
   List<ServiceOption> get services => _list(raw['services']).map(ServiceOption.new).toList();
   List<ProviderOption> get providers => _list(raw['providers']).map(ProviderOption.new).toList();
   List<Map<String, dynamic>> get resources => _list(raw['resources']);
+  /// Catalogue items that can be added to a visit as materials or charges (not services, not packages).
+  List<SvcData> get extras => _list(raw['extras']).map(SvcData.new).toList();
   num get deposit => _n(_map(raw['settings'])['deposit_amount']);
   int get freeCancelHours => (_map(raw['settings'])['free_cancel_hours'] as num?)?.toInt() ?? 12;
 }
 
-/// Server totals for a booking that is not made yet (`POST /quote`).
+/// Server totals for a booking that is not made yet (`svc_quote`).
 class ServiceQuote {
   ServiceQuote(this.raw);
   final Map<String, dynamic> raw;
@@ -109,54 +142,118 @@ class SlotProvider {
   List<Map<String, dynamic>> get slots => _list(raw['slots']);
 }
 
-/// Calls One Local's server (`/api/partner/service/*`). The Supabase session token is the only credential; the database checks the business, the
-/// role, the time and every rule again. Writes carry an Idempotency-Key so a retried tap never books twice.
-/// The server routes are not written yet: the contract is in specs/pos-section-i/spec.md.
-class ServiceApi {
-  ServiceApi({http.Client? client, String? baseUrl, String? Function()? accessToken})
-      : _http = client ?? http.Client(),
-        _token = accessToken ?? (() => Supabase.instance.client.auth.currentSession?.accessToken),
-        _base = (baseUrl ?? const String.fromEnvironment('PARTNER_API_BASE_URL')).replaceAll(RegExp(r'/+$'), '');
+/// Frame 108: the filtered list plus its count (`svc_history`).
+class HistoryData extends SvcData {
+  const HistoryData(super.raw);
+  int get total => i('total');
+  String get monthLabel => s('month_label');
+  List<AppointmentView> get items => _list(raw['appointments']).map(AppointmentView.new).toList();
+  List<SvcData> get providers => l('providers');
+}
 
-  final http.Client _http;
-  final String? Function() _token;
-  final String _base;
+/// Frame 83 (`svc_service_list`).
+class ServiceListData extends SvcData {
+  const ServiceListData(super.raw);
+  int get total => i('total');
+  int get shown => i('shown');
+  List<String> get categories => ls('categories');
+  int count(String status) => m('counts').i(status);
+  List<SvcData> get services => l('services');
+}
+
+/// Frame 84 (`svc_service_detail`).
+class ServiceDetail extends SvcData {
+  const ServiceDetail(super.raw);
+  String get id => s('id');
+  String get name => s('name');
+  num get price => n('price');
+  bool get active => s('status') == 'active';
+  String get fulfilment => s('fulfilment');
+  List<SvcData> get staff => l('staff');
+  List<SvcData> get addons => l('addons');
+  List<String> get locations => ls('locations');
+  List<String> get checklist => ls('checklist');
+  bool get canEdit => b('can_edit');
+}
+
+/// Frame 87 (`svc_staff_list`).
+class StaffData extends SvcData {
+  const StaffData(super.raw);
+  int count(String filter) => m('counts').i(filter);
+  List<SvcData> get providers => l('providers');
+  List<SvcData> get candidates => l('candidates');
+  List<SvcData> get services => l('services');
+  List<SvcData> get locations => l('locations');
+  bool get canEdit => b('can_edit');
+}
+
+/// Frame 89 (`svc_schedule`).
+class ScheduleData extends SvcData {
+  const ScheduleData(super.raw);
+  String get locationId => m('location').s('id');
+  String get locationName => m('location').s('name');
+  List<SvcData> get hours => l('hours');
+  List<SvcData> get hoursRows => l('hours_rows');
+  List<SvcData> get providers => l('providers');
+  int get availableToday => i('available_today');
+  SvcData get slot => m('slot');
+  List<SvcData> get exceptions => l('exceptions');
+  bool get canEdit => b('can_edit');
+}
+
+/// Frames 85 and 86 (`svc_plan_list`).
+class PlanListData extends SvcData {
+  const PlanListData(super.raw);
+  List<SvcData> get plans => l('plans');
+  int count(String status) => m('counts').i(status);
+  int get activeMembers => i('active_members');
+  int get joinedThisMonth => i('joined_this_month');
+  num get monthlyRecurring => n('monthly_recurring');
+  List<SvcData> get services => l('services');
+  bool get canEdit => b('can_edit');
+}
+
+/// A package or membership sold to one customer, with the credits left.
+class EntitlementView extends SvcData {
+  const EntitlementView(super.raw);
+  String get id => s('id');
+  String get name => s('name');
+  String get kind => s('kind');
+  List<SvcData> get credits => l('credits');
+}
+
+/// The Service POS functions, all through the one generic endpoint (`POST /rpc/<name>`, lib/api/rpc_client.dart). The Supabase session
+/// token is the only credential; the database checks the business, the role, the time and every rule again. Writes carry an
+/// Idempotency-Key so a retried tap never books, charges or saves twice.
+class ServiceApi {
+  ServiceApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc})
+      : _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken);
+
+  final RpcClient _rpc;
   static final _rand = Random.secure();
 
   /// A fresh key for one intent (one tap). Keep it and send it again when retrying that same tap.
   static String newKey() => 'svc-${List.generate(16, (_) => _rand.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
 
-  Future<Map<String, dynamic>> _send(String method, String path, {Object? body, String? key, Map<String, String>? query}) async {
-    final token = _token();
-    if (token == null) throw const PartnerApiException(401, 'Sign in to continue.');
-    var uri = Uri.parse('$_base/api/partner/service$path');
-    if (query != null && query.isNotEmpty) uri = uri.replace(queryParameters: query);
-    final headers = {
-      'Authorization': 'Bearer $token',
-      if (body != null) 'Content-Type': 'application/json',
-      'Idempotency-Key': ?key,
-    };
-    final res = await (method == 'GET' ? _http.get(uri, headers: headers) : _http.post(uri, headers: headers, body: body == null ? null : jsonEncode(body)))
-        .timeout(const Duration(seconds: 30));
-    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
-    final map = decoded is Map ? decoded.cast<String, dynamic>() : <String, dynamic>{};
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw ServiceApiException(res.statusCode, (map['detail'] as String?) ?? 'Something went wrong. Please try again.', map['code'] as String?);
+  Future<Map<String, dynamic>> _call(String fn, Map<String, Object?> args, {String? key}) async {
+    final body = <String, dynamic>{...args}..removeWhere((_, v) => v == null);
+    try {
+      return await _rpc.callMap(fn, body, key);
+    } on RpcException catch (e) {
+      throw ServiceApiException(e.status, e.message, e.code);
     }
-    return map;
   }
 
-  Future<Catalogue> catalogue({String? locationId}) async =>
-      Catalogue(await _send('GET', '/catalogue', query: {'location_id': ?locationId}));
+  Future<Catalogue> catalogue({String? locationId}) async => Catalogue(await _call('svc_catalogue', {'location_id': locationId}));
 
   Future<CalendarData> calendar({required String date, String view = 'day', String? locationId, String? staffId}) async =>
-      CalendarData(await _send('GET', '/calendar', query: {'date': date, 'view': view, 'location_id': ?locationId, 'staff_id': ?staffId}));
+      CalendarData(await _call('svc_calendar', {'date': date, 'view': view, 'location_id': locationId, 'staff_id': staffId}));
 
   Future<ServiceQuote> quote({required String serviceId, List<String> addonIds = const [], String? staffId}) async =>
-      ServiceQuote(await _send('POST', '/quote', body: {'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': ?staffId}));
+      ServiceQuote(await _call('svc_quote', {'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': staffId}));
 
   Future<List<SlotProvider>> slots({required String date, required String serviceId, List<String> addonIds = const [], String? staffId}) async {
-    final r = await _send('POST', '/slots', body: {'date': date, 'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': ?staffId});
+    final r = await _call('svc_slots', {'date': date, 'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': staffId});
     return _list(r['providers']).map(SlotProvider.new).toList();
   }
 
@@ -172,28 +269,80 @@ class ServiceApi {
     required String startsAt,
     String? depositMethod,
     num? tendered,
+    String? entitlementId,
+    String? serviceAddress,
+    String? accessNote,
   }) async =>
-      AppointmentView(await _send('POST', '/appointments', key: key, body: {
+      AppointmentView(await _call('svc_book', key: key, {
         'customer_name': customerName,
         if (customerPhone != null && customerPhone.isNotEmpty) 'customer_phone': customerPhone,
         'service_id': serviceId,
         'addon_ids': addonIds,
         'staff_id': staffId,
-        'resource_id': ?resourceId,
+        'resource_id': resourceId,
         'starts_at': startsAt,
+        'entitlement_id': entitlementId,
+        if (serviceAddress != null && serviceAddress.trim().isNotEmpty) 'service_address': serviceAddress.trim(),
+        if (accessNote != null && accessNote.trim().isNotEmpty) 'access_note': accessNote.trim(),
         if (depositMethod != null) 'deposit': {'method': depositMethod, 'tendered': ?tendered},
       }));
 
-  Future<List<AppointmentView>> history({String filter = 'all', String q = '', String? before}) async {
-    final r = await _send('GET', '/appointments', query: {'filter': filter, if (q.trim().isNotEmpty) 'q': q.trim(), 'before': ?before});
-    return _list(r['appointments']).map(AppointmentView.new).toList();
-  }
+  Future<HistoryData> history({String filter = 'all', String q = '', String? before, String? fulfilment, String? staffId, String period = 'all'}) async =>
+      HistoryData(await _call('svc_history', {
+        'filter': filter,
+        if (q.trim().isNotEmpty) 'q': q.trim(),
+        'before': before,
+        'fulfilment': fulfilment,
+        'staff_id': staffId,
+        if (period != 'all') 'period': period,
+      }));
 
-  Future<AppointmentView> get(String id) async => AppointmentView(await _send('GET', '/appointments/$id'));
+  Future<AppointmentView> get(String id) async => AppointmentView(await _call('svc_appointment_view', {'id': id}));
 
   Future<AppointmentView> act(String id, String action, {required int version, String? key, Map<String, Object?> extra = const {}}) async =>
-      AppointmentView(await _send('POST', '/appointments/$id/act', key: key ?? newKey(), body: {'action': action, 'expected_version': version, ...extra}));
+      AppointmentView(await _call('svc_appointment_act', key: key ?? newKey(), {'id': id, 'action': action, 'expected_version': version, ...extra}));
 
-  Future<AppointmentView> bill(String id, {required String method, num? tendered, required int version, required String key}) async =>
-      AppointmentView(await _send('POST', '/appointments/$id/bill', key: key, body: {'method': method, 'tendered': ?tendered, 'expected_version': version}));
+  Future<AppointmentView> bill(String id, {String? method, num? tendered, required int version, required String key}) async =>
+      AppointmentView(await _call('svc_bill', key: key, {'id': id, 'method': method, 'tendered': tendered, 'expected_version': version}));
+
+  /// During the visit: ticks checklist items, keeps the provider's notes, adds customer-approved materials, or asks for the arrival confirmation.
+  Future<AppointmentView> jobUpdate(String id,
+          {required int version, required String key, List<String>? done, String? providerNotes, List<Map<String, Object?>>? extras, bool requestConfirmation = false}) async =>
+      AppointmentView(await _call('svc_job_update', key: key, {
+        'id': id,
+        'expected_version': version,
+        'done': done,
+        'provider_notes': providerNotes,
+        'extras': extras,
+        if (requestConfirmation) 'request_confirmation': true,
+      }));
+
+  Future<ServiceListData> serviceList({String q = '', String? category, String? type, String? status}) async =>
+      ServiceListData(await _call('svc_service_list', {if (q.trim().isNotEmpty) 'q': q.trim(), 'category': category, 'type': type, 'status': status}));
+
+  Future<ServiceDetail> serviceDetail(String id) async => ServiceDetail(await _call('svc_service_detail', {'id': id}));
+
+  Future<ServiceDetail> saveService(Map<String, Object?> fields, {required String key}) async => ServiceDetail(await _call('svc_service_save', fields, key: key));
+
+  Future<StaffData> staff({String q = '', String filter = 'all'}) async =>
+      StaffData(await _call('svc_staff_list', {if (q.trim().isNotEmpty) 'q': q.trim(), 'filter': filter}));
+
+  Future<StaffData> saveProvider(Map<String, Object?> fields, {required String key}) async => StaffData(await _call('svc_provider_save', fields, key: key));
+
+  Future<ScheduleData> schedule({String? locationId}) async => ScheduleData(await _call('svc_schedule', {'location_id': locationId}));
+
+  Future<ScheduleData> saveSchedule(Map<String, Object?> fields, {required String key}) async => ScheduleData(await _call('svc_schedule_save', fields, key: key));
+
+  Future<PlanListData> plans(String kind, {String q = '', String? status}) async =>
+      PlanListData(await _call('svc_plan_list', {'kind': kind, if (q.trim().isNotEmpty) 'q': q.trim(), 'status': status}));
+
+  Future<SvcData> savePlan(Map<String, Object?> fields, {required String key}) async => SvcData(await _call('svc_plan_save', fields, key: key));
+
+  /// Sells a package or membership to one customer: an ordinary order paid in full now, then the credits.
+  Future<EntitlementView> sell({required String key, required String planId, required String customerName, required String customerPhone, required String method, num? tendered}) async =>
+      EntitlementView(await _call('svc_entitlement_sell', key: key,
+          {'plan_id': planId, 'customer_name': customerName, 'customer_phone': customerPhone, 'method': method, 'tendered': tendered}));
+
+  Future<List<EntitlementView>> entitlementsFor(String phone) async =>
+      _list((await _call('svc_entitlements_for', {'customer_phone': phone}))['entitlements']).map(EntitlementView.new).toList();
 }

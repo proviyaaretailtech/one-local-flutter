@@ -124,9 +124,9 @@ void main() {
       final s = FakeServer((_) => ok(calendar()));
       final c = await s.api.calendar(date: '2026-10-08', view: 'week', staffId: 's1');
       final r = s.requests.single;
-      expect(r.method, 'GET');
-      expect(r.url.path, '/api/partner/service/calendar');
-      expect(r.url.queryParameters, {'date': '2026-10-08', 'view': 'week', 'staff_id': 's1'});
+      expect(r.method, 'POST');
+      expect(r.url.path, '/rpc/svc_calendar');
+      expect(jsonDecode(r.body), {'date': '2026-10-08', 'view': 'week', 'staff_id': 's1'});
       expect(r.headers['Authorization'], 'Bearer token-123');
       expect(c.appointments, 8);
       expect(c.availableSlots, 6);
@@ -149,7 +149,7 @@ void main() {
         tendered: 500,
       );
       final r = s.requests.single;
-      expect(r.url.path, '/api/partner/service/appointments');
+      expect(r.url.path, '/rpc/svc_book');
       expect(r.headers['Idempotency-Key'], 'svc-abc');
       expect(jsonDecode(r.body), {
         'customer_name': 'Riya Sharma',
@@ -169,11 +169,12 @@ void main() {
       final s = FakeServer((_) => ok(bookedView()));
       await s.api.act('ap1', 'cancel', version: 3, extra: {'reason': 'customer asked'});
       await s.api.bill('ap1', method: 'cash', tendered: 800, version: 4, key: 'svc-b1');
-      expect(s.requests[0].url.path, '/api/partner/service/appointments/ap1/act');
+      expect(s.requests[0].url.path, '/rpc/svc_appointment_act');
       expect(s.requests[0].headers['Idempotency-Key'], startsWith('svc-'));
-      expect(jsonDecode(s.requests[0].body), {'action': 'cancel', 'expected_version': 3, 'reason': 'customer asked'});
-      expect(s.requests[1].url.path, '/api/partner/service/appointments/ap1/bill');
-      expect(jsonDecode(s.requests[1].body), {'method': 'cash', 'tendered': 800, 'expected_version': 4});
+      expect(jsonDecode(s.requests[0].body), {'id': 'ap1', 'action': 'cancel', 'expected_version': 3, 'reason': 'customer asked'});
+      expect(s.requests[1].url.path, '/rpc/svc_bill');
+      expect(s.requests[1].headers['Idempotency-Key'], 'svc-b1');
+      expect(jsonDecode(s.requests[1].body), {'id': 'ap1', 'method': 'cash', 'tendered': 800, 'expected_version': 4});
     });
 
     test('server refusals keep their message and code', () async {
@@ -192,7 +193,7 @@ void main() {
     test('history passes filter and search', () async {
       final s = FakeServer((_) => ok({'appointments': []}));
       await s.api.history(filter: 'completed', q: ' riya ');
-      expect(s.requests.single.url.queryParameters, {'filter': 'completed', 'q': 'riya'});
+      expect(jsonDecode(s.requests.single.body), {'filter': 'completed', 'q': 'riya'});
     });
   });
 
@@ -228,7 +229,7 @@ void main() {
       await showTall(t, ServiceCalendarScreen(api: s.api, initialDate: DateTime(2026, 10, 8)));
       await t.tap(find.bySemanticsLabel('Fri 9'));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['date'], '2026-10-09');
+      expect(jsonDecode(s.requests.last.body)['date'], '2026-10-09');
     });
 
     testWidgets('Week and a chosen provider are sent to the server', (t) async {
@@ -236,12 +237,12 @@ void main() {
       await showTall(t, ServiceCalendarScreen(api: s.api, initialDate: DateTime(2026, 10, 8)));
       await t.tap(find.text('Week'));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['view'], 'week');
+      expect(jsonDecode(s.requests.last.body)['view'], 'week');
       await t.tap(find.text('All providers'));
       await t.pumpAndSettle();
       await t.tap(find.text('Kavya Nair').last);
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['staff_id'], 's2');
+      expect(jsonDecode(s.requests.last.body)['staff_id'], 's2');
     });
 
     testWidgets('an empty day says so, an error offers a retry', (t) async {
@@ -259,12 +260,12 @@ void main() {
   group('Appointment Booking (Figma 91)', () {
     http.Response Function(http.Request) router({bool bookFails = false}) => (r) {
           final p = r.url.path;
-          if (p.endsWith('/catalogue')) return ok(catalogue());
-          if (p.endsWith('/quote')) return ok(quote(addon: (jsonDecode(r.body)['addon_ids'] as List).isNotEmpty));
-          if (p.endsWith('/slots')) {
+          if (p.endsWith('/svc_catalogue')) return ok(catalogue());
+          if (p.endsWith('/svc_quote')) return ok(quote(addon: (jsonDecode(r.body)['addon_ids'] as List).isNotEmpty));
+          if (p.endsWith('/svc_slots')) {
             return ok({'providers': [{'staff_id': 's1', 'name': 'Neha Rao', 'slots': [{'starts_at': '2026-10-08T04:30:00+00:00', 'label': '10:00 AM', 'range_label': '10:00 – 11:05 AM'}]}]});
           }
-          if (p.endsWith('/appointments')) return bookFails ? err(500, 'Network trouble.') : ok(bookedView());
+          if (p.endsWith('/svc_book')) return bookFails ? err(500, 'Network trouble.') : ok(bookedView());
           return err(404, 'not found');
         };
 
@@ -321,7 +322,7 @@ void main() {
     testWidgets('quote asks the server with choices only; the policy banner can be dismissed', (t) async {
       final s = FakeServer(router());
       await fill(t, s, addon: true);
-      expect(jsonDecode(s.where('POST', '/quote').last.body), {'service_id': 'sv1', 'addon_ids': ['ad1'], 'staff_id': 's1'});
+      expect(jsonDecode(s.where('POST', '/svc_quote').last.body), {'service_id': 'sv1', 'addon_ids': ['ad1'], 'staff_id': 's1'});
       await t.tap(find.byKey(const ValueKey('dismiss-policy')));
       await t.pumpAndSettle();
       expect(find.text('Cancellation policy'), findsNothing);
@@ -335,7 +336,7 @@ void main() {
       expect(find.text('Advance ₹200'), findsOneWidget);
       await t.tap(find.text('Take Cash'));
       await t.pumpAndSettle();
-      final r = s.where('POST', '/appointments').single;
+      final r = s.where('POST', '/svc_book').single;
       expect(r.headers['Idempotency-Key'], startsWith('svc-'));
       final body = jsonDecode(r.body) as Map;
       expect(body['customer_name'], 'Riya Sharma');
@@ -350,7 +351,7 @@ void main() {
 
     testWidgets('"collect the advance later" books without a payment; a failed call keeps the key for the retry', (t) async {
       var fail = true;
-      final s = FakeServer((r) => r.url.path.endsWith('/appointments') && fail ? err(500, 'Network trouble.') : router()(r));
+      final s = FakeServer((r) => r.url.path.endsWith('/svc_book') && fail ? err(500, 'Network trouble.') : router()(r));
       await fill(t, s);
       await t.tap(find.text('Confirm booking · ₹200 advance'));
       await t.pumpAndSettle();
@@ -362,14 +363,14 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Collect the advance later'));
       await t.pumpAndSettle();
-      final calls = s.where('POST', '/appointments').toList();
+      final calls = s.where('POST', '/svc_book').toList();
       expect(calls.length, 2);
       expect(calls[0].headers['Idempotency-Key'], calls[1].headers['Idempotency-Key'], reason: 'a retried tap must not book twice');
       expect(jsonDecode(calls[1].body), isNot(contains('deposit')));
     });
 
     testWidgets('a time taken on another device clears the chosen time and says why', (t) async {
-      final s = FakeServer((r) => r.url.path.endsWith('/appointments') ? err(409, 'That time was just booked on another device.') : router()(r));
+      final s = FakeServer((r) => r.url.path.endsWith('/svc_book') ? err(409, 'That time was just booked on another device.') : router()(r));
       await fill(t, s);
       await t.tap(find.text('Confirm booking · ₹200 advance'));
       await t.pumpAndSettle();
@@ -385,7 +386,7 @@ void main() {
       await t.tap(find.text('Confirm booking'));
       await t.pumpAndSettle();
       expect(toast('Add the customer first.'), findsOneWidget);
-      expect(s.where('POST', '/appointments'), isEmpty);
+      expect(s.where('POST', '/svc_book'), isEmpty);
     });
   });
 

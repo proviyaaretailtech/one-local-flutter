@@ -40,6 +40,9 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
   String? _quoteError;
   bool _policyShown = true;
   bool _busy = false;
+  String _address = '', _access = '';
+  List<EntitlementView> _ents = const [];
+  EntitlementView? _ent;
   String? _key; // one key per booking intent: kept for a retry, dropped when anything the person chose changes
   int _seq = 0;
 
@@ -99,6 +102,41 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     _name = name.text.trim();
     _phone = phone.text.replaceAll(RegExp(r'\D'), '');
     if (_phone.length > 10 && _phone.startsWith('91')) _phone = _phone.substring(2);
+    _ent = null;
+    _ents = const [];
+    _changed();
+    if (_phone.length == 10) {
+      try {
+        final e = await _api.entitlementsFor(_phone);
+        if (mounted) setState(() => _ents = e);
+      } catch (_) {
+        // the booking still works without a package; the server checks any package again
+      }
+    }
+  }
+
+  Future<void> _pickEntitlement() async {
+    final picked = await showOrderSheet<String>(context, title: 'Package or membership', body: (ctx) => Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(contentPadding: EdgeInsets.zero, title: Text('Do not use one', style: inter(15, _ent == null ? 700 : 500)), onTap: () => Navigator.pop(ctx, '')),
+          for (final e in _ents)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(e.name, style: inter(15, e.id == _ent?.id ? 700 : 500)),
+              subtitle: Text(e.credits.map((c) => '${c.s('name')} ${c.i('left')} left').join(' · '), style: inter(12.5, 400, color: kMuted)),
+              onTap: () => Navigator.pop(ctx, e.id),
+            ),
+        ]));
+    if (picked == null) return;
+    _ent = picked.isEmpty ? null : _ents.firstWhere((e) => e.id == picked);
+    _changed();
+  }
+
+  Future<void> _pickAddress() async {
+    final a = await askText(context, 'Customer address', initial: _address, hint: 'Flat, building, area, PIN', lines: 2);
+    if (a == null || !mounted) return;
+    final acc = await askText(context, 'Access (optional)', initial: _access, hint: 'Gate 2 · Lift available', action: 'Done');
+    _address = a;
+    _access = acc ?? '';
     _changed();
   }
 
@@ -195,13 +233,17 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
       showToast(context, _name.isEmpty ? 'Add the customer first.' : (_service == null ? 'Choose a service.' : (_provider == null ? 'Choose a provider.' : 'Choose a date and time.')));
       return;
     }
+    if (_service!.fulfilment == 'on_location' && _address.trim().isEmpty) {
+      showToast(context, 'Add the customer\'s address for an on-location job.');
+      return;
+    }
     if (_phone.isNotEmpty && _phone.length != 10) {
       showToast(context, 'Enter a 10-digit mobile number.');
       return;
     }
     final q = _quote!;
     String? method;
-    if (q.deposit > 0) {
+    if (q.deposit > 0 && _ent == null) {
       final choice = await showOrderSheet<String>(context, title: 'Advance ${rupees(q.deposit)}', body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             for (final (id, label) in const [('cash', 'Cash'), ('card', 'Card'), ('upi', 'UPI / QR')]) ...[LightCta(label: 'Take $label', onPressed: () => Navigator.pop(ctx, id)), const SizedBox(height: 8)],
             UnderLink('Collect the advance later', onTap: () => Navigator.pop(ctx, 'later')),
@@ -222,9 +264,20 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
         resourceId: _resource?['id'] as String?,
         startsAt: '${_slot!['starts_at']}',
         depositMethod: method,
+        entitlementId: _ent?.id,
+        serviceAddress: _address,
+        accessNote: _access,
       );
       if (!mounted) return;
       showToast(context, '${booked.displayNo} booked.');
+      if (booked.arrivalCode != null) {
+        await showOrderSheet<void>(context, title: 'Arrival code ${booked.arrivalCode}', body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('Share this code with ${booked.customer}. The provider asks for it on arrival. It is shown only now.', style: inter(14, 400, color: kMuted, height: 1.4)),
+              const SizedBox(height: 14),
+              DarkCta(label: 'Done', onPressed: () => Navigator.pop(ctx)),
+            ]));
+        if (!mounted) return;
+      }
       Navigator.of(context).pop(booked);
     } on ServiceApiException catch (e) {
       if (mounted) {
@@ -251,18 +304,23 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
           child: ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 16), children: [
             Text('Appointment Booking', style: inter(30, 700, height: 1.15)),
             const SizedBox(height: 8),
-            Text('New appointment · Customer visits the studio', style: inter(13.5, 400, color: kMuted)),
+            Text(s?.fulfilment == 'on_location' ? 'New job · Provider visits the customer' : 'New appointment · Customer visits the studio', style: inter(13.5, 400, color: kMuted)),
             if (_error != null) ...[const SizedBox(height: 16), OrderCardBox(child: Text(_error!, style: inter(13.5, 500)))],
             const SizedBox(height: 22),
             _heading('Customer & service'),
             _field('Customer', _name.isEmpty ? 'Add customer' : (_phone.isEmpty ? _name : '$_name · +91 $_phone'), _name.isEmpty, _pickCustomer, key: 'customer'),
             _field('Service', s == null ? 'Choose a service' : '${s.name} · ${rupees(s.price)} · ${s.durationMin} min', s == null, _pickService, key: 'service'),
+            if (_ents.isNotEmpty) _field('Package', _ent == null ? 'Do not use a package' : _ent!.name, _ent == null, _pickEntitlement, key: 'package'),
             _field('Provider', _provider == null ? 'Choose a provider' : (_provider!.title.isEmpty ? _provider!.name : '${_provider!.name} · ${_provider!.title}'), _provider == null, _pickProvider, key: 'provider'),
             const SizedBox(height: 6),
             _heading('Schedule & location'),
             _field('Date', _dateLabel(_date), false, _pickDate, key: 'date'),
             _field('Time', _slot == null ? 'Choose a time' : '${_slot!['range_label']}', _slot == null, _pickTime, key: 'time'),
-            _field('Business location', _locationText(), false, (_cat?.resources.isEmpty ?? true) ? null : _pickResource, key: 'location'),
+            if (s?.fulfilment == 'on_location')
+              _field('Customer address', _address.isEmpty ? 'Add the address' : [_address, if (_access.isNotEmpty) _access].join(' · '), _address.isEmpty, _pickAddress, key: 'address')
+            else
+              _field('Business location', _locationText(), false, (_cat?.resources.isEmpty ?? true) ? null : _pickResource, key: 'location'),
+            if (_ent != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('${_ent!.name} credit is applied when the booking is made; the advance is then taken only on what is left.', style: inter(12.5, 400, color: kMuted))),
             if (s != null && s.addons.isNotEmpty) ...[const SizedBox(height: 4), _addonsCard(s, q)],
             if (q != null) ...[const SizedBox(height: 14), _summary(q)] else if (_quoteError != null) ...[const SizedBox(height: 14), OrderCardBox(child: Text(_quoteError!, style: inter(13.5, 500)))],
             if (_policyShown) ...[const SizedBox(height: 14), _policy(q?.freeCancelHours ?? _cat?.freeCancelHours ?? 12, q?.deposit ?? _cat?.deposit ?? 0)],

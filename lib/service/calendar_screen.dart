@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'booking_screen.dart';
+import 'service_menu.dart';
 import 'service_api.dart';
 import 'service_widgets.dart';
+import 'visit_screens.dart';
 
 String _iso(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -80,7 +82,8 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        ServiceTopBar(business: d == null ? '' : [d.business, if (d.city.isNotEmpty) d.city].where((e) => e.isNotEmpty).join(' · '), initials: widget.initials, onBack: Navigator.canPop(context) ? () => Navigator.maybePop(context) : null),
+        ServiceTopBar(business: d == null ? '' : [d.business, if (d.city.isNotEmpty) d.city].where((e) => e.isNotEmpty).join(' · '), initials: widget.initials,
+            onMenu: () => showServiceMenu(context, _api, business: d?.business ?? '', onNavigate: widget.onNavigate)),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
@@ -130,6 +133,7 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
                   ),
                 ]),
                 const SizedBox(height: 14),
+                if (d.closed != null) ...[SvcInfo(title: 'Closed today', text: d.closed!), const SizedBox(height: 4)],
                 if (d.items.isEmpty) OrderCardBox(child: Text('No appointments yet. Tap Book appointment to add one.', style: inter(14, 400, color: kMuted))),
                 for (final a in d.items) ...[
                   _card(a),
@@ -191,7 +195,10 @@ class _ServiceCalendarScreenState extends State<ServiceCalendarScreen> {
 
   Widget _card(AppointmentView a) => InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () => showToast(context, 'Appointment details come in a later release.'),
+        onTap: () async {
+          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => AppointmentDetailScreen(api: _api, id: a.id, business: _data?.business ?? '', onNavigate: widget.onNavigate)));
+          if (mounted) _load();
+        },
         child: OrderCardBox(
           radius: 18,
           padding: const EdgeInsets.all(14),

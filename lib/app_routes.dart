@@ -10,6 +10,7 @@ import 'orders/cart_screen.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
 import 'service/calendar_screen.dart';
+import 'service/service_widgets.dart' show ServiceRoutes;
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 
@@ -24,7 +25,7 @@ void installRoutes() {
       onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
   HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
   HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
-  HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
+  HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
