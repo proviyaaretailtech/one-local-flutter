@@ -167,6 +167,45 @@ try {
   ok('inventory: A document untouched after all of that', sql(`select status||':'||version from inventory_documents where id='${docId}'`) === 'draft:' + d1.j.version && sql(`select count(*) from stock_movements where organization_id='${orgA}'`) === '1');
   ok('inventory: A viewer can read stock but not create documents', (await rpc(V, 'inv_dashboard')).s === 200 && (await rpc(V, 'inv_document_save', draft, `gw-inv-${randomUUID()}`)).s === 403);
   ok('inventory: applicant with no business gets nothing', refused(await rpc(P1, 'inv_dashboard')) && refused(await rpc(P1, 'inv_stock_detail', { item_id: itemA })));
+
+  // ---- purchasing (section H purchasing): A's orders, prices and audits against B's token
+  const supA = `zz-sup-${run}`, supB = `zz-supb-${run}`;
+  sql(`insert into pos_suppliers(row_id,organization_id,location_id,id,name,rating,payment_terms) values (gen_random_uuid(),'${orgA}','${locA}','${supA}','ZZ ABC Foods',4.8,'Net 15 Days'),(gen_random_uuid(),'${orgB}','${locB}','${supB}','ZZ B Foods',3,'Net 7 Days')`);
+  const priceA = sql(`insert into pos_supplier_prices(row_id,organization_id,location_id,id,ingredient_name,material_id,supplier_id,unit,last_price,current_price,lowest_week,source,sku_id,approved,lead_time_hours,moq) values (gen_random_uuid(),'${orgA}','${locA}','zz-p-${run}','ZZ Paneer','${itemA}','${supA}','kg',400,410,400,'AI Inferred','INGR-042',true,24,10) returning row_id`).split('\n')[0];
+  const poLines = [{ inventory_item_id: itemA, qty: 10, unit_cost_minor: 36000, gst_pct: 5 }];
+  ok('purchasing: no token is 401, service-only helpers are not on the allowlist', (await rpc(null, 'pur_po_list')).s === 401 && (await rpc(A, 'pur_po_json')).s === 404 && (await rpc(A, 'purchasing_receipt_posted')).s === 404);
+  const pkey = `gw-pur-${randomUUID()}`;
+  const po1 = await rpc(A, 'pur_po_create', { supplier_id: supA, lines: poLines }, pkey);
+  ok('purchasing: A creates a purchase order (Idempotency-Key becomes the key), total 3,600', po1.s === 200 && po1.j.status === 'open' && po1.j.number?.startsWith('PO-') && Number(po1.j.totals.estimated_minor) === 360000, po1);
+  const po1b = await rpc(A, 'pur_po_create', { supplier_id: supA, lines: poLines }, pkey);
+  ok('purchasing: same key replays the same order', po1b.s === 200 && po1b.j.id === po1.j.id && po1b.j.replayed === true, po1b);
+  ok('purchasing: A list shows it, one open order', await (async () => { const r = await rpc(A, 'pur_po_list', { status: 'pending' }); return r.s === 200 && Number(r.j.open_count) === 1 && r.j.orders.some(o => o.id === po1.j.id); })());
+  ok('purchasing: bad shape is a 400 with a sentence', await (async () => { const r = await rpc(A, 'pur_po_create', { supplier_id: supA, lines: [] }, `gw-pur-${randomUUID()}`); return r.s === 400 && r.j.code === 'validation'; })());
+  const pv = await rpc(A, 'pur_price_view', { price_id: priceA });
+  ok('purchasing: A reads the supplier price detail', pv.s === 200 && pv.j.ingredient_name === 'ZZ Paneer' && pv.j.bids.length === 1 && Number(pv.j.rate_minor) === 41000, pv);
+  const rc = await rpc(A, 'pur_po_receive', { id: po1.j.id }, `gw-pur-${randomUUID()}`);
+  ok('purchasing: A starts the receipt, a draft for the order number', rc.s === 200 && rc.j.status === 'draft' && rc.j.po?.number === po1.j.number, rc);
+  const au = await rpc(A, 'pur_audit_record', { price_id: priceA, checks: [{ name: 'Receiving temperature', detail: '8.1C', result: 'fail' }] });
+  ok('purchasing: A manager records an audit, re-audit required', au.s === 200 && au.j.audit.reaudit_required === true, au);
+  ok('purchasing: A manager cannot choose the preferred supplier (403)', (await rpc(A, 'pur_sourcing_select', { price_id: priceA }, `gw-pur-${randomUUID()}`)).s === 403);
+  // B (another business, real owner) against A's purchasing
+  const pbList = await rpc(B, 'pur_po_list');
+  ok('purchasing: B list shows none of A', pbList.s === 200 && Number(pbList.j.open_count) === 0 && !JSON.stringify(pbList.j).includes(po1.j.id), pbList);
+  const bOpt = await rpc(B, 'pur_options');
+  ok('purchasing: B options show none of A suppliers, items or prices', bOpt.s === 200 && !JSON.stringify(bOpt.j).includes(supA) && !JSON.stringify(bOpt.j).includes(itemA) && !JSON.stringify(bOpt.j).includes(priceA), bOpt);
+  ok('purchasing: B cannot view A order (id and number), nor its price detail', (await rpc(B, 'pur_po_view', { id: po1.j.id })).s === 404 && (await rpc(B, 'pur_po_view', { number: po1.j.number })).s === 404
+    && (await rpc(B, 'pur_price_view', { price_id: priceA })).s === 404);
+  ok('purchasing: B cannot receive, choose sourcing on, or audit A rows', (await rpc(B, 'pur_po_receive', { id: po1.j.id }, `gw-pur-${randomUUID()}`)).s === 404
+    && (await rpc(B, 'pur_sourcing_select', { price_id: priceA }, `gw-pur-${randomUUID()}`)).s === 404
+    && (await rpc(B, 'pur_audit_record', { price_id: priceA, checks: [{ name: 'x', result: 'pass' }] })).s === 404);
+  ok('purchasing: B cannot open A location, order from A supplier, or with A item', refused(await rpc(B, 'pur_po_list', { location_id: locA })) && refused(await rpc(B, 'pur_options', { location_id: locA }))
+    && refused(await rpc(B, 'pur_po_create', { supplier_id: supA, lines: [{ inventory_item_id: itemA, qty: 1, unit_cost_minor: 1 }] }, `gw-pur-${randomUUID()}`))
+    && refused(await rpc(B, 'pur_po_create', { supplier_id: supB, lines: [{ inventory_item_id: itemA, qty: 1, unit_cost_minor: 1 }] }, `gw-pur-${randomUUID()}`))
+    && refused(await rpc(B, 'pur_po_create', { location_id: locA, supplier_id: supB, lines: [{ inventory_item_id: itemA, qty: 1, unit_cost_minor: 1 }] }, `gw-pur-${randomUUID()}`)));
+  ok('purchasing: A order, preferred supplier and audit untouched after all of that', sql(`select count(*) from pos_purchase_orders where organization_id='${orgA}'`) === '1' && sql(`select approved from pos_supplier_prices where row_id='${priceA}'`) === 't'
+    && sql(`select count(*) from supplier_quality_checks where price_row_id='${priceA}'`) === '1' && sql(`select count(*) from inventory_documents where po_ref='${po1.j.number}' and status='draft'`) === '1');
+  ok('purchasing: A viewer (no purchasing role) is refused; applicant with no business gets nothing', refused(await rpc(V, 'pur_po_list')) && refused(await rpc(V, 'pur_po_create', { supplier_id: supA, lines: poLines }, `gw-pur-${randomUUID()}`))
+    && refused(await rpc(P1, 'pur_po_list')) && refused(await rpc(P1, 'pur_price_view', { price_id: priceA })));
   ok('payment webhook hook answers 501 (not connected)', (await fetch(`${API}/webhooks/razorpay`, { method: 'POST' })).status === 501);
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.stack?.slice(0, 600));
@@ -175,6 +214,13 @@ try {
   for (const id of users) { try { sql(`delete from org_users where user_id='${id}'`); sql(`delete from auth.users where id='${id}'`); } catch { /* kept rows are test users */ } }
   try { sql(`update orders set notes='ZZ-TEST gw' where organization_id in ('${orgA}','${orgB}') and coalesce(notes,'') not like 'ZZ-TEST%'`); } catch {}
   sql(`delete from org_bill_settings where organization_id in ('${orgA}','${orgB}')`);
+  try {   // purchasing rows of the two test businesses (the three new tables are append-only: lift the guard for this cleanup only)
+    for (const t of ['purchase_events', 'supplier_quality_checks', 'purchase_receipt_lines']) sql(`alter table ${t} disable trigger user`);
+    sql(`delete from purchase_events where organization_id in ('${orgA}','${orgB}')`); sql(`delete from supplier_quality_checks where organization_id in ('${orgA}','${orgB}')`); sql(`delete from purchase_receipt_lines where organization_id in ('${orgA}','${orgB}')`);
+    for (const t of ['purchase_events', 'supplier_quality_checks', 'purchase_receipt_lines']) sql(`alter table ${t} enable trigger user`);
+    sql(`delete from pos_purchase_order_lines where organization_id in ('${orgA}','${orgB}')`); sql(`delete from pos_purchase_orders where organization_id in ('${orgA}','${orgB}')`);
+    sql(`delete from pos_supplier_prices where organization_id in ('${orgA}','${orgB}')`); sql(`delete from pos_suppliers where organization_id in ('${orgA}','${orgB}')`);
+  } catch (e) { console.log('note: purchasing cleanup', e.message.slice(0, 160)); }
   sql(`delete from org_counters where organization_id in ('${orgA}','${orgB}')`);
   try { sql(`delete from inventory_bins where organization_id in ('${orgA}','${orgB}')`); } catch {}
   try { console.log(execSync('../../database/purge_test_orders.sh', { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { console.log('purge:', e.message.slice(0, 120)); }
