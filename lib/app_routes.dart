@@ -8,6 +8,9 @@ import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
 import 'inventory/inventory_dashboard.dart';
 import 'inventory/stock_detail_screen.dart';
+import 'notices/feedback_screen.dart';
+import 'notices/notices_api.dart';
+import 'notices/notices_home.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
 import 'sell/sell_env.dart';
@@ -29,6 +32,9 @@ void installRoutes() {
       onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
   HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
   HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
+  // Section N: notification and announcement centres, customer messages and feedback.
+  HomeNav.notifications = (c) => Navigator.of(c).push(NoticesHome.route());
+  HomeNav.reviews = HomeNav.complaints = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FeedbackScreen(api: NoticesApi())));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
