@@ -1,0 +1,2588 @@
+{
+    "options": {
+        "me": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager",
+            "can_record": true,
+            "can_approve": false
+        },
+        "bins": [
+            {
+                "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                "code": "A-01",
+                "name": "Shelf A-01",
+                "zone": "shelf",
+                "storage": "ambient",
+                "capacity_units": null
+            },
+            {
+                "id": "187c6c9d-09db-4c80-b6a3-714845cfb71d",
+                "code": "C-01",
+                "name": "Chiller C-01",
+                "zone": "shelf",
+                "storage": "chilled",
+                "capacity_units": null
+            },
+            {
+                "id": "50d378b3-717c-4c98-840d-540068bc0a10",
+                "code": "B-01",
+                "name": "Backroom B-01",
+                "zone": "backroom",
+                "storage": "ambient",
+                "capacity_units": null
+            },
+            {
+                "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                "code": "B-02",
+                "name": "Backroom B-02",
+                "zone": "backroom",
+                "storage": "ambient",
+                "capacity_units": 60.000
+            },
+            {
+                "id": "4101c6f6-1b4c-49eb-8964-a6b2ea781f79",
+                "code": "Q-01",
+                "name": "Quarantine Q-01",
+                "zone": "quarantine",
+                "storage": "ambient",
+                "capacity_units": null
+            }
+        ],
+        "staff": [
+            {
+                "id": "40000000-0000-0000-0000-000000000001",
+                "name": "Niraj",
+                "role": "inventory_manager"
+            },
+            {
+                "id": "40000000-0000-0000-0000-000000000002",
+                "name": "Rohan Shah",
+                "role": "org_owner"
+            }
+        ],
+        "reasons": {
+            "reject": [
+                "Broken seal",
+                "Damaged packaging",
+                "Expired or short-dated",
+                "Wrong item",
+                "Temperature breach"
+            ],
+            "transfer": [
+                "Refill sales shelf",
+                "Free up backroom",
+                "Move near-expiry forward",
+                "Rebalance between stores"
+            ],
+            "adjustment": [
+                "Cycle-count shortage",
+                "Cycle-count surplus",
+                "Damaged in store",
+                "Expired",
+                "Supplier short delivery",
+                "Data entry correction"
+            ]
+        },
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "approvers": [
+            {
+                "id": "40000000-0000-0000-0000-000000000002",
+                "name": "Rohan Shah",
+                "role": "org_owner"
+            }
+        ],
+        "locations": [
+            {
+                "id": "40000000-0000-0000-0000-00000000010a",
+                "code": "MAIN",
+                "name": "Latur Main Branch"
+            },
+            {
+                "id": "40000000-0000-0000-0000-00000000020a",
+                "code": "WH-LTR",
+                "name": "Latur Warehouse"
+            }
+        ],
+        "snapshot_at": "2026-10-16T05:10:44.360704+00:00"
+    },
+    "forecast": {
+        "days": 7,
+        "item": {
+            "id": "40b00000-0000-0000-0000-000000000001",
+            "sku": "CC-500-BOT",
+            "name": "Coca-Cola 500ml",
+            "unit": "unit"
+        },
+        "series": [
+            {
+                "day": 0,
+                "date": "2026-10-16",
+                "value": 75.0
+            },
+            {
+                "day": 1,
+                "date": "2026-10-17",
+                "value": 61.0,
+                "inbound": 0
+            },
+            {
+                "day": 2,
+                "date": "2026-10-18",
+                "value": 69.0,
+                "inbound": 22.000
+            },
+            {
+                "day": 3,
+                "date": "2026-10-19",
+                "value": 55.0,
+                "inbound": 0
+            },
+            {
+                "day": 4,
+                "date": "2026-10-20",
+                "value": 41.0,
+                "inbound": 0
+            },
+            {
+                "day": 5,
+                "date": "2026-10-21",
+                "value": 27.0,
+                "inbound": 0
+            },
+            {
+                "day": 6,
+                "date": "2026-10-22",
+                "value": 13.0,
+                "inbound": 0
+            },
+            {
+                "day": 7,
+                "date": "2026-10-23",
+                "value": -1.0,
+                "inbound": 0
+            }
+        ],
+        "inbound": [
+            {
+                "day": 2,
+                "qty": 22.000,
+                "date": "2026-10-18",
+                "doc_no": "RCV-002"
+            }
+        ],
+        "opening": 75.000,
+        "end_stock": -1.0,
+        "sensitivity": [
+            {
+                "end": 18.6,
+                "pct": -20,
+                "per_day": 11.20
+            },
+            {
+                "end": -1.0,
+                "pct": 0,
+                "per_day": 14.00
+            },
+            {
+                "end": -20.6,
+                "pct": 20,
+                "per_day": 16.80
+            }
+        ],
+        "suggest_qty": 15,
+        "demand_total": 98.0,
+        "history_days": 14,
+        "baseline_date": "2026-10-16",
+        "inbound_total": 22.000,
+        "safety_buffer": 14.0,
+        "demand_per_day": 14.00,
+        "buffer_breach_day": 6,
+        "rejected_excluded": 2.000,
+        "demand_from_history": false
+    },
+    "movement": {
+        "id": 409,
+        "item": {
+            "id": "40b00000-0000-0000-0000-000000000001",
+            "sku": "CC-500-BOT",
+            "name": "Coca-Cola 500ml",
+            "unit": "unit",
+            "category": "Beverages"
+        },
+        "kind": "sale",
+        "note": "P-00001",
+        "after": 84.000,
+        "delta": -6.000,
+        "trail": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "kind": "placed",
+                "actor": "pos",
+                "label": "Order P-00001 placed - 6 items"
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "kind": "paid",
+                "actor": "pos",
+                "label": "P-00001 paid in full"
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "kind": "fulfilment_opened",
+                "actor": "pos",
+                "label": "P-00001 awaiting store acceptance"
+            }
+        ],
+        "before": 90.000,
+        "status": "posted",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "quantity": -6.000,
+        "reference": {
+            "id": "9204e02c-78d3-4761-95aa-8faee1e42f1c",
+            "type": "order",
+            "label": "P-00001",
+            "method": "POS checkout",
+            "channel": "pickup",
+            "recorded_by": {
+                "id": "40000000-0000-0000-0000-000000000002",
+                "name": "Rohan Shah",
+                "role": "org_owner"
+            }
+        },
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "allocations": [
+            {
+                "bin": {
+                    "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                    "code": "A-01",
+                    "name": "Shelf A-01",
+                    "zone": "shelf"
+                },
+                "lot": {
+                    "id": "cc8bad20-09a2-445b-bcb4-b6601130fac4",
+                    "lot_code": "CC-A",
+                    "expiry_date": "2026-11-03"
+                },
+                "quantity": -6.000,
+                "bin_after": 36.000,
+                "bin_before": 42.000
+            }
+        ],
+        "damaged_after": 0,
+        "reserved_after": 0,
+        "unchanged_bins": [
+            {
+                "code": "B-02",
+                "name": "Backroom B-02",
+                "zone": "backroom",
+                "on_hand": 48.000
+            }
+        ]
+    },
+    "dashboard": {
+        "low": {
+            "top": [
+            ],
+            "count": 0
+        },
+        "counts": {
+            "low": 0,
+            "out": 1,
+            "total": 2,
+            "healthy": 1,
+            "critical": 1,
+            "near_expiry": 0
+        },
+        "expiry": {
+            "top": [
+            ],
+            "count": 0
+        },
+        "damaged": {
+            "top": [
+                {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "name": "Coca-Cola 500ml",
+                    "units": 2.000,
+                    "bin_code": "Q-01"
+                }
+            ],
+            "count": 1,
+            "units": 2.000
+        },
+        "forecast": {
+            "id": "40b00000-0000-0000-0000-000000000001",
+            "name": "Coca-Cola 500ml",
+            "unit": "unit",
+            "end_stock": 96.0,
+            "shortfall_at_plus20": false
+        },
+        "headline": {
+            "id": "40b00000-0000-0000-0000-000000000002",
+            "eta": null,
+            "name": "Paneer",
+            "unit": "kg",
+            "inbound": 0,
+            "available": 0,
+            "stock_days": null
+        },
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "positioning": {
+            "free": 75.000,
+            "total": 99.000,
+            "inbound": 24.000
+        },
+        "snapshot_at": "2026-10-16T05:10:44.360704+00:00",
+        "discrepancies": {
+            "count": 2,
+            "items": [
+                {
+                    "id": "c145ba7f-d898-4f73-b65f-e0f8d0950524",
+                    "rn": 1,
+                    "doc_no": "AUD-001",
+                    "status": "review",
+                    "doc_type": "audit",
+                    "rejected": 0.000,
+                    "variance": -2.000,
+                    "created_at": "2026-10-16T05:10:44.360704+00:00"
+                },
+                {
+                    "id": "703e995e-1e97-452b-a937-da2615dc6ad8",
+                    "rn": 2,
+                    "doc_no": "RCV-002",
+                    "status": "draft",
+                    "doc_type": "receipt",
+                    "rejected": 2.000,
+                    "variance": null,
+                    "created_at": "2026-10-16T05:10:44.360704+00:00"
+                }
+            ]
+        },
+        "replenishment": [
+            {
+                "id": "40b00000-0000-0000-0000-000000000002",
+                "name": "Paneer",
+                "unit": "kg",
+                "urgent": true,
+                "suggest": 2
+            }
+        ]
+    },
+    "movements": {
+        "movements": [
+            {
+                "id": 420,
+                "ref": {
+                    "id": "d8149c20-2cf5-48a4-8f79-e76d270feffb",
+                    "type": "document",
+                    "label": "TRF-005",
+                    "method": "Stock transfer",
+                    "doc_type": "transfer"
+                },
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit"
+                },
+                "kind": "transfer_out",
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "delta": -5.000,
+                "quantity": -5.000,
+                "created_at": "2026-10-16T05:10:44.360704+00:00"
+            },
+            {
+                "id": 419,
+                "ref": {
+                    "type": "manual",
+                    "label": "Manual entry",
+                    "method": "Manual entry"
+                },
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit"
+                },
+                "kind": "receipt",
+                "actor": null,
+                "delta": 1.000,
+                "quantity": 1.000,
+                "created_at": "2026-10-16T05:10:44.360704+00:00"
+            },
+            {
+                "id": 418,
+                "ref": {
+                    "type": "manual",
+                    "label": "Manual entry",
+                    "method": "Manual entry"
+                },
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit"
+                },
+                "kind": "wastage",
+                "actor": null,
+                "delta": -1.000,
+                "quantity": -1.000,
+                "created_at": "2026-10-16T05:10:44.360704+00:00"
+            },
+            {
+                "id": 417,
+                "ref": {
+                    "id": "929b1ef8-89d4-4878-9292-684f96ce5516",
+                    "type": "document",
+                    "label": "ADJ-002",
+                    "method": "Approved adjustment",
+                    "doc_type": "adjustment"
+                },
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit"
+                },
+                "kind": "transfer_in",
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000002",
+                    "name": "Rohan Shah",
+                    "role": "org_owner"
+                },
+                "delta": 0,
+                "quantity": 2.000,
+                "created_at": "2026-10-16T05:10:44.360704+00:00"
+            },
+            {
+                "id": 416,
+                "ref": {
+                    "id": "929b1ef8-89d4-4878-9292-684f96ce5516",
+                    "type": "document",
+                    "label": "ADJ-002",
+                    "method": "Approved adjustment",
+                    "doc_type": "adjustment"
+                },
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit"
+                },
+                "kind": "transfer_out",
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000002",
+                    "name": "Rohan Shah",
+                    "role": "org_owner"
+                },
+                "delta": -2.000,
+                "quantity": -2.000,
+                "created_at": "2026-10-16T05:10:44.360704+00:00"
+            }
+        ]
+    },
+    "stock_list": {
+        "page": 1,
+        "items": [
+            {
+                "id": "40b00000-0000-0000-0000-000000000002",
+                "sku": "PANEER",
+                "name": "Paneer",
+                "unit": "kg",
+                "status": "out",
+                "damaged": 0,
+                "category": "Dairy",
+                "reserved": 0,
+                "available": 0,
+                "item_type": "ingredient",
+                "in_transit": 0,
+                "stock_days": null,
+                "expiry_date": null,
+                "expiry_days": null
+            },
+            {
+                "id": "40b00000-0000-0000-0000-000000000001",
+                "sku": "CC-500-BOT",
+                "name": "Coca-Cola 500ml",
+                "unit": "unit",
+                "status": "healthy",
+                "damaged": 2.000,
+                "category": "Beverages",
+                "reserved": 0,
+                "available": 75.000,
+                "item_type": "sku",
+                "in_transit": 24.000,
+                "stock_days": 175.0,
+                "expiry_date": "2026-11-03",
+                "expiry_days": 18
+            }
+        ],
+        "total": 2,
+        "counts": {
+            "all": 2,
+            "low": 0,
+            "sku": 1,
+            "healthy": 1,
+            "critical": 1,
+            "ingredient": 1,
+            "near_expiry": 0
+        },
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "page_size": 8,
+        "categories": [
+            "Beverages",
+            "Dairy"
+        ],
+        "snapshot_at": "2026-10-16T05:10:44.360704+00:00"
+    },
+    "audit_review": {
+        "id": "c145ba7f-d898-4f73-b65f-e0f8d0950524",
+        "note": "Shelf shortage · recount confirmed",
+        "lines": [
+            {
+                "id": "28227acf-2fd1-4976-92d2-0b1c46e0bf43",
+                "lot": null,
+                "qty": null,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 36.000
+                    },
+                    {
+                        "id": "4101c6f6-1b4c-49eb-8964-a6b2ea781f79",
+                        "code": "Q-01",
+                        "name": "Quarantine Q-01",
+                        "zone": "quarantine",
+                        "on_hand": 2.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 44.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": null,
+                "inbound": 24.000,
+                "line_no": 1,
+                "from_bin": null,
+                "lot_code": null,
+                "position": {
+                    "damaged": 2.000,
+                    "reserved": 0,
+                    "sellable": 80.000,
+                    "available": 80.000
+                },
+                "variance": -2.000,
+                "system_qty": 80.000,
+                "adjust_type": null,
+                "counted_qty": 78.000,
+                "expiry_date": null,
+                "accepted_qty": null,
+                "expected_qty": null,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "Morning cycle count",
+        "doc_no": "AUD-001",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "submit",
+                "to_status": "review",
+                "from_status": "draft"
+            }
+        ],
+        "linked": null,
+        "po_ref": "",
+        "reason": "",
+        "status": "review",
+        "version": 4,
+        "doc_type": "audit",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": null,
+        "replayed": false,
+        "posted_at": null,
+        "posted_by": null,
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": null,
+        "invoice_ref": "",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": "2026-10-16T05:10:44.360704+00:00",
+        "submitted_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "supplier_name": "",
+        "allowed_actions": [
+            "cancel",
+            "complete",
+            "reopen"
+        ],
+        "can_draft_adjustment": true
+    },
+    "stock_detail": {
+        "bins": [
+            {
+                "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                "code": "A-01",
+                "name": "Shelf A-01",
+                "zone": "shelf",
+                "on_hand": 44.000
+            },
+            {
+                "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                "code": "B-02",
+                "name": "Backroom B-02",
+                "zone": "backroom",
+                "on_hand": 36.000
+            },
+            {
+                "id": "4101c6f6-1b4c-49eb-8964-a6b2ea781f79",
+                "code": "Q-01",
+                "name": "Quarantine Q-01",
+                "zone": "quarantine",
+                "on_hand": 2.000
+            }
+        ],
+        "item": {
+            "id": "40b00000-0000-0000-0000-000000000001",
+            "sku": "CC-500-BOT",
+            "name": "Coca-Cola 500ml",
+            "unit": "unit",
+            "barcode": "8901764011506",
+            "category": "Beverages",
+            "item_type": "sku",
+            "reorder_level": 20.000
+        },
+        "lots": [
+            {
+                "id": "cc8bad20-09a2-445b-bcb4-b6601130fac4",
+                "zone": "quarantine",
+                "bin_id": "4101c6f6-1b4c-49eb-8964-a6b2ea781f79",
+                "on_hand": 2.000,
+                "bin_code": "Q-01",
+                "bin_name": "Quarantine Q-01",
+                "lot_code": "CC-A",
+                "days_left": 18,
+                "expiry_date": "2026-11-03"
+            },
+            {
+                "id": "cc8bad20-09a2-445b-bcb4-b6601130fac4",
+                "zone": "shelf",
+                "bin_id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                "on_hand": 32.000,
+                "bin_code": "A-01",
+                "bin_name": "Shelf A-01",
+                "lot_code": "CC-A",
+                "days_left": 18,
+                "expiry_date": "2026-11-03"
+            },
+            {
+                "id": "bb7b3859-2cb9-4333-89bc-efce1c982f86",
+                "zone": "shelf",
+                "bin_id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                "on_hand": 12.000,
+                "bin_code": "A-01",
+                "bin_name": "Shelf A-01",
+                "lot_code": "CC-B",
+                "days_left": 32,
+                "expiry_date": "2026-11-17"
+            },
+            {
+                "id": "bb7b3859-2cb9-4333-89bc-efce1c982f86",
+                "zone": "backroom",
+                "bin_id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                "on_hand": 36.000,
+                "bin_code": "B-02",
+                "bin_name": "Backroom B-02",
+                "lot_code": "CC-B",
+                "days_left": 32,
+                "expiry_date": "2026-11-17"
+            }
+        ],
+        "status": "healthy",
+        "damaged": 2.000,
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "reserved": 0,
+        "sellable": 80.000,
+        "available": 80.000,
+        "in_transit": 24.000,
+        "stock_days": 186.7,
+        "expiry_date": "2026-11-03",
+        "snapshot_at": "2026-10-16T05:10:44.360704+00:00",
+        "daily_demand": 0.43,
+        "latest_movement": {
+            "id": 417,
+            "item": {
+                "id": "40b00000-0000-0000-0000-000000000001",
+                "sku": "CC-500-BOT",
+                "name": "Coca-Cola 500ml",
+                "unit": "unit",
+                "category": "Beverages"
+            },
+            "kind": "transfer_in",
+            "note": "ADJ-002",
+            "after": 80.000,
+            "delta": 0,
+            "before": 80.000,
+            "status": "posted",
+            "location": {
+                "id": "40000000-0000-0000-0000-00000000010a",
+                "code": "MAIN",
+                "name": "Latur Main Branch"
+            },
+            "quantity": 2.000,
+            "reference": {
+                "id": "929b1ef8-89d4-4878-9292-684f96ce5516",
+                "type": "document",
+                "label": "ADJ-002",
+                "method": "Approved adjustment",
+                "doc_type": "adjustment",
+                "recorded_by": {
+                    "id": "40000000-0000-0000-0000-000000000002",
+                    "name": "Rohan Shah",
+                    "role": "org_owner"
+                }
+            },
+            "created_at": "2026-10-16T05:10:44.360704+00:00",
+            "allocations": [
+                {
+                    "bin": {
+                        "id": "4101c6f6-1b4c-49eb-8964-a6b2ea781f79",
+                        "code": "Q-01",
+                        "name": "Quarantine Q-01",
+                        "zone": "quarantine"
+                    },
+                    "lot": {
+                        "id": "cc8bad20-09a2-445b-bcb4-b6601130fac4",
+                        "lot_code": "CC-A",
+                        "expiry_date": "2026-11-03"
+                    },
+                    "quantity": 2.000,
+                    "bin_after": 2.000,
+                    "bin_before": 0
+                }
+            ],
+            "damaged_after": 2.000,
+            "reserved_after": 0,
+            "unchanged_bins": [
+                {
+                    "code": "A-01",
+                    "name": "Shelf A-01",
+                    "zone": "shelf",
+                    "on_hand": 44.000
+                },
+                {
+                    "code": "B-02",
+                    "name": "Backroom B-02",
+                    "zone": "backroom",
+                    "on_hand": 36.000
+                }
+            ]
+        }
+    },
+    "audit_counted": {
+        "id": "c145ba7f-d898-4f73-b65f-e0f8d0950524",
+        "note": "Shelf shortage · recount confirmed",
+        "lines": [
+            {
+                "id": "28227acf-2fd1-4976-92d2-0b1c46e0bf43",
+                "lot": null,
+                "qty": null,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 36.000
+                    },
+                    {
+                        "id": "4101c6f6-1b4c-49eb-8964-a6b2ea781f79",
+                        "code": "Q-01",
+                        "name": "Quarantine Q-01",
+                        "zone": "quarantine",
+                        "on_hand": 2.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 44.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": null,
+                "inbound": 24.000,
+                "line_no": 1,
+                "from_bin": null,
+                "lot_code": null,
+                "position": {
+                    "damaged": 2.000,
+                    "reserved": 0,
+                    "sellable": 80.000,
+                    "available": 80.000
+                },
+                "variance": -2.000,
+                "system_qty": 80.000,
+                "adjust_type": null,
+                "counted_qty": 78.000,
+                "expiry_date": null,
+                "accepted_qty": null,
+                "expected_qty": null,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "Morning cycle count",
+        "doc_no": "AUD-001",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            }
+        ],
+        "linked": null,
+        "po_ref": "",
+        "reason": "",
+        "status": "draft",
+        "version": 3,
+        "doc_type": "audit",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": null,
+        "replayed": false,
+        "posted_at": null,
+        "posted_by": null,
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": null,
+        "invoice_ref": "",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": null,
+        "submitted_by": null,
+        "supplier_name": "",
+        "allowed_actions": [
+            "cancel",
+            "submit"
+        ],
+        "can_draft_adjustment": false
+    },
+    "receipt_draft": {
+        "id": "703e995e-1e97-452b-a937-da2615dc6ad8",
+        "note": "",
+        "lines": [
+            {
+                "id": "67665e1c-8475-4f3c-9664-de416e99ae8c",
+                "lot": null,
+                "qty": 24.000,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 48.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 36.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": null,
+                "inbound": 24.000,
+                "line_no": 1,
+                "from_bin": null,
+                "lot_code": "CC-C",
+                "position": {
+                    "damaged": 0,
+                    "reserved": 0,
+                    "sellable": 84.000,
+                    "available": 84.000
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": null,
+                "counted_qty": null,
+                "expiry_date": "2026-11-25",
+                "accepted_qty": 22.000,
+                "expected_qty": 24.000,
+                "rejected_qty": 2.000,
+                "reject_reason": "Broken seal"
+            }
+        ],
+        "title": "",
+        "doc_no": "RCV-002",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            }
+        ],
+        "linked": null,
+        "po_ref": "PO-105",
+        "reason": "",
+        "status": "draft",
+        "version": 2,
+        "doc_type": "receipt",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": null,
+        "replayed": false,
+        "posted_at": null,
+        "posted_by": null,
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": "2026-10-18T05:10:44.360704+00:00",
+        "invoice_ref": "INV-5512",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": null,
+        "submitted_by": null,
+        "supplier_name": "Coca-Cola Bottling",
+        "allowed_actions": [
+            "cancel",
+            "submit"
+        ],
+        "can_draft_adjustment": false
+    },
+    "receipt_posted": {
+        "id": "cd3a55fc-8955-427f-8d67-ff982fbefe14",
+        "note": "",
+        "lines": [
+            {
+                "id": "bbded1b5-c7b2-462c-8a4e-b1c6f9738754",
+                "lot": {
+                    "id": "cc8bad20-09a2-445b-bcb4-b6601130fac4",
+                    "lot_code": "CC-A",
+                    "expiry_date": "2026-11-03"
+                },
+                "qty": 42.000,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 48.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 42.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": {
+                    "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                    "code": "A-01",
+                    "name": "Shelf A-01",
+                    "zone": "shelf",
+                    "on_hand": 42.000,
+                    "storage": "ambient",
+                    "bin_total": 42.000,
+                    "free_capacity": null,
+                    "capacity_units": null
+                },
+                "inbound": 0,
+                "line_no": 1,
+                "from_bin": null,
+                "lot_code": "CC-A",
+                "position": {
+                    "damaged": 0,
+                    "reserved": 0,
+                    "sellable": 90.000,
+                    "available": 90.000
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": null,
+                "counted_qty": null,
+                "expiry_date": "2026-11-03",
+                "accepted_qty": 42.000,
+                "expected_qty": 42.000,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            },
+            {
+                "id": "38661e6e-3465-4992-b39d-efede7617e6f",
+                "lot": {
+                    "id": "bb7b3859-2cb9-4333-89bc-efce1c982f86",
+                    "lot_code": "CC-B",
+                    "expiry_date": "2026-11-17"
+                },
+                "qty": 48.000,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 48.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 42.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": {
+                    "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                    "code": "B-02",
+                    "name": "Backroom B-02",
+                    "zone": "backroom",
+                    "on_hand": 48.000,
+                    "storage": "ambient",
+                    "bin_total": 48.000,
+                    "free_capacity": 12.000,
+                    "capacity_units": 60.000
+                },
+                "inbound": 0,
+                "line_no": 2,
+                "from_bin": null,
+                "lot_code": "CC-B",
+                "position": {
+                    "damaged": 0,
+                    "reserved": 0,
+                    "sellable": 90.000,
+                    "available": 90.000
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": null,
+                "counted_qty": null,
+                "expiry_date": "2026-11-17",
+                "accepted_qty": 48.000,
+                "expected_qty": 48.000,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "",
+        "doc_no": "RCV-001",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "submit",
+                "to_status": "review",
+                "from_status": "draft"
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "post",
+                "to_status": "posted",
+                "from_status": "review"
+            }
+        ],
+        "linked": null,
+        "po_ref": "PO-101",
+        "reason": "",
+        "status": "posted",
+        "version": 4,
+        "doc_type": "receipt",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": null,
+        "replayed": false,
+        "posted_at": "2026-10-16T05:10:44.360704+00:00",
+        "posted_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": null,
+        "invoice_ref": "INV-5401",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": "2026-10-16T05:10:44.360704+00:00",
+        "submitted_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "supplier_name": "Coca-Cola Bottling",
+        "allowed_actions": [
+        ],
+        "can_draft_adjustment": false
+    },
+    "receipt_review": {
+        "id": "cd3a55fc-8955-427f-8d67-ff982fbefe14",
+        "note": "",
+        "lines": [
+            {
+                "id": "bbded1b5-c7b2-462c-8a4e-b1c6f9738754",
+                "lot": null,
+                "qty": 42.000,
+                "bins": [
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": {
+                    "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                    "code": "A-01",
+                    "name": "Shelf A-01",
+                    "zone": "shelf",
+                    "on_hand": 0,
+                    "storage": "ambient",
+                    "bin_total": 0,
+                    "free_capacity": null,
+                    "capacity_units": null
+                },
+                "inbound": 90.000,
+                "line_no": 1,
+                "from_bin": null,
+                "lot_code": "CC-A",
+                "position": {
+                    "damaged": 0,
+                    "reserved": 0,
+                    "sellable": 0,
+                    "available": 0
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": null,
+                "counted_qty": null,
+                "expiry_date": "2026-11-03",
+                "accepted_qty": 42.000,
+                "expected_qty": 42.000,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            },
+            {
+                "id": "38661e6e-3465-4992-b39d-efede7617e6f",
+                "lot": null,
+                "qty": 48.000,
+                "bins": [
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": {
+                    "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                    "code": "B-02",
+                    "name": "Backroom B-02",
+                    "zone": "backroom",
+                    "on_hand": 0,
+                    "storage": "ambient",
+                    "bin_total": 0,
+                    "free_capacity": 60.000,
+                    "capacity_units": 60.000
+                },
+                "inbound": 90.000,
+                "line_no": 2,
+                "from_bin": null,
+                "lot_code": "CC-B",
+                "position": {
+                    "damaged": 0,
+                    "reserved": 0,
+                    "sellable": 0,
+                    "available": 0
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": null,
+                "counted_qty": null,
+                "expiry_date": "2026-11-17",
+                "accepted_qty": 48.000,
+                "expected_qty": 48.000,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "",
+        "doc_no": "RCV-001",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "submit",
+                "to_status": "review",
+                "from_status": "draft"
+            }
+        ],
+        "linked": null,
+        "po_ref": "PO-101",
+        "reason": "",
+        "status": "review",
+        "version": 3,
+        "doc_type": "receipt",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": null,
+        "replayed": false,
+        "posted_at": null,
+        "posted_by": null,
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": null,
+        "invoice_ref": "INV-5401",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": "2026-10-16T05:10:44.360704+00:00",
+        "submitted_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "supplier_name": "Coca-Cola Bottling",
+        "allowed_actions": [
+            "cancel",
+            "post",
+            "return"
+        ],
+        "can_draft_adjustment": false
+    },
+    "transfer_draft": {
+        "id": "62232bc5-4a3c-487d-9469-d09483d45c1e",
+        "note": "",
+        "lines": [
+            {
+                "id": "c902defd-1d87-40a2-aef0-958f637fde4e",
+                "lot": null,
+                "qty": 12.000,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 48.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 34.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": {
+                    "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                    "code": "A-01",
+                    "name": "Shelf A-01",
+                    "zone": "shelf",
+                    "on_hand": 34.000,
+                    "storage": "ambient",
+                    "bin_total": 34.000,
+                    "free_capacity": null,
+                    "capacity_units": null
+                },
+                "inbound": 24.000,
+                "line_no": 1,
+                "from_bin": {
+                    "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                    "code": "B-02",
+                    "name": "Backroom B-02",
+                    "zone": "backroom",
+                    "on_hand": 48.000,
+                    "storage": "ambient",
+                    "bin_total": 48.000,
+                    "free_capacity": 12.000,
+                    "capacity_units": 60.000
+                },
+                "lot_code": null,
+                "position": {
+                    "damaged": 0,
+                    "reserved": 0,
+                    "sellable": 82.000,
+                    "available": 82.000
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": null,
+                "counted_qty": null,
+                "expiry_date": null,
+                "accepted_qty": null,
+                "expected_qty": null,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "Shelf replenishment",
+        "doc_no": "TRF-001",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            }
+        ],
+        "linked": null,
+        "po_ref": "",
+        "reason": "Refill sales shelf",
+        "status": "draft",
+        "version": 2,
+        "doc_type": "transfer",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "replayed": false,
+        "posted_at": null,
+        "posted_by": null,
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": null,
+        "invoice_ref": "",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": null,
+        "submitted_by": null,
+        "supplier_name": "",
+        "allowed_actions": [
+            "cancel",
+            "post"
+        ],
+        "can_draft_adjustment": false
+    },
+    "transfer_posted": {
+        "id": "62232bc5-4a3c-487d-9469-d09483d45c1e",
+        "note": "",
+        "lines": [
+            {
+                "id": "c902defd-1d87-40a2-aef0-958f637fde4e",
+                "lot": null,
+                "qty": 12.000,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 36.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 46.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": {
+                    "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                    "code": "A-01",
+                    "name": "Shelf A-01",
+                    "zone": "shelf",
+                    "on_hand": 46.000,
+                    "storage": "ambient",
+                    "bin_total": 46.000,
+                    "free_capacity": null,
+                    "capacity_units": null
+                },
+                "inbound": 24.000,
+                "line_no": 1,
+                "from_bin": {
+                    "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                    "code": "B-02",
+                    "name": "Backroom B-02",
+                    "zone": "backroom",
+                    "on_hand": 36.000,
+                    "storage": "ambient",
+                    "bin_total": 36.000,
+                    "free_capacity": 24.000,
+                    "capacity_units": 60.000
+                },
+                "lot_code": null,
+                "position": {
+                    "damaged": 0,
+                    "reserved": 0,
+                    "sellable": 82.000,
+                    "available": 82.000
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": null,
+                "counted_qty": null,
+                "expiry_date": null,
+                "accepted_qty": null,
+                "expected_qty": null,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "Shelf replenishment",
+        "doc_no": "TRF-001",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "post",
+                "to_status": "posted",
+                "from_status": "draft"
+            }
+        ],
+        "linked": null,
+        "po_ref": "",
+        "reason": "Refill sales shelf",
+        "status": "posted",
+        "version": 3,
+        "doc_type": "transfer",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "replayed": false,
+        "posted_at": "2026-10-16T05:10:44.360704+00:00",
+        "posted_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": null,
+        "invoice_ref": "",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": null,
+        "submitted_by": null,
+        "supplier_name": "",
+        "allowed_actions": [
+        ],
+        "can_draft_adjustment": false
+    },
+    "adjustment_draft": {
+        "id": "01d77670-a548-449d-840e-df470d0384b6",
+        "note": "Two unreserved bottles missing from shelf.",
+        "lines": [
+            {
+                "id": "ed37f5c9-9a08-4298-a858-ecd6b2dc38dd",
+                "lot": {
+                    "id": "cc8bad20-09a2-445b-bcb4-b6601130fac4",
+                    "lot_code": "CC-A",
+                    "expiry_date": "2026-11-03"
+                },
+                "qty": 2.000,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 48.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 36.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": null,
+                "inbound": 24.000,
+                "line_no": 1,
+                "from_bin": {
+                    "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                    "code": "A-01",
+                    "name": "Shelf A-01",
+                    "zone": "shelf",
+                    "on_hand": 36.000,
+                    "storage": "ambient",
+                    "bin_total": 36.000,
+                    "free_capacity": null,
+                    "capacity_units": null
+                },
+                "lot_code": null,
+                "position": {
+                    "damaged": 0,
+                    "reserved": 0,
+                    "sellable": 84.000,
+                    "available": 84.000
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": "decrease",
+                "counted_qty": null,
+                "expiry_date": null,
+                "accepted_qty": null,
+                "expected_qty": null,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "Audit shortage",
+        "doc_no": "ADJ-001",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            }
+        ],
+        "linked": null,
+        "po_ref": "",
+        "reason": "Cycle-count shortage",
+        "status": "draft",
+        "version": 3,
+        "doc_type": "adjustment",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": null,
+        "replayed": false,
+        "posted_at": null,
+        "posted_by": null,
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": null,
+        "invoice_ref": "",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": null,
+        "submitted_by": null,
+        "supplier_name": "",
+        "allowed_actions": [
+            "cancel",
+            "submit"
+        ],
+        "can_draft_adjustment": false
+    },
+    "forecast_history": {
+        "days": 7,
+        "item": {
+            "id": "40b00000-0000-0000-0000-000000000001",
+            "sku": "CC-500-BOT",
+            "name": "Coca-Cola 500ml",
+            "unit": "unit"
+        },
+        "series": [
+            {
+                "day": 0,
+                "date": "2026-10-16",
+                "value": 75.0
+            },
+            {
+                "day": 1,
+                "date": "2026-10-17",
+                "value": 74.6,
+                "inbound": 0
+            },
+            {
+                "day": 2,
+                "date": "2026-10-18",
+                "value": 96.1,
+                "inbound": 22.000
+            },
+            {
+                "day": 3,
+                "date": "2026-10-19",
+                "value": 95.7,
+                "inbound": 0
+            },
+            {
+                "day": 4,
+                "date": "2026-10-20",
+                "value": 95.3,
+                "inbound": 0
+            },
+            {
+                "day": 5,
+                "date": "2026-10-21",
+                "value": 94.9,
+                "inbound": 0
+            },
+            {
+                "day": 6,
+                "date": "2026-10-22",
+                "value": 94.4,
+                "inbound": 0
+            },
+            {
+                "day": 7,
+                "date": "2026-10-23",
+                "value": 94.0,
+                "inbound": 0
+            }
+        ],
+        "inbound": [
+            {
+                "day": 2,
+                "qty": 22.000,
+                "date": "2026-10-18",
+                "doc_no": "RCV-002"
+            }
+        ],
+        "opening": 75.000,
+        "end_stock": 94.0,
+        "sensitivity": [
+            {
+                "end": 94.6,
+                "pct": -20,
+                "per_day": 0.34
+            },
+            {
+                "end": 94.0,
+                "pct": 0,
+                "per_day": 0.43
+            },
+            {
+                "end": 93.4,
+                "pct": 20,
+                "per_day": 0.52
+            }
+        ],
+        "suggest_qty": 0,
+        "demand_total": 3.0,
+        "history_days": 14,
+        "baseline_date": "2026-10-16",
+        "inbound_total": 22.000,
+        "safety_buffer": 0.4,
+        "demand_per_day": 0.43,
+        "buffer_breach_day": null,
+        "rejected_excluded": 2.000,
+        "demand_from_history": true
+    },
+    "adjustment_posted": {
+        "id": "01d77670-a548-449d-840e-df470d0384b6",
+        "note": "Two unreserved bottles missing from shelf.",
+        "lines": [
+            {
+                "id": "ed37f5c9-9a08-4298-a858-ecd6b2dc38dd",
+                "lot": {
+                    "id": "cc8bad20-09a2-445b-bcb4-b6601130fac4",
+                    "lot_code": "CC-A",
+                    "expiry_date": "2026-11-03"
+                },
+                "qty": 2.000,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 48.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 34.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": null,
+                "inbound": 24.000,
+                "line_no": 1,
+                "from_bin": {
+                    "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                    "code": "A-01",
+                    "name": "Shelf A-01",
+                    "zone": "shelf",
+                    "on_hand": 34.000,
+                    "storage": "ambient",
+                    "bin_total": 34.000,
+                    "free_capacity": null,
+                    "capacity_units": null
+                },
+                "lot_code": null,
+                "position": {
+                    "damaged": 0,
+                    "reserved": 0,
+                    "sellable": 82.000,
+                    "available": 82.000
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": "decrease",
+                "counted_qty": null,
+                "expiry_date": null,
+                "accepted_qty": null,
+                "expected_qty": null,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "Audit shortage",
+        "doc_no": "ADJ-001",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "submit",
+                "to_status": "awaiting_approval",
+                "from_status": "draft"
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000002",
+                    "name": "Rohan Shah",
+                    "role": "org_owner"
+                },
+                "action": "approve",
+                "to_status": "posted",
+                "from_status": "awaiting_approval"
+            }
+        ],
+        "linked": null,
+        "po_ref": "",
+        "reason": "Cycle-count shortage",
+        "status": "posted",
+        "version": 5,
+        "doc_type": "adjustment",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": null,
+        "replayed": false,
+        "posted_at": "2026-10-16T05:10:44.360704+00:00",
+        "posted_by": {
+            "id": "40000000-0000-0000-0000-000000000002",
+            "name": "Rohan Shah",
+            "role": "org_owner"
+        },
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": {
+            "id": "40000000-0000-0000-0000-000000000002",
+            "name": "Rohan Shah",
+            "role": "org_owner"
+        },
+        "expected_at": null,
+        "invoice_ref": "",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": "2026-10-16T05:10:44.360704+00:00",
+        "submitted_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "supplier_name": "",
+        "allowed_actions": [
+        ],
+        "can_draft_adjustment": false
+    },
+    "documents_receipt": {
+        "documents": [
+            {
+                "id": "cd3a55fc-8955-427f-8d67-ff982fbefe14",
+                "title": "",
+                "doc_no": "RCV-001",
+                "po_ref": "PO-101",
+                "reason": "",
+                "status": "posted",
+                "totals": {
+                    "lines": 2,
+                    "counted": 0,
+                    "expected": 90.000,
+                    "received": 90.000,
+                    "rejected": 0.000,
+                    "variance": null
+                },
+                "version": 4,
+                "doc_type": "receipt",
+                "posted_at": "2026-10-16T05:10:44.360704+00:00",
+                "created_at": "2026-10-16T05:10:44.360704+00:00",
+                "first_item": "Coca-Cola 500ml",
+                "expected_at": null,
+                "invoice_ref": "INV-5401",
+                "to_location": null,
+                "supplier_name": "Coca-Cola Bottling"
+            },
+            {
+                "id": "703e995e-1e97-452b-a937-da2615dc6ad8",
+                "title": "",
+                "doc_no": "RCV-002",
+                "po_ref": "PO-105",
+                "reason": "",
+                "status": "draft",
+                "totals": {
+                    "lines": 1,
+                    "counted": 0,
+                    "expected": 24.000,
+                    "received": 24.000,
+                    "rejected": 2.000,
+                    "variance": null
+                },
+                "version": 2,
+                "doc_type": "receipt",
+                "posted_at": null,
+                "created_at": "2026-10-16T05:10:44.360704+00:00",
+                "first_item": "Coca-Cola 500ml",
+                "expected_at": "2026-10-18T05:10:44.360704+00:00",
+                "invoice_ref": "INV-5512",
+                "to_location": null,
+                "supplier_name": "Coca-Cola Bottling"
+            }
+        ]
+    },
+    "adjustment_awaiting": {
+        "id": "01d77670-a548-449d-840e-df470d0384b6",
+        "note": "Two unreserved bottles missing from shelf.",
+        "lines": [
+            {
+                "id": "ed37f5c9-9a08-4298-a858-ecd6b2dc38dd",
+                "lot": {
+                    "id": "cc8bad20-09a2-445b-bcb4-b6601130fac4",
+                    "lot_code": "CC-A",
+                    "expiry_date": "2026-11-03"
+                },
+                "qty": 2.000,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 48.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 36.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": null,
+                "inbound": 24.000,
+                "line_no": 1,
+                "from_bin": {
+                    "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                    "code": "A-01",
+                    "name": "Shelf A-01",
+                    "zone": "shelf",
+                    "on_hand": 36.000,
+                    "storage": "ambient",
+                    "bin_total": 36.000,
+                    "free_capacity": null,
+                    "capacity_units": null
+                },
+                "lot_code": null,
+                "position": {
+                    "damaged": 0,
+                    "reserved": 0,
+                    "sellable": 84.000,
+                    "available": 84.000
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": "decrease",
+                "counted_qty": null,
+                "expiry_date": null,
+                "accepted_qty": null,
+                "expected_qty": null,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "Audit shortage",
+        "doc_no": "ADJ-001",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "submit",
+                "to_status": "awaiting_approval",
+                "from_status": "draft"
+            }
+        ],
+        "linked": null,
+        "po_ref": "",
+        "reason": "Cycle-count shortage",
+        "status": "awaiting_approval",
+        "version": 4,
+        "doc_type": "adjustment",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": null,
+        "replayed": false,
+        "posted_at": null,
+        "posted_by": null,
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": null,
+        "invoice_ref": "",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": "2026-10-16T05:10:44.360704+00:00",
+        "submitted_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "supplier_name": "",
+        "allowed_actions": [
+            "cancel"
+        ],
+        "can_draft_adjustment": false
+    },
+    "transfer_in_transit": {
+        "id": "d8149c20-2cf5-48a4-8f79-e76d270feffb",
+        "note": "",
+        "lines": [
+            {
+                "id": "e1e5c3cf-4a70-433f-b24c-594f0048b956",
+                "lot": null,
+                "qty": 5.000,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 31.000
+                    },
+                    {
+                        "id": "4101c6f6-1b4c-49eb-8964-a6b2ea781f79",
+                        "code": "Q-01",
+                        "name": "Quarantine Q-01",
+                        "zone": "quarantine",
+                        "on_hand": 2.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 44.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "",
+                "to_bin": null,
+                "inbound": 24.000,
+                "line_no": 1,
+                "from_bin": {
+                    "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                    "code": "B-02",
+                    "name": "Backroom B-02",
+                    "zone": "backroom",
+                    "on_hand": 31.000,
+                    "storage": "ambient",
+                    "bin_total": 31.000,
+                    "free_capacity": 29.000,
+                    "capacity_units": 60.000
+                },
+                "lot_code": null,
+                "position": {
+                    "damaged": 2.000,
+                    "reserved": 0,
+                    "sellable": 75.000,
+                    "available": 75.000
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": null,
+                "counted_qty": null,
+                "expiry_date": null,
+                "accepted_qty": null,
+                "expected_qty": null,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "",
+        "doc_no": "TRF-005",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            },
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": null,
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "dispatch",
+                "to_status": "in_transit",
+                "from_status": "draft"
+            }
+        ],
+        "linked": null,
+        "po_ref": "",
+        "reason": "Rebalance between stores",
+        "status": "in_transit",
+        "version": 3,
+        "doc_type": "transfer",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": null,
+        "replayed": false,
+        "posted_at": null,
+        "posted_by": null,
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": null,
+        "invoice_ref": "",
+        "linked_from": null,
+        "to_location": {
+            "id": "40000000-0000-0000-0000-00000000020a",
+            "code": "WH-LTR",
+            "name": "Latur Warehouse"
+        },
+        "cancelled_at": null,
+        "submitted_at": null,
+        "submitted_by": null,
+        "supplier_name": "",
+        "allowed_actions": [
+            "receive"
+        ],
+        "can_draft_adjustment": false
+    },
+    "adjustment_from_audit": {
+        "id": "7566f4ca-85ca-4a0f-bb6f-ee975c14adba",
+        "note": "Shelf shortage · recount confirmed",
+        "lines": [
+            {
+                "id": "1454ada0-a985-4c0f-b60c-1dae5aaf141f",
+                "lot": null,
+                "qty": 2.000,
+                "bins": [
+                    {
+                        "id": "c056ce41-4bf4-43a9-b478-22494de4e4b7",
+                        "code": "B-02",
+                        "name": "Backroom B-02",
+                        "zone": "backroom",
+                        "on_hand": 36.000
+                    },
+                    {
+                        "id": "4101c6f6-1b4c-49eb-8964-a6b2ea781f79",
+                        "code": "Q-01",
+                        "name": "Quarantine Q-01",
+                        "zone": "quarantine",
+                        "on_hand": 2.000
+                    },
+                    {
+                        "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                        "code": "A-01",
+                        "name": "Shelf A-01",
+                        "zone": "shelf",
+                        "on_hand": 44.000
+                    }
+                ],
+                "item": {
+                    "id": "40b00000-0000-0000-0000-000000000001",
+                    "sku": "CC-500-BOT",
+                    "name": "Coca-Cola 500ml",
+                    "unit": "unit",
+                    "barcode": "8901764011506",
+                    "category": "Beverages",
+                    "item_type": "sku"
+                },
+                "note": "from AUD-001",
+                "to_bin": null,
+                "inbound": 24.000,
+                "line_no": 1,
+                "from_bin": {
+                    "id": "7c3d3269-9ad0-4d67-95a9-01621bd2610c",
+                    "code": "A-01",
+                    "name": "Shelf A-01",
+                    "zone": "shelf",
+                    "on_hand": 44.000,
+                    "storage": "ambient",
+                    "bin_total": 44.000,
+                    "free_capacity": null,
+                    "capacity_units": null
+                },
+                "lot_code": null,
+                "position": {
+                    "damaged": 2.000,
+                    "reserved": 0,
+                    "sellable": 80.000,
+                    "available": 80.000
+                },
+                "variance": null,
+                "system_qty": null,
+                "adjust_type": "decrease",
+                "counted_qty": null,
+                "expiry_date": null,
+                "accepted_qty": null,
+                "expected_qty": null,
+                "rejected_qty": 0.000,
+                "reject_reason": null
+            }
+        ],
+        "title": "Audit shortage",
+        "doc_no": "ADJ-003",
+        "events": [
+            {
+                "at": "2026-10-16T05:10:44.360704+00:00",
+                "note": "from AUD-001",
+                "actor": {
+                    "id": "40000000-0000-0000-0000-000000000001",
+                    "name": "Niraj",
+                    "role": "inventory_manager"
+                },
+                "action": "create",
+                "to_status": "draft",
+                "from_status": null
+            }
+        ],
+        "linked": {
+            "id": "c145ba7f-d898-4f73-b65f-e0f8d0950524",
+            "doc_no": "AUD-001",
+            "status": "review",
+            "doc_type": "audit"
+        },
+        "po_ref": "",
+        "reason": "Cycle-count variance",
+        "status": "draft",
+        "version": 1,
+        "doc_type": "adjustment",
+        "location": {
+            "id": "40000000-0000-0000-0000-00000000010a",
+            "code": "MAIN",
+            "name": "Latur Main Branch"
+        },
+        "operator": null,
+        "replayed": false,
+        "posted_at": null,
+        "posted_by": null,
+        "created_at": "2026-10-16T05:10:44.360704+00:00",
+        "created_by": {
+            "id": "40000000-0000-0000-0000-000000000001",
+            "name": "Niraj",
+            "role": "inventory_manager"
+        },
+        "updated_at": "2026-10-16T05:10:44.360704+00:00",
+        "approved_by": null,
+        "expected_at": null,
+        "invoice_ref": "",
+        "linked_from": null,
+        "to_location": null,
+        "cancelled_at": null,
+        "submitted_at": null,
+        "submitted_by": null,
+        "supplier_name": "",
+        "allowed_actions": [
+            "cancel",
+            "submit"
+        ],
+        "can_draft_adjustment": false
+    }
+}

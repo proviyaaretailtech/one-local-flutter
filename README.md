@@ -1,4 +1,4 @@
-# VINII POS — new mobile Flutter app
+# One Local POS — new mobile Flutter app
 
 Rebuild from Figma `FINAL-PARTNER-APP` section by section. Old app: `Pos flutter/` (archived on `archive/pos-flutter-pre-rebuild`).
 

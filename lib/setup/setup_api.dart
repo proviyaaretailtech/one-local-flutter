@@ -1,10 +1,9 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
 import '../onboarding/document_picker.dart';
 
@@ -45,55 +44,35 @@ class SetupState {
   bool isDone(String key) => row(key)['done'] == true;
 }
 
-/// One call per screen action, all through the One Local server (`/api/setup/*`). The server and the database check every rule.
+/// One call per screen action, all through the one `/rpc/<name>` door ([RpcClient]). The database checks every rule.
 class SetupApi {
-  SetupApi({http.Client? client, String? baseUrl, String? Function()? accessToken})
+  SetupApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc})
       : _http = client ?? http.Client(),
-        _token = accessToken ?? (() => Supabase.instance.client.auth.currentSession?.accessToken),
-        _base = (baseUrl ?? const String.fromEnvironment('PARTNER_API_BASE_URL')).replaceAll(RegExp(r'/+$'), '');
+        _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken);
 
   final http.Client _http;
-  final String? Function() _token;
-  final String _base;
+  final RpcClient _rpc;
 
-  Future<Map<String, dynamic>> _send(String method, String path, [Object? body]) async {
-    final token = _token();
-    if (token == null) throw const PartnerApiException(401, 'Sign in to continue.');
-    final uri = Uri.parse('$_base/api/setup$path');
-    final headers = {'Authorization': 'Bearer $token', if (body != null) 'Content-Type': 'application/json'};
-    final res = await switch (method) {
-      'GET' => _http.get(uri, headers: headers),
-      'PUT' => _http.put(uri, headers: headers, body: jsonEncode(body ?? {})),
-      _ => _http.post(uri, headers: headers, body: body == null ? null : jsonEncode(body)),
-    }.timeout(const Duration(seconds: 30));
-    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
-    final map = decoded is Map ? decoded.cast<String, dynamic>() : <String, dynamic>{};
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw PartnerApiException(res.statusCode, (map['detail'] as String?) ?? 'Something went wrong. Please try again.');
-    }
-    return map;
-  }
+  Future<SetupState> _state(String fn, [Map<String, dynamic> args = const {}]) async => SetupState(await _rpc.callMap(fn, args));
 
-  Future<SetupState> _state(String method, String path, [Object? body]) async => SetupState(await _send(method, path, body));
-
-  Future<SetupState> get() => _state('GET', '/state');
-  Future<SetupState> confirmPlan(String? planCode) => _state('PUT', '/plan', {'plan_code': planCode});
-  Future<SetupState> savePayment(Map<String, dynamic> body) => _state('PUT', '/payment', body);
-  Future<SetupState> saveTax(Map<String, dynamic> body) => _state('PUT', '/tax', body);
-  Future<SetupState> registerPos(Map<String, dynamic> body) => _state('PUT', '/pos', body);
-  Future<SetupState> inviteStaff(Map<String, dynamic> body) => _state('POST', '/staff', body);
-  Future<SetupState> addItem(Map<String, dynamic> body) => _state('POST', '/items', body);
-  Future<SetupState> saveListing(Map<String, dynamic> body) => _state('PUT', '/listing', body);
-  Future<SetupState> saveFulfilment(Map<String, dynamic> body) => _state('PUT', '/fulfilment', body);
-  Future<SetupState> tourSeen(int step) => _state('POST', '/tour', {'step': step});
-  Future<SetupState> complete() => _state('POST', '/complete');
+  Future<SetupState> get() => _state('partner_setup_get');
+  Future<SetupState> confirmPlan(String? planCode) => _state('partner_setup_confirm_plan', {'plan_code': planCode});
+  Future<SetupState> savePayment(Map<String, dynamic> body) => _state('partner_setup_save_payment', body);
+  Future<SetupState> saveTax(Map<String, dynamic> body) => _state('partner_setup_save_tax', body);
+  Future<SetupState> registerPos(Map<String, dynamic> body) => _state('partner_setup_register_pos', body);
+  Future<SetupState> inviteStaff(Map<String, dynamic> body) => _state('partner_setup_invite_staff', body);
+  Future<SetupState> addItem(Map<String, dynamic> body) => _state('partner_setup_add_item', body);
+  Future<SetupState> saveListing(Map<String, dynamic> body) => _state('partner_setup_save_listing', body);
+  Future<SetupState> saveFulfilment(Map<String, dynamic> body) => _state('partner_setup_save_fulfilment', body);
+  Future<SetupState> tourSeen(int step) => _state('partner_setup_tour_seen', {'step': step});
+  Future<SetupState> complete() => _state('partner_setup_complete');
 
   /// Two steps: ask for a private slot, send the bytes to it, then confirm so the server attaches the image.
   Future<SetupState> uploadImage({required String kind, required Uint8List bytes, required String contentType}) async {
-    final slot = await _send('POST', '/images/upload', {'kind': kind, 'content_type': contentType, 'size': bytes.length});
+    final slot = await _rpc.callMap('partner_setup_image_slot', {'kind': kind, 'content_type': contentType, 'size': bytes.length});
     final put = await _http.put(Uri.parse(slot['upload_url'] as String), headers: {'Content-Type': contentType, 'x-upsert': 'true'}, body: bytes).timeout(const Duration(seconds: 120));
     if (put.statusCode < 200 || put.statusCode >= 300) throw const PartnerApiException(502, 'The upload did not finish. Please try again.');
-    return _state('POST', '/images', {'kind': kind, 'path': slot['path'], 'content_type': contentType, 'size': bytes.length});
+    return _state('partner_setup_image_attach', {'kind': kind, 'path': slot['path'], 'content_type': contentType, 'size': bytes.length});
   }
 }
 

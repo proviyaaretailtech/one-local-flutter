@@ -24,6 +24,8 @@ class HomeNav {
   // Later phases (G catalogue, H inventory, F sell, J–Q back office).
   static HomeRoute? items;
   static HomeRoute? stock;
+  // Section H: one item's stock detail (section J's low-stock "view item" uses it).
+  static ItemRoute? stockItem;
   static HomeRoute? bill;
   static HomeRoute? money;
   static HomeRoute? notifications;
@@ -31,9 +33,8 @@ class HomeNav {
   static HomeRoute? reviews;
   static HomeRoute? support;
 
-  // Section J: low stock and purchase suggestions. Section H sets [stockItem] (one item's stock detail).
+  // Section J: low stock and purchase suggestions ("view item" uses section H's [stockItem]).
   static HomeRoute? lowStock;
-  static ItemRoute? stockItem;
 
   /// Opens [route], or tells the person that [what] is not available yet.
   static void go(BuildContext context, HomeRoute? route, String what) {
