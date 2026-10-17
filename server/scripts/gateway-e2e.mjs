@@ -167,6 +167,35 @@ try {
   ok('inventory: A document untouched after all of that', sql(`select status||':'||version from inventory_documents where id='${docId}'`) === 'draft:' + d1.j.version && sql(`select count(*) from stock_movements where organization_id='${orgA}'`) === '1');
   ok('inventory: A viewer can read stock but not create documents', (await rpc(V, 'inv_dashboard')).s === 200 && (await rpc(V, 'inv_document_save', draft, `gw-inv-${randomUUID()}`)).s === 403);
   ok('inventory: applicant with no business gets nothing', refused(await rpc(P1, 'inv_dashboard')) && refused(await rpc(P1, 'inv_stock_detail', { item_id: itemA })));
+  // ---- money (section K): A's expenses, adjustments and settlements against B's token, and against A's own lower roles
+  const OA = await person('owner-a', orgA, 'org_owner');
+  const setA = sql(`insert into settlements(organization_id,period_start,period_end,status,gross_minor,commission_minor,net_minor,food_due_minor) values ('${orgA}','2026-09-28','2026-10-04','paid',600000,60000,540000,600000) returning id`).split('\n')[0];
+  ok('money: no token is 401, helpers are not on the allowlist', (await rpc(null, 'money_overview')).s === 401 && (await rpc(A, 'money_require')).s === 404 && (await rpc(A, 'money_cash_flows')).s === 404);
+  ok('money: A manager is offered the location screens but not settlements, payouts or reports', await (async () => { const o = await rpc(A, 'money_options'); return o.s === 200 && o.j.screens.includes('payments') && !o.j.screens.includes('settlements') && !o.j.screens.includes('reports'); })());
+  ok('money: a viewer gets no money screens (403)', (await rpc(V, 'money_overview')).s === 403 && (await rpc(V, 'money_expense_record', { category: 'X', title: 'x', amount_minor: 100 }, `gw-mo-${randomUUID()}`)).s === 403);
+  ok('money: an applicant with no business gets nothing', refused(await rpc(P1, 'money_options')) && refused(await rpc(P1, 'money_overview')));
+  ok('money: bad shape is a 400 with a sentence', await (async () => { const r = await rpc(A, 'money_expense_record', { category: 'X', title: 'x', amount_minor: 0 }, `gw-mo-${randomUUID()}`); return r.s === 400 && r.j.code === 'validation'; })());
+  const ekey = `gw-mo-${randomUUID()}`;
+  const e1 = await rpc(A, 'money_expense_record', { category: 'Packaging', title: 'Carry bags', amount_minor: 30000, method: 'cash' }, ekey);
+  const e2 = await rpc(A, 'money_expense_record', { category: 'Packaging', title: 'Carry bags', amount_minor: 30000, method: 'cash' }, ekey);
+  ok('money: an expense is recorded once, a retry returns the same record', e1.s === 200 && e1.j.status === 'posted' && e2.s === 200 && e2.j.id === e1.j.id && e2.j.replayed === true, [e1, e2]);
+  ok('money: a missing key is a 400', (await rpc(A, 'money_expense_record', { category: 'Packaging', title: 'x', amount_minor: 100 })).s === 400);
+  const adj = await rpc(A, 'money_adjustment_request', { reason: 'Price correction', amount_minor: -25000 }, `gw-mo-${randomUUID()}`);
+  ok('money: A manager requests an adjustment into review', adj.s === 200 && adj.j.status === 'review', adj);
+  ok('money: B cannot decide, void or read anything of A', (await rpc(B, 'money_adjustment_decide', { id: adj.j.id, decision: 'reject', note: 'steal it' }, `gw-mo-${randomUUID()}`)).s === 404
+    && (await rpc(B, 'money_expense_void', { id: e1.j.id, note: 'steal it' }, `gw-mo-${randomUUID()}`)).s === 404
+    && (await rpc(B, 'money_settlement_detail', { id: setA })).s === 404);
+  ok('money: A manager cannot approve or void (403), owner of A can', (await rpc(A, 'money_adjustment_decide', { id: adj.j.id, decision: 'approve' }, `gw-mo-${randomUUID()}`)).s === 403
+    && (await rpc(A, 'money_expense_void', { id: e1.j.id, note: 'no right' }, `gw-mo-${randomUUID()}`)).s === 403
+    && (await rpc(OA, 'money_adjustment_decide', { id: adj.j.id, decision: 'approve' }, `gw-mo-${randomUUID()}`)).j?.status === 'approved');
+  ok('money: a second decision on the same adjustment is a 409', (await rpc(OA, 'money_adjustment_decide', { id: adj.j.id, decision: 'reject', note: 'too late' }, `gw-mo-${randomUUID()}`)).s === 409);
+  ok('money: A manager cannot read settlements, payouts or reports (403)', (await rpc(A, 'money_settlements_list')).s === 403 && (await rpc(A, 'money_payouts_list')).s === 403 && (await rpc(A, 'money_reports')).s === 403 && (await rpc(A, 'money_report_rows', { report: 'settlements' })).s === 403 && (await rpc(A, 'money_report_rows', { report: 'payouts' })).s === 403);
+  ok('money: A owner sees the settlement, B owner sees none of it', JSON.stringify((await rpc(OA, 'money_settlements_list')).j).includes(setA) && !JSON.stringify((await rpc(B, 'money_settlements_list')).j).includes(setA));
+  ok('money: B lists have none of A (expenses, adjustments, transactions, cashbook)', (await rpc(B, 'money_expenses_list')).j.count === 0 && (await rpc(B, 'money_refunds_list', { period: 'all' })).j.total === 0
+    && !JSON.stringify((await rpc(B, 'money_transactions_list')).j).includes(e1.j.id) && (await rpc(B, 'money_cashbook')).j.started === false);
+  ok('money: B cannot use A location (reads and writes)', refused(await rpc(B, 'money_expenses_list', { location_id: locA })) && refused(await rpc(B, 'money_payments_list', { location_id: locA }))
+    && refused(await rpc(B, 'money_cashbook', { location_id: locA })) && refused(await rpc(B, 'money_cash_record', { location_id: locA, direction: 'in', title: 'x', amount_minor: 100 }, `gw-mo-${randomUUID()}`)));
+  ok('money: B cannot pay or set the due date of A invoices', refused(await rpc(B, 'money_invoice_pay', { invoice_id: randomUUID(), amount_minor: 100 }, `gw-mo-${randomUUID()}`)) && refused(await rpc(B, 'money_invoice_set_due', { invoice_id: randomUUID(), due_date: '2026-10-20' })));
   ok('payment webhook hook answers 501 (not connected)', (await fetch(`${API}/webhooks/razorpay`, { method: 'POST' })).status === 501);
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.stack?.slice(0, 600));
