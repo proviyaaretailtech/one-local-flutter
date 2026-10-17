@@ -353,7 +353,7 @@ Future<void> exportCsv(BuildContext context, MoneyApi api, String report, Map<St
 
 // ---------------------------------------------------------------- forms
 
-enum FieldKind { text, amount, pick }
+enum FieldKind { text, amount, signedAmount, pick }
 
 class FormFieldSpec {
   const FormFieldSpec(this.key, this.label, {this.kind = FieldKind.text, this.options = const [], this.initial = '', this.hint, this.optional = false});
@@ -412,7 +412,7 @@ class _MoneyFormState extends State<_MoneyForm> {
         setState(() => error = 'Fill in ${f.label.toLowerCase()}.');
         return;
       }
-      if (f.kind == FieldKind.amount) {
+      if (f.kind == FieldKind.amount || f.kind == FieldKind.signedAmount) {
         final p = parseRupees(t.replaceAll(RegExp(r'^[+−-]'), ''));
         if (p == null) {
           setState(() => error = 'Enter ${f.label.toLowerCase()} as rupees, for example 250 or 250.50.');

@@ -237,7 +237,7 @@ class RefundsScreen extends StatelessWidget {
               InvSecondary('Request adjustment', onPressed: () async {
                 final done = await showMoneyForm(c.context, title: 'Request adjustment', action: 'Send for review', note: 'Another person with approval rights decides it. Use a minus sign to reduce money.', fields: const [
                   FormFieldSpec('reason', 'Reason'),
-                  FormFieldSpec('amount', 'Amount (₹)', kind: FieldKind.amount, hint: '-250 or 80'),
+                  FormFieldSpec('amount', 'Amount (₹)', kind: FieldKind.signedAmount, hint: '-250 or 80'),
                   FormFieldSpec('kind', 'Kind', kind: FieldKind.pick, options: [('price_correction', 'Price correction'), ('fee_reversal', 'Fee reversal'), ('discount', 'Discount'), ('other', 'Other')], initial: 'other'),
                 ], onSubmit: (v, key) => env.api.requestAdjustment(v, key));
                 if (done) await c.reload();
