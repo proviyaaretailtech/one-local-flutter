@@ -76,3 +76,19 @@ test('inventory (section H): every function is listed, reads are "read", writes 
   const keep = parse('inv_document_save', { doc_type: 'receipt', title: 'x', lines: [{ inventory_item_id: 'a', qty: 1 }] });
   assert.ok(keep.success && keep.data.title === 'x' && keep.data.lines.length === 1);   // fields the schema does not name still reach the database
 });
+
+test('kitchen (section H): five functions listed, writes carry the Idempotency-Key, shapes are checked', async () => {
+  for (const a of ['kitchen_config', 'kitchen_station_view', 'kds_queue']) assert.equal(lookup(a)?.rate, 'read', a);
+  for (const a of ['kitchen_station_save', 'kds_ticket_act']) { const e = lookup(a); assert.ok(e && e.kind === 'db' && e.idem && e.rate === 'write', a); }
+  for (const a of ['kitchen_station_json', 'kds_ticket_json', 'kds_station_keys', 'kitchen_can']) assert.equal(lookup(a), undefined, a);   // helpers are not reachable
+  assert.equal((await post('/rpc/kds_queue')).status, 401);
+  const parse = (alias: string, body: unknown) => (lookup(alias) as { args: { safeParse(v: unknown): { success: boolean; data?: any } } }).args.safeParse(body);
+  assert.equal(parse('kitchen_station_save', { name: '   ' }).success, false);
+  assert.equal(parse('kitchen_station_save', { name: 'x'.repeat(61) }).success, false);
+  assert.equal(parse('kitchen_station_save', { name: 'Tandoor', printer_id: 'nope' }).success, false);
+  assert.equal(parse('kds_ticket_act', { ticket_id: '40000000-0000-0000-0000-0000000000a1', action: 'delete' }).success, false);
+  assert.equal(parse('kds_queue', { status: 'late' }).success, false);
+  assert.equal(parse('kds_queue', { station: 'Main Kitchen' }).success, false);
+  const keep = parse('kitchen_station_save', { name: 'Tandoor', extra: 1 });
+  assert.ok(keep.success && keep.data.extra === 1);
+});

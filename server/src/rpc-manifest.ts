@@ -18,6 +18,7 @@ import { secureHandlers, withImageLinks, type SecureHandler } from './modules/se
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
+import * as kit from './schemas/kitchen.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -100,6 +101,13 @@ export const MANIFEST: Entry[] = [
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  // ---- kitchen stations and the kitchen display, section H (0430, 0431). Body = the function's `p` object; the database checks organisation,
+  //      location and role (kitchen:view / kitchen:configure; order.update_status to act on a ticket). Writes carry the Idempotency-Key header.
+  db('kitchen_config', { args: kit.Config, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
+  db('kitchen_station_view', { args: kit.StationView, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
+  db('kitchen_station_save', { args: kit.StationSave, map: P, rate: 'write', idem: true, roles: 'staff with kitchen:configure' }),
+  db('kds_queue', { args: kit.Queue, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
+  db('kds_ticket_act', { args: kit.TicketAct, map: P, rate: 'write', idem: true, roles: 'staff with order.update_status' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 

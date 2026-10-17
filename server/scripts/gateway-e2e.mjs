@@ -167,6 +167,33 @@ try {
   ok('inventory: A document untouched after all of that', sql(`select status||':'||version from inventory_documents where id='${docId}'`) === 'draft:' + d1.j.version && sql(`select count(*) from stock_movements where organization_id='${orgA}'`) === '1');
   ok('inventory: A viewer can read stock but not create documents', (await rpc(V, 'inv_dashboard')).s === 200 && (await rpc(V, 'inv_document_save', draft, `gw-inv-${randomUUID()}`)).s === 403);
   ok('inventory: applicant with no business gets nothing', refused(await rpc(P1, 'inv_dashboard')) && refused(await rpc(P1, 'inv_stock_detail', { item_id: itemA })));
+  // ---- kitchen stations and display (section H, 0430-0431): A's kitchen against B's token
+  ok('kitchen: no token is 401', (await rpc(null, 'kds_queue')).s === 401 && (await rpc(null, 'kitchen_config')).s === 401);
+  const kcfg = await rpc(A, 'kitchen_config');
+  ok('kitchen: A manager sees Main Kitchen and may configure', kcfg.s === 200 && kcfg.j.stations.some(s => s.key === 'main') && kcfg.j.can.configure === true, kcfg);
+  const ksave = await rpc(A, 'kitchen_station_save', { name: `Tandoor ${run}` }, `gw-kit-${randomUUID()}`);
+  ok('kitchen: A creates a station', ksave.s === 200 && ksave.j.name === `Tandoor ${run}`, ksave);
+  const stA = ksave.j.id;
+  ok('kitchen: bad shape is a 400 with a sentence', await (async () => { const r = await rpc(A, 'kitchen_station_save', { name: '   ' }); return r.s === 400 && r.j.code === 'validation'; })());
+  ok('kitchen: viewer cannot see or change the setup', refused(await rpc(V, 'kitchen_config')) && refused(await rpc(V, 'kitchen_station_save', { name: 'Nope' })));
+  const kotNo = sql(`select next_org_seq('${orgA}','kot')`);
+  const tkA = sql(`insert into kot_tickets(organization_id,order_id,kot_no,station,status) values ('${orgA}','${oid}',${kotNo},'main','new') returning id`).split('\n')[0];
+  sql(`update order_items set kot_ticket_id='${tkA}' where order_id='${oid}'`);
+  const kq = await rpc(A, 'kds_queue');
+  ok('kitchen: A sees its ticket in the queue', kq.s === 200 && kq.j.tickets.some(t => t.id === tkA) && kq.j.live >= 1, kq.j && kq.j.live);
+  const bcfg = await rpc(B, 'kitchen_config'), bq = await rpc(B, 'kds_queue');
+  ok('kitchen: B config has none of A', bcfg.s === 200 && !JSON.stringify(bcfg.j).includes(stA) && !JSON.stringify(bcfg.j).includes(orgA), bcfg.j);
+  ok('kitchen: B queue is empty', bq.s === 200 && bq.j.live === 0 && bq.j.tickets.length === 0 && !JSON.stringify(bq.j).includes(tkA));
+  ok('kitchen: B cannot view or change A station', (await rpc(B, 'kitchen_station_view', { id: stA })).s === 404 && (await rpc(B, 'kitchen_station_save', { id: stA, name: 'Hacked' }, `gw-kit-${randomUUID()}`)).s === 404);
+  ok('kitchen: B cannot link its station to A station, nor filter by it', refused(await rpc(B, 'kitchen_station_save', { name: 'Bx', kds_group_id: stA }, `gw-kit-${randomUUID()}`))
+    && (await rpc(B, 'kds_queue', { station: 'main', location_id: locA })).j?.tickets?.length === 0);
+  ok('kitchen: B cannot act on A ticket (start, item, ready, print)', (await Promise.all(['start', 'ready', 'print'].map(a => rpc(B, 'kds_ticket_act', { ticket_id: tkA, action: a }, `gw-kit-${randomUUID()}`)))).every(r => r.s === 404)
+    && (await rpc(B, 'kds_ticket_act', { ticket_id: tkA, action: 'item_done', item_id: sql(`select id from order_items where order_id='${oid}' limit 1`) }, `gw-kit-${randomUUID()}`)).s === 404);
+  ok('kitchen: A ticket untouched by B', sql(`select status from kot_tickets where id='${tkA}'`) === 'new');
+  const kst = await rpc(A, 'kds_ticket_act', { ticket_id: tkA, action: 'start' }, `gw-kit-${randomUUID()}`);
+  ok('kitchen: A starts its ticket', kst.s === 200 && kst.j.status === 'preparing', kst);
+  ok('kitchen: a stale screen is a 409 version_conflict', await (async () => { const r = await rpc(A, 'kds_ticket_act', { ticket_id: tkA, action: 'print', expected_updated_at: '2000-01-01T00:00:00Z' }, `gw-kit-${randomUUID()}`); return r.s === 409 && r.j.code === 'version_conflict'; })());
+  ok('kitchen: applicant with no business gets nothing', refused(await rpc(P1, 'kds_queue')) && refused(await rpc(P1, 'kitchen_config')));
   ok('payment webhook hook answers 501 (not connected)', (await fetch(`${API}/webhooks/razorpay`, { method: 'POST' })).status === 501);
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.stack?.slice(0, 600));
