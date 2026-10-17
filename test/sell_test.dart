@@ -620,6 +620,22 @@ void main() {
       expect(find.text('Return recorded. A manager approves it next.'), findsOneWidget);
     });
 
+    testWidgets('a damaged item is refunded but marked not to go back on the shelf', (t) async {
+      final till = Till();
+      await tall(t, ReturnsScreen(env: till.env()));
+      await t.tap(find.text('+ Return'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('P-00087 · Rahul Patil'));
+      await t.pumpAndSettle();
+      await t.tap(find.byTooltip('One more Amul Butter 500g'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Damaged'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Record return'));
+      await t.pumpAndSettle();
+      expect(jsonDecode(till.where('POST', '/pos_return_create').single.body)['lines'], [{'order_item_id': 'i1', 'qty': 1, 'restock': false}]);
+    });
+
     testWidgets('no item chosen: no request', (t) async {
       final till = Till();
       await tall(t, ReturnsScreen(env: till.env()));

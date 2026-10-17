@@ -182,7 +182,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
         ),
         if (open) ...[
           const Divider(height: 20, color: kLine),
-          for (final l in r.lines) KeyValue('${l['qty']} × ${l['name']}', rupees((l['amount'] as num?) ?? 0), bold: false),
+          for (final l in r.lines) KeyValue('${l['qty']} × ${l['name']}${l['restock'] == false ? ' · damaged' : ''}', rupees((l['amount'] as num?) ?? 0), bold: false),
           KeyValue('Bill', '#${r.orderNo}', bold: false),
           const SizedBox(height: 8),
           if (r.status == 'requested') Row(children: [
@@ -212,6 +212,7 @@ class _NewReturnState extends State<_NewReturn> {
   List<Receipt>? _bills;
   Receipt? _bill;
   final _qty = <String, int>{};
+  final _damaged = <String>{}; // items that come back broken: refunded, but not put back in stock
   String _reason = _ReturnsScreenState._reasons.first;
   String? _error;
   bool _busy = false;
@@ -241,7 +242,7 @@ class _NewReturnState extends State<_NewReturn> {
   }
 
   Future<void> _submit() async {
-    final lines = [for (final e in _qty.entries.where((e) => e.value > 0)) {'order_item_id': e.key, 'qty': e.value}];
+    final lines = [for (final e in _qty.entries.where((e) => e.value > 0)) {'order_item_id': e.key, 'qty': e.value, if (_damaged.contains(e.key)) 'restock': false}];
     if (lines.isEmpty) {
       setState(() => _error = 'Choose the items being returned.');
       return;
@@ -289,6 +290,11 @@ class _NewReturnState extends State<_NewReturn> {
         for (final i in _bill!.items)
           Row(children: [
             Expanded(child: Text('${i['name']} (sold ${i['qty']})', style: inter(14, 500))),
+            if ((_qty[i['order_item_id']] ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: FilterChip(label: const Text('Damaged'), selected: _damaged.contains(i['order_item_id']), onSelected: (v) => setState(() => v ? _damaged.add('${i['order_item_id']}') : _damaged.remove('${i['order_item_id']}'))),
+              ),
             IconButton(tooltip: 'One less ${i['name']}', onPressed: (_qty[i['order_item_id']] ?? 0) > 0 ? () => setState(() => _qty[i['order_item_id']] = _qty[i['order_item_id']]! - 1) : null, icon: const Icon(LucideIcons.minus, size: 16)),
             Text('${_qty[i['order_item_id']] ?? 0}', style: inter(15, 700)),
             IconButton(tooltip: 'One more ${i['name']}', onPressed: (_qty[i['order_item_id']] ?? 0) < (i['qty'] as num) ? () => setState(() => _qty[i['order_item_id']] = (_qty[i['order_item_id']] ?? 0) + 1) : null, icon: const Icon(LucideIcons.plus, size: 16)),

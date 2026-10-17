@@ -74,6 +74,7 @@ try {
   const six = [{ menu_item_id: by.AB500.id, qty: 2 }, { menu_item_id: by.CC500.id, qty: 1 }];   // 560 + 40 = 600
 
   // ---- coupons
+  ok('kitchen and viewer cannot read receipts, returns or coupons (403)', (await rpc(V, 'pos_receipt_list')).s === 403 && (await rpc(V, 'pos_return_list')).s === 403 && (await rpc(V, 'pos_coupon_list')).s === 403);
   ok('biller cannot create a coupon (403)', (await rpc(BL, 'pos_coupon_save', { code: 'WELCOME10', kind: 'percent', value: 10 })).s === 403);
   const cp = await rpc(A, 'pos_coupon_save', { code: 'welcome10', label: 'Welcome', kind: 'percent', value: 10, min_order: 500, max_discount: 50 });
   ok('manager creates the coupon', cp.s === 200 && cp.j.code === 'WELCOME10', cp);
@@ -87,6 +88,16 @@ try {
   ok('org B cannot use org A coupon', (await api(B, 'POST', `${O}/quote`, { lines: [{ menu_item_id: sql(`select id from menu_items where organization_id='${orgB}'`), qty: 1 }], coupon_code: 'WELCOME10' })).j.code === 'coupon_unknown');
   const sold = await api(BL, 'POST', `${O}/checkout`, { lines: six, method: 'cash', tendered: 600, coupon_code: 'WELCOME10', notes: 'ZZ-TEST f' }, k());
   ok('checkout with coupon: discount 50, total 577.50', sold.s === 200 && sold.j.bill.discount === 50 && sold.j.bill.total === 577.5, sold.j?.bill);
+
+  // limits and free bills
+  await rpc(A, 'pos_coupon_save', { code: 'ONCE1', kind: 'flat', value: 10, max_uses: 1 });
+  await rpc(A, 'pos_coupon_save', { code: 'FREE100', kind: 'percent', value: 100 });
+  const lim1 = await api(BL, 'POST', `${O}/hold`, { lines: six, coupon_code: 'ONCE1', notes: 'ZZ-TEST f' }, k());
+  ok('coupon with 1 use: the first bill takes it', lim1.s === 200 && lim1.j.bill.discount === 10, lim1);
+  ok('coupon used up: 422 coupon_limit', (await api(BL, 'POST', `${O}/quote`, { lines: six, coupon_code: 'ONCE1' })).j.code === 'coupon_limit');
+  ok('a free bill is refused: 422 coupon_zero', (await api(BL, 'POST', `${O}/quote`, { lines: six, coupon_code: 'FREE100' })).j.code === 'coupon_zero');
+  await api(A, 'POST', `${O}/${lim1.j.id}/cancel`, { reason: 'test', version: lim1.j.version });
+  ok('cancelling that bill gives the use back', (await api(BL, 'POST', `${O}/quote`, { lines: six, coupon_code: 'ONCE1' })).s === 200);
 
   // ---- split payment
   const held = await api(BL, 'POST', `${O}/hold`, { lines: [{ menu_item_id: by.AB500.id, qty: 1 }, { menu_item_id: by.AM1L.id, qty: 1 }], customer_name: 'Riya Patel', notes: 'ZZ-TEST f' }, k());
@@ -106,6 +117,7 @@ try {
   ok('the bill is paid, shown as Split', paid.stage === 'pending' && paid.payment_chip === 'Paid · Split', paid.payment_chip);
   ok('split: two payments in the database, change recorded', sql(`select count(*) from payments where order_id='${held.j.id}'`) === '2' && sql(`select tendered from pos_cash_tenders where order_id='${held.j.id}'`) === '500.00');
   const sp2 = await sp(BL, held.j.id, parts, splitKey);
+  ok('split: the same key with other parts is 422 idempotency_mismatch', (await sp(BL, held.j.id, [{ method: 'cash', amount: 1 }, { method: 'upi', amount: 1 }], splitKey)).j?.code === 'idempotency_mismatch');
   ok('split: same key again is a replay', sp2.s === 200 && sp2.j.replayed === true && sql(`select count(*) from payments where order_id='${held.j.id}'`) === '2', sp2.j);
   ok('split: a paid bill cannot be paid again (409)', (await sp(BL, held.j.id, [{ method: 'cash', amount: 200 }, { method: 'upi', amount: 157 }])).s === 409);
 
@@ -123,16 +135,17 @@ try {
 
   // ---- receipts and transaction history
   const rc = await rpc(BL, 'pos_receipt_list');
-  ok('receipts: 3 bills for org A, newest first', rc.s === 200 && rc.j.length === 3 && rc.j[0].id === held2.j.id, rc.j?.map(r => r.display_no));
+  ok('receipts: 4 bills for org A (one cancelled), newest first', rc.s === 200 && rc.j.length === 4 && rc.j[0].id === held2.j.id, rc.j?.map(r => r.display_no));
   const rSplit = rc.j.find(r => r.id === held.j.id);
   ok('receipt row: split bill, customer, 2 lines, methods, status', rSplit.status === 'paid' && rSplit.customer_name === 'Riya Patel' && rSplit.items.length === 2 && rSplit.methods.length === 2 && Number(rSplit.total) === 357 && rSplit.items.every(i => i.order_item_id), rSplit);
   const rCoupon = rc.j.find(r => r.coupon_code === 'WELCOME10');
   ok('receipt row: coupon bill shows the discount', rCoupon && Number(rCoupon.discount) === 50, rCoupon);
   ok('receipts: status unpaid = the held bill', (await rpc(BL, 'pos_receipt_list', { status: 'unpaid' })).j.map(r => r.id).join() === held2.j.id);
+  ok('receipts: status cancelled = the cancelled coupon bill', (await rpc(BL, 'pos_receipt_list', { status: 'cancelled' })).j.map(r => r.id).join() === lim1.j.id);
   ok('receipts: search by customer', (await rpc(BL, 'pos_receipt_list', { q: 'riya' })).j.length === 1);
   ok('receipts: date range in the past is empty', (await rpc(BL, 'pos_receipt_list', { from: '2020-01-01', to: '2020-01-31' })).j.length === 0);
   const today = new Date().toISOString().slice(0, 10), tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
-  ok('receipts: today in range finds all 3', (await rpc(BL, 'pos_receipt_list', { from: today, to: tomorrow })).j.length === 3);
+  ok('receipts: today in range finds all 4', (await rpc(BL, 'pos_receipt_list', { from: today, to: tomorrow })).j.length === 4);
   ok('receipts: bad status / date 400', (await rpc(BL, 'pos_receipt_list', { status: 'x' })).s === 400 && (await rpc(BL, 'pos_receipt_list', { from: 'yesterday' })).s === 400);
   ok('receipts: org B sees none of org A', (await rpc(B, 'pos_receipt_list')).j.length === 0);
 
@@ -188,11 +201,12 @@ try {
   sql(`delete from org_counters where organization_id in ('${orgA}','${orgB}')`);
   try { sql(`delete from inventory_bins where organization_id in ('${orgA}','${orgB}')`); } catch { /* table may not exist on an older schema */ }  // created with each business; blocks the purge
   // returns point at order lines and refunds, which the shared purge does not know about: remove them first (append-only guards lifted for this dev cleanup only)
-  for (const t of ['sell_return_lines', 'sell_returns', 'sell_payment_attempts']) sql(`alter table ${t} disable trigger user`);
+  for (const t of ['sell_return_lines', 'sell_returns', 'sell_payment_attempts', 'sell_coupon_redemptions']) sql(`alter table ${t} disable trigger user`);
+  sql(`delete from sell_coupon_redemptions where organization_id in ('${orgA}','${orgB}')`);
   sql(`delete from sell_return_lines where organization_id in ('${orgA}','${orgB}')`);
   sql(`delete from sell_returns where organization_id in ('${orgA}','${orgB}')`);
   sql(`delete from sell_payment_attempts where organization_id in ('${orgA}','${orgB}')`);
-  for (const t of ['sell_return_lines', 'sell_returns', 'sell_payment_attempts']) sql(`alter table ${t} enable trigger user`);
+  for (const t of ['sell_return_lines', 'sell_returns', 'sell_payment_attempts', 'sell_coupon_redemptions']) sql(`alter table ${t} enable trigger user`);
   sql(`delete from sell_coupons where organization_id in ('${orgA}','${orgB}')`);
   sql(`delete from menu_categories where organization_id in ('${orgA}','${orgB}')`);
   try { console.log(execSync('../../database/purge_test_orders.sh', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim().split('\n').pop()); }

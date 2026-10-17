@@ -43,7 +43,7 @@ const STATUS: Record<string, number> = {
   TOO_FAR: 422, PICKUP_MISMATCH: 422, CASH_MISMATCH: 422, IDEMPOTENCY: 422, IDEMPOTENCY_MISMATCH: 422, UNDERPAID: 422, OVERPAY: 422,
   SHORT: 409, ALLOCATION: 409, CAPACITY: 422, STORAGE: 422, TENANT: 403,                                   // inventory (section H)
   CONFLICT: 409, SCOPE: 403,                                                                                     // purchase suggestions (section J)
-  COUPON_UNKNOWN: 422, COUPON_MIN: 422, OVER_REFUND: 422, OVER_RETURN: 422, PROVIDER_OFF: 503, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
+  COUPON_UNKNOWN: 422, COUPON_MIN: 422, COUPON_LIMIT: 422, COUPON_CUSTOMER: 422, COUPON_ZERO: 422, OVER_REFUND: 422, OVER_RETURN: 422, PROVIDER_OFF: 503, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
 };
 const CODE: Record<string, string> = {
   NOT_DELIVERABLE: 'order_not_deliverable', PICKED_UP: 'already_picked_up', EXPIRED: 'offer_expired', TAKEN: 'already_taken',

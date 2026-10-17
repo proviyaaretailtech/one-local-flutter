@@ -32,12 +32,12 @@ export const Receipts = obj({
 export const ReturnList = obj({ status: z.enum(['all', 'requested', 'approved', 'rejected', 'refunded'], { message: 'Unknown status.' }).optional(), q: text(60).optional() });
 export const ReturnCreate = obj({
   order_id: id, reason: text(200), note: text(300).optional(),
-  lines: z.array(obj({ order_item_id: id, qty: z.number().int().min(1).max(99) })).min(1, 'Choose the items being returned.').max(50), ...key,
+  lines: z.array(obj({ order_item_id: id, qty: z.number().int().min(1).max(99), restock: z.boolean().optional() })).min(1, 'Choose the items being returned.').max(50), ...key,
 });
 export const ReturnDecide = obj({ return_id: id, decision: z.enum(['approve', 'reject'], { message: 'Approve or reject.' }), note: text(300).optional() });
 export const ReturnRefund = obj({ return_id: id, method: z.enum(['cash', 'upi', 'card', 'other'], { message: 'Choose how the money goes back.' }), ...key });
 export const CouponList = obj({});
 export const CouponSave = obj({
   code: text(20), label: text(80).optional(), kind: z.enum(['percent', 'flat'], { message: 'Choose percent or flat.' }), value: z.number().positive('Enter a value above zero.'),
-  min_order: z.number().min(0).nullish(), max_discount: z.number().positive().nullish(), active: z.boolean().optional(), starts_at: text(40).nullish(), ends_at: text(40).nullish(),
+  min_order: z.number().min(0).nullish(), max_discount: z.number().positive().nullish(), max_uses: z.number().int().positive().nullish(), max_uses_per_customer: z.number().int().positive().nullish(), active: z.boolean().optional(), starts_at: text(40).nullish(), ends_at: text(40).nullish(),
 });
