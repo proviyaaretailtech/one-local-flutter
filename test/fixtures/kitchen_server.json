@@ -1,7 +1,7 @@
 {
  "config": {
   "can": {
-   "configure": false
+   "configure": true
   },
   "prep_areas": [],
   "printers": [
@@ -16,61 +16,62 @@
    {
     "active": true,
     "colour": "#76ec00",
-    "id": "cf5573e6-ca74-4e6a-b410-8bf069a430a5",
+    "id": "1b0a4c18-20ae-4d87-ba99-b16efae798ce",
     "kds_group": null,
     "key": "main",
     "name": "Main Kitchen",
-    "open_tickets": 1,
+    "open_tickets": 0,
     "prep_area": null,
     "printer": null,
-    "sort_order": 0
+    "sort_order": 0,
+    "version": 1
    },
    {
     "active": true,
     "colour": "#76ec00",
-    "id": "fac657e4-4552-4bd8-9040-115bbeb52e31",
+    "id": "6a8d842d-a45c-4242-99a8-5c8d12ad766f",
     "kds_group": null,
     "key": "tandoor",
     "name": "Tandoor",
     "open_tickets": 0,
     "prep_area": null,
     "printer": null,
-    "sort_order": 1
+    "sort_order": 1,
+    "version": 1
    },
    {
     "active": true,
     "colour": "#76ec00",
-    "id": "38a04a09-25fd-4b2e-bb94-6f5e5b4e9b1e",
+    "id": "a750d1d2-c41f-4a49-9c29-b34386e5cc82",
     "kds_group": null,
     "key": "beverages",
     "name": "Beverages",
-    "open_tickets": 1,
-    "prep_area": null,
-    "printer": null,
-    "sort_order": 2
-   },
-   {
-    "active": true,
-    "colour": "#76ec00",
-    "id": "35ce4922-4923-4f6a-9c86-ad3eec4c06bf",
-    "kds_group": null,
-    "key": "desserts",
-    "name": "Sweets",
     "open_tickets": 0,
     "prep_area": null,
-    "printer": {
-     "id": "43c00000-0000-0000-0000-000000000001",
-     "name": "Hot kitchen"
-    },
-    "sort_order": 3
+    "printer": null,
+    "sort_order": 2,
+    "version": 1
    },
    {
     "active": true,
     "colour": "#76ec00",
-    "id": "47dc6611-9b2b-4de1-8ca0-cbed17b77fd1",
+    "id": "a88093ac-dcf1-4560-a32e-075fc021dd90",
+    "kds_group": null,
+    "key": "desserts",
+    "name": "Sweet shop",
+    "open_tickets": 0,
+    "prep_area": null,
+    "printer": null,
+    "sort_order": 3,
+    "version": 4
+   },
+   {
+    "active": true,
+    "colour": "#76ec00",
+    "id": "942c3eb8-c67e-4c9c-9d7c-ab2f366db05c",
     "kds_group": {
-     "id": "35ce4922-4923-4f6a-9c86-ad3eec4c06bf",
-     "name": "Sweets"
+     "id": "a88093ac-dcf1-4560-a32e-075fc021dd90",
+     "name": "Sweet shop"
     },
     "key": "cold_desserts",
     "name": "Cold Desserts",
@@ -80,7 +81,14 @@
      "id": "43c00000-0000-0000-0000-000000000001",
      "name": "Hot kitchen"
     },
-    "sort_order": 4
+    "sort_order": 4,
+    "version": 1
+   }
+  ],
+  "unassigned": [
+   {
+    "items": 1,
+    "key": "grill_unmade"
    }
   ]
  },
@@ -113,7 +121,7 @@
    },
    {
     "key": "desserts",
-    "name": "Sweets"
+    "name": "Sweet shop"
    },
    {
     "key": "cold_desserts",
@@ -131,18 +139,19 @@
   "tickets": [
    {
     "age_minutes": 0,
+    "card_id": "b5338e0d-87a9-473e-9046-891365dea449:tandoor",
     "channel": "dine_in",
     "chip": "new",
-    "created_at": "2026-10-17T05:58:23.065651+00:00",
+    "created_at": "2026-10-17T15:20:23.10399+00:00",
     "delayed": false,
     "display_no": "P-00001",
     "done_count": 0,
-    "id": "e3fe0b12-9cd7-462e-8ed1-46629cf79d0d",
+    "id": "b5338e0d-87a9-473e-9046-891365dea449",
     "item_count": 2,
     "items": [
      {
       "done": false,
-      "id": "7e75f978-57ca-44b6-a170-f0be0bd3fec8",
+      "id": "630be6f9-42bb-470c-a3ec-30bc2026ade2",
       "name": "Butter Naan",
       "notes": null,
       "qty": 4,
@@ -152,7 +161,7 @@
      },
      {
       "done": false,
-      "id": "bff9db1a-ecb8-417e-a375-8c30204aa771",
+      "id": "015023b1-559a-4b9a-964a-cb9adc9443c9",
       "name": "Paneer Tikka",
       "notes": null,
       "qty": 2,
@@ -162,30 +171,36 @@
      }
     ],
     "kot_no": 1,
-    "order_id": "86025550-ddd6-49e4-b5a3-138cd48a2e7e",
+    "order_id": "0f0091f1-e181-4db8-844e-e963e66523e2",
     "order_note": null,
     "priority": "urgent",
+    "ready_at": null,
+    "served_at": null,
+    "started_at": null,
+    "station": "tandoor",
+    "station_name": "Tandoor",
     "stations": [
      "Tandoor"
     ],
     "status": "new",
     "table_label": "T1",
-    "updated_at": "2026-10-17T05:58:23.065651+00:00"
+    "version": "6918a55eefd3bbeff4f0f097da1c8574"
    },
    {
     "age_minutes": 30,
+    "card_id": "7bedea82-c0cb-4443-adf9-3860694621a0:main",
     "channel": "pickup",
     "chip": "new",
-    "created_at": "2026-10-17T05:28:23.065651+00:00",
+    "created_at": "2026-10-17T14:50:23.10399+00:00",
     "delayed": true,
     "display_no": "P-00002",
     "done_count": 0,
-    "id": "caa33f72-6b7d-4aad-8406-f09026ba18f8",
+    "id": "7bedea82-c0cb-4443-adf9-3860694621a0",
     "item_count": 1,
     "items": [
      {
       "done": false,
-      "id": "c9e69bf9-7447-4521-b6ba-ce7e2e397d66",
+      "id": "fa22574b-b3c5-4d17-9a88-3702046d58e1",
       "name": "Veg Manchow Soup",
       "notes": null,
       "qty": 2,
@@ -195,30 +210,36 @@
      }
     ],
     "kot_no": 2,
-    "order_id": "c74dfa7d-eac8-4fb1-8972-8285bcb62f17",
+    "order_id": "45cf2f48-18f4-4088-b0aa-fe992035bf38",
     "order_note": "extra spicy",
     "priority": "normal",
+    "ready_at": null,
+    "served_at": null,
+    "started_at": null,
+    "station": "main",
+    "station_name": "Main Kitchen",
     "stations": [
      "Main Kitchen"
     ],
     "status": "new",
     "table_label": null,
-    "updated_at": "2026-10-17T05:58:23.065651+00:00"
+    "version": "1909e5d7486c9cb60d72f251bf2786e0"
    },
    {
     "age_minutes": 0,
+    "card_id": "12548b5a-88e7-43d9-936b-1f5f9d469772:beverages",
     "channel": "dine_in",
     "chip": "new",
-    "created_at": "2026-10-17T05:58:23.065651+00:00",
+    "created_at": "2026-10-17T15:20:23.10399+00:00",
     "delayed": false,
     "display_no": "P-00003",
     "done_count": 0,
-    "id": "76e559f7-e479-46bf-af45-bee461b66a87",
+    "id": "12548b5a-88e7-43d9-936b-1f5f9d469772",
     "item_count": 1,
     "items": [
      {
       "done": false,
-      "id": "1bb53d6f-2393-4f8b-a40a-d9481b54628e",
+      "id": "fa3dc712-c558-44cd-9fbc-ff33a9aa9cc1",
       "name": "Lassi",
       "notes": null,
       "qty": 3,
@@ -228,30 +249,36 @@
      }
     ],
     "kot_no": 3,
-    "order_id": "bf472d75-4d88-4f47-bb1c-d7dbcc2eff5f",
+    "order_id": "6ba7ca51-5b30-45af-9871-b28b53ffe349",
     "order_note": null,
     "priority": "normal",
+    "ready_at": null,
+    "served_at": null,
+    "started_at": null,
+    "station": "beverages",
+    "station_name": "Beverages",
     "stations": [
      "Beverages"
     ],
     "status": "new",
     "table_label": "T1",
-    "updated_at": "2026-10-17T05:58:23.065651+00:00"
+    "version": "079bffbdb37ed0330b8659dd1d9f78dd"
    },
    {
     "age_minutes": 0,
+    "card_id": "4c7a5481-cc5a-4273-986f-5ce834b30629:main",
     "channel": "delivery",
     "chip": "new",
-    "created_at": "2026-10-17T05:58:23.065651+00:00",
+    "created_at": "2026-10-17T15:20:23.10399+00:00",
     "delayed": false,
     "display_no": "P-00004",
     "done_count": 0,
-    "id": "42ba2997-13f2-48db-bb94-636f8e93d96e",
+    "id": "4c7a5481-cc5a-4273-986f-5ce834b30629",
     "item_count": 1,
     "items": [
      {
       "done": false,
-      "id": "f144845a-2b16-49bd-ac4b-93a4eef29abb",
+      "id": "17006019-d3fe-4b9a-bb04-e713542a8641",
       "name": "Veg Manchow Soup",
       "notes": null,
       "qty": 1,
@@ -261,15 +288,20 @@
      }
     ],
     "kot_no": 4,
-    "order_id": "cad6e82a-652c-4cbc-b6b1-2aa4a93d4099",
+    "order_id": "c5361488-ce27-4b4a-ab74-1688aae9e87c",
     "order_note": null,
     "priority": "normal",
+    "ready_at": null,
+    "served_at": null,
+    "started_at": null,
+    "station": "main",
+    "station_name": "Main Kitchen",
     "stations": [
      "Main Kitchen"
     ],
     "status": "new",
     "table_label": null,
-    "updated_at": "2026-10-17T05:58:23.065651+00:00"
+    "version": "43d4c32ab27b3f499fc3c752b98c3588"
    }
   ]
  },
@@ -302,7 +334,7 @@
    },
    {
     "key": "desserts",
-    "name": "Sweets"
+    "name": "Sweet shop"
    },
    {
     "key": "cold_desserts",
@@ -320,18 +352,19 @@
   "tickets": [
    {
     "age_minutes": 0,
+    "card_id": "b5338e0d-87a9-473e-9046-891365dea449:tandoor",
     "channel": "dine_in",
     "chip": "ready",
-    "created_at": "2026-10-17T05:58:23.065651+00:00",
+    "created_at": "2026-10-17T15:20:23.10399+00:00",
     "delayed": false,
     "display_no": "P-00001",
     "done_count": 2,
-    "id": "e3fe0b12-9cd7-462e-8ed1-46629cf79d0d",
+    "id": "b5338e0d-87a9-473e-9046-891365dea449",
     "item_count": 2,
     "items": [
      {
       "done": true,
-      "id": "7e75f978-57ca-44b6-a170-f0be0bd3fec8",
+      "id": "630be6f9-42bb-470c-a3ec-30bc2026ade2",
       "name": "Butter Naan",
       "notes": null,
       "qty": 4,
@@ -341,7 +374,7 @@
      },
      {
       "done": true,
-      "id": "bff9db1a-ecb8-417e-a375-8c30204aa771",
+      "id": "015023b1-559a-4b9a-964a-cb9adc9443c9",
       "name": "Paneer Tikka",
       "notes": null,
       "qty": 2,
@@ -351,63 +384,36 @@
      }
     ],
     "kot_no": 1,
-    "order_id": "86025550-ddd6-49e4-b5a3-138cd48a2e7e",
+    "order_id": "0f0091f1-e181-4db8-844e-e963e66523e2",
     "order_note": null,
     "priority": "urgent",
+    "ready_at": "2026-10-17T15:20:23.10399+00:00",
+    "served_at": null,
+    "started_at": "2026-10-17T15:20:23.10399+00:00",
+    "station": "tandoor",
+    "station_name": "Tandoor",
     "stations": [
      "Tandoor"
     ],
     "status": "ready",
     "table_label": "T1",
-    "updated_at": "2026-10-17T05:58:23.065651+00:00"
+    "version": "dac3a4cd54c2a27dc869cf0315280d23"
    },
    {
     "age_minutes": 0,
-    "channel": "delivery",
-    "chip": "new",
-    "created_at": "2026-10-17T05:58:23.065651+00:00",
-    "delayed": false,
-    "display_no": "P-00004",
-    "done_count": 0,
-    "id": "42ba2997-13f2-48db-bb94-636f8e93d96e",
-    "item_count": 1,
-    "items": [
-     {
-      "done": false,
-      "id": "f144845a-2b16-49bd-ac4b-93a4eef29abb",
-      "name": "Veg Manchow Soup",
-      "notes": null,
-      "qty": 1,
-      "station": "main",
-      "status": "pending",
-      "variant": null
-     }
-    ],
-    "kot_no": 4,
-    "order_id": "cad6e82a-652c-4cbc-b6b1-2aa4a93d4099",
-    "order_note": null,
-    "priority": "normal",
-    "stations": [
-     "Main Kitchen"
-    ],
-    "status": "new",
-    "table_label": null,
-    "updated_at": "2026-10-17T05:58:23.065651+00:00"
-   },
-   {
-    "age_minutes": 0,
+    "card_id": "12548b5a-88e7-43d9-936b-1f5f9d469772:beverages",
     "channel": "dine_in",
     "chip": "new",
-    "created_at": "2026-10-17T05:58:23.065651+00:00",
+    "created_at": "2026-10-17T15:20:23.10399+00:00",
     "delayed": false,
     "display_no": "P-00003",
     "done_count": 0,
-    "id": "76e559f7-e479-46bf-af45-bee461b66a87",
+    "id": "12548b5a-88e7-43d9-936b-1f5f9d469772",
     "item_count": 1,
     "items": [
      {
       "done": false,
-      "id": "1bb53d6f-2393-4f8b-a40a-d9481b54628e",
+      "id": "fa3dc712-c558-44cd-9fbc-ff33a9aa9cc1",
       "name": "Lassi",
       "notes": null,
       "qty": 3,
@@ -417,30 +423,75 @@
      }
     ],
     "kot_no": 3,
-    "order_id": "bf472d75-4d88-4f47-bb1c-d7dbcc2eff5f",
+    "order_id": "6ba7ca51-5b30-45af-9871-b28b53ffe349",
     "order_note": null,
     "priority": "normal",
+    "ready_at": null,
+    "served_at": null,
+    "started_at": null,
+    "station": "beverages",
+    "station_name": "Beverages",
     "stations": [
      "Beverages"
     ],
     "status": "new",
     "table_label": "T1",
-    "updated_at": "2026-10-17T05:58:23.065651+00:00"
+    "version": "079bffbdb37ed0330b8659dd1d9f78dd"
+   },
+   {
+    "age_minutes": 0,
+    "card_id": "4c7a5481-cc5a-4273-986f-5ce834b30629:main",
+    "channel": "delivery",
+    "chip": "new",
+    "created_at": "2026-10-17T15:20:23.10399+00:00",
+    "delayed": false,
+    "display_no": "P-00004",
+    "done_count": 0,
+    "id": "4c7a5481-cc5a-4273-986f-5ce834b30629",
+    "item_count": 1,
+    "items": [
+     {
+      "done": false,
+      "id": "17006019-d3fe-4b9a-bb04-e713542a8641",
+      "name": "Veg Manchow Soup",
+      "notes": null,
+      "qty": 1,
+      "station": "main",
+      "status": "pending",
+      "variant": null
+     }
+    ],
+    "kot_no": 4,
+    "order_id": "c5361488-ce27-4b4a-ab74-1688aae9e87c",
+    "order_note": null,
+    "priority": "normal",
+    "ready_at": null,
+    "served_at": null,
+    "started_at": null,
+    "station": "main",
+    "station_name": "Main Kitchen",
+    "stations": [
+     "Main Kitchen"
+    ],
+    "status": "new",
+    "table_label": null,
+    "version": "43d4c32ab27b3f499fc3c752b98c3588"
    },
    {
     "age_minutes": 30,
+    "card_id": "7bedea82-c0cb-4443-adf9-3860694621a0:main",
     "channel": "pickup",
     "chip": "served",
-    "created_at": "2026-10-17T05:28:23.065651+00:00",
+    "created_at": "2026-10-17T14:50:23.10399+00:00",
     "delayed": false,
     "display_no": "P-00002",
     "done_count": 1,
-    "id": "caa33f72-6b7d-4aad-8406-f09026ba18f8",
+    "id": "7bedea82-c0cb-4443-adf9-3860694621a0",
     "item_count": 1,
     "items": [
      {
       "done": true,
-      "id": "c9e69bf9-7447-4521-b6ba-ce7e2e397d66",
+      "id": "fa22574b-b3c5-4d17-9a88-3702046d58e1",
       "name": "Veg Manchow Soup",
       "notes": null,
       "qty": 2,
@@ -450,15 +501,188 @@
      }
     ],
     "kot_no": 2,
-    "order_id": "c74dfa7d-eac8-4fb1-8972-8285bcb62f17",
+    "order_id": "45cf2f48-18f4-4088-b0aa-fe992035bf38",
     "order_note": "extra spicy",
     "priority": "normal",
+    "ready_at": "2026-10-17T15:20:23.10399+00:00",
+    "served_at": "2026-10-17T15:20:23.10399+00:00",
+    "started_at": "2026-10-17T15:20:23.10399+00:00",
+    "station": "main",
+    "station_name": "Main Kitchen",
     "stations": [
      "Main Kitchen"
     ],
     "status": "delivered",
     "table_label": null,
-    "updated_at": "2026-10-17T05:58:23.065651+00:00"
+    "version": "9b95dededcfc45fe891b9af7aa163d87"
+   }
+  ]
+ },
+ "queue_multi": {
+  "can": {
+   "act": true
+  },
+  "counts": {
+   "all": 8,
+   "in_progress": 0,
+   "new": 5,
+   "ready": 2,
+   "served": 1
+  },
+  "delayed_after_minutes": 15,
+  "live": 8,
+  "station": null,
+  "stations": [
+   {
+    "key": "main",
+    "name": "Main Kitchen"
+   },
+   {
+    "key": "tandoor",
+    "name": "Tandoor"
+   },
+   {
+    "key": "beverages",
+    "name": "Beverages"
+   },
+   {
+    "key": "desserts",
+    "name": "Sweet shop"
+   },
+   {
+    "key": "cold_desserts",
+    "name": "Cold Desserts"
+   },
+   {
+    "key": "unassigned",
+    "name": "Unassigned"
+   }
+  ],
+  "stats": {
+   "completed_today": 1,
+   "delayed": 0,
+   "dine_in": 4,
+   "online_delivery": 1,
+   "pending": 5,
+   "queue_critical": 0
+  },
+  "tickets": [
+   {
+    "age_minutes": 0,
+    "card_id": "53ab44e5-5134-49d1-b3a6-6baa69546df9:beverages",
+    "channel": "dine_in",
+    "chip": "new",
+    "created_at": "2026-10-17T15:20:23.10399+00:00",
+    "delayed": false,
+    "display_no": "P-00006",
+    "done_count": 0,
+    "id": "53ab44e5-5134-49d1-b3a6-6baa69546df9",
+    "item_count": 1,
+    "items": [
+     {
+      "done": false,
+      "id": "26197007-3c44-4ecb-aecf-0a657bb65b7c",
+      "name": "Lassi",
+      "notes": null,
+      "qty": 2,
+      "station": "beverages",
+      "status": "pending",
+      "variant": null
+     }
+    ],
+    "kot_no": 6,
+    "order_id": "bdf19b3c-ed69-4f6e-a399-b7ae083c09e1",
+    "order_note": null,
+    "priority": "normal",
+    "ready_at": null,
+    "served_at": null,
+    "started_at": null,
+    "station": "beverages",
+    "station_name": "Beverages",
+    "stations": [
+     "Beverages"
+    ],
+    "status": "new",
+    "table_label": "T1",
+    "version": "a4c676d2d70ac408773785c41672a8d6"
+   },
+   {
+    "age_minutes": 0,
+    "card_id": "53ab44e5-5134-49d1-b3a6-6baa69546df9:tandoor",
+    "channel": "dine_in",
+    "chip": "new",
+    "created_at": "2026-10-17T15:20:23.10399+00:00",
+    "delayed": false,
+    "display_no": "P-00006",
+    "done_count": 0,
+    "id": "53ab44e5-5134-49d1-b3a6-6baa69546df9",
+    "item_count": 1,
+    "items": [
+     {
+      "done": false,
+      "id": "03286edb-2c1a-48db-abae-be31c6a48e0c",
+      "name": "Paneer Tikka",
+      "notes": null,
+      "qty": 1,
+      "station": "tandoor",
+      "status": "pending",
+      "variant": null
+     }
+    ],
+    "kot_no": 6,
+    "order_id": "bdf19b3c-ed69-4f6e-a399-b7ae083c09e1",
+    "order_note": null,
+    "priority": "normal",
+    "ready_at": null,
+    "served_at": null,
+    "started_at": null,
+    "station": "tandoor",
+    "station_name": "Tandoor",
+    "stations": [
+     "Tandoor"
+    ],
+    "status": "new",
+    "table_label": "T1",
+    "version": "4b61b61825a480d4f9ba4ccf81621228"
+   },
+   {
+    "age_minutes": 0,
+    "card_id": "53ab44e5-5134-49d1-b3a6-6baa69546df9:unassigned",
+    "channel": "dine_in",
+    "chip": "new",
+    "created_at": "2026-10-17T15:20:23.10399+00:00",
+    "delayed": false,
+    "display_no": "P-00006",
+    "done_count": 0,
+    "id": "53ab44e5-5134-49d1-b3a6-6baa69546df9",
+    "item_count": 1,
+    "items": [
+     {
+      "done": false,
+      "id": "93c7b6a6-0229-4db9-accc-b40e4bc7aa52",
+      "name": "Grilled Corn",
+      "notes": null,
+      "qty": 1,
+      "station": "grill_unmade",
+      "status": "pending",
+      "variant": null
+     }
+    ],
+    "kot_no": 6,
+    "order_id": "bdf19b3c-ed69-4f6e-a399-b7ae083c09e1",
+    "order_note": null,
+    "priority": "normal",
+    "ready_at": null,
+    "served_at": null,
+    "started_at": null,
+    "station": "unassigned",
+    "station_name": "Unassigned",
+    "stations": [
+     "Unassigned"
+    ],
+    "status": "new",
+    "table_label": "T1",
+    "version": "912ab57b5e50840f7a51a80205a8ba76"
    }
   ]
  },
@@ -468,9 +692,9 @@
    "configure": true
   },
   "colour": "#76ec00",
-  "id": "47dc6611-9b2b-4de1-8ca0-cbed17b77fd1",
+  "id": "942c3eb8-c67e-4c9c-9d7c-ab2f366db05c",
   "kds_group": {
-   "id": "35ce4922-4923-4f6a-9c86-ad3eec4c06bf",
+   "id": "a88093ac-dcf1-4560-a32e-075fc021dd90",
    "name": "Sweets"
   },
   "key": "cold_desserts",
@@ -481,22 +705,24 @@
    "id": "43c00000-0000-0000-0000-000000000001",
    "name": "Hot kitchen"
   },
-  "sort_order": 4
+  "sort_order": 4,
+  "version": 1
  },
  "ticket": {
   "age_minutes": 0,
+  "card_id": "b5338e0d-87a9-473e-9046-891365dea449:tandoor",
   "channel": "dine_in",
   "chip": "in_progress",
-  "created_at": "2026-10-17T05:58:23.065651+00:00",
+  "created_at": "2026-10-17T15:20:23.10399+00:00",
   "delayed": false,
   "display_no": "P-00001",
   "done_count": 1,
-  "id": "e3fe0b12-9cd7-462e-8ed1-46629cf79d0d",
+  "id": "b5338e0d-87a9-473e-9046-891365dea449",
   "item_count": 2,
   "items": [
    {
     "done": true,
-    "id": "7e75f978-57ca-44b6-a170-f0be0bd3fec8",
+    "id": "630be6f9-42bb-470c-a3ec-30bc2026ade2",
     "name": "Butter Naan",
     "notes": null,
     "qty": 4,
@@ -506,7 +732,7 @@
    },
    {
     "done": false,
-    "id": "bff9db1a-ecb8-417e-a375-8c30204aa771",
+    "id": "015023b1-559a-4b9a-964a-cb9adc9443c9",
     "name": "Paneer Tikka",
     "notes": null,
     "qty": 2,
@@ -516,15 +742,20 @@
    }
   ],
   "kot_no": 1,
-  "order_id": "86025550-ddd6-49e4-b5a3-138cd48a2e7e",
+  "order_id": "0f0091f1-e181-4db8-844e-e963e66523e2",
   "order_note": null,
   "priority": "urgent",
+  "ready_at": null,
   "replayed": false,
+  "served_at": null,
+  "started_at": "2026-10-17T15:20:23.10399+00:00",
+  "station": "tandoor",
+  "station_name": "Tandoor",
   "stations": [
    "Tandoor"
   ],
   "status": "preparing",
   "table_label": "T1",
-  "updated_at": "2026-10-17T05:58:23.065651+00:00"
+  "version": "21a2e0f4a758db51894e8baf9931d317"
  }
 }

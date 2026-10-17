@@ -96,9 +96,9 @@ void main() {
       expect(argsOf(s.first), {'name': 'Grill', 'printer_id': 'p1'});
       await f.api.saveStation(name: 'Other');
       expect(f.of('kitchen_station_save').last.headers['Idempotency-Key'], startsWith('kit-'));
-      await f.api.act('t1', 'item_done', itemId: 'i1', seenAt: DateTime.utc(2026, 10, 17, 5, 58, 23));
+      await f.api.act('t1', 'item_done', station: 'tandoor', itemId: 'i1', version: 'abc');
       final a = f.of('kds_ticket_act').single;
-      expect(argsOf(a), {'ticket_id': 't1', 'action': 'item_done', 'item_id': 'i1', 'expected_updated_at': '2026-10-17T05:58:23.000Z'});
+      expect(argsOf(a), {'ticket_id': 't1', 'action': 'item_done', 'station': 'tandoor', 'item_id': 'i1', 'expected_version': 'abc'});
       expect(a.headers['Idempotency-Key'], startsWith('kit-'));
     });
 
@@ -114,7 +114,7 @@ void main() {
       await show(t, KitchenSetupScreen(env: f.env()));
       expect(find.text('Kitchen Setup'), findsOneWidget);
       expect(find.text('Stations, printers & prep areas'), findsOneWidget);
-      for (final n in ['Main Kitchen', 'Tandoor', 'Beverages', 'Sweets', 'Cold Desserts']) {
+      for (final n in ['Main Kitchen', 'Tandoor', 'Beverages', 'Sweet shop', 'Cold Desserts']) {
         expect(find.text(n), findsOneWidget);
       }
       expect(find.text('Kitchen station'), findsNWidgets(5));
@@ -125,8 +125,20 @@ void main() {
       expect(find.text('Add station'), findsOneWidget);
     });
 
+    testWidgets('warns about a menu station that has no station row (its orders show as Unassigned)', (t) async {
+      await show(t, KitchenSetupScreen(env: Fake().env()));
+      expect(find.byKey(const ValueKey('unassigned-warning')), findsOneWidget);
+      expect(find.textContaining('grill_unmade (1 item)'), findsOneWidget);
+    });
+
+    testWidgets('no warning when every menu station has a station', (t) async {
+      final cfg = owner(fx['config'] as Map<String, dynamic>)..['unassigned'] = [];
+      await show(t, KitchenSetupScreen(env: Fake((r) => fnOf(r) == 'kitchen_config' ? ok(cfg) : null).env()));
+      expect(find.byKey(const ValueKey('unassigned-warning')), findsNothing);
+    });
+
     testWidgets('a person who cannot configure sees no add buttons; the server said so', (t) async {
-      final f = Fake((r) => fnOf(r) == 'kitchen_config' ? ok(fx['config']) : null);
+      final f = Fake((r) => fnOf(r) == 'kitchen_config' ? ok(copy(fx['config'] as Map<String, dynamic>)..['can'] = {'configure': false}) : null);
       await show(t, KitchenSetupScreen(env: f.env()));
       expect(find.text('Add station'), findsNothing);
       expect(find.text('Add printer'), findsNothing);
@@ -319,12 +331,13 @@ void main() {
       final f = Fake();
       await show(t, KdsScreen(env: f.env()));
       final tk = (fx['queue'] as Map)['tickets'][0];
-      await t.tap(find.byKey(ValueKey('act-start-${tk['id']}')));
+      await t.tap(find.byKey(ValueKey('act-start-${tk['card_id']}')));
       await t.pumpAndSettle();
       final a = argsOf(f.of('kds_ticket_act').single);
       expect(a['ticket_id'], tk['id']);
       expect(a['action'], 'start');
-      expect(DateTime.parse(a['expected_updated_at'] as String), DateTime.parse(tk['updated_at'] as String));
+      expect(a['station'], tk['station']);
+      expect(a['expected_version'], tk['version']);
       expect(f.of('kds_queue').length, 2);
     });
 
@@ -359,9 +372,9 @@ void main() {
       });
       final f = Fake((r) => fnOf(r) == 'kds_queue' ? ok(q) : null);
       await show(t, KdsScreen(env: f.env()));
-      await t.tap(find.byKey(ValueKey('act-ready-${q['tickets'][0]['id']}')));
+      await t.tap(find.byKey(ValueKey('act-ready-${q['tickets'][0]['card_id']}')));
       await t.pumpAndSettle();
-      await t.tap(find.byKey(ValueKey('act-serve-${q['tickets'][1]['id']}')));
+      await t.tap(find.byKey(ValueKey('act-serve-${q['tickets'][1]['card_id']}')));
       await t.pumpAndSettle();
       expect(f.of('kds_ticket_act').map((r) => argsOf(r)['action']).toList(), ['ready', 'serve']);
     });
@@ -370,7 +383,7 @@ void main() {
       final f = Fake();
       await show(t, KdsScreen(env: f.env()));
       final tk = (fx['queue'] as Map)['tickets'][1];
-      await t.tap(find.byKey(ValueKey('print-${tk['id']}')));
+      await t.tap(find.byKey(ValueKey('print-${tk['card_id']}')));
       await t.pump();
       await t.pump();
       expect(argsOf(f.of('kds_ticket_act').single)['action'], 'print');
@@ -380,7 +393,7 @@ void main() {
     testWidgets('a stale ticket: the server sentence is replaced by a plain one and the screen reloads', (t) async {
       final f = Fake((r) => fnOf(r) == 'kds_ticket_act' ? err(409, 'This ticket was changed on another screen.', 'version_conflict') : null);
       await show(t, KdsScreen(env: f.env()));
-      await t.tap(find.byKey(ValueKey('act-start-${(fx['queue'] as Map)['tickets'][0]['id']}')));
+      await t.tap(find.byKey(ValueKey('act-start-${(fx['queue'] as Map)['tickets'][0]['card_id']}')));
       await t.pumpAndSettle();
       expect(find.textContaining('changed on another screen'), findsOneWidget);
       expect(f.of('kds_queue').length, 2);
@@ -425,6 +438,24 @@ void main() {
       await t.tap(find.byKey(const ValueKey('status-new')));
       await t.pumpAndSettle();
       expect(find.text('No orders match.'), findsOneWidget);
+    });
+
+    testWidgets('a multi-station order is one card per station; each button acts on its own station only; Unassigned has its chip', (t) async {
+      final q = copy(fx['queue_multi'] as Map<String, dynamic>);
+      final f = Fake((r) => fnOf(r) == 'kds_queue' ? ok(q) : null);
+      await show(t, KdsScreen(env: f.env()));
+      final cards = q['tickets'] as List;
+      expect(cards.map((c) => c['station']).toSet(), {'tandoor', 'beverages', 'unassigned'});
+      expect(find.text('Unassigned'), findsWidgets); // the chip and the card tag
+      expect(find.byKey(const ValueKey('station-chip-unassigned')), findsOneWidget);
+      expect(find.text('Start'), findsNWidgets(3));
+      final bev = cards.firstWhere((c) => c['station'] == 'beverages');
+      await t.tap(find.byKey(ValueKey('act-start-${bev['card_id']}')));
+      await t.pumpAndSettle();
+      final a = argsOf(f.of('kds_ticket_act').single);
+      expect(a['station'], 'beverages');
+      expect(a['ticket_id'], bev['id']);
+      expect(a['expected_version'], bev['version']);
     });
 
     testWidgets('the display asks again by itself on the interval and stops when closed', (t) async {

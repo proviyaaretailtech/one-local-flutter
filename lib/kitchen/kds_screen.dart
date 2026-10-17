@@ -57,11 +57,11 @@ class _KdsScreenState extends State<KdsScreen> {
   }
 
   Future<void> _act(Facts t, String action, {String? itemId}) async {
-    final id = t.s('id');
+    final id = t.s('card_id');
     if (_busy.contains(id)) return;
     setState(() => _busy.add(id));
     try {
-      await env.api.act(id, action, itemId: itemId, seenAt: t.t('updated_at'));
+      await env.api.act(t.s('id'), action, station: t.s('station'), itemId: itemId, version: t.s('version'));
       if (action == 'print' && mounted) showToast(context, 'Ticket sent to the printer.');
     } on KitchenApiException catch (e) {
       if (mounted) showToast(context, e.stale ? 'This ticket changed on another screen. Showing the latest.' : e.message);
@@ -148,7 +148,7 @@ class _KdsScreenState extends State<KdsScreen> {
       ]),
       const SizedBox(height: 14),
       if (tickets.isEmpty) InvCard(child: Text(_q.isNotEmpty || _status != 'all' || _station.isNotEmpty ? 'No orders match.' : 'No orders in the kitchen right now.', style: inter(15, 400, color: kMuted))),
-      for (final t in tickets) _TicketCard(key: ValueKey('ticket-${t.s('id')}'), t: t, canAct: canAct, busy: _busy.contains(t.s('id')), onAct: _act),
+      for (final t in tickets) _TicketCard(key: ValueKey('ticket-${t.s('card_id')}'), t: t, canAct: canAct, busy: _busy.contains(t.s('card_id')), onAct: _act),
     ];
   }
 
@@ -281,7 +281,7 @@ class _TicketCard extends StatelessWidget {
             Semantics(
               button: true,
               child: InkWell(
-                key: ValueKey('print-${t.s('id')}'),
+                key: ValueKey('print-${t.s('card_id')}'),
                 borderRadius: BorderRadius.circular(12),
                 onTap: busy ? null : () => onAct(t, 'print'),
                 child: Container(
@@ -318,7 +318,7 @@ class _Action extends StatelessWidget {
           color: soft ? Colors.white : const Color(0xFF76EC00),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: soft ? const BorderSide(color: Color(0xFFD9DBD5)) : BorderSide.none),
           child: InkWell(
-            key: ValueKey('act-$action-${t.s('id')}'),
+            key: ValueKey('act-$action-${t.s('card_id')}'),
             borderRadius: BorderRadius.circular(12),
             onTap: busy ? null : () => onAct(t, action),
             child: Container(

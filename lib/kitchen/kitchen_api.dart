@@ -33,17 +33,18 @@ class KitchenApi {
 
   Future<Facts> station(String id) async => Facts(await _call('kitchen_station_view', {'id': id}));
 
-  /// Creates a station (no [id]) or changes one. A null group, printer or area clears it.
-  Future<Facts> saveStation({String? id, required String name, String? kdsGroupId, String? printerId, String? prepAreaId, String? key}) async =>
-      Facts(await _call('kitchen_station_save', {'id': id, 'name': name, 'kds_group_id': kdsGroupId, 'printer_id': printerId, 'prep_area_id': prepAreaId}, key: key ?? newKey()));
+  /// Creates a station. (Changing one sends `id` and the `version` seen, plus only the fields to change; no screen does that yet.)
+  Future<Facts> saveStation({required String name, String? kdsGroupId, String? printerId, String? prepAreaId, String? key}) async =>
+      Facts(await _call('kitchen_station_save', {'name': name, 'kds_group_id': kdsGroupId, 'printer_id': printerId, 'prep_area_id': prepAreaId}, key: key ?? newKey()));
 
   /// The display: counters, status chips and ticket cards. [status] is all | new | in_progress | ready | served; [station] a station key.
   Future<Facts> queue({String? station, String status = 'all', String q = ''}) async =>
       Facts(await _call('kds_queue', {'station': station, 'status': status, 'q': q.trim().isEmpty ? null : q.trim()}));
 
-  /// start / item_done / item_undo / ready / serve / print. Answers the ticket as it is now.
-  Future<Facts> act(String ticketId, String action, {String? itemId, DateTime? seenAt, String? key}) async =>
-      Facts(await _call('kds_ticket_act', {'ticket_id': ticketId, 'action': action, 'item_id': itemId, 'expected_updated_at': seenAt?.toUtc().toIso8601String()}, key: key ?? newKey()));
+  /// start / item_done / item_undo / ready / serve / print on ONE card: [station] is the card's station key (a ticket with items for several stations
+  /// is acted on one station at a time) and [version] the card's `version` the person saw. Answers the card as it is now.
+  Future<Facts> act(String ticketId, String action, {String? station, String? itemId, String? version, String? key}) async =>
+      Facts(await _call('kds_ticket_act', {'ticket_id': ticketId, 'action': action, 'station': station, 'item_id': itemId, 'expected_version': version}, key: key ?? newKey()));
 }
 
 class KitchenApiException extends PartnerApiException {

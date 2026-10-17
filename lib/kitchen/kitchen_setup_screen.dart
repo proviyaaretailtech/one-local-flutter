@@ -61,7 +61,25 @@ class _KitchenSetupScreenState extends State<KitchenSetupScreen> {
   List<Widget> _body(Facts d) {
     final can = d.m('can').b('configure');
     final stations = d.l('stations'), printers = d.l('printers'), areas = d.l('prep_areas');
+    final unassigned = d.l('unassigned');
     return [
+      if (unassigned.isNotEmpty)
+        Container(
+          key: const ValueKey('unassigned-warning'),
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(color: kAmberBgH, borderRadius: BorderRadius.circular(16)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Some menu items have no kitchen station', style: inter(15, 700, color: kAmberText)),
+            const SizedBox(height: 4),
+            Text(
+              'Their orders show under "Unassigned" on the kitchen display until a station with the same name is added: '
+              '${unassigned.map((u) => '${u.s('key')} (${u.n('items').toInt()} ${u.n('items') == 1 ? 'item' : 'items'})').join(', ')}.',
+              style: inter(13.5, 400, height: 1.35),
+            ),
+          ]),
+        ),
       _Section(
         title: 'Kitchen stations',
         action: can ? KitchenAddButton('Add station', onPressed: () => _add(d)) : null,
