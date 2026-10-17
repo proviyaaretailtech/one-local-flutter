@@ -51,10 +51,7 @@ src/auth.ts         verifies the Bearer token with Supabase Auth (public key, ca
 src/staff.ts        requireStaff (org_users + roles), requireSignedIn
 src/db.ts           service-role client, anonClient, userClient (as the caller), OL_/POS_/INV_/GRN_/SVC_ error -> HTTP status
 src/config.ts       env guard (local only), key lookup
-src/modules/        me, onboarding, setup, home, orders
-scripts/            home-checks.ts, orders-e2e.mjs   (the python walks are in ../tool/)
-tests/unit/         router, errors, limits, redaction (no database)
-scripts/            manifest-audit.mjs, gateway-e2e.mjs, orders-e2e.mjs, home-checks.ts   (the python walks are in ../tool/)
+scripts/            manifest-audit.mjs, gateway-e2e.mjs, orders-e2e.mjs, catalogue-e2e.mjs, home-checks.ts   (the python walks are in ../tool/)
 tests/unit/         router, errors, limits, redaction, gateway door and manifest (no database)
 ```
 
@@ -69,7 +66,7 @@ python3 ../tool/onboarding_e2e.py             # 35 checks, section B  (through /
 python3 ../tool/setup_e2e.py                  # 36 checks, section C  (through /rpc)
 node scripts/orders-e2e.mjs                   # 44 checks, section E (two businesses, tenancy, idempotency, version conflicts)
 node scripts/sell-e2e.mjs                     # 74 checks, section F, through /rpc (search, coupons, split pay, receipts, returns, refunds, tenancy)
-BASE_URL=http://localhost:8090 node --env-file=.env scripts/home-checks.ts   # 36 checks, section D
+node scripts/catalogue-e2e.mjs                # section G through /rpc (catalogue + GRN as real staff of two businesses; needs section H installed)
 BASE_URL=http://localhost:8090 node --env-file=.env scripts/home-checks.ts   # 36 checks, section D (reads run as the signed-in person)
 ```
 

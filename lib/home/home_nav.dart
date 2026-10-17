@@ -36,6 +36,9 @@ class HomeNav {
   static HomeRoute? reviews;
   static HomeRoute? support;
 
+  // Section G: the GRN queue, and where "Open Receipt" on the GRN dashboard goes (section H's receipt screen plugs in here).
+  static HomeRoute? grn;
+  static void Function(BuildContext context, String receiptDocumentId)? receipt;
   // Section J: low stock and purchase suggestions ("view item" uses section H's [stockItem]).
   static HomeRoute? lowStock;
 
@@ -52,6 +55,6 @@ class HomeNav {
   static void reset() {
     home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = lowStock = null;
     stockItem = null;
-    home = orders = orderHistory = setup = items = stock = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = null;
+    home = orders = orderHistory = setup = items = stock = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = null;
   }
 }

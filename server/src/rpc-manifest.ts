@@ -18,6 +18,8 @@ import { secureHandlers, withImageLinks, type SecureHandler } from './modules/se
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
+import * as cat from './schemas/catalogue.ts';
+import * as grn from './schemas/grn.ts';
 import * as bo from './schemas/backoffice.ts';
 import * as svc from './schemas/service.ts';
 import * as sell from './schemas/sell.ts';
@@ -116,6 +118,23 @@ export const MANIFEST: Entry[] = [
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  // ---- store catalogue and goods-received (GRN) matching, section G (0390, 0391, 0409). Body = the function's `p` object; the database
+  //      checks organisation, location and role (menu:create / menu:update, inventory:record / inventory:approve). The sell screen's search
+  //      is cat_item_list with status 'active'. Helpers (cat_stock_map, cat_location, cat_item_json, grn_rows, grn_totals, grn_signature,
+  //      grn_person, grn_receipt, the triggers) are not executable by `authenticated` and stay off this list.
+  db('cat_item_list', { args: cat.List, map: P, rate: 'read', roles: STAFF }),
+  db('cat_item_view', { args: cat.View, map: P, rate: 'read', roles: STAFF }),
+  db('cat_item_lookup', { args: cat.Lookup, map: P, rate: 'read', roles: STAFF }),
+  db('cat_item_save', { args: cat.Save, map: P, rate: 'write', idem: true, roles: 'staff with menu:create (new) or menu:update (change)' }),
+  db('grn_list', { args: grn.List, map: P, rate: 'read', roles: STAFF }),
+  db('grn_view', { args: grn.Receipt, map: P, rate: 'read', roles: STAFF }),
+  db('grn_matching_view', { args: grn.Receipt, map: P, rate: 'read', roles: STAFF }),
+  db('grn_open', { args: grn.Receipt, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('grn_invoice_save', { args: grn.Invoice, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('grn_costs_save', { args: grn.Costs, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('grn_resolve', { args: grn.Resolve, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('grn_request_approval', { args: grn.RequestApproval, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('grn_decide', { args: grn.Decide, map: P, rate: 'write', roles: 'inventory:approve; approving posts the receipt through section H' }),
   // ---- back office, section J (0420): Low Stock and Purchase Suggestions, read from section H's stock numbers. Body = the function's `p`
   //      object; no location_id = the whole business, which the database allows only for a business-wide person.
   db('backoffice_low_stock', { args: bo.LowStock, map: P, rate: 'read', roles: 'staff with inventory:read' }),
