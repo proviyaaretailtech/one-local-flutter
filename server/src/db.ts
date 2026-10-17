@@ -16,6 +16,13 @@ export function db(): SupabaseClient {
   return client;
 }
 
+/** A client on the public (anon/publishable) key only: used to verify a token without any privileged key. */
+export function anonClient(): SupabaseClient | null {
+  const url = supabaseUrl(), anon = anonKey();
+  if (!url || !anon) return null;
+  return createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
 /** A client that acts AS the caller (their own access token on the anon key), so auth.uid() and RLS apply. */
 export function userClient(request: Request): SupabaseClient {
   const url = supabaseUrl(), anon = anonKey();
@@ -25,23 +32,35 @@ export function userClient(request: Request): SupabaseClient {
   return createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
 }
 
-// Database functions raise errors like "OL_STALE: this order was already changed on another phone".
+// Database functions raise errors like "OL_STALE: this order was already changed on another phone": a family prefix (OL, POS, INV,
+// GRN, SVC), a reason, then the sentence the app shows. The reason decides the HTTP status; an unknown reason is a plain 400.
+const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC'];
 const STATUS: Record<string, number> = {
-  OL_BAD_REQUEST: 400, OL_BAD_QTY: 400, OL_EMPTY: 400, OL_NOT_FOUND: 404, OL_NOT_ONE_LOCAL: 404,
-  OL_NOT_ACCEPTING: 409, OL_ITEM_UNAVAILABLE: 409, OL_STALE: 409, OL_WRONG_STATE: 409, OL_EXPIRED: 409,
-  OL_NOT_DELIVERABLE: 409, OL_PICKED_UP: 409, OL_TAKEN: 409, OL_GONE: 410,
-  OL_BAD_STEP: 409, OL_TOO_FAR: 422, OL_PICKUP_MISMATCH: 422, OL_CASH_MISMATCH: 422, OL_IDEMPOTENCY: 422, OL_IDEMPOTENCY_MISMATCH: 422, OL_IN_PROGRESS: 409,
+  BAD_REQUEST: 400, BAD_QTY: 400, EMPTY: 400, BAD_TABLE: 400, FORBIDDEN: 403, NOT_FOUND: 404, NOT_ONE_LOCAL: 404,
+  NOT_ACCEPTING: 409, ITEM_UNAVAILABLE: 409, STALE: 409, WRONG_STATE: 409, EXPIRED: 409, NOT_DELIVERABLE: 409, PICKED_UP: 409, TAKEN: 409,
+  BAD_STEP: 409, IN_PROGRESS: 409, HAS_PAYMENTS: 409, NOT_PAID_IN_FULL: 409, DUPLICATE: 409, NOT_APPROVED: 409, FROZEN: 409,
+  STATUS_AUTHORITY: 409, ORDER_FROZEN: 409, GONE: 410,
+  TOO_FAR: 422, PICKUP_MISMATCH: 422, CASH_MISMATCH: 422, IDEMPOTENCY: 422, IDEMPOTENCY_MISMATCH: 422, UNDERPAID: 422, OVERPAY: 422,
+  SHORT: 409, ALLOCATION: 409, CAPACITY: 422, STORAGE: 422, TENANT: 403,                                   // inventory (section H)
+  COUPON_UNKNOWN: 422, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
 };
 const CODE: Record<string, string> = {
-  OL_NOT_DELIVERABLE: 'order_not_deliverable', OL_PICKED_UP: 'already_picked_up', OL_EXPIRED: 'offer_expired', OL_TAKEN: 'already_taken',
-  OL_STALE: 'version_conflict', OL_GONE: 'offer_withdrawn', OL_NOT_FOUND: 'not_found', OL_WRONG_STATE: 'wrong_state',
-  OL_BAD_STEP: 'invalid_transition', OL_TOO_FAR: 'too_far', OL_PICKUP_MISMATCH: 'pickup_mismatch', OL_CASH_MISMATCH: 'cash_mismatch', OL_IDEMPOTENCY: 'idempotency_mismatch', OL_IDEMPOTENCY_MISMATCH: 'idempotency_mismatch', OL_IN_PROGRESS: 'in_progress',
+  NOT_DELIVERABLE: 'order_not_deliverable', PICKED_UP: 'already_picked_up', EXPIRED: 'offer_expired', TAKEN: 'already_taken',
+  STALE: 'version_conflict', GONE: 'offer_withdrawn', BAD_STEP: 'invalid_transition', BAD_QTY: 'bad_quantity', EMPTY: 'empty_cart',
+  IDEMPOTENCY: 'idempotency_mismatch', IDEMPOTENCY_MISMATCH: 'idempotency_mismatch', STATUS_AUTHORITY: 'wrong_state', ORDER_FROZEN: 'wrong_state', FROZEN: 'wrong_state',
+  ITEM_UNAVAILABLE: 'item_unavailable',
 };
+const sentence = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) + (/[.!?]$/.test(s) ? '' : '.') : 'Request refused.');
 
 export function mapDbError(error: { message?: string; code?: string } | null): never {
   const message = error?.message ?? 'Database error';
-  const match = message.match(/^(OL_[A-Z_]+):\s*(.*)$/);
-  if (match) throw new HttpError(STATUS[match[1]] ?? 400, match[2], undefined, CODE[match[1]]);
+  const match = message.match(/^([A-Z]+)_([A-Z_]+):\s*(.*)$/);
+  if (match && FAMILIES.includes(match[1])) {
+    const reason = match[2];
+    throw new HttpError(STATUS[reason] ?? 400, (match[1] === 'OL' ? match[3] : sentence(match[3])), undefined, CODE[reason] ?? reason.toLowerCase());
+  }
+  // Row-level security and missing grants answer 42501: the caller may not do this.
+  if (error?.code === '42501' || /permission denied|row-level security/i.test(message)) throw new HttpError(403, 'You do not have permission to do that.', undefined, 'forbidden');
   // Only the code and the message: `details` and `hint` can quote the row that was refused (names, phones, addresses).
   console.error('[db]', { code: error?.code, message: message.slice(0, 200) });
   throw new HttpError(500, 'Something went wrong. Please try again.');

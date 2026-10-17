@@ -1,5 +1,5 @@
 // Who is calling: the Supabase access token the app sends as `Authorization: Bearer <token>`, verified by Supabase Auth.
-import { db } from './db.ts';
+import { anonClient, db } from './db.ts';
 import { sha256 } from './http.ts';
 
 const cache = new Map<string, { id: string | null; until: number }>();
@@ -15,7 +15,8 @@ export async function signedInUserId(request: Request): Promise<string | null> {
   if (hit && hit.until > Date.now()) return hit.id;
   let id: string | null = null;
   try {
-    const { data, error } = await db().auth.getUser(token);
+    // Verified with the public key when there is one: the token check needs no privileged key.
+    const { data, error } = await (anonClient() ?? db()).auth.getUser(token);
     if (!error) id = data.user?.id ?? null;
   } catch { /* an unreachable auth service counts as "not signed in" for this call only */ }
   if (cache.size > 5000) cache.clear();

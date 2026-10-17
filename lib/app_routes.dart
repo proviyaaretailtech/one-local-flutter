@@ -6,7 +6,10 @@ import 'catalogue/catalogue_screen.dart';
 import 'catalogue/grn_screens.dart';
 import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
+import 'inventory/inventory_dashboard.dart';
+import 'inventory/stock_detail_screen.dart';
 import 'orders/cart_screen.dart';
+import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
@@ -19,6 +22,11 @@ void installRoutes() {
   HomeNav.bill = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CartScreen(onNavigate: (id) => _tab(c, id))));
   HomeNav.items = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CatalogueScreen(onNavigate: (id) => _tab(c, id))));
   HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const GrnQueueScreen()));
+  InvEnv inventoryEnv(BuildContext c) => InvEnv(
+      onNavigate: (id) => _tab(c, id),
+      onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
+  HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
+  HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
