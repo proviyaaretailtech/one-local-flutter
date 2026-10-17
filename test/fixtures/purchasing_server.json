@@ -1,0 +1,711 @@
+{
+ "list": {
+  "due": "all",
+  "orders": [
+   {
+    "id": "d27337de-540c-48e9-aaa8-555515784a8b",
+    "lines": [
+     {
+      "id": "30ae3f43-d9cb-4fa7-85cf-fb48d2aadb9c",
+      "tag": "discrepancy",
+      "code": "TOMATO",
+      "item": {
+       "id": "43b00000-0000-0000-0000-000000000004",
+       "sku": "TOMATO",
+       "name": "Red Tomatoes",
+       "unit": "kg"
+      },
+      "name": "Red Tomatoes",
+      "unit": "kg",
+      "gst_pct": 12.0,
+      "line_no": 1,
+      "lot_code": "Veggie Crate 02",
+      "tax_minor": 9990,
+      "expiry_date": "2026-10-22",
+      "material_id": "43b00000-0000-0000-0000-000000000004",
+      "ordered_qty": 20,
+      "accepted_qty": 18.5,
+      "received_qty": 18.5,
+      "rejected_qty": 1.5,
+      "ordered_minor": 90000,
+      "accepted_minor": 83250,
+      "unit_cost_minor": 4500
+     },
+     {
+      "id": "24d8bfc5-8e28-4ffb-812a-6c3b975bf97c",
+      "tag": "approved",
+      "code": "PANEER",
+      "item": {
+       "id": "43b00000-0000-0000-0000-000000000001",
+       "sku": "PANEER",
+       "name": "Paneer",
+       "unit": "kg"
+      },
+      "name": "Paneer",
+      "unit": "kg",
+      "gst_pct": 5.0,
+      "line_no": 2,
+      "lot_code": null,
+      "tax_minor": 14000,
+      "expiry_date": null,
+      "material_id": "43b00000-0000-0000-0000-000000000001",
+      "ordered_qty": 10,
+      "accepted_qty": 10,
+      "received_qty": 10,
+      "rejected_qty": 0,
+      "ordered_minor": 280000,
+      "accepted_minor": 280000,
+      "unit_cost_minor": 28000
+     }
+    ],
+    "notes": "",
+    "number": "PO-0002",
+    "status": "partial",
+    "totals": {
+     "tax_minor": 23990,
+     "total_minor": 387240,
+     "subtotal_minor": 363250,
+     "estimated_minor": 370000
+    },
+    "overdue": true,
+    "supplier": {
+     "id": "sup-abc",
+     "name": "ABC Foods",
+     "rating": 4.8,
+     "payment_terms": "Net 15 Days"
+    },
+    "order_date": "2026-10-17T06:03:40.730904+00:00",
+    "location_id": "43000000-0000-0000-0000-00000000010a",
+    "received_at": "2026-10-17T06:03:41.335366+00:00",
+    "open_receipt": null,
+    "allowed_actions": [
+     "receive"
+    ],
+    "expected_delivery": "2026-10-15T06:03:40.730904+00:00"
+   },
+   {
+    "id": "81034cf7-81e8-43ce-9eef-527e6764fb99",
+    "lines": [
+     {
+      "id": "8c87349d-18ee-4eb3-aaf2-c5f22ed87895",
+      "tag": "approved",
+      "code": "PANEER",
+      "item": {
+       "id": "43b00000-0000-0000-0000-000000000001",
+       "sku": "PANEER",
+       "name": "Paneer",
+       "unit": "kg"
+      },
+      "name": "Paneer",
+      "unit": "kg",
+      "gst_pct": 5.0,
+      "line_no": 1,
+      "lot_code": "LOT-PAN-20260908",
+      "tax_minor": 14000,
+      "expiry_date": "2026-10-24",
+      "material_id": "43b00000-0000-0000-0000-000000000001",
+      "ordered_qty": 10,
+      "accepted_qty": 10,
+      "received_qty": 10,
+      "rejected_qty": 0,
+      "ordered_minor": 280000,
+      "accepted_minor": 280000,
+      "unit_cost_minor": 28000
+     },
+     {
+      "id": "5fd9d6f0-fd7a-4705-84db-38520668e35a",
+      "tag": "approved",
+      "code": "CAPSICUM",
+      "item": {
+       "id": "43b00000-0000-0000-0000-000000000002",
+       "sku": "CAPSICUM",
+       "name": "Capsicum",
+       "unit": "kg"
+      },
+      "name": "Capsicum",
+      "unit": "kg",
+      "gst_pct": 0.0,
+      "line_no": 2,
+      "lot_code": "CAP-2",
+      "tax_minor": 0,
+      "expiry_date": "2026-10-22",
+      "material_id": "43b00000-0000-0000-0000-000000000002",
+      "ordered_qty": 8,
+      "accepted_qty": 8,
+      "received_qty": 8,
+      "rejected_qty": 0,
+      "ordered_minor": 64000,
+      "accepted_minor": 64000,
+      "unit_cost_minor": 8000
+     },
+     {
+      "id": "f2395770-9a67-4da1-98fb-d0dc484bc86a",
+      "tag": "approved",
+      "code": "BASMATI",
+      "item": {
+       "id": "43b00000-0000-0000-0000-000000000003",
+       "sku": "BASMATI",
+       "name": "Basmati rice",
+       "unit": "kg"
+      },
+      "name": "Basmati rice",
+      "unit": "kg",
+      "gst_pct": 5.0,
+      "line_no": 3,
+      "lot_code": "RICE-1",
+      "tax_minor": 12000,
+      "expiry_date": "2027-08-13",
+      "material_id": "43b00000-0000-0000-0000-000000000003",
+      "ordered_qty": 20,
+      "accepted_qty": 20,
+      "received_qty": 20,
+      "rejected_qty": 0,
+      "ordered_minor": 240000,
+      "accepted_minor": 240000,
+      "unit_cost_minor": 12000
+     }
+    ],
+    "notes": "",
+    "number": "PO-0001",
+    "status": "received",
+    "totals": {
+     "tax_minor": 26000,
+     "total_minor": 610000,
+     "subtotal_minor": 584000,
+     "estimated_minor": 584000
+    },
+    "overdue": false,
+    "supplier": {
+     "id": "sup-abc",
+     "name": "ABC Foods",
+     "rating": 4.8,
+     "payment_terms": "Net 15 Days"
+    },
+    "order_date": "2026-10-17T06:03:40.730904+00:00",
+    "location_id": "43000000-0000-0000-0000-00000000010a",
+    "received_at": "2026-10-17T06:03:41.269477+00:00",
+    "open_receipt": null,
+    "allowed_actions": [],
+    "expected_delivery": "2026-10-18T06:03:40.730904+00:00"
+   }
+  ],
+  "status": "all",
+  "open_count": 1
+ },
+ "price": {
+  "bids": [
+   {
+    "moq": 10.0,
+    "unit": "kg",
+    "price_id": "43c00000-0000-0000-0000-000000000001",
+    "priority": "Medium",
+    "supplier": {
+     "id": "sup-abc",
+     "name": "ABC Foods",
+     "rating": 4.8,
+     "payment_terms": "Net 15 Days"
+    },
+    "preferred": true,
+    "rate_minor": 41000,
+    "updated_at": "2026-10-17T06:03:40.730904+00:00",
+    "supplier_id": "sup-abc",
+    "lead_time_hours": 24,
+    "availability_pct": 98.0
+   },
+   {
+    "moq": 15.0,
+    "unit": "kg",
+    "price_id": "43c00000-0000-0000-0000-000000000002",
+    "priority": "Medium",
+    "supplier": {
+     "id": "sup-krishna",
+     "name": "Krishna Dairy",
+     "rating": 4.2,
+     "payment_terms": "Net 7 Days"
+    },
+    "preferred": false,
+    "rate_minor": 42500,
+    "updated_at": "2026-10-17T06:03:40.730904+00:00",
+    "supplier_id": "sup-krishna",
+    "lead_time_hours": 36,
+    "availability_pct": null
+   }
+  ],
+  "unit": "kg",
+  "audit": {
+   "fail": 0,
+   "pass": 0,
+   "checks": [],
+   "rounds": 0,
+   "warning": 0,
+   "audited_at": null,
+   "audited_by": null,
+   "reaudit_required": false
+  },
+  "emoji": "🧀",
+  "sku_id": "INGR-042",
+  "source": "AI Inferred",
+  "contract": {
+   "moq": 10.0,
+   "payment_terms": "Net 15 Days",
+   "lead_time_hours": 24,
+   "availability_pct": 98.0
+  },
+  "price_id": "43c00000-0000-0000-0000-000000000001",
+  "supplier": {
+   "id": "sup-abc",
+   "name": "ABC Foods",
+   "rating": 4.8,
+   "payment_terms": "Net 15 Days"
+  },
+  "rate_minor": 41000,
+  "allowed_actions": [
+   "re_audit"
+  ],
+  "ingredient_name": "Fresh Malai Paneer",
+  "preferred_price_id": "43c00000-0000-0000-0000-000000000001"
+ },
+ "options": {
+  "items": [
+   {
+    "id": "43b00000-0000-0000-0000-000000000003",
+    "sku": "BASMATI",
+    "name": "Basmati rice",
+    "unit": "kg"
+   },
+   {
+    "id": "43b00000-0000-0000-0000-000000000002",
+    "sku": "CAPSICUM",
+    "name": "Capsicum",
+    "unit": "kg"
+   },
+   {
+    "id": "43b00000-0000-0000-0000-000000000001",
+    "sku": "PANEER",
+    "name": "Paneer",
+    "unit": "kg"
+   },
+   {
+    "id": "43b00000-0000-0000-0000-000000000004",
+    "sku": "TOMATO",
+    "name": "Red Tomatoes",
+    "unit": "kg"
+   }
+  ],
+  "prices": [
+   {
+    "unit": "kg",
+    "price_id": "43c00000-0000-0000-0000-000000000001",
+    "preferred": true,
+    "material_id": "43b00000-0000-0000-0000-000000000001",
+    "price_minor": 41000,
+    "supplier_id": "sup-abc",
+    "ingredient_name": "Fresh Malai Paneer"
+   },
+   {
+    "unit": "kg",
+    "price_id": "43c00000-0000-0000-0000-000000000002",
+    "preferred": false,
+    "material_id": "43b00000-0000-0000-0000-000000000001",
+    "price_minor": 42500,
+    "supplier_id": "sup-krishna",
+    "ingredient_name": "Fresh Malai Paneer"
+   }
+  ],
+  "suppliers": [
+   {
+    "id": "sup-abc",
+    "name": "ABC Foods",
+    "rating": 4.8,
+    "payment_terms": "Net 15 Days"
+   },
+   {
+    "id": "sup-krishna",
+    "name": "Krishna Dairy",
+    "rating": 4.2,
+    "payment_terms": "Net 7 Days"
+   }
+  ],
+  "can_record": true,
+  "open_count": 1,
+  "can_approve": false
+ },
+ "receive": {
+  "po": {
+   "id": "81034cf7-81e8-43ce-9eef-527e6764fb99",
+   "lines": [
+    {
+     "id": "8c87349d-18ee-4eb3-aaf2-c5f22ed87895",
+     "tag": null,
+     "code": "PANEER",
+     "item": {
+      "id": "43b00000-0000-0000-0000-000000000001",
+      "sku": "PANEER",
+      "name": "Paneer",
+      "unit": "kg"
+     },
+     "name": "Paneer",
+     "unit": "kg",
+     "gst_pct": 5.0,
+     "line_no": 1,
+     "lot_code": null,
+     "tax_minor": 0,
+     "expiry_date": null,
+     "material_id": "43b00000-0000-0000-0000-000000000001",
+     "ordered_qty": 10,
+     "accepted_qty": 0,
+     "received_qty": 0,
+     "rejected_qty": 0,
+     "ordered_minor": 280000,
+     "accepted_minor": 0,
+     "unit_cost_minor": 28000
+    },
+    {
+     "id": "5fd9d6f0-fd7a-4705-84db-38520668e35a",
+     "tag": null,
+     "code": "CAPSICUM",
+     "item": {
+      "id": "43b00000-0000-0000-0000-000000000002",
+      "sku": "CAPSICUM",
+      "name": "Capsicum",
+      "unit": "kg"
+     },
+     "name": "Capsicum",
+     "unit": "kg",
+     "gst_pct": 0.0,
+     "line_no": 2,
+     "lot_code": null,
+     "tax_minor": 0,
+     "expiry_date": null,
+     "material_id": "43b00000-0000-0000-0000-000000000002",
+     "ordered_qty": 8,
+     "accepted_qty": 0,
+     "received_qty": 0,
+     "rejected_qty": 0,
+     "ordered_minor": 64000,
+     "accepted_minor": 0,
+     "unit_cost_minor": 8000
+    },
+    {
+     "id": "f2395770-9a67-4da1-98fb-d0dc484bc86a",
+     "tag": null,
+     "code": "BASMATI",
+     "item": {
+      "id": "43b00000-0000-0000-0000-000000000003",
+      "sku": "BASMATI",
+      "name": "Basmati rice",
+      "unit": "kg"
+     },
+     "name": "Basmati rice",
+     "unit": "kg",
+     "gst_pct": 5.0,
+     "line_no": 3,
+     "lot_code": null,
+     "tax_minor": 0,
+     "expiry_date": null,
+     "material_id": "43b00000-0000-0000-0000-000000000003",
+     "ordered_qty": 20,
+     "accepted_qty": 0,
+     "received_qty": 0,
+     "rejected_qty": 0,
+     "ordered_minor": 240000,
+     "accepted_minor": 0,
+     "unit_cost_minor": 12000
+    }
+   ],
+   "notes": "",
+   "number": "PO-0001",
+   "status": "open",
+   "totals": {
+    "tax_minor": 0,
+    "total_minor": 0,
+    "subtotal_minor": 0,
+    "estimated_minor": 584000
+   },
+   "overdue": false,
+   "supplier": {
+    "id": "sup-abc",
+    "name": "ABC Foods",
+    "rating": 4.8,
+    "payment_terms": "Net 15 Days"
+   },
+   "order_date": "2026-10-17T06:03:40.730904+00:00",
+   "location_id": "43000000-0000-0000-0000-00000000010a",
+   "received_at": null,
+   "open_receipt": {
+    "id": "50f4ab9f-ba24-4a37-9759-bfd1d3659f16",
+    "doc_no": "RCV-001",
+    "status": "draft"
+   },
+   "allowed_actions": [
+    "receive"
+   ],
+   "expected_delivery": "2026-10-18T06:03:40.730904+00:00"
+  },
+  "doc_no": "RCV-001",
+  "status": "draft",
+  "created": true,
+  "version": 2,
+  "document_id": "50f4ab9f-ba24-4a37-9759-bfd1d3659f16"
+ },
+ "po_partial": {
+  "id": "d27337de-540c-48e9-aaa8-555515784a8b",
+  "lines": [
+   {
+    "id": "30ae3f43-d9cb-4fa7-85cf-fb48d2aadb9c",
+    "tag": "discrepancy",
+    "code": "TOMATO",
+    "item": {
+     "id": "43b00000-0000-0000-0000-000000000004",
+     "sku": "TOMATO",
+     "name": "Red Tomatoes",
+     "unit": "kg"
+    },
+    "name": "Red Tomatoes",
+    "unit": "kg",
+    "gst_pct": 12.0,
+    "line_no": 1,
+    "lot_code": "Veggie Crate 02",
+    "tax_minor": 9990,
+    "expiry_date": "2026-10-22",
+    "material_id": "43b00000-0000-0000-0000-000000000004",
+    "ordered_qty": 20,
+    "accepted_qty": 18.5,
+    "received_qty": 18.5,
+    "rejected_qty": 1.5,
+    "ordered_minor": 90000,
+    "accepted_minor": 83250,
+    "unit_cost_minor": 4500
+   },
+   {
+    "id": "24d8bfc5-8e28-4ffb-812a-6c3b975bf97c",
+    "tag": "approved",
+    "code": "PANEER",
+    "item": {
+     "id": "43b00000-0000-0000-0000-000000000001",
+     "sku": "PANEER",
+     "name": "Paneer",
+     "unit": "kg"
+    },
+    "name": "Paneer",
+    "unit": "kg",
+    "gst_pct": 5.0,
+    "line_no": 2,
+    "lot_code": null,
+    "tax_minor": 14000,
+    "expiry_date": null,
+    "material_id": "43b00000-0000-0000-0000-000000000001",
+    "ordered_qty": 10,
+    "accepted_qty": 10,
+    "received_qty": 10,
+    "rejected_qty": 0,
+    "ordered_minor": 280000,
+    "accepted_minor": 280000,
+    "unit_cost_minor": 28000
+   }
+  ],
+  "notes": "",
+  "number": "PO-0002",
+  "status": "partial",
+  "totals": {
+   "tax_minor": 23990,
+   "total_minor": 387240,
+   "subtotal_minor": 363250,
+   "estimated_minor": 370000
+  },
+  "overdue": true,
+  "supplier": {
+   "id": "sup-abc",
+   "name": "ABC Foods",
+   "rating": 4.8,
+   "payment_terms": "Net 15 Days"
+  },
+  "order_date": "2026-10-17T06:03:40.730904+00:00",
+  "location_id": "43000000-0000-0000-0000-00000000010a",
+  "received_at": "2026-10-17T06:03:41.335366+00:00",
+  "open_receipt": null,
+  "allowed_actions": [
+   "receive"
+  ],
+  "expected_delivery": "2026-10-15T06:03:40.730904+00:00"
+ },
+ "po_received": {
+  "id": "81034cf7-81e8-43ce-9eef-527e6764fb99",
+  "lines": [
+   {
+    "id": "8c87349d-18ee-4eb3-aaf2-c5f22ed87895",
+    "tag": "approved",
+    "code": "PANEER",
+    "item": {
+     "id": "43b00000-0000-0000-0000-000000000001",
+     "sku": "PANEER",
+     "name": "Paneer",
+     "unit": "kg"
+    },
+    "name": "Paneer",
+    "unit": "kg",
+    "gst_pct": 5.0,
+    "line_no": 1,
+    "lot_code": "LOT-PAN-20260908",
+    "tax_minor": 14000,
+    "expiry_date": "2026-10-24",
+    "material_id": "43b00000-0000-0000-0000-000000000001",
+    "ordered_qty": 10,
+    "accepted_qty": 10,
+    "received_qty": 10,
+    "rejected_qty": 0,
+    "ordered_minor": 280000,
+    "accepted_minor": 280000,
+    "unit_cost_minor": 28000
+   },
+   {
+    "id": "5fd9d6f0-fd7a-4705-84db-38520668e35a",
+    "tag": "approved",
+    "code": "CAPSICUM",
+    "item": {
+     "id": "43b00000-0000-0000-0000-000000000002",
+     "sku": "CAPSICUM",
+     "name": "Capsicum",
+     "unit": "kg"
+    },
+    "name": "Capsicum",
+    "unit": "kg",
+    "gst_pct": 0.0,
+    "line_no": 2,
+    "lot_code": "CAP-2",
+    "tax_minor": 0,
+    "expiry_date": "2026-10-22",
+    "material_id": "43b00000-0000-0000-0000-000000000002",
+    "ordered_qty": 8,
+    "accepted_qty": 8,
+    "received_qty": 8,
+    "rejected_qty": 0,
+    "ordered_minor": 64000,
+    "accepted_minor": 64000,
+    "unit_cost_minor": 8000
+   },
+   {
+    "id": "f2395770-9a67-4da1-98fb-d0dc484bc86a",
+    "tag": "approved",
+    "code": "BASMATI",
+    "item": {
+     "id": "43b00000-0000-0000-0000-000000000003",
+     "sku": "BASMATI",
+     "name": "Basmati rice",
+     "unit": "kg"
+    },
+    "name": "Basmati rice",
+    "unit": "kg",
+    "gst_pct": 5.0,
+    "line_no": 3,
+    "lot_code": "RICE-1",
+    "tax_minor": 12000,
+    "expiry_date": "2027-08-13",
+    "material_id": "43b00000-0000-0000-0000-000000000003",
+    "ordered_qty": 20,
+    "accepted_qty": 20,
+    "received_qty": 20,
+    "rejected_qty": 0,
+    "ordered_minor": 240000,
+    "accepted_minor": 240000,
+    "unit_cost_minor": 12000
+   }
+  ],
+  "notes": "",
+  "number": "PO-0001",
+  "status": "received",
+  "totals": {
+   "tax_minor": 26000,
+   "total_minor": 610000,
+   "subtotal_minor": 584000,
+   "estimated_minor": 584000
+  },
+  "overdue": false,
+  "supplier": {
+   "id": "sup-abc",
+   "name": "ABC Foods",
+   "rating": 4.8,
+   "payment_terms": "Net 15 Days"
+  },
+  "order_date": "2026-10-17T06:03:40.730904+00:00",
+  "location_id": "43000000-0000-0000-0000-00000000010a",
+  "received_at": "2026-10-17T06:03:41.269477+00:00",
+  "open_receipt": null,
+  "allowed_actions": [],
+  "expected_delivery": "2026-10-18T06:03:40.730904+00:00"
+ },
+ "price_krishna": {
+  "bids": [
+   {
+    "moq": 10.0,
+    "unit": "kg",
+    "price_id": "43c00000-0000-0000-0000-000000000001",
+    "priority": "Medium",
+    "supplier": {
+     "id": "sup-abc",
+     "name": "ABC Foods",
+     "rating": 4.8,
+     "payment_terms": "Net 15 Days"
+    },
+    "preferred": false,
+    "rate_minor": 41000,
+    "updated_at": "2026-10-17T06:03:40.730904+00:00",
+    "supplier_id": "sup-abc",
+    "lead_time_hours": 24,
+    "availability_pct": 98.0
+   },
+   {
+    "moq": 15.0,
+    "unit": "kg",
+    "price_id": "43c00000-0000-0000-0000-000000000002",
+    "priority": "Medium",
+    "supplier": {
+     "id": "sup-krishna",
+     "name": "Krishna Dairy",
+     "rating": 4.2,
+     "payment_terms": "Net 7 Days"
+    },
+    "preferred": true,
+    "rate_minor": 42500,
+    "updated_at": "2026-10-17T06:03:40.730904+00:00",
+    "supplier_id": "sup-krishna",
+    "lead_time_hours": 36,
+    "availability_pct": null
+   }
+  ],
+  "unit": "kg",
+  "audit": {
+   "fail": 0,
+   "pass": 0,
+   "checks": [],
+   "rounds": 0,
+   "warning": 0,
+   "audited_at": null,
+   "audited_by": null,
+   "reaudit_required": false
+  },
+  "emoji": "🧀",
+  "sku_id": "INGR-042",
+  "source": "Quote",
+  "contract": {
+   "moq": 15.0,
+   "payment_terms": "Net 7 Days",
+   "lead_time_hours": 36,
+   "availability_pct": null
+  },
+  "price_id": "43c00000-0000-0000-0000-000000000002",
+  "supplier": {
+   "id": "sup-krishna",
+   "name": "Krishna Dairy",
+   "rating": 4.2,
+   "payment_terms": "Net 7 Days"
+  },
+  "rate_minor": 42500,
+  "allowed_actions": [
+   "select_sourcing",
+   "re_audit"
+  ],
+  "ingredient_name": "Fresh Malai Paneer",
+  "preferred_price_id": "43c00000-0000-0000-0000-000000000002"
+ }
+}

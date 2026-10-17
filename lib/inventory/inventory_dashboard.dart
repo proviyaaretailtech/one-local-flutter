@@ -14,7 +14,7 @@ import 'transfer_screen.dart';
 
 /// What every section H screen shares: the API and the ways out of the section (other bottom-bar tabs, the linked order, Items, bell).
 class InvEnv {
-  InvEnv({InventoryApi? api, this.onNavigate, this.onOpenOrder, this.onItems, this.onBell}) : api = api ?? InventoryApi();
+  InvEnv({InventoryApi? api, this.onNavigate, this.onOpenOrder, this.onOpenPurchasing, this.onItems, this.onBell}) : api = api ?? InventoryApi();
   final InventoryApi api;
 
   /// Bottom-bar tabs this section does not own: 'money', 'item', 'bill', 'online'.
@@ -22,6 +22,9 @@ class InvEnv {
 
   /// Opens a linked order (Movement Detail "Open Linked Transaction").
   final void Function(BuildContext context, String orderId)? onOpenOrder;
+
+  /// Opens the purchasing screens (Purchase History) from Planning > Replenishment; null keeps the "later release" notice.
+  final void Function(BuildContext context)? onOpenPurchasing;
   final VoidCallback? onItems, onBell;
 
   static const dashboardRoute = '/inventory';
@@ -176,7 +179,7 @@ class _InventoryDashboardState extends State<InventoryDashboard> {
         child: Column(children: [
           _plan(LucideIcons.shoppingCart, kGreenIconBg, kPostedText, 'Replenishment',
               repl.isEmpty ? 'Nothing to reorder now' : repl.take(2).map((r) => '${_short(r.s('name'))} ${qty(r.n('suggest'))}u ${r.b('urgent') ? 'urgent' : 'suggested'}').join(' · '),
-              () => env.later(context, 'Replenishment')),
+              () => env.onOpenPurchasing != null ? env.onOpenPurchasing!(context) : env.later(context, 'Replenishment')),
           _plan(LucideIcons.trendingUp, kBlueIconBg, kBlueIcon, 'Inventory Forecast',
               fc == null ? 'No recent sales to project from' : '${_short(fc.s('name'))} ${qty(fc.n('end_stock'))}u end-stock${fc.b('shortfall_at_plus20') ? ' · +20% demand = shortfall' : ''}',
               () => _go(ForecastScreen(env: env, itemId: fc?.s('id')))),
