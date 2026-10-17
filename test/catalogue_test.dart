@@ -72,6 +72,11 @@ void main() {
       expect(parsePriceMinor('-4'), isNull);
       expect(parsePriceMinor('abc'), isNull);
     });
+    test('a product billed on two lines at different prices shows the average, never zero', () {
+      expect(invoiceUnitMinor({'qty': 20, 'unit_price_minor': null, 'price_mixed': true, 'amount_minor': 50000}), 2500);
+      expect(invoiceUnitMinor({'qty': 24, 'unit_price_minor': 3000, 'amount_minor': 72000}), 3000);
+      expect(invoiceUnitMinor(null), isNull);
+    });
     test('unit labels follow the Figma list rows', () {
       expect(unitShort('l'), 'L');
       expect(unitSub('l'), 'Lts');
@@ -87,8 +92,9 @@ void main() {
       final s = Fake((_) => ok(catalogueList(sixItems)));
       final l = await s.api.list(q: ' coca ', category: 'Beverages', page: 2, pageSize: 6);
       final r = s.requests.single;
-      expect(r.url.path, '/api/partner/catalogue');
-      expect(r.url.queryParameters, {'q': 'coca', 'category': 'Beverages', 'page': '2', 'page_size': '6'});
+      expect(r.url.path, '/rpc/cat_item_list');
+      expect(r.method, 'POST');
+      expect(jsonDecode(r.body), {'q': 'coca', 'category': 'Beverages', 'page': 2, 'page_size': 6});
       expect(r.headers['Authorization'], 'Bearer token-123');
       expect(l.items.length, 6);
       expect(l.count('total'), 142);
@@ -99,11 +105,11 @@ void main() {
       final s = Fake((_) => ok(item('i1', 'X', 'X1', 100)));
       await s.api.save({'mode': 'quick', 'name': 'X', 'sku': 'X1', 'price_minor': 100}, key: 'cat-key-1');
       await s.api.save({'version': 3, 'name': 'Y'}, id: 'i1');
-      expect(s.requests[0].method, 'POST');
+      expect(s.requests[0].url.path, '/rpc/cat_item_save');
       expect(s.requests[0].headers['Idempotency-Key'], 'cat-key-1');
-      expect(s.requests[1].method, 'PUT');
-      expect(s.requests[1].url.path, '/api/partner/catalogue/i1');
-      expect(s.body(s.requests[1]), {'version': 3, 'name': 'Y'});
+      expect(s.requests[1].url.path, '/rpc/cat_item_save');
+      expect(s.requests[1].headers['Idempotency-Key'], isNull);
+      expect(s.body(s.requests[1]), {'version': 3, 'name': 'Y', 'id': 'i1'});
     });
 
     test('refusals keep their message and code', () async {
@@ -122,19 +128,19 @@ void main() {
       await s.api.grnResolve('r1', version: 4, resolution: 'accept_claim_credit', claimRef: ' CLM-105 ', evidence: 'photos');
       await s.api.grnRequestApproval('r1', version: 5);
       await s.api.grnDecide('r1', version: 6, approve: false, note: 'again');
-      expect(s.requests.map((r) => '${r.method} ${r.url.path}'), ['POST /api/partner/grn/open', 'POST /api/partner/grn/r1/resolve', 'POST /api/partner/grn/r1/request-approval', 'POST /api/partner/grn/r1/decide']);
-      expect(s.body(s.requests[1]), {'version': 4, 'resolution': 'accept_claim_credit', 'claim_ref': 'CLM-105', 'evidence': 'photos'});
-      expect(s.body(s.requests[3]), {'version': 6, 'decision': 'reject', 'note': 'again'});
+      expect(s.requests.map((r) => '${r.method} ${r.url.path}'), ['POST /rpc/grn_open', 'POST /rpc/grn_resolve', 'POST /rpc/grn_request_approval', 'POST /rpc/grn_decide']);
+      expect(s.body(s.requests[1]), {'receipt_document_id': 'r1', 'version': 4, 'resolution': 'accept_claim_credit', 'claim_ref': 'CLM-105', 'evidence': 'photos'});
+      expect(s.body(s.requests[3]), {'receipt_document_id': 'r1', 'version': 6, 'decision': 'reject', 'note': 'again'});
     });
   });
 
   group('Catalogue list', () {
     Fake server() => Fake((r) {
           final p = r.url.path;
-          if (p.endsWith('/catalogue') && r.method == 'GET') return ok(catalogueList(sixItems));
-          if (p.endsWith('/catalogue/i1')) return ok(sixItems.first);
-          if (p.endsWith('/catalogue/lookup')) return r.url.queryParameters['code'] == 'CC500' ? ok(sixItems.first) : err(404, 'No item has that code.', 'not_found');
-          if (p.endsWith('/catalogue') && r.method == 'POST') return ok(item('n1', 'Oat', 'OAT1', 4500));
+          if (p.endsWith('/cat_item_list')) return ok(catalogueList(sixItems));
+          if (p.endsWith('/cat_item_view')) return ok(sixItems.first);
+          if (p.endsWith('/cat_item_lookup')) return jsonDecode(r.body)['code'] == 'CC500' ? ok(sixItems.first) : err(404, 'No item has that code.', 'not_found');
+          if (p.endsWith('/cat_item_save')) return ok(item('n1', 'Oat', 'OAT1', 4500));
           return err(404, 'nope');
         });
 
@@ -173,12 +179,12 @@ void main() {
       expect(find.text('Available'), findsNWidgets(6));
       await t.tap(find.text('Dairy'));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['category'], 'Dairy');
-      expect(s.requests.last.url.queryParameters['page'], '1');
+      expect(jsonDecode(s.requests.last.body)['category'], 'Dairy');
+      expect(jsonDecode(s.requests.last.body)['page'], 1);
       await t.enterText(find.byType(TextField), 'salt');
       await t.pump(const Duration(milliseconds: 350));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['q'], 'salt');
+      expect(jsonDecode(s.requests.last.body)['q'], 'salt');
     });
 
     testWidgets('the next page asks the server for page 2', (t) async {
@@ -186,7 +192,7 @@ void main() {
       await phone(t, CatalogueScreen(api: s.api));
       await t.tap(find.byTooltip('Next page'));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['page'], '2');
+      expect(jsonDecode(s.requests.last.body)['page'], 2);
     });
 
     testWidgets('a failed load shows the message and a retry', (t) async {
@@ -251,7 +257,7 @@ void main() {
       expect(find.text('Required fields are blank · Not ready to add'), findsOneWidget);
       await t.tap(find.text('Add product'));
       await t.pump();
-      expect(s.where('POST', '/catalogue'), isEmpty);
+      expect(s.where('POST', '/cat_item_save'), isEmpty);
       final fields = find.descendant(of: find.byType(Dialog), matching: find.byType(TextField));
       await t.enterText(fields.at(0), 'Oat Crunch');
       await t.enterText(fields.at(1), 'OAT1');
@@ -260,14 +266,14 @@ void main() {
       expect(find.text('Required fields are blank · Not ready to add'), findsNothing);
       await t.tap(find.text('Add product'));
       await t.pumpAndSettle();
-      final post = s.where('POST', '/catalogue').single;
+      final post = s.where('POST', '/cat_item_save').single;
       expect(s.body(post), {'mode': 'quick', 'name': 'Oat Crunch', 'sku': 'OAT1', 'price_minor': 4500});
       expect(post.headers['Idempotency-Key'], startsWith('cat-'));
       expect(toast('Oat added.'), findsOneWidget);
     });
 
     testWidgets('Quick Add shows the database refusal in the dialog and stays open', (t) async {
-      final s = Fake((r) => r.method == 'POST' ? err(409, 'Another item already uses SKU OAT1.', 'duplicate') : ok(catalogueList(sixItems)));
+      final s = Fake((r) => r.url.path.endsWith('/cat_item_save') ? err(409, 'Another item already uses SKU OAT1.', 'duplicate') : ok(catalogueList(sixItems)));
       await phone(t, CatalogueScreen(api: s.api), height: 3000);
       await t.tap(find.text('+ Add Items'));
       await t.pumpAndSettle();
@@ -378,8 +384,8 @@ void main() {
       await t.tap(find.text('Complete tax validation'));
       await t.pumpAndSettle();
       final r = s.requests.single;
-      expect(r.method, 'PUT');
-      expect(r.url.path, endsWith('/catalogue/i1'));
+      expect(r.url.path, endsWith('/cat_item_save'));
+      expect(jsonDecode(r.body)['id'], 'i1');
       expect(jsonDecode(r.body)['version'], 3);
       expect(find.text('This item changed on another device'), findsOneWidget);
     });
@@ -387,7 +393,7 @@ void main() {
 
   group('GRN Matching', () {
     testWidgets('invoice and receiving tables with the exception colours, counts and Review Exceptions', (t) async {
-      final s = Fake((r) => r.url.path.endsWith('/matching') ? ok(matchingView()) : ok(grnView()));
+      final s = Fake((r) => r.url.path.endsWith('/grn_matching_view') ? ok(matchingView()) : ok(grnView()));
       await phone(t, GrnMatchingScreen(receiptId: 'r1', api: s.api), height: 3200);
       expect(find.text('GRN Matching'), findsOneWidget);
       expect(find.text('RCV-2026-BB4 • MATCH INVOICE'), findsOneWidget);
@@ -411,7 +417,7 @@ void main() {
     });
 
     testWidgets('Review Exceptions opens the dashboard', (t) async {
-      final s = Fake((r) => r.url.path.endsWith('/matching') ? ok(matchingView()) : ok(grnView()));
+      final s = Fake((r) => r.url.path.endsWith('/grn_matching_view') ? ok(matchingView()) : ok(grnView()));
       await phone(t, GrnMatchingScreen(receiptId: 'r1', api: s.api), height: 3200);
       await t.tap(find.text('Review Exceptions'));
       await t.pumpAndSettle();
@@ -430,7 +436,7 @@ void main() {
     testWidgets('shows the GRN, the invoice against physical receiving, the resolution form, posting preview and checklist', (t) async {
       final s = Fake((_) => ok(grnView()));
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
-      expect(s.requests.first.url.path, '/api/partner/grn/open');
+      expect(s.requests.first.url.path, '/rpc/grn_open');
       expect(find.text('GRN Dashboard'), findsOneWidget);
       expect(find.text('Open receipt → Scan/Enter Products → Match Invoice'), findsOneWidget);
       for (final c in ['Receiving', 'GRN', 'Putaway', 'Shelf Labels']) {
@@ -461,15 +467,15 @@ void main() {
       // the request button is there but not usable until the database says so
       await t.tap(find.text('Request owner approval'));
       await t.pump();
-      expect(s.requests.where((r) => r.url.path.endsWith('request-approval')), isEmpty);
+      expect(s.requests.where((r) => r.url.path.endsWith('/grn_request_approval')), isEmpty);
       expect(t.takeException(), isNull);
     });
 
     testWidgets('saving a claim sends the reference and evidence; once valid, Request owner approval works', (t) async {
       var view = grnView();
       final s = Fake((r) {
-        if (r.url.path.endsWith('/resolve')) view = grnView(valid: true, blockers: const [], version: 5);
-        if (r.url.path.endsWith('/request-approval')) view = grnView(status: 'approval_due', valid: true, blockers: const [], version: 6, actions: {'can_resolve': false, 'can_request': false, 'can_approve': false, 'can_reject': false});
+        if (r.url.path.endsWith('/grn_resolve')) view = grnView(valid: true, blockers: const [], version: 5);
+        if (r.url.path.endsWith('/grn_request_approval')) view = grnView(status: 'approval_due', valid: true, blockers: const [], version: 6, actions: {'can_resolve': false, 'can_request': false, 'can_approve': false, 'can_reject': false});
         return ok(view);
       });
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
@@ -478,14 +484,14 @@ void main() {
       await t.ensureVisible(find.text('Save resolution'));
       await t.tap(find.text('Save resolution'));
       await t.pumpAndSettle();
-      final res = s.requests.firstWhere((r) => r.url.path.endsWith('/resolve'));
-      expect(jsonDecode(res.body), {'version': 4, 'resolution': 'accept_claim_credit', 'claim_ref': 'CLM-105', 'evidence': 'Seal inspection, 2 photos'});
+      final res = s.requests.firstWhere((r) => r.url.path.endsWith('/grn_resolve'));
+      expect(jsonDecode(res.body), {'receipt_document_id': 'r1', 'version': 4, 'resolution': 'accept_claim_credit', 'claim_ref': 'CLM-105', 'evidence': 'Seal inspection, 2 photos'});
       expect(find.text('Resolved'), findsOneWidget);
       await t.ensureVisible(find.text('Request owner approval'));
       await t.tap(find.text('Request owner approval'));
       await t.pumpAndSettle();
-      final req = s.requests.firstWhere((r) => r.url.path.endsWith('/request-approval'));
-      expect(jsonDecode(req.body), {'version': 5});
+      final req = s.requests.firstWhere((r) => r.url.path.endsWith('/grn_request_approval'));
+      expect(jsonDecode(req.body), {'receipt_document_id': 'r1', 'version': 5});
       expect(find.text('Approval due'), findsOneWidget);
       expect(find.text('Waiting for owner approval'), findsOneWidget);
     });
@@ -493,7 +499,7 @@ void main() {
     testWidgets('an approver sees Approve and post stock and Send back; send back needs a reason', (t) async {
       var view = grnView(status: 'approval_due', valid: true, blockers: const [], version: 6, actions: {'can_resolve': false, 'can_request': false, 'can_approve': true, 'can_reject': true});
       final s = Fake((r) {
-        if (r.url.path.endsWith('/decide')) {
+        if (r.url.path.endsWith('/grn_decide')) {
           final b = jsonDecode(r.body) as Map<String, dynamic>;
           view = b['decision'] == 'approve' ? grnView(status: 'approved', valid: true, blockers: const [], version: 7, actions: {'can_resolve': false, 'can_request': false, 'can_approve': false, 'can_reject': false}) : grnView(valid: true, blockers: const [], version: 7, decisionNote: b['note'] as String?);
         }
@@ -506,25 +512,25 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.widgetWithText(TextButton, 'Send back'));
       await t.pumpAndSettle();
-      expect(s.requests.where((r) => r.url.path.endsWith('/decide')), isEmpty); // empty reason: nothing sent
+      expect(s.requests.where((r) => r.url.path.endsWith('/grn_decide')), isEmpty); // empty reason: nothing sent
       await t.enterText(find.byType(TextField).last, 'Attach the credit note');
       await t.tap(find.widgetWithText(TextButton, 'Send back'));
       await t.pumpAndSettle();
-      expect(jsonDecode(s.requests.last.body), {'version': 6, 'decision': 'reject', 'note': 'Attach the credit note'});
+      expect(jsonDecode(s.requests.last.body), {'receipt_document_id': 'r1', 'version': 6, 'decision': 'reject', 'note': 'Attach the credit note'});
       expect(find.text('Sent back: Attach the credit note'), findsOneWidget);
     });
 
     testWidgets('approving posts and shows Approved', (t) async {
       var view = grnView(status: 'approval_due', valid: true, blockers: const [], version: 6, actions: {'can_resolve': false, 'can_request': false, 'can_approve': true, 'can_reject': true});
       final s = Fake((r) {
-        if (r.url.path.endsWith('/decide')) view = grnView(status: 'approved', valid: true, blockers: const [], version: 7, actions: {'can_resolve': false, 'can_request': false, 'can_approve': false, 'can_reject': false});
+        if (r.url.path.endsWith('/grn_decide')) view = grnView(status: 'approved', valid: true, blockers: const [], version: 7, actions: {'can_resolve': false, 'can_request': false, 'can_approve': false, 'can_reject': false});
         return ok(view);
       });
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
       await t.ensureVisible(find.text('Approve and post stock'));
       await t.tap(find.text('Approve and post stock'));
       await t.pumpAndSettle();
-      expect(jsonDecode(s.requests.last.body), {'version': 6, 'decision': 'approve'});
+      expect(jsonDecode(s.requests.last.body), {'receipt_document_id': 'r1', 'version': 6, 'decision': 'approve'});
       expect(find.text('Approved · stock posted'), findsOneWidget);
       expect(find.text('Posted'), findsOneWidget);
       expect(find.text('Owner approved · stock posted'), findsOneWidget);
@@ -533,7 +539,7 @@ void main() {
     testWidgets('a database refusal is shown as a message; a stale version reloads', (t) async {
       var n = 0;
       final s = Fake((r) {
-        if (r.url.path.endsWith('/request-approval')) return err(409, 'This GRN was changed on another device.', 'version_conflict');
+        if (r.url.path.endsWith('/grn_request_approval')) return err(409, 'This GRN was changed on another device.', 'version_conflict');
         n++;
         return ok(grnView(valid: true, blockers: const []));
       });
@@ -553,7 +559,7 @@ void main() {
     });
 
     testWidgets('a role that may only read opens the existing GRN (open refused with 403)', (t) async {
-      final s = Fake((r) => r.url.path.endsWith('/open') ? err(403, 'Your role cannot review receipts.', 'forbidden') : ok(grnView(actions: {'can_resolve': false, 'can_request': false, 'can_approve': false, 'can_reject': false})));
+      final s = Fake((r) => r.url.path.endsWith('/grn_open') ? err(403, 'Your role cannot review receipts.', 'forbidden') : ok(grnView(actions: {'can_resolve': false, 'can_request': false, 'can_approve': false, 'can_reject': false})));
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
       expect(find.text('GRN-105'), findsOneWidget);
     });
@@ -561,7 +567,7 @@ void main() {
 
   group('GRN queue', () {
     testWidgets('lists receipts with a status and opens the dashboard', (t) async {
-      final s = Fake((r) => r.url.path.endsWith('/grn')
+      final s = Fake((r) => r.url.path.endsWith('/grn_list')
           ? ok({
               'items': [
                 {'receipt_document_id': 'r1', 'doc_no': 'RCV-105', 'doc_status': 'review', 'grn_no': 'GRN-105', 'review_status': 'matching', 'supplier_name': 'Coca-Cola Bottling', 'invoice_no': 'INV-5512', 'has_invoice': true, 'exceptions': 1},

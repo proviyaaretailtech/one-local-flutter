@@ -21,6 +21,7 @@ Safety check of every listed function: `node scripts/manifest-audit.mjs` (fails 
 | `pos_quote_order`, `pos_order_history`, `pos_order_view`, `pos_checkout` (idem), `pos_checkout_pay` (idem), `pos_set_order_status`, `pos_fulfilment_act` (idem), `pos_refund` (idem) | same name | staff of a business; roles inside | 0370, 0371 |
 | `online_order_act` | `gw_online_order_act` | staff with order.update_status | 0361: accept / reject / ready an online order; writes the `dispatch.release_requested` / `dispatch.cancel_requested` outbox event |
 | `pos_home_online`, `pos_home_channel` | same name | staff | 0362 |
+| `cat_item_list`, `cat_item_view`, `cat_item_lookup`, `cat_item_save` (idem); `grn_list`, `grn_view`, `grn_matching_view`, `grn_open`, `grn_invoice_save`, `grn_costs_save`, `grn_resolve`, `grn_request_approval`, `grn_decide` | same name | staff; menu / inventory permissions inside | section G, 0390 / 0391 / 0409 (details below) |
 | `static_taxonomy` | none (static lists) | any signed-in person | `schemas/onboarding.ts` |
 
 The `gw_*` wrappers (0360) take the user id from the token (`auth.uid()`); the original `partner_app_*` / `partner_setup_*` functions take a user id and stay unreachable for the app.
@@ -70,36 +71,33 @@ Staff only. Every database call runs AS the signed-in staff member (their token 
 | POST | `/api/partner/pos-orders/:id/cancel` | `{reason, version}` | `pos_set_order_status` |
 | POST | `/api/partner/pos-orders/:id/act` (key) | `{action, version, lines?, delivery?, note?, reason?}` | `pos_fulfilment_act`; `online_accept/online_reject/online_ready` → `ol_partner_act` |
 
-## Section G: store catalogue and GRN matching — `lib/catalogue/catalogue_api.dart`, `modules/catalogue.ts`, `modules/grn.ts`, migrations 0390 and 0391
+## Section G: store catalogue and GRN matching — `lib/catalogue/catalogue_api.dart` → `POST /rpc/<name>`, migrations 0390, 0391, 0409
 
-Staff only; every call runs AS the signed-in staff member (their token on the anon key). The server checks request shape (zod, unknown fields refused); every rule is in the database. Money is in **minor units** (paise). Optional `Idempotency-Key` on item create.
+All through the one generic endpoint (section 1); every call runs AS the signed-in staff member. Body = the function's `p` object, checked
+for shape by `src/schemas/catalogue.ts` and `src/schemas/grn.ts` (unknown fields refused, 400 `validation`); every rule is in the database.
+Money is in **minor units** (paise). `Idempotency-Key` header on item create (`cat_item_save` is `idem`).
 
 Stable item fields (section F reads these): `id`, `name`, `sku`, `barcode`, `category`, `price_minor`, `mrp_minor`, `currency`, `selling_unit`, `net_qty`, `net_qty_unit`, `gst_pct`, `hsn`, `status` (`active|inactive|draft`), `available`, `stock_qty` (null when stock is unknown), `inventory_item_id`, `version`.
 
-| Method | Path | Request | Database function |
-|---|---|---|---|
-| GET | `/api/partner/catalogue` | `q? status?(all\|active\|inactive\|draft\|out\|combo) category? page? page_size?(1-100) location?` | `cat_item_list` → `{counts{total,active,out_of_stock,inactive,combos,categories,drafts}, categories[], total_matching, page, page_size, items[]}` |
-| GET | `/api/partner/catalogue/search` | `q, limit?(1-50)` | `cat_item_list` (active items by name, SKU, barcode or brand) → `{items[]}`. Use this from the sell screen. |
-| GET | `/api/partner/catalogue/lookup` | `code` (barcode, then SKU) | `cat_item_lookup` (404 when no item has the code) |
-| GET | `/api/partner/catalogue/:id` | – | `cat_item_view` |
-| POST | `/api/partner/catalogue` | `{mode: quick\|full, draft?, name, sku, price_minor, category?, brand?, barcode?, mrp_minor?, cost_minor?, hsn?, gst_pct?, selling_unit?, net_qty?, net_qty_unit?, unit_description?, purchase_pack_units?, storage?}` | `cat_item_save`. Full non-draft needs `hsn` + `gst_pct` (422 `tax_required`); duplicate SKU/barcode 409; price above MRP 400. |
-| PUT | `/api/partner/catalogue/:id` | same fields, `version` required | `cat_item_save` (409 `version_conflict` when stale) |
+| Name | Body (`p`) | Answer / rules |
+|---|---|---|
+| `cat_item_list` | `q? status?(all\|active\|inactive\|draft\|out\|combo) category? page? page_size?(1-100) location_id?` | `{counts{total,active,out_of_stock,inactive,combos,categories,drafts}, categories[], total_matching, page, page_size, items[]}`. The sell screen's search is this call with `status: 'active'` (name, SKU, barcode or brand). |
+| `cat_item_lookup` | `code` (barcode, then SKU), `location_id?` | one item; 404 when no item has the code |
+| `cat_item_view` | `id`, `location_id?` | one item |
+| `cat_item_save` | create: `{mode: quick\|full, draft?, name, sku, price_minor, category?, brand?, barcode?, mrp_minor?, cost_minor?, hsn?, gst_pct?, selling_unit?, net_qty?, net_qty_unit?, unit_description?, purchase_pack_units?, storage?}`; change: same fields + `id`, `version` | Full non-draft needs `hsn` + `gst_pct` (422 `tax_required`); duplicate SKU/barcode 409; price above MRP 400; stale 409 `version_conflict`. A stock item section H already keeps with the same SKU is linked as it is (never renamed or relabelled); a selling unit different from its counting unit is 400. |
+| `grn_list` | `{}` | receipts in review, approved in the last 30 days, and cancelled in the last 30 days (`review_status: cancelled`) |
+| `grn_open` | `{receipt_document_id}` | creates the GRN number once; 409 if the receipt is not in review |
+| `grn_view` | `{receipt_document_id}` | dashboard: totals, `invoice_total_minor`, rows, resolution, posting preview, checklist, blockers, allowed actions; `status` matching \| approval_due \| approved \| cancelled |
+| `grn_matching_view` | `{receipt_document_id}` | invoice lines, received rows with state: matched, short, over, price_diff, rejected, missing, not_on_invoice. A product billed on several lines at different prices: `invoice.unit_price_minor` null, `price_mixed` true, `unit_prices[]`, `amount_minor` = sum of the lines (state price_diff). |
+| `grn_invoice_save` | `{receipt_document_id, supplier_name, invoice_no, invoice_date: YYYY-MM-DD, po_ref?, lines:[{inventory_item_id?, product_name, qty, unit?, unit_price_minor}]}` | replaces the invoice while matching; clears the resolution |
+| `grn_costs_save` | `{receipt_document_id, costs:[{line_id, unit_cost_minor}]}` | unit prices noticed at receiving (location scoped) |
+| `grn_resolve` | `{receipt_document_id, version, resolution: accept_claim_credit\|accept_as_received, claim_ref?, evidence?, note?}` | claim needs reference + evidence; waiving a claim needs a note |
+| `grn_request_approval` | `{receipt_document_id, version}` | 422 `unresolved` while exceptions are unresolved |
+| `grn_decide` | `{receipt_document_id, version, decision: approve\|reject, note?}` | approver role only; the requester cannot approve unless the only approver; approve posts stock through section H `inv_document_act`; reject needs a note |
 
-GRN: `:id` is the RECEIPT document id of section H (`inventory_documents.id`). A receipt must be sent to GRN review in section H first. **Needs section H merged.**
-
-| Method | Path | Request | Database function |
-|---|---|---|---|
-| GET | `/api/partner/grn` | – | `grn_list` (receipts in review and approved in the last 30 days) |
-| POST | `/api/partner/grn/open` | `{receipt_document_id}` | `grn_open` (creates the GRN number once; 409 if the receipt is not in review) |
-| GET | `/api/partner/grn/:id` | – | `grn_view` (dashboard: totals, rows, resolution, posting preview, checklist, blockers, allowed actions) |
-| GET | `/api/partner/grn/:id/matching` | – | `grn_matching_view` (invoice lines, received rows with state: matched, short, over, price_diff, rejected, missing, not_on_invoice) |
-| PUT | `/api/partner/grn/:id/invoice` | `{supplier_name, invoice_no, invoice_date: YYYY-MM-DD, po_ref?, lines:[{inventory_item_id?, product_name, qty, unit?, unit_price_minor}]}` | `grn_invoice_save` (replaces the invoice while matching; clears the resolution) |
-| PUT | `/api/partner/grn/:id/costs` | `{costs:[{line_id, unit_cost_minor}]}` | `grn_costs_save` (unit prices noticed at receiving) |
-| POST | `/api/partner/grn/:id/resolve` | `{version, resolution: accept_claim_credit\|accept_as_received, claim_ref?, evidence?, note?}` | `grn_resolve` (claim needs reference + evidence; waiving a claim needs a note) |
-| POST | `/api/partner/grn/:id/request-approval` | `{version}` | `grn_request_approval` (422 `unresolved` while exceptions are unresolved) |
-| POST | `/api/partner/grn/:id/decide` | `{version, decision: approve\|reject, note?}` | `grn_decide` (approver role only; the requester cannot approve unless the only approver; approve posts stock through section H `inv_document_act`; reject needs a note) |
-
-A GRN review that is not approved blocks section H's own `post` of that receipt (trigger `grn_post_gate`).
+`receipt_document_id` is the section H receipt (`inventory_documents.id`); a receipt must be sent to GRN review in section H first.
+**Every** section H receipt needs an approved GRN before its stock goes up: `inv_document_act` `post` without one is 409 (`GRN_NOT_APPROVED`, trigger
+`grn_post_gate` on `stock_movements`). Cancelling a receipt closes its GRN as `cancelled` (0409).
 
 ## Not called by the app today (exist in the customer app for the OLD partner app, not ported)
 

@@ -162,7 +162,7 @@ class _GrnMatchingState extends State<GrnMatchingScreen> {
                         _line(
                           r.received!['name'].toString(),
                           '${qty(r.received!['qty'] as num)} ${r.received!['unit']}',
-                          r.received!['unit_cost_minor'] == null ? (r.state == 'not_on_invoice' || r.state == 'missing' ? '—' : _m((r.invoice?['unit_price_minor'] as num?) ?? 0)) : _m(r.received!['unit_cost_minor'] as num),
+                          r.received!['unit_cost_minor'] == null ? (r.state == 'not_on_invoice' || r.state == 'missing' ? '—' : _m(invoiceUnitMinor(r.invoice) ?? 0)) : _m(r.received!['unit_cost_minor'] as num),
                           bg: _bg(r),
                           fg: _fg(r),
                           note: r.state == 'not_on_invoice' ? 'NOT ON INVOICE' : null,
@@ -314,6 +314,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
   Widget _statusChip(GrnView v) {
     final (label, bg, fg) = switch (v.status) {
       'approved' => ('Approved', kLimeSoft, kGreenText),
+      'cancelled' => ('Cancelled', const Color(0xFFEEF1EA), kMuted),
       'approval_due' => ('Approval due', const Color(0xFFEEF1EA), kInk),
       _ => (v.exceptions > 0 && v.resolution['valid'] != true ? 'Review' : 'Ready', const Color(0xFFEEF1EA), kInk),
     };
@@ -322,7 +323,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
 
   Widget _lineCard(GrnRow r) {
     final inv = r.invoice, rec = r.received;
-    final price = (inv?['unit_price_minor'] as num?) ?? (rec?['unit_cost_minor'] as num?) ?? 0;
+    final price = invoiceUnitMinor(inv) ?? (rec?['unit_cost_minor'] as num?) ?? 0;
     final unit = (inv?['unit'] ?? rec?['unit'] ?? 'units').toString();
     final recQty = (rec?['qty'] as num?) ?? 0, rej = (rec?['rejected_qty'] as num?) ?? 0;
     return OrderCardBox(
@@ -470,6 +471,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
 
   Widget _actions(GrnView v) {
     if (v.status == 'approved') return const DarkButton('Approved · stock posted', onPressed: null);
+    if (v.status == 'cancelled') return const DarkButton('Receipt cancelled · nothing posted', onPressed: null);
     if (v.status == 'approval_due') {
       return Column(children: [
         if (v.can('can_approve')) DarkButton('Approve and post stock', busy: _busy, onPressed: () => _do(() => _api.grnDecide(v.receiptId, version: v.version, approve: true), done: 'Approved. Stock posted.')) else const DarkButton('Waiting for owner approval', onPressed: null),
@@ -640,6 +642,7 @@ class _GrnQueueState extends State<GrnQueueScreen> {
 
   String _label(GrnQueueRow r) => switch (r.reviewStatus) {
         'approved' => 'Approved',
+        'cancelled' => 'Cancelled',
         'approval_due' => 'Approval due',
         'matching' => r.hasInvoice ? ((r.exceptions ?? 0) > 0 ? '${r.exceptions} to review' : 'Matches') : 'Needs invoice',
         _ => 'Not opened',
@@ -697,4 +700,14 @@ class _GrnQueueState extends State<GrnQueueScreen> {
       ]),
     );
   }
+}
+
+/// The billed unit price of one product. When the invoice bills it on several lines at different prices (`price_mixed`), the database
+/// sends no single price, so the average (amount / quantity) is shown; the row is a price difference either way.
+num? invoiceUnitMinor(Map<String, dynamic>? inv) {
+  if (inv == null) return null;
+  final p = inv['unit_price_minor'] as num?;
+  if (p != null) return p;
+  final amount = inv['amount_minor'] as num?, q = inv['qty'] as num?;
+  return amount == null || q == null || q == 0 ? null : (amount / q).round();
 }

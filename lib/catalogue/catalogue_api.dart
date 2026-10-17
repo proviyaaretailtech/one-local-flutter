@@ -1,81 +1,66 @@
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
 
-/// Section G server calls (`/api/partner/catalogue/*` and `/api/partner/grn/*`). The Supabase session token is the only credential; the
-/// server and the database check the business, the role and every rule again. The app holds no business rule: it draws what the server
-/// says and sends what the person typed. Money travels in minor units (paise).
+/// Section G calls through the POS server's one generic endpoint (`POST /rpc/<name>`: cat_item_* and grn_*, see
+/// server/src/rpc-manifest.ts). The Supabase session token is the only credential; the server runs each function as the signed-in
+/// person and the database checks the business, the location, the role and every rule. The app holds no business rule: it draws
+/// what the database says and sends what the person typed. Money travels in minor units (paise).
 class CatalogueApi {
-  CatalogueApi({http.Client? client, String? baseUrl, String? Function()? accessToken})
-      : _http = client ?? http.Client(),
-        _token = accessToken ?? (() => Supabase.instance.client.auth.currentSession?.accessToken),
-        _base = (baseUrl ?? const String.fromEnvironment('PARTNER_API_BASE_URL')).replaceAll(RegExp(r'/+$'), '');
+  CatalogueApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc})
+      : _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken);
 
-  final http.Client _http;
-  final String? Function() _token;
-  final String _base;
+  final RpcClient _rpc;
   static final _rand = Random.secure();
 
   /// One key per intent (one tap); send it again when retrying that same tap.
   static String newKey() => 'cat-${List.generate(16, (_) => _rand.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
 
-  Future<Map<String, dynamic>> _send(String method, String path, {Object? body, String? key, Map<String, String>? query}) async {
-    final token = _token();
-    if (token == null) throw const PartnerApiException(401, 'Sign in to continue.');
-    var uri = Uri.parse('$_base/api/partner$path');
-    if (query != null && query.isNotEmpty) uri = uri.replace(queryParameters: query);
-    final headers = {'Authorization': 'Bearer $token', if (body != null) 'Content-Type': 'application/json', 'Idempotency-Key': ?key};
-    final enc = body == null ? null : jsonEncode(body);
-    final future = switch (method) {
-      'GET' => _http.get(uri, headers: headers),
-      'PUT' => _http.put(uri, headers: headers, body: enc),
-      _ => _http.post(uri, headers: headers, body: enc),
-    };
-    final res = await future.timeout(const Duration(seconds: 30));
-    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
-    final map = decoded is Map ? decoded.cast<String, dynamic>() : <String, dynamic>{};
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw CatalogueApiException(res.statusCode, (map['detail'] as String?) ?? 'Something went wrong. Please try again.', map['code'] as String?);
+  Future<Map<String, dynamic>> _call(String fn, Map<String, dynamic> args, {String? key}) async {
+    try {
+      return await _rpc.callMap(fn, args, key);
+    } on RpcException catch (e) {
+      throw CatalogueApiException(e.status, e.message, e.code);
     }
-    return map;
   }
 
   // ---------------------------------------------------------------- catalogue
   Future<CatalogueList> list({String q = '', String status = 'all', String? category, int page = 1, int pageSize = 20}) async {
-    final r = await _send('GET', '/catalogue', query: {
+    final r = await _call('cat_item_list', {
       if (q.trim().isNotEmpty) 'q': q.trim(),
       if (status != 'all') 'status': status,
       'category': ?category,
-      'page': '$page',
-      'page_size': '$pageSize',
+      'page': page,
+      'page_size': pageSize,
     });
     return CatalogueList(r);
   }
 
-  Future<CatItem> lookup(String code) async => CatItem((await _send('GET', '/catalogue/lookup', query: {'code': code.trim()})));
-  Future<CatItem> get(String id) async => CatItem(await _send('GET', '/catalogue/$id'));
+  Future<CatItem> lookup(String code) async => CatItem(await _call('cat_item_lookup', {'code': code.trim()}));
+  Future<CatItem> get(String id) async => CatItem(await _call('cat_item_view', {'id': id}));
 
-  /// [fields] holds only what the person typed (names as the server expects them); `version` is required when [id] is set.
+  /// [fields] holds only what the person typed (names as the database expects them); `version` is required when [id] is set.
   Future<CatItem> save(Map<String, dynamic> fields, {String? id, String? key}) async => CatItem(id == null
-      ? await _send('POST', '/catalogue', body: fields, key: key ?? newKey())
-      : await _send('PUT', '/catalogue/$id', body: fields));
+      ? await _call('cat_item_save', fields, key: key ?? newKey())
+      : await _call('cat_item_save', {...fields, 'id': id}));
 
-  // ---------------------------------------------------------------- GRN
+  // ---------------------------------------------------------------- GRN (receiptId is the section H receipt document)
   Future<List<GrnQueueRow>> grnQueue() async {
-    final r = await _send('GET', '/grn');
+    final r = await _call('grn_list', {});
     return ((r['items'] as List?) ?? const []).map((e) => GrnQueueRow((e as Map).cast<String, dynamic>())).toList();
   }
 
-  Future<GrnView> grnOpen(String receiptId) async => GrnView(await _send('POST', '/grn/open', body: {'receipt_document_id': receiptId}));
-  Future<GrnView> grn(String receiptId) async => GrnView(await _send('GET', '/grn/$receiptId'));
-  Future<GrnMatching> grnMatching(String receiptId) async => GrnMatching(await _send('GET', '/grn/$receiptId/matching'));
+  Map<String, dynamic> _r(String receiptId) => {'receipt_document_id': receiptId};
+  Future<GrnView> grnOpen(String receiptId) async => GrnView(await _call('grn_open', _r(receiptId)));
+  Future<GrnView> grn(String receiptId) async => GrnView(await _call('grn_view', _r(receiptId)));
+  Future<GrnMatching> grnMatching(String receiptId) async => GrnMatching(await _call('grn_matching_view', _r(receiptId)));
 
   Future<GrnView> grnResolve(String receiptId, {required int version, required String resolution, String? claimRef, String? evidence, String? note}) async =>
-      GrnView(await _send('POST', '/grn/$receiptId/resolve', body: {
+      GrnView(await _call('grn_resolve', {
+        ..._r(receiptId),
         'version': version,
         'resolution': resolution,
         if (claimRef != null && claimRef.trim().isNotEmpty) 'claim_ref': claimRef.trim(),
@@ -84,10 +69,11 @@ class CatalogueApi {
       }));
 
   Future<GrnView> grnRequestApproval(String receiptId, {required int version}) async =>
-      GrnView(await _send('POST', '/grn/$receiptId/request-approval', body: {'version': version}));
+      GrnView(await _call('grn_request_approval', {..._r(receiptId), 'version': version}));
 
   Future<GrnView> grnDecide(String receiptId, {required int version, required bool approve, String? note}) async =>
-      GrnView(await _send('POST', '/grn/$receiptId/decide', body: {
+      GrnView(await _call('grn_decide', {
+        ..._r(receiptId),
         'version': version,
         'decision': approve ? 'approve' : 'reject',
         if (note != null && note.trim().isNotEmpty) 'note': note.trim(),

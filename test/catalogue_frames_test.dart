@@ -27,7 +27,7 @@ CatalogueApi _api() => CatalogueApi(
       accessToken: () => 'frames',
       client: MockClient((r) async {
         final p = r.url.path;
-        final Object body = p.endsWith('/matching') ? matchingView() : p.contains('/grn/') ? grnView() : p.endsWith('/catalogue/i1') ? sixItems.first : catalogueList(sixItems);
+        final Object body = p.endsWith('/grn_matching_view') ? matchingView() : p.contains('/grn_') ? grnView() : p.endsWith('/cat_item_view') ? sixItems.first : catalogueList(sixItems);
         return http.Response(jsonEncode(body), 200, headers: {'content-type': 'application/json; charset=utf-8'});
       }),
     );
