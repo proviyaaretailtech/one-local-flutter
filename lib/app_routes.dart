@@ -10,6 +10,8 @@ import 'inventory/stock_detail_screen.dart';
 import 'orders/cart_screen.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
+import 'service/calendar_screen.dart';
+import 'service/service_widgets.dart' show ServiceRoutes;
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 
@@ -26,6 +28,7 @@ void installRoutes() {
   HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
   HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
+  HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
@@ -44,7 +47,9 @@ void _tab(BuildContext context, String id) => switch (id) {
 Future<void> openWorkspace(BuildContext context, {AuthRepository? auth, SetupApi? setupApi}) async {
   bool needsSetup = false;
   try {
-    needsSetup = !(await (setupApi ?? SetupApi()).get()).completed;
+    final setup = await (setupApi ?? SetupApi()).get();
+    needsSetup = !setup.completed;
+    HomeNav.partnerType = setup.partnerType;
   } on PartnerApiException {
     needsSetup = false;
   } catch (_) {
