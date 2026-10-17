@@ -1,0 +1,54 @@
+{
+  "floor": {
+    "location": {"id": "loc-1", "name": "A Main", "code": "MAIN"},
+    "areas": [{"id": "area-g", "name": "Ground Floor"}],
+    "tables": [
+      {"id": "t1", "label": "T1", "seats": 4, "own_seats": 4, "area_id": "area-g", "area_name": "Ground Floor", "status": "available", "since": null, "elapsed_minutes": null, "reserved_at": null, "reservation_id": null, "merge": null},
+      {"id": "t2", "label": "T2", "seats": 2, "own_seats": 2, "area_id": "area-g", "area_name": "Ground Floor", "status": "occupied", "since": "2026-10-17T05:00:00+00:00", "elapsed_minutes": 75, "reserved_at": null, "reservation_id": null, "merge": null},
+      {"id": "t3", "label": "T3", "seats": 4, "own_seats": 4, "area_id": "area-g", "area_name": "Ground Floor", "status": "reserved", "since": null, "elapsed_minutes": null, "reserved_at": "2026-10-17T14:00:00+00:00", "reservation_id": "res-1", "merge": null},
+      {"id": "t4", "label": "T4", "seats": 4, "own_seats": 4, "area_id": "area-g", "area_name": "Ground Floor", "status": "available", "since": null, "elapsed_minutes": null, "reserved_at": null, "reservation_id": null, "merge": null},
+      {"id": "t5", "label": "T5", "seats": 6, "own_seats": 6, "area_id": "area-g", "area_name": "Ground Floor", "status": "cleaning", "since": null, "elapsed_minutes": null, "reserved_at": null, "reservation_id": null, "merge": null},
+      {"id": "t12", "label": "T12", "seats": 8, "own_seats": 4, "area_id": "area-g", "area_name": "Ground Floor", "status": "available", "merge": {"id": "m-1", "primary": true, "primary_table_id": "t12", "labels": ["T12", "T13"], "combined_seats": 8}},
+      {"id": "t13", "label": "T13", "seats": 8, "own_seats": 4, "area_id": "area-g", "area_name": "Ground Floor", "status": "available", "merge": {"id": "m-1", "primary": false, "primary_table_id": "t12", "labels": ["T12", "T13"], "combined_seats": 8}}
+    ],
+    "counts": {"all": 7, "available": 4, "occupied": 1, "reserved": 1, "cleaning": 1},
+    "rule": {"merge": "Tables must be in the same dining area to combine.", "merge_min": 2, "merge_max": 8},
+    "can": {"reserve": true, "manage": true, "order": true},
+    "now": "2026-10-17T06:15:00+00:00"
+  },
+  "view_available": {
+    "table": {"id": "t4", "label": "T4", "seats": 4, "own_seats": 4, "min_capacity": 1, "area_id": "area-g", "area_name": "Ground Floor", "main_table_id": "t4"},
+    "status": "available", "since": null, "elapsed_minutes": null, "reserved_at": null, "merge": null, "channel": null, "guests": null, "waiter": null, "bill_total": 0,
+    "orders": [], "reservations": [], "allowed": ["start_order", "history", "merge", "reserve"]
+  },
+  "view_occupied": {
+    "table": {"id": "t2", "label": "T12", "seats": 4, "own_seats": 4, "min_capacity": 1, "area_id": "area-g", "area_name": "Ground Floor", "main_table_id": "t2"},
+    "status": "occupied", "since": "2026-10-17T05:00:00+00:00", "elapsed_minutes": 75, "merge": null, "channel": "dine_in", "guests": 4, "waiter": "SS", "bill_total": 1302.00,
+    "orders": [{"id": "o-1", "display_no": "P-9002", "status": "sent_to_kitchen", "total": 1302.00}], "reservations": [], "allowed": ["open_order", "history", "transfer", "merge", "reserve"]
+  },
+  "order_view": {
+    "table": {"id": "t2", "label": "T12", "seats": 4, "area_name": "Ground Floor", "main_table_id": "t2"},
+    "status": {"key": "sent_to_kitchen", "label": "ACTIVE IN KITCHEN"},
+    "orders": [{"id": "o-1", "display_no": "P-9002", "status": "sent_to_kitchen", "updated_at": "2026-10-17T06:00:00+00:00", "total": 1302.00, "subtotal": 1240.00}],
+    "items": [
+      {"id": "i1", "name": "Chicken Tikka Biryani", "qty": 2, "unit_price": 320.00, "line_total": 640.00, "status": "preparing", "status_label": "Preparing"},
+      {"id": "i2", "name": "Butter Naan", "qty": 4, "unit_price": 60.00, "line_total": 240.00, "status": "preparing", "status_label": "Preparing"},
+      {"id": "i3", "name": "Paneer Butter Masala", "qty": 1, "unit_price": 360.00, "line_total": 360.00, "status": "preparing", "status_label": "Preparing"}
+    ],
+    "timeline": [
+      {"at": "2026-10-17T13:45:00+00:00", "message": "Table set & checked in by Captain"},
+      {"at": "2026-10-17T13:48:00+00:00", "message": "KOT #103 generated (auto-fire)"}
+    ],
+    "subtotal": 1240.00,
+    "can": {"add_items": false, "send_kot": false, "print_kot": false, "change_table": true, "merge_table": true, "generate_bill": true},
+    "unavailable": {"add_items": "Adding items to an open order is not in this release.", "print_kot": "Printing a KOT is not in this release."}
+  },
+  "history": {"table": {"id": "t4", "label": "T4"}, "entries": [
+    {"kind": "order", "when": "2026-10-16T14:00:00+00:00", "title": "Order P-9001", "detail": "2 guests - total 525.00", "status": "paid"},
+    {"kind": "reservation", "when": "2026-10-15T14:00:00+00:00", "title": "Reservation for John Doe", "detail": "4 guests", "status": "cancelled"}
+  ]},
+  "reserved": {"reservation": {"id": "res-9", "table_id": "t4", "table_label": "T4", "guest_name": "John Doe", "phone": "+1 (555) 019-2834", "guests": 4, "scheduled_at": "2026-10-17T14:00:00+00:00", "status": "confirmed", "notes": ""}, "replayed": false},
+  "transferred": {"from": {"id": "t2", "label": "T12"}, "to": {"id": "t1", "label": "T1"}, "moved_orders": 1, "bill_total": 1302.00, "consolidated": false},
+  "merged": {"merge_id": "m-2", "primary_table_id": "t1", "combined_seats": 8, "members": [{"id": "t1", "label": "T1", "seats": 4}, {"id": "t4", "label": "T4", "seats": 4}]},
+  "split": {"merge_id": "m-1", "released": [{"id": "t12", "label": "T12"}, {"id": "t13", "label": "T13"}]}
+}

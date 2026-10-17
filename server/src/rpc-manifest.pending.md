@@ -26,6 +26,7 @@ grn_open, grn_list, grn_view, grn_matching_view, grn_invoice_save, grn_costs_sav
 
 ## Seen on the local database from other sections (not in the two branches above)
 Section H (inventory): now in the manifest (all twelve inv_ functions), audited and in the cross-tenant e2e.
+Section H (tables and floor, 0404): now in the manifest (all nine tbl_ functions), audited and in the cross-tenant e2e.
 Section I (services): svc_catalogue, svc_quote, svc_calendar, svc_slots, svc_book, svc_appointment_view, svc_appointment_act, svc_bill, svc_history.
 Section J (back office): backoffice_low_stock, purchase_suggestions_refresh, purchase_suggestions_list, purchase_suggestions_close.
 

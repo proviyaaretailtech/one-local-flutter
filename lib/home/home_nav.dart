@@ -26,6 +26,8 @@ class HomeNav {
   static HomeRoute? stock;
   // Section H: one item's stock detail (section J's low-stock "view item" uses it).
   static ItemRoute? stockItem;
+  // Section H: tables and floor (the POS tab).
+  static HomeRoute? tables;
   static HomeRoute? bill;
   static HomeRoute? money;
   static HomeRoute? notifications;
@@ -45,6 +47,6 @@ class HomeNav {
   /// Clears every hook (tests).
   static void reset() {
     stockItem = null;
-    home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = money = notifications = complaints = reviews = support = null;
   }
 }

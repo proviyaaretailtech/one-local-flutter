@@ -18,6 +18,7 @@ import { secureHandlers, withImageLinks, type SecureHandler } from './modules/se
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
+import * as tbl from './schemas/tables.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -100,6 +101,17 @@ export const MANIFEST: Entry[] = [
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  // ---- tables and floor, section H (0404). Body = the function's `p` object (location_id, table ids); the database validates it and checks
+  //      organisation, store and role (order:place for reserving; order:place + order:update_status or dining_tables:manage for transfer / merge / split).
+  db('tbl_floor', { args: tbl.Floor, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  db('tbl_view', { args: tbl.TableRef, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_order_view', { args: tbl.TableRef, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_history', { args: tbl.History, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_reserve', { args: tbl.Reserve, map: P, rate: 'write', idem: true, roles: 'staff with order:place (or table manager)' }),
+  db('tbl_reserve_cancel', { args: tbl.ReserveCancel, map: P, rate: 'write', roles: 'staff with order:place (or table manager)' }),
+  db('tbl_transfer', { args: tbl.Transfer, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
+  db('tbl_merge', { args: tbl.Merge, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
+  db('tbl_split', { args: tbl.Split, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 
