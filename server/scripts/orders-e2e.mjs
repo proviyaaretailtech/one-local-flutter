@@ -1,4 +1,4 @@
-// E2E: VINII POS section E over HTTP against the standalone POS server (routes /api/partner/pos-orders/*), as two real signed-in
+// E2E: One Local POS section E over HTTP against the standalone POS server (routes /api/partner/pos-orders/*), as two real signed-in
 // staff members of two different businesses. LOCAL ONLY. Tags its orders 'ZZ-TEST' and purges them, its users and its businesses at the end.
 // Usage (from new-mobile-flutter/server, server running):  node scripts/orders-e2e.mjs   (POS_API overrides the address; keys read from ./.env, never printed)
 import { readFileSync } from 'node:fs';
@@ -42,11 +42,11 @@ try {
   ok('three staff signed in', !!A && !!B && !!V);
 
   ok('no token: 401', (await api(null, 'GET', '')).s === 401);
-  const root = `${API}/api/partner/me`, bearer = t => ({ headers: { Authorization: `Bearer ${t}` } });
+  const root = `${API}/rpc/me`, bearer = t => ({ method: 'POST', headers: { Authorization: `Bearer ${t}` } });
   const meA = await fetch(root, bearer(A)).then(async r => ({ s: r.status, j: await r.json() }));
   ok('/me: staff of A sees A and their role', meA.s === 200 && meA.j.restaurant.id === orgA && meA.j.person.role === 'manager' && meA.j.restaurant.set_up === false, meA);
-  ok('/me: no token 401, garbage token 401', (await fetch(root)).status === 401 && (await fetch(root, bearer('x'.repeat(40)))).status === 401);
-  ok('unknown path 404, wrong method 405', (await fetch(`${API}/api/nope`)).status === 404 && (await fetch(root, { method: 'POST' })).status === 405);
+  ok('/me: no token 401, garbage token 401', (await fetch(root, { method: 'POST' })).status === 401 && (await fetch(root, bearer('x'.repeat(40)))).status === 401);
+  ok('unknown path 404, wrong method 405', (await fetch(`${API}/api/nope`)).status === 404 && (await fetch(root, { method: 'GET' })).status === 405);
   const cat = await api(A, 'GET', '/catalog');
   ok('catalog: org A sees its 5 items only', cat.s === 200 && cat.j.items.length === 5 && !cat.j.items.some(i => i.name === 'B only item'), cat);
   const qty = { 'Amul Butter 500g': 2, 'Britannia Good Day 600g': 1, 'Parle Monaco 200g': 3, 'Horlicks 500g': 1, 'Kinley Mineral Water 1L': 2 };

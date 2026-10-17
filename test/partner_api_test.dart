@@ -22,7 +22,7 @@ void main() {
     });
     final api = PartnerApi(client: client, baseUrl: '$base/', accessToken: () => 'tok123');
     final me = await api.me();
-    expect(seen.url.toString(), '$base/api/partner/me');
+    expect(seen.url.toString(), '$base/rpc/me');
     expect(seen.headers['Authorization'], 'Bearer tok123');
     expect(me.name, 'Phase A Tester');
     expect(me.email, 'a@b.c');

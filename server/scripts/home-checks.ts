@@ -1,4 +1,4 @@
-// VINII POS control centre (src/modules/home.ts, GET /api/partner/home and /home/feed) against the LOCAL Supabase from
+// One Local POS control centre (src/modules/home.ts, GET /api/partner/home and /home/feed) against the LOCAL Supabase from
 // .env. Covers: today's sales from bills only (cancelled excluded), top items, active orders with the One Local
 // delivery status and ETA, catalogue gaps, low stock, KOT made on a cancelled bill, goods received, the 7-day feed with the
 // previous period, and tenancy: another organisation sees none of it, a person assigned to one outlet sees only that outlet,
@@ -10,6 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const localEnv: Record<string, string> = {};
 for (const line of readFileSync(`${process.cwd()}/.env`, 'utf8').split('\n')) { const m = line.match(/^([A-Z_]+)=(.*)$/); if (m) localEnv[m[1]] = m[2]; }
@@ -75,6 +76,19 @@ async function main() {
     return { userId: id, email, name: email, role, organizationId, organizationName };
   }
 
+  // Every read below runs AS the signed-in person (their own token on the anon key), exactly like the running server, so row-level security applies.
+  const clients = new Map<string, SupabaseClient>();
+  const asUser = async (u: { email: string }) => {
+    if (clients.has(u.email)) return clients.get(u.email)!;
+    const c = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '', { auth: { persistSession: false, autoRefreshToken: false } });
+    const r = await c.auth.signInWithPassword({ email: u.email, password: users[u.email] });
+    if (r.error) throw new Error(`sign in ${u.email}: ${r.error.message}`);
+    clients.set(u.email, c);
+    return c;
+  };
+  const S = async (u: any, wanted?: string | null) => home.homeSummary(u, wanted, new Date(), await asUser(u));
+  const F = async (u: any, opts: any) => home.homeFeed(u, opts, new Date(), await asUser(u));
+
   const A = await org(`zz-home-checks-${RUN}`, 'ZZ Home checks', 'Restaurant');
   const B = await org(`zz-home-checks-b-${RUN}`, 'ZZ Home checks B', 'Retail');
   const a1 = await outlet(A.id, 'ZZ Main Branch');
@@ -129,7 +143,7 @@ async function main() {
   must(await d.from('pos_goods_receipts').insert({ row_id: randomUUID(), organization_id: A.id, location_id: a1, id: `zz-grn-${RUN}`, po_number: 'ZZ-PO', received_at: earlyToday, subtotal: 2500, tax: 0, total: 2500 }));
 
   // ---------------- 1. the dashboard, whole organisation ----------------
-  const h = await home.homeSummary(owner);
+  const h = await S(owner);
   check('owner sees both outlets; header says All outlets (2)', h.outlets.length === 2 && h.outlet.name === 'All outlets (2)', h.outlet);
   check('restaurant kind from business_domain; open from ol_merchant_channels', h.outlet.kind === 'restaurant' && h.outlet.is_open === true);
   check('sales today = 340 + 160 + 820 + 500 (cancelled 999 and older bills excluded), 4 orders', h.sales.total === 1820 && h.sales.orders === 4, h.sales);
@@ -148,29 +162,29 @@ async function main() {
   check('nothing from organisation B leaks in', !JSON.stringify(h).includes('4444') && !JSON.stringify(h).includes('Rice 5kg'));
 
   // ---------------- 2. one outlet ----------------
-  const one = await home.homeSummary(owner, a2);
+  const one = await S(owner, a2);
   check('?location narrows to one outlet: its name, 500 sales, 1 order, its stock only', one.outlet.name === 'ZZ Second Branch' && one.sales.total === 500 && one.sales.orders === 1 && one.stock_health.length === 1 && one.stock_health[0].name === 'Rice', one);
-  const assigned = await home.homeSummary(branch2);
+  const assigned = await S(branch2);
   check('a manager assigned to the second branch sees only it, without asking', assigned.outlets.length === 1 && assigned.outlet.name === 'ZZ Second Branch' && assigned.sales.total === 500 && assigned.active_orders.length === 0, assigned.outlet);
-  await refused('that manager cannot open the main branch (404)', 404, () => home.homeSummary(branch2, a1));
-  await refused('another organisation\'s outlet id is a 404', 404, () => home.homeSummary(owner, b1));
-  await refused('a malformed outlet id is a 400', 400, () => home.homeSummary(owner, "x' or 1=1"));
+  await refused('that manager cannot open the main branch (404)', 404, () => S(branch2, a1));
+  await refused('another organisation\'s outlet id is a 404', 404, () => S(owner, b1));
+  await refused('a malformed outlet id is a 400', 400, () => S(owner, "x' or 1=1"));
 
   // ---------------- 3. organisation B ----------------
-  const hb = await home.homeSummary(ownerB);
+  const hb = await S(ownerB);
   check('organisation B: its own outlet and bill only, store kind, open status unknown (no channel row)',
     hb.outlet.name === 'ZZ B Branch' && hb.sales.total === 4444 && hb.sales.orders === 1 && hb.outlet.kind === 'store' && hb.outlet.is_open === null && hb.catalogue.missing_recipes === null && !hb.stock_tracked, hb);
 
   // ---------------- 4. the feed ----------------
-  const f = await home.homeFeed(owner, { days: 7, compare: true });
+  const f = await F(owner, { days: 7, compare: true });
   check('feed 7 days: net sales 1820 + 700, 5 bills, 3 completed (paid, delivered, paid)', f.period.net_sales === 2520 && f.period.orders === 5 && f.period.orders_completed === 3, f.period);
   check('feed: average bill 504, previous week 300 from one bill', f.period.aov === 504 && f.previous?.net_sales === 300 && f.previous?.orders === 1, f.previous);
   check('feed: 7 daily slots ending today, today 1820, totals add up', f.daily.length === 7 && f.daily[6].date === f.date && f.daily[6].sales === 1820 && f.daily.reduce((n, x) => n + x.sales, 0) === 2520, f.daily);
   check('feed: today 1820 from 4 orders, open', f.today.sales === 1820 && f.today.orders === 4 && f.today.is_open === true);
-  const f1 = await home.homeFeed(owner, { days: 1, compare: false });
+  const f1 = await F(owner, { days: 1, compare: false });
   check('feed 1 day without compare: no previous block', f1.previous === null && f1.daily.length === 1 && f1.period.net_sales === 1820);
-  await refused('feed refuses 5 days (400)', 400, () => home.homeFeed(owner, { days: 5, compare: true }));
-  const fb = await home.homeFeed(branch2, { days: 7, compare: true });
+  await refused('feed refuses 5 days (400)', 400, () => F(owner, { days: 5, compare: true }));
+  const fb = await F(branch2, { days: 7, compare: true });
   check('feed for the second-branch manager: 500 only', fb.period.net_sales === 500 && fb.scope === 'ZZ Second Branch', fb.period);
 
   // ---------------- 5. over HTTP (the running dev server) ----------------

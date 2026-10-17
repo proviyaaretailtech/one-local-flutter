@@ -64,10 +64,16 @@ def approved_partner(tag, partner_type, sell_plan, phone, with_bank):
 phone_a = '98' + RUN + '01'; phone_b = '98' + RUN + '02'
 A = approved_partner('a', 'store', 'pos_and_onelocal', phone_a, True)
 B = approved_partner('b', 'restaurant', 'onelocal_app', phone_b, False)
-def api(method, path, body=None, who=A): return call(method, API + '/api/setup' + path, body, who)
+# The walk keeps the screen-level call sites; each is sent through the one generic endpoint POST /rpc/<name>.
+RPC = {('GET', '/state'): 'partner_setup_get', ('PUT', '/plan'): 'partner_setup_confirm_plan', ('PUT', '/payment'): 'partner_setup_save_payment',
+       ('PUT', '/tax'): 'partner_setup_save_tax', ('PUT', '/pos'): 'partner_setup_register_pos', ('POST', '/staff'): 'partner_setup_invite_staff',
+       ('POST', '/items'): 'partner_setup_add_item', ('PUT', '/listing'): 'partner_setup_save_listing', ('PUT', '/fulfilment'): 'partner_setup_save_fulfilment',
+       ('POST', '/tour'): 'partner_setup_tour_seen', ('POST', '/complete'): 'partner_setup_complete',
+       ('POST', '/images/upload'): 'partner_setup_image_slot', ('POST', '/images'): 'partner_setup_image_attach'}
+def api(method, path, body=None, who=A): return call('POST', f'{API}/rpc/{RPC[(method, path)]}', body or {}, who)
 
 # who ---------------------------------------------------------------------------------------------------------------------
-s, _ = call('GET', API + '/api/setup/state'); check('no token is refused (401)', s == 401)
+s, _ = call('POST', API + '/rpc/partner_setup_get', {}); check('no token is refused (401)', s == 401)
 s, tok = call('POST', f'{SB}/auth/v1/admin/users', {'email': f'setup.e2e.none.{RUN}@test.local', 'password': PW, 'email_confirm': True}, admin)
 s, t = call('POST', f'{SB}/auth/v1/token?grant_type=password', {'email': f'setup.e2e.none.{RUN}@test.local', 'password': PW}, {'apikey': PK})
 s, d = api('GET', '/state', who={'Authorization': 'Bearer ' + t['access_token']}); check('a login without an approved business gets 404', s == 404)

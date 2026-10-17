@@ -142,13 +142,13 @@ void main() {
       final client = MockClient((r) async {
         seen.add('${r.method} ${r.url.path} ${r.headers['Authorization']}');
         const json = {'content-type': 'application/json'};
-        if (r.url.path.endsWith('/tax')) return http.Response(jsonEncode({'detail': 'GSTIN looks wrong.'}), 400, headers: json);
+        if (r.url.path == '/rpc/partner_setup_save_tax') return http.Response(jsonEncode({'detail': 'GSTIN looks wrong.'}), 400, headers: json);
         return http.Response(jsonEncode(sampleSetup().raw), 200, headers: json);
       });
       final api = SetupApi(client: client, baseUrl: 'http://api.test/', accessToken: () => 'tok');
       final s = await api.get();
       expect(s.businessName, 'Sharma General Store');
-      expect(seen.single, 'GET /api/setup/state Bearer tok');
+      expect(seen.single, 'POST /rpc/partner_setup_get Bearer tok');
       await expectLater(api.saveTax({'gst_registered': true}), throwsA(isA<PartnerApiException>().having((e) => e.message, 'message', 'GSTIN looks wrong.')));
     });
     test('no session, no call', () async {

@@ -1,16 +1,21 @@
 {
-  "name": "vinii-pos-server",
+  "name": "one-local-pos-server",
   "version": "0.1.0",
   "private": true,
-  "description": "VINII POS backend: authenticates the app's Supabase session and forwards to database functions. No business rules live here.",
+  "description": "One Local POS backend: one generic endpoint /rpc/<name>: authenticates the app's Supabase session and calls allowlisted database functions as the caller. No business rules live here.",
   "type": "module",
-  "engines": { "node": ">=22.18" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/index.ts",
     "start": "node --env-file-if-exists=.env src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/unit/*.test.ts",
-    "e2e": "python3 ../tool/onboarding_e2e.py && python3 ../tool/setup_e2e.py && node scripts/orders-e2e.mjs && node --env-file-if-exists=.env scripts/home-checks.ts"
+    "audit": "node scripts/manifest-audit.mjs",
+    "e2e": "node scripts/manifest-audit.mjs && node scripts/gateway-e2e.mjs && python3 ../tool/onboarding_e2e.py && python3 ../tool/setup_e2e.py && node scripts/orders-e2e.mjs && node --env-file-if-exists=.env scripts/home-checks.ts",
+    "build:vercel": "esbuild src/vercel.ts --bundle --platform=node --format=esm --target=node22 --outfile=api/index.js --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "vercel-build": "npm run build:vercel"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.116.0",
@@ -18,6 +23,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "esbuild": "^0.28.2",
     "typescript": "6.0.3"
   }
 }

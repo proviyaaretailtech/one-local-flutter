@@ -14,7 +14,7 @@ class PosApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'VINII POS',
+      title: 'One Local POS',
       debugShowCheckedModeBanner: false,
       theme: posTheme(),
       // On a wide desktop browser the app sits in a phone-width column, as it would on a phone.

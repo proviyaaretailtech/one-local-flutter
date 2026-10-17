@@ -102,7 +102,7 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
         HomeNav.go(context, HomeNav.orders, 'Online orders');
       case 'Bill':
       case 'POS':
-        HomeNav.go(context, HomeNav.bill, 'Billing');
+        HomeNav.go(context, HomeNav.partnerType == 'service' ? HomeNav.service : HomeNav.bill, HomeNav.partnerType == 'service' ? 'Appointments' : 'Billing');
       case 'Item':
       case 'Menu':
         HomeNav.go(context, HomeNav.items, label == 'Menu' ? 'The menu' : 'Items');
@@ -300,7 +300,7 @@ class _Body extends StatelessWidget {
             _StockCard(s),
             if (s.stock.isNotEmpty) ...[
               const SizedBox(height: 8),
-              LimeOnDarkButton(label: 'Restock critical items', onPressed: () => HomeNav.go(context, HomeNav.stock, 'Restocking')),
+              LimeOnDarkButton(label: 'Restock critical items', onPressed: () => HomeNav.go(context, HomeNav.lowStock, 'Restocking')),
             ],
             const SizedBox(height: 20),
             SectionHeader('Business insights', badge: GreyTag(day), action: 'See all', onAction: onInsights),

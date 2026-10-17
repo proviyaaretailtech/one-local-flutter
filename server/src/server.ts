@@ -27,17 +27,25 @@ function toRequest(req: IncomingMessage, port: number): Request {
   });
 }
 
+/** One request in, one response out: shared by the local node:http server and the Vercel function, so there is one codebase. */
+export async function handle(request: Request): Promise<Response> {
+  const extra = cors(request.headers.get('origin') ?? undefined);
+  let response: Response;
+  try {
+    response = request.method === 'OPTIONS' ? new Response(null, { status: 204 }) : await dispatch(request);
+  } catch (error) {
+    console.error('[server]', redact(error));
+    response = fail(500, 'Something went wrong. Please try again.');
+  }
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries({ ...extra, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })) headers.set(k, v);
+  return new Response(response.body, { status: response.status, headers });
+}
+
 export function createApp(port = 0): Server {
   return createServer(async (req, res) => {
-    const extra = cors(req.headers.origin);
-    let response: Response;
-    try {
-      response = req.method === 'OPTIONS' ? new Response(null, { status: 204 }) : await dispatch(toRequest(req, port));
-    } catch (error) {
-      console.error('[server]', redact(error));
-      response = fail(500, 'Something went wrong. Please try again.');
-    }
-    const out: Record<string, string> = { ...extra, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
+    const response = await handle(toRequest(req, port));
+    const out: Record<string, string> = {};
     response.headers.forEach((v, k) => { out[k] = v; });
     res.writeHead(response.status, out);
     res.end(Buffer.from(await response.arrayBuffer()));
