@@ -27,6 +27,8 @@ class HomeNav {
   // Section H: one item's stock detail (section J's low-stock "view item" uses it).
   static ItemRoute? stockItem;
   static HomeRoute? bill;
+  // Section M: the storefront page builder and its settings.
+  static HomeRoute? storefront;
   static HomeRoute? money;
   static HomeRoute? notifications;
   static HomeRoute? complaints;
@@ -49,6 +51,6 @@ class HomeNav {
   /// Clears every hook (tests).
   static void reset() {
     stockItem = null;
-    home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = grn = receipt = null;
+    home = orders = orderHistory = setup = items = stock = bill = storefront = money = notifications = complaints = reviews = support = grn = receipt = null;
   }
 }
