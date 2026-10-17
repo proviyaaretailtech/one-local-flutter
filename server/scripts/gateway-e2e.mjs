@@ -167,6 +167,38 @@ try {
   ok('inventory: A document untouched after all of that', sql(`select status||':'||version from inventory_documents where id='${docId}'`) === 'draft:' + d1.j.version && sql(`select count(*) from stock_movements where organization_id='${orgA}'`) === '1');
   ok('inventory: A viewer can read stock but not create documents', (await rpc(V, 'inv_dashboard')).s === 200 && (await rpc(V, 'inv_document_save', draft, `gw-inv-${randomUUID()}`)).s === 403);
   ok('inventory: applicant with no business gets nothing', refused(await rpc(P1, 'inv_dashboard')) && refused(await rpc(P1, 'inv_stock_detail', { item_id: itemA })));
+  // ---- tables and floor (section H, 0404): A's tables, reservations and merges against B's token
+  const tbl = l => sql(`insert into dining_tables(organization_id,location_id,label,seats,sort_order) values ('${orgA}','${locA}','${l}',4,1) returning id`).split('\n')[0];
+  const tA1 = tbl('ZT1'), tA2 = tbl('ZT2'), tA3 = tbl('ZT3');
+  const tB1 = sql(`insert into dining_tables(organization_id,location_id,label,seats) values ('${orgB}','${locB}','ZB1',4) returning id`).split('\n')[0];
+  const soon = new Date(Date.now() + 86400000).toISOString();
+  ok('tables: no token is 401; helpers are not on the allowlist', (await rpc(null, 'tbl_floor')).s === 401 && (await rpc(A, 'tbl_states')).s === 404 && (await rpc(A, 'tbl_guard')).s === 404);
+  const fA = await rpc(A, 'tbl_floor');
+  ok('tables: A sees its own three tables, all available', fA.s === 200 && fA.j.tables.filter(t => t.label.startsWith('ZT') && t.status === 'available').length === 3, fA);
+  ok('tables: bad shape is a 400 with a sentence', await (async () => { const r = await rpc(A, 'tbl_view', { table_id: 'nope' }); return r.s === 400 && r.j.code === 'validation'; })());
+  const rk = `gw-tbl-${randomUUID()}`, res = { table_id: tA1, guest_name: 'ZZ Guest', phone: '5550100', guests: 4, scheduled_at: soon };
+  const tr1 = await rpc(A, 'tbl_reserve', res, rk), tr2 = await rpc(A, 'tbl_reserve', res, rk);
+  ok('tables: reserve works and a retry with the same key is the same reservation', tr1.s === 200 && tr2.s === 200 && tr2.j.replayed === true && tr1.j.reservation.id === tr2.j.reservation.id, [tr1, tr2]);
+  ok('tables: capacity is a 422 with a sentence', await (async () => { const r = await rpc(A, 'tbl_reserve', { ...res, table_id: tA2, guests: 9 }, `gw-tbl-${randomUUID()}`); return r.s === 422 && r.j.code === 'capacity'; })());
+  const d3 = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+  ok('tables: a booking in the store wall clock works; an instant without its zone is a 400', (await rpc(A, 'tbl_reserve', { table_id: tA2, guest_name: 'ZZ Local', phone: '5550101', guests: 2, local_date: d3, local_time: '19:30' }, `gw-tbl-${randomUUID()}`)).s === 200
+    && (await rpc(A, 'tbl_reserve', { table_id: tA2, guest_name: 'ZZ NoZone', phone: '5550101', guests: 2, scheduled_at: `${d3}T12:00:00` }, `gw-tbl-${randomUUID()}`)).s === 400);
+  ok('tables: transfer from an empty table is a 409', (await rpc(A, 'tbl_transfer', { from_table_id: tA1, to_table_id: tA2 })).s === 409);
+  const mg = await rpc(A, 'tbl_merge', { table_ids: [tA2, tA3] });
+  ok('tables: A merges two tables', mg.s === 200 && mg.j.combined_seats === 8, mg);
+  const bFloor = await rpc(B, 'tbl_floor');
+  ok('tables: B floor has only its own table', bFloor.s === 200 && bFloor.j.tables.length === 1 && bFloor.j.tables[0].label === 'ZB1' && !JSON.stringify(bFloor.j).includes(tA1), bFloor);
+  ok('tables: B cannot view, read the order of, or read the history of A tables', (await rpc(B, 'tbl_view', { table_id: tA1 })).s === 404 && (await rpc(B, 'tbl_order_view', { table_id: tA1 })).s === 404 && (await rpc(B, 'tbl_history', { table_id: tA1 })).s === 404);
+  ok('tables: B cannot reserve, transfer, merge, cancel or split anything of A', (await rpc(B, 'tbl_reserve', { ...res, guest_name: 'ZZ Intruder' }, `gw-tbl-${randomUUID()}`)).s === 404
+    && (await rpc(B, 'tbl_transfer', { from_table_id: tA1, to_table_id: tB1 })).s === 404 && (await rpc(B, 'tbl_transfer', { from_table_id: tB1, to_table_id: tA1 })).s === 404
+    && (await rpc(B, 'tbl_merge', { table_ids: [tA2, tA3] })).s === 404 && (await rpc(B, 'tbl_reserve_cancel', { id: tr1.j.reservation.id })).s === 404
+    && (await rpc(B, 'tbl_split', { merge_id: mg.j.merge_id })).s === 404);
+  ok('tables: B cannot open the A store, and A rows are untouched', refused(await rpc(B, 'tbl_floor', { location_id: locA }))
+    && sql(`select count(*) from pos_reservations where organization_id='${orgA}' and guest_name='ZZ Intruder'`) === '0'
+    && sql(`select count(*) from table_merge_members where merge_id='${mg.j.merge_id}' and released_at is null`) === '2'
+    && sql(`select status from pos_reservations where row_id='${tr1.j.reservation.id}'`) === 'confirmed');
+  ok('tables: A viewer (no order rights) is refused; applicant with no business gets nothing', (await rpc(V, 'tbl_floor')).s === 403 && refused(await rpc(P1, 'tbl_floor')) && refused(await rpc(P1, 'tbl_view', { table_id: tA1 })));
+  ok('tables: A splits its merge', (await rpc(A, 'tbl_split', { merge_id: mg.j.merge_id })).s === 200);
   // ---- back office, section J (0420): low stock and purchase suggestions, A's against B's token and against a manager bound to one store
   sql(`update inventory_items set reorder_level = 20 where id = '${itemA}'`);
   const locA2 = sql(`insert into locations(organization_id,name,code) values ('${orgA}','ZZ GW Second ${run}','ZZ2-${run}') returning id`).split('\n')[0];
@@ -247,6 +279,7 @@ try {
   try { sql(`update orders set notes='ZZ-TEST gw' where organization_id in ('${orgA}','${orgB}') and coalesce(notes,'') not like 'ZZ-TEST%'`); } catch {}
   sql(`delete from org_bill_settings where organization_id in ('${orgA}','${orgB}')`);
   sql(`delete from org_counters where organization_id in ('${orgA}','${orgB}')`);
+  try { sql(`delete from table_merge_members where organization_id in ('${orgA}','${orgB}')`); sql(`delete from pos_reservations where organization_id in ('${orgA}','${orgB}')`); sql(`delete from dining_tables where organization_id in ('${orgA}','${orgB}')`); } catch {}
   try { sql(`delete from inventory_bins where organization_id in ('${orgA}','${orgB}')`); } catch {}
   try { console.log(execSync('../../database/purge_test_orders.sh', { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { console.log('purge:', e.message.slice(0, 120)); }
   console.log('leftover test businesses: ' + sql(`select count(*) from organizations where id in ('${orgA}','${orgB}')`));

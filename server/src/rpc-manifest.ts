@@ -20,6 +20,7 @@ import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
 import * as cat from './schemas/catalogue.ts';
 import * as grn from './schemas/grn.ts';
+import * as tbl from './schemas/tables.ts';
 import * as bo from './schemas/backoffice.ts';
 import * as svc from './schemas/service.ts';
 
@@ -121,6 +122,17 @@ export const MANIFEST: Entry[] = [
   db('grn_resolve', { args: grn.Resolve, map: P, rate: 'write', roles: 'staff with inventory:record' }),
   db('grn_request_approval', { args: grn.RequestApproval, map: P, rate: 'write', roles: 'staff with inventory:record' }),
   db('grn_decide', { args: grn.Decide, map: P, rate: 'write', roles: 'inventory:approve; approving posts the receipt through section H' }),
+  // ---- tables and floor, section H (0404). Body = the function's `p` object (location_id, table ids); the database validates it and checks
+  //      organisation, store and role (order:place for reserving; order:place + order:update_status or dining_tables:manage for transfer / merge / split).
+  db('tbl_floor', { args: tbl.Floor, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  db('tbl_view', { args: tbl.TableRef, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_order_view', { args: tbl.TableRef, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_history', { args: tbl.History, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_reserve', { args: tbl.Reserve, map: P, rate: 'write', idem: true, roles: 'staff with order:place (or table manager)' }),
+  db('tbl_reserve_cancel', { args: tbl.ReserveCancel, map: P, rate: 'write', roles: 'staff with order:place (or table manager)' }),
+  db('tbl_transfer', { args: tbl.Transfer, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
+  db('tbl_merge', { args: tbl.Merge, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
+  db('tbl_split', { args: tbl.Split, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   // ---- back office, section J (0420): Low Stock and Purchase Suggestions, read from section H's stock numbers. Body = the function's `p`
   //      object; no location_id = the whole business, which the database allows only for a business-wide person.
   db('backoffice_low_stock', { args: bo.LowStock, map: P, rate: 'read', roles: 'staff with inventory:read' }),

@@ -26,6 +26,8 @@ class HomeNav {
   static HomeRoute? stock;
   // Section H: one item's stock detail (section J's low-stock "view item" uses it).
   static ItemRoute? stockItem;
+  // Section H: tables and floor (the POS tab).
+  static HomeRoute? tables;
   static HomeRoute? bill;
   // Section I: the Service POS calendar, used instead of `bill` by service partners (partner_type 'service').
   static HomeRoute? service;
@@ -55,6 +57,6 @@ class HomeNav {
   static void reset() {
     home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = lowStock = null;
     stockItem = null;
-    home = orders = orderHistory = setup = items = stock = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = null;
   }
 }

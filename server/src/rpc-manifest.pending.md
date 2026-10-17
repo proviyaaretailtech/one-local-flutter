@@ -22,6 +22,7 @@ by this work** (the audit script does it the moment they are listed). `anon` mus
 ## Seen on the local database from other sections (not in the two branches above)
 Section H (inventory): now in the manifest (all twelve inv_ functions), audited and in the cross-tenant e2e.
 Section G (catalogue, GRN): now in the manifest (four cat_item_ and nine grn_ functions), audited and in the cross-tenant e2e.
+Section H (tables and floor, 0404): now in the manifest (all nine tbl_ functions), audited and in the cross-tenant e2e.
 Section I (services): svc_catalogue, svc_quote, svc_calendar, svc_slots, svc_book, svc_appointment_view, svc_appointment_act, svc_bill, svc_history.
 Section J (back office): now in the manifest (backoffice_low_stock, purchase_suggestions_refresh / list / close), audited and in the cross-tenant e2e.
 

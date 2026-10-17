@@ -16,6 +16,8 @@ import 'service/calendar_screen.dart';
 import 'service/service_widgets.dart' show ServiceRoutes;
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
+import 'tables/floor_screen.dart';
+import 'tables/table_widgets.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
 /// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G) and low stock (J) into the [HomeNav] hooks.
@@ -30,6 +32,7 @@ void installRoutes() {
       onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
   HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
   HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
+  HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id == 'menu' ? 'item' : id)))));
   HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
   HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
