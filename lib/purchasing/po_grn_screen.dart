@@ -60,6 +60,20 @@ class _PoGrnScreenState extends State<PoGrnScreen> {
     }
   }
 
+  Future<void> _act(String action, String done) async {
+    setState(() => _busy = true);
+    try {
+      final po = await env.api.act(widget.orderId, action);
+      if (!mounted) return;
+      setState(() => _po = po);
+      showToast(context, done);
+    } catch (e) {
+      if (mounted) showToast(context, e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => InvScaffold(env: env.inv, onRefresh: _load, children: [
         const InvTitle('Goods Receipt Note'),
@@ -76,6 +90,12 @@ class _PoGrnScreenState extends State<PoGrnScreen> {
       PoTotalsCard(po),
       if (draft != null) InvNote('A receipt (${draft.s('doc_no')}) is waiting in ${draft.s('status') == 'review' ? 'GRN review' : 'draft'}. Stock changes only when it is posted.'),
       if (po.canReceive) InvPrimary('Confirm Receipt & Update Stock', busy: _busy, onPressed: _confirm),
+      if (po.status == 'Pending' && !po.can('approve') && po.can('reject')) InvNote('You raised this order and it is above ${money(po.n('self_approval_limit_minor'))}: someone else approves it.'),
+      if (po.status == 'Draft' || po.status == 'Pending') InvNote(po.status == 'Draft' ? 'A draft is not sent for approval yet.' : 'Waiting for approval. Goods can be received once it is approved.'),
+      if (po.can('submit')) InvSecondary('Submit for approval', onPressed: _busy ? null : () => _act('submit', 'Submitted for approval.')),
+      if (po.can('approve')) InvPrimary('Approve order', busy: _busy, onPressed: () => _act('approve', 'Approved.')),
+      if (po.can('reject')) InvSecondary('Reject', onPressed: _busy ? null : () => _act('reject', 'Rejected.')),
+      if (po.can('cancel')) InvSecondary('Cancel order', onPressed: _busy ? null : () => _act('cancel', 'Order cancelled.')),
     ];
   }
 }

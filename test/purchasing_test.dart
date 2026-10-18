@@ -40,7 +40,7 @@ class Fake {
       return switch (fnOf(r)) {
         'pur_options' => ok(fx['options']),
         'pur_po_list' => ok(fx['list']),
-        'pur_po_view' => ok(argsOf(r)['id'] == (fx['po_received'] as Map)['id'] ? fx['po_received'] : fx['po_partial']),
+        'pur_po_view' => ok(switch (argsOf(r)['id']) { final i when i == (fx['po_received'] as Map)['id'] => fx['po_received'], final i when i == (fx['po_pending'] as Map)['id'] => fx['po_pending'], _ => fx['po_partial'] }),
         'pur_price_view' => ok(fx['price']),
         'pur_po_receive' => ok(fx['receive']),
         _ => err(404, 'not found: ${fnOf(r)}'),
@@ -102,9 +102,10 @@ void main() {
       expect(r.headers['Idempotency-Key'], 'k-2');
       expect(argsOf(r)['supplier_id'], 'sup-abc');
       expect((argsOf(r)['lines'] as List).single['unit_cost_minor'], 28000);
-      expect(po.number, 'PO-0001');
-      expect(po.status, 'received');
-      expect(po.lines.length, 3);
+      expect(po.number, 'SPO-0007');
+      expect(po.status, 'Received');
+      expect(po.lines.length, 2);
+      expect(argsOf(r)['submit'], true);
     });
 
     test('a server sentence and code survive', () async {
@@ -129,23 +130,23 @@ void main() {
   });
 
   group('Purchase History', () {
-    testWidgets('shows the open count, filters and every order with lines and totals', (t) async {
+    testWidgets('shows the open count, filters and every order with its lifecycle status, lines and totals', (t) async {
       final s = Fake();
       await showTall(t, PoHistoryScreen(env: s.env));
       expect(find.text('Purchase History'), findsOneWidget);
-      expect(find.text('Open 1 order'), findsOneWidget);
+      expect(find.text('Open 2 orders'), findsOneWidget);
       for (final x in ['All Orders', 'Open', 'Pending', 'Received', 'All', 'Overdue', '+ New Order', 'More Filters']) {
         expect(find.text(x), findsWidgets, reason: x);
       }
-      expect(find.text('PO-0002 · ABC Foods'), findsOneWidget);
-      expect(find.text('PO-0001 · ABC Foods'), findsOneWidget);
-      expect(find.text('In progress'), findsOneWidget);
-      expect(find.text('Red Tomatoes'), findsOneWidget);
+      expect(find.text('SPO-0007 · ABC Foods'), findsOneWidget);
+      for (final x in ['Pending approval', 'Approved', 'Draft', 'Cancelled', 'Received']) {
+        expect(find.text(x), findsWidgets, reason: x);
+      }
+      expect(find.text('Red Tomatoes'), findsWidgets);
       expect(find.text('Discrepancy'), findsWidgets);
-      expect(find.text('Approved'), findsWidgets);
       expect(find.text('1.5 kg rejected'), findsOneWidget);
-      expect(find.text('LOT-PAN-20260908'), findsOneWidget);
-      expect(find.text('Subtotal accepted goods'), findsNWidgets(2));
+      expect(find.text('LOT-PAN-20260908'), findsWidgets);
+      expect(find.text('Subtotal accepted goods'), findsWidgets);
     });
 
     testWidgets('a status chip asks the server for that filter', (t) async {
@@ -171,25 +172,68 @@ void main() {
   });
 
   group('Goods Receipt Note', () {
-    testWidgets('lines, tax and total as the server computed them; no receive button once received', (t) async {
+    testWidgets('a received order: the Figma discrepancy lines, tax and total as the server computed them; no receive button', (t) async {
       final s = Fake();
       await showTall(t, PoGrnScreen(env: s.env, orderId: (fx['po_received'] as Map)['id'] as String));
       expect(find.text('Goods Receipt Note'), findsOneWidget);
-      expect(find.text('PO-0001 · ABC Foods'), findsOneWidget);
-      expect(find.text('Received'), findsOneWidget);
+      expect(find.text('SPO-0007 · ABC Foods'), findsOneWidget);
+      expect(find.text('Received'), findsWidgets);
+      expect(find.text('Discrepancy'), findsWidgets);
+      expect(find.text('18.5 kg accepted'), findsOneWidget);
+      expect(find.text('1.5 kg rejected'), findsOneWidget);
+      expect(find.text('Subtotal accepted goods'), findsOneWidget);
+      expect(find.text('₹3,632.50'), findsOneWidget);
+      expect(find.text('₹239.90'), findsOneWidget);
       expect(find.text('GRN total'), findsOneWidget);
-      expect(find.text('₹6,100.00'), findsOneWidget);
+      expect(find.text('₹3,872.40'), findsOneWidget);
       expect(find.text('Confirm Receipt & Update Stock'), findsNothing);
     });
 
-    testWidgets('a partial order with the discrepancy chip, the Figma figures and the confirm button', (t) async {
+    testWidgets('a partly received order: In progress, what arrived so far, and the confirm button', (t) async {
       final po = Map<String, dynamic>.from(fx['po_partial'] as Map);
       final s = Fake();
       await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
-      expect(find.text('Discrepancy'), findsWidgets);
-      expect(find.text('18.5 kg accepted'), findsOneWidget);
-      expect(find.text('₹832.50'), findsNothing); // line values are not shown; only totals
+      expect(find.text('In progress'), findsOneWidget);
+      expect(find.text('5.0 kg accepted'), findsOneWidget);
       expect(find.text('Confirm Receipt & Update Stock'), findsOneWidget);
+    });
+
+    testWidgets('a pending order: waiting for approval, no confirm button, Cancel order asks the server', (t) async {
+      final po = Map<String, dynamic>.from(fx['po_pending'] as Map);
+      final s = Fake((r) => fnOf(r) == 'pur_po_act' ? ok({...po, 'status': 'Cancelled', 'allowed_actions': <String>[]}) : null);
+      await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
+      expect(find.text('Pending approval'), findsOneWidget);
+      expect(find.textContaining('Waiting for approval'), findsOneWidget);
+      expect(find.text('Confirm Receipt & Update Stock'), findsNothing);
+      expect(find.text('Approve order'), findsNothing);
+      await t.tap(find.text('Cancel order'));
+      await t.pumpAndSettle();
+      final call = s.requests.lastWhere((r) => fnOf(r) == 'pur_po_act');
+      expect(argsOf(call)['action'], 'cancel');
+      expect(argsOf(call)['id'], po['id']);
+      expect(find.text('Cancelled'), findsOneWidget);
+    });
+
+    testWidgets('an approver sees Approve order and Reject; approving sends the action', (t) async {
+      final po = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['approve', 'reject', 'cancel']};
+      final s = Fake((r) => fnOf(r) == 'pur_po_view' ? ok(po) : (fnOf(r) == 'pur_po_act' ? ok({...po, 'status': 'Approved', 'allowed_actions': ['receive']}) : null));
+      await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
+      expect(find.text('Reject'), findsOneWidget);
+      await t.tap(find.text('Approve order'));
+      await t.pumpAndSettle();
+      expect(argsOf(s.requests.lastWhere((r) => fnOf(r) == 'pur_po_act'))['action'], 'approve');
+      expect(find.text('Approved'), findsWidgets);
+      expect(find.text('Confirm Receipt & Update Stock'), findsOneWidget);
+    });
+
+    testWidgets('a refused action shows the server sentence, not a crash', (t) async {
+      final po = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['approve']};
+      final s = Fake((r) => fnOf(r) == 'pur_po_view' ? ok(po) : (fnOf(r) == 'pur_po_act' ? err(403, 'An order above 1000000 paise is approved by someone other than the person who raised it.', 'forbidden') : null));
+      await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
+      await t.tap(find.text('Approve order'));
+      await t.pumpAndSettle();
+      expect(find.textContaining('someone other than the person who raised it'), findsOneWidget);
+      expect(find.text('Pending approval'), findsOneWidget);
     });
 
     testWidgets('confirming starts the receipt and opens section H receiving with that document', (t) async {
@@ -209,7 +253,7 @@ void main() {
       final s = Fake((r) => fnOf(r) == 'pur_po_create' ? ok(fx['po_partial']) : null);
       await showTall(t, PoCreateScreen(env: s.env));
       expect(find.text('Restaurant Purchase'), findsOneWidget);
-      expect(find.text('Open 1 order'), findsOneWidget);
+      expect(find.text('Open 0 orders'), findsOneWidget);
       expect(find.text('Estimated total'), findsOneWidget);
       expect(find.text('₹0'), findsOneWidget);
       expect(tester(t, 'Create purchase order'), isNull); // disabled until a supplier and an item exist
@@ -234,6 +278,7 @@ void main() {
       final call = s.requests.lastWhere((r) => fnOf(r) == 'pur_po_create');
       final a = argsOf(call);
       expect(a['supplier_id'], isNotEmpty);
+      expect(a['submit'], true);
       final line = (a['lines'] as List).single as Map;
       expect([line['qty'], line['unit_cost_minor'], line['gst_pct']], [10, 36000, 5]);
       expect(call.headers['Idempotency-Key'], startsWith('pur-'));
@@ -290,22 +335,14 @@ void main() {
     });
 
     testWidgets('quality audit: the latest round with the summary banner', (t) async {
-      final price = Map<String, dynamic>.from(fx['price'] as Map);
-      price['audit'] = {
-        'rounds': 1, 'round': 1, 'pass': 4, 'warning': 1, 'fail': 1, 'reaudit_required': true,
-        'checks': [
-          {'id': '1', 'name': 'Receiving temperature', 'detail': '8.1C recorded', 'result': 'fail'},
-          {'id': '2', 'name': 'Batch & expiry labelling', 'detail': 'Expiry label not legible', 'result': 'warning'},
-          {'id': '3', 'name': 'Appearance & colour', 'detail': 'Uniform white colour', 'result': 'pass'},
-        ],
-      };
+      final price = Map<String, dynamic>.from(fx['price_audited'] as Map);   // what the server returned after a round of 4 pass, 1 warning, 1 fail
       final s = Fake((r) => fnOf(r) == 'pur_price_view' ? ok(price) : null);
       await showTall(t, SupplierPriceScreen(env: s.env, priceId: 'p-1', tab: 'audit'));
       expect(find.text('Re-audit required · 4 Pass · 1 Warning · 1 Fail'), findsOneWidget);
       expect(find.text('Receiving temperature'), findsOneWidget);
       expect(find.text('Fail'), findsOneWidget);
       expect(find.text('Warning'), findsOneWidget);
-      expect(find.text('Pass'), findsOneWidget);
+      expect(find.text('Pass'), findsNWidgets(4));
     });
 
     testWidgets('Re-Audit sends the checks as typed; a role without the action sees both buttons disabled', (t) async {

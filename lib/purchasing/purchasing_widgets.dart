@@ -31,12 +31,14 @@ String qty1(num? v) {
 /// "kg" for `kg`, "units" for the generic `unit`.
 String unitWord(String unit) => unit == 'unit' ? 'units' : unit;
 
-/// Order status chip: "Pending" (nothing received), "In progress" (some received), "Received"; cancelled as "Cancelled".
+/// Order status chip: the device lifecycle's own words. "Pending" = awaiting approval, "In progress" = partly received.
 (String, Color, Color) poLook(String s) => switch (s) {
-      'open' => ('Pending', kGreyBg, kMuted),
-      'partial' => ('In progress', kBlueIconBg, kBlueIcon),
-      'received' => ('Received', kMintBg, kPostedText),
-      'cancelled' => ('Cancelled', kRedSoft, kRedText),
+      'Draft' => ('Draft', kGreyBg, kMuted),
+      'Pending' => ('Pending approval', kAmberBgH, kAmberText),
+      'Approved' => ('Approved', kBlueIconBg, kBlueIcon),
+      'Partially Received' => ('In progress', kBlueIconBg, kBlueIcon),
+      'Received' => ('Received', kMintBg, kPostedText),
+      'Cancelled' => ('Cancelled', kRedSoft, kRedText),
       _ => (s, kGreyBg, kMuted),
     };
 
@@ -68,7 +70,7 @@ class PoHeaderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, bg, fg) = poLook(po.status);
     final received = po.t('received_at'), expected = po.t('expected_delivery');
-    final when = po.status == 'received' && received != null
+    final when = po.status == 'Received' && received != null
         ? 'Received ${dayMonth(received, year: true)}'
         : expected != null
             ? '${po.overdue ? 'Overdue · expected' : 'Expected'} ${dayMonth(expected, year: true)}'

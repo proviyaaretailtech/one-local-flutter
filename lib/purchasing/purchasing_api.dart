@@ -46,8 +46,12 @@ class PurchasingApi {
   Future<PurchaseOrder> order(String id) async => PurchaseOrder(await _call('pur_po_view', {'id': id}));
 
   /// [lines]: `{inventory_item_id, qty, unit_cost_minor, gst_pct}`.
-  Future<PurchaseOrder> create({required String supplierId, required List<Map<String, Object?>> lines, String? notes, String? expectedDelivery, required String key}) async =>
-      PurchaseOrder(await _call('pur_po_create', {'supplier_id': supplierId, 'lines': lines, 'notes': notes, 'expected_delivery': expectedDelivery}, key: key));
+  /// [submit] true makes it Pending (awaiting approval); otherwise a Draft. Nothing is committed to the supplier until someone approves it.
+  Future<PurchaseOrder> create({required String supplierId, required List<Map<String, Object?>> lines, String? notes, String? expectedDelivery, bool submit = true, required String key}) async =>
+      PurchaseOrder(await _call('pur_po_create', {'supplier_id': supplierId, 'lines': lines, 'notes': notes, 'expected_delivery': expectedDelivery, 'submit': submit}, key: key));
+
+  /// submit / approve / reject / cancel. The database decides who may, and refuses approving your own order above its limit.
+  Future<PurchaseOrder> act(String id, String action, {String? note}) async => PurchaseOrder(await _call('pur_po_act', {'id': id, 'action': action, 'note': note}));
 
   /// Starts (or reopens) the receipt draft for an order. The answer names the receipt document ([Facts.s] `document_id`); section H's receiving screen takes it from there.
   Future<Facts> receive(String poId, {String? key}) async => Facts(await _call('pur_po_receive', {'id': poId}, key: key ?? newKey()));
@@ -79,6 +83,7 @@ class PurchaseOrder extends Facts {
   Facts get totals => m('totals');
   List<String> get actions => ls('allowed_actions');
   bool get canReceive => actions.contains('receive');
+  bool can(String action) => actions.contains(action);
   bool get overdue => b('overdue');
   Facts? get openReceipt => mo('open_receipt');
 }
