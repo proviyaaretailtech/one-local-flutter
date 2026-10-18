@@ -238,7 +238,7 @@ Future<T?> showCatSheet<T>(BuildContext context, {required String title, String?
     builder: (ctx) => SafeArea(
       top: false,
       child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(20, 10, 20, 16 + MediaQuery.viewInsetsOf(ctx).bottom),
+        padding: EdgeInsets.fromLTRB(20, 10, 20, 24 + MediaQuery.viewInsetsOf(ctx).bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFD9DCE2), borderRadius: BorderRadius.circular(4)))),
           const SizedBox(height: 18),

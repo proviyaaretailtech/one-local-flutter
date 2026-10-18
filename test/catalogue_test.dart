@@ -164,6 +164,7 @@ void main() {
       expect(find.text('42000 g'), findsOneWidget);
       expect(find.text('₹72/Dz'), findsOneWidget);
       expect(find.text('Available · QR ✓'), findsNWidgets(6));
+      await t.scrollUntilVisible(find.text('Showing 1–6 of 142 items'), 300, scrollable: find.byType(Scrollable).first); // the pager scrolls with the list
       expect(find.text('Showing 1–6 of 142 items'), findsOneWidget);
       expect(find.text('POS Items'), findsOneWidget);
       expect(find.text('A simpler receipt preview'), findsOneWidget);
@@ -190,6 +191,7 @@ void main() {
     testWidgets('the next page asks the server for page 2', (t) async {
       final s = server();
       await phone(t, CatalogueScreen(api: s.api));
+      await t.scrollUntilVisible(find.byTooltip('Next page'), 300, scrollable: find.byType(Scrollable).first);
       await t.tap(find.byTooltip('Next page'));
       await t.pumpAndSettle();
       expect(jsonDecode(s.requests.last.body)['page'], 2);

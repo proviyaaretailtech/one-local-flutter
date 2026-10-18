@@ -171,13 +171,12 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
               if (_noteOpen) ...[const SizedBox(height: 14), _note()],
               const SizedBox(height: 14),
               ..._body(d),
+              // pager and the POS link scroll with the list: pinned above the bar they left room for about one product
+              if (d != null && d.totalMatching > 0) _pager(d),
+              const SizedBox(height: 8),
+              DarkButton('POS Items', trailing: LucideIcons.arrowRight, onPressed: () => _tab('bill')),
             ]),
           ),
-        ),
-        if (d != null && d.totalMatching > 0) _pager(d),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: DarkButton('POS Items', trailing: LucideIcons.arrowRight, onPressed: () => _tab('bill')),
         ),
         PosBottomNav(active: 'item', onTap: _tab),
       ]),
@@ -317,7 +316,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
         );
     final shown = <int>{1, if (d.page > 1) d.page - 1, d.page, if (d.page < pages) d.page + 1, pages}.where((p) => p >= 1 && p <= pages).toList()..sort();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
       child: Row(children: [
         Expanded(child: Text('Showing $from–$to of $total items', style: inter(13, 400, color: kMuted))),
         IconButton(tooltip: 'Previous page', visualDensity: VisualDensity.compact, onPressed: d.page > 1 ? () { _page = d.page - 1; _load(); } : null, icon: const Icon(LucideIcons.chevronLeft, size: 20)),
@@ -417,9 +416,16 @@ class _AddChoice extends StatelessWidget {
         child: InkWell(
           customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-            child: Row(children: [Icon(icon, size: 22, color: kDark), const SizedBox(width: 10), Flexible(child: Text(label, style: inter(17, 700, color: kDark)))]),
+          // fixed height and one line: both choices are the same size whatever the label
+          child: SizedBox(
+            height: 64,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 22, color: kDark), const SizedBox(width: 10), Text(label, maxLines: 1, style: inter(17, 700, color: kDark))]),
+              ),
+            ),
           ),
         ),
       );
