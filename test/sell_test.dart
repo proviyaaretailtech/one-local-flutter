@@ -636,6 +636,37 @@ void main() {
       expect(jsonDecode(till.where('POST', '/pos_return_create').single.body)['lines'], [{'order_item_id': 'i1', 'qty': 1, 'restock': false}]);
     });
 
+    testWidgets('the Damaged mark appears only once an item is chosen, and can be switched off again', (t) async {
+      final till = Till();
+      await tall(t, ReturnsScreen(env: till.env()));
+      await t.tap(find.text('+ Return'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('P-00087 · Rahul Patil'));
+      await t.pumpAndSettle();
+      expect(find.text('Damaged'), findsNothing);
+      await t.tap(find.byTooltip('One more Amul Butter 500g'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Damaged'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Damaged'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Record return'));
+      await t.pumpAndSettle();
+      expect(jsonDecode(till.where('POST', '/pos_return_create').single.body)['lines'], [{'order_item_id': 'i1', 'qty': 1}]); // back on the shelf is the default: no flag sent
+    });
+
+    testWidgets('a return whose item was marked damaged says so in its details', (t) async {
+      final till = Till();
+      till.returns = [
+        {...retRow('t1', 'RET-0001', 'approved'), 'lines': [{'name': 'Horlicks 500g', 'qty': 1, 'amount': 320, 'restock': false}, {'name': 'Parle-G', 'qty': 2, 'amount': 20, 'restock': true}]},
+      ];
+      await tall(t, ReturnsScreen(env: till.env()));
+      await t.tap(find.text('View details'));
+      await t.pumpAndSettle();
+      expect(find.text('1 × Horlicks 500g · damaged'), findsOneWidget);
+      expect(find.text('2 × Parle-G'), findsOneWidget);
+    });
+
     testWidgets('no item chosen: no request', (t) async {
       final till = Till();
       await tall(t, ReturnsScreen(env: till.env()));
