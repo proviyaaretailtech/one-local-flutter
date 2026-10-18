@@ -96,8 +96,8 @@ class _HubScreenState extends State<HubScreen> {
         HomeNav.go(context, HomeNav.items, 'The menu');
       case 'Stock':
         HomeNav.go(context, HomeNav.stock, 'Stock');
-      case 'Money':
-        HomeNav.go(context, HomeNav.money, 'Money');
+      case 'Home':
+        HomeNav.go(context, HomeNav.home, 'Home');
     }
   }
 

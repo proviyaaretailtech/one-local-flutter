@@ -17,7 +17,7 @@ class InvEnv {
   InvEnv({InventoryApi? api, this.onNavigate, this.onOpenOrder, this.onItems, this.onBell}) : api = api ?? InventoryApi();
   final InventoryApi api;
 
-  /// Bottom-bar tabs this section does not own: 'money', 'item', 'bill', 'online'.
+  /// Bottom-bar tabs this section does not own: 'home', 'item', 'bill', 'online'.
   final ValueChanged<String>? onNavigate;
 
   /// Opens a linked order (Movement Detail "Open Linked Transaction").

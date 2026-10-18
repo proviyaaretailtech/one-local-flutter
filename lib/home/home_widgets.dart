@@ -173,7 +173,7 @@ class BarTab {
 }
 
 const kStoreTabs = [
-  BarTab('Money', LucideIcons.indianRupee),
+  BarTab('Home', LucideIcons.house),
   BarTab('Item', LucideIcons.archive),
   BarTab('Bill', LucideIcons.receiptText, hero: true),
   BarTab('Online order', LucideIcons.shoppingBag),
@@ -181,7 +181,7 @@ const kStoreTabs = [
 ];
 
 const kHubTabs = [
-  BarTab('Money', LucideIcons.indianRupee),
+  BarTab('Home', LucideIcons.house),
   BarTab('Menu', LucideIcons.bookOpenText),
   BarTab('POS', LucideIcons.receiptText, hero: true),
   BarTab('Orders', LucideIcons.shoppingBag),

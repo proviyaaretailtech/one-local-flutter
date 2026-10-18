@@ -8,13 +8,18 @@ import 'home_api.dart';
 import 'home_nav.dart';
 import 'home_widgets.dart';
 import 'hub_screen.dart';
+import '../service/history_screen.dart';
+import '../service/service_api.dart';
+import '../service/service_dashboard.dart';
 
 /// Figma section D "Seller Admin Dashboard / POS control center". Every figure comes from
 /// `GET /api/partner/home`; a tile without a data source says so instead of showing a number.
 /// Restaurants get the same screen (their own dashboard is not drawn yet) with the restaurant tab set.
+/// A service business gets its own dashboard ([ServiceHomeBody], from `svc_dashboard`) inside the same shell.
 class ControlCentreScreen extends StatefulWidget {
-  const ControlCentreScreen({super.key, this.api, this.auth, this.now});
+  const ControlCentreScreen({super.key, this.api, this.auth, this.now, this.serviceApi});
   final HomeApi? api;
+  final ServiceApi? serviceApi;
   final AuthRepository? auth;
 
   /// Clock for "Synced … ago" (tests).
@@ -28,6 +33,7 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
   late final HomeApi _api = widget.api ?? HomeApi();
   late Future<HomeSummary> _summary = _api.summary();
   String? _location;
+  String? _kind; // the kind of business the summary reported (decides what the centre tab opens)
 
   Future<void> _reload() async {
     final next = _api.summary(location: _location);
@@ -102,14 +108,15 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
         HomeNav.go(context, HomeNav.orders, 'Online orders');
       case 'Bill':
       case 'POS':
-        HomeNav.go(context, HomeNav.partnerType == 'service' ? HomeNav.service : HomeNav.bill, HomeNav.partnerType == 'service' ? 'Appointments' : 'Billing');
+        final service = HomeNav.partnerType == 'service' || _kind == 'service';
+        HomeNav.go(context, service ? HomeNav.service : HomeNav.bill, service ? 'Appointments' : 'Billing');
       case 'Item':
       case 'Menu':
         HomeNav.go(context, HomeNav.items, label == 'Menu' ? 'The menu' : 'Items');
       case 'Stock':
         HomeNav.go(context, HomeNav.stock, 'Stock');
-      case 'Money':
-        HomeNav.go(context, HomeNav.money, 'Money');
+      case 'Home':
+        break; // already on the dashboard
     }
   }
 
@@ -119,6 +126,7 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
       future: _summary,
       builder: (context, snap) {
         final s = snap.data;
+        if (s != null) _kind = s.outletKind;
         final loading = snap.connectionState != ConnectionState.done;
         final tabs = s?.outletKind == 'restaurant' ? kHubTabs : kStoreTabs;
         return Scaffold(
@@ -131,11 +139,18 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
                 ? const Center(child: CircularProgressIndicator(color: kLink))
                 : snap.hasError
                     ? _ErrorState(error: snap.error!, onRetry: _reload)
-                    : RefreshIndicator(
+                    : s!.outletKind == 'service'
+                        ? ServiceHomeBody(
+                            api: widget.serviceApi ?? ServiceApi(),
+                            personName: s.personName,
+                            onMenu: _openMenu,
+                            onInsights: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ServiceHistoryScreen(api: widget.serviceApi ?? ServiceApi()))),
+                          )
+                        : RefreshIndicator(
                         color: kLink,
                         onRefresh: _reload,
                         child: _Body(
-                          s: s!,
+                          s: s,
                           now: (widget.now ?? DateTime.now)(),
                           onMenu: _openMenu,
                           onOutlet: () => _pickOutlet(s),

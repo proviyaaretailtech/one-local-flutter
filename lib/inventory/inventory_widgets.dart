@@ -163,7 +163,7 @@ class InvBottomNav extends StatelessWidget {
   final String active;
   final ValueChanged<String> onTap;
   static const tabs = [
-    ('money', 'Money', LucideIcons.indianRupee),
+    ('home', 'Home', LucideIcons.house),
     ('item', 'Item', LucideIcons.archive),
     ('bill', 'Bill', LucideIcons.receiptText),
     ('online', 'Online order', LucideIcons.shoppingBag),

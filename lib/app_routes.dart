@@ -41,7 +41,7 @@ void installRoutes() {
 
 /// Bottom-bar tabs of the order screens that belong to other sections.
 void _tab(BuildContext context, String id) => switch (id) {
-      'money' => HomeNav.go(context, HomeNav.money, 'Money'),
+      'home' => HomeNav.go(context, HomeNav.home, 'Home'),
       'item' => HomeNav.go(context, HomeNav.items, 'Items'),
       'bill' => HomeNav.go(context, HomeNav.bill, 'Bill'),
       'stock' => HomeNav.go(context, HomeNav.stock, 'Stock'),

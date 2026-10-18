@@ -11,7 +11,7 @@ import 'orders_api.dart';
 
 /// Section E entry (Figma "Orders History"): every order of this business, newest first, with search and
 /// All / Completed / Pending / Cancelled. The control centre (section D) links here.
-/// [onNavigate] receives the bottom-bar tabs this section does not own ('money', 'item', 'online', 'stock'); 'bill' opens a new cart.
+/// [onNavigate] receives the bottom-bar tabs this section does not own ('home', 'item', 'online', 'stock'); 'bill' opens a new cart.
 class OrdersHome extends StatefulWidget {
   const OrdersHome({super.key, this.api, this.onNavigate, this.onMenu});
   final OrdersApi? api;

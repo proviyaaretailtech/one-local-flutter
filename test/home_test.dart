@@ -292,11 +292,11 @@ void main() {
 
     testWidgets('store and restaurant tab bars', (t) async {
       await showHome(t);
-      for (final l in ['Money', 'Item', 'Bill', 'Online order', 'Stock']) {
+      for (final l in ['Home', 'Item', 'Bill', 'Online order', 'Stock']) {
         expect(find.byKey(ValueKey('tab-$l')), findsOneWidget);
       }
       await showHome(t, summary: summaryJson(kind: 'restaurant'));
-      for (final l in ['Money', 'Menu', 'POS', 'Orders', 'Stock']) {
+      for (final l in ['Home', 'Menu', 'POS', 'Orders', 'Stock']) {
         expect(find.byKey(ValueKey('tab-$l')), findsOneWidget);
       }
     });
@@ -393,7 +393,7 @@ void main() {
       expect(find.text('8.4%'), findsOneWidget);
       expect(find.text('1.2%'), findsOneWidget);
       expect(find.byType(SalesBars), findsOneWidget);
-      for (final l in ['Money', 'Menu', 'POS', 'Orders', 'Stock']) {
+      for (final l in ['Home', 'Menu', 'POS', 'Orders', 'Stock']) {
         expect(find.byKey(ValueKey('tab-$l')), findsOneWidget);
       }
     });

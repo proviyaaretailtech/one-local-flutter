@@ -224,9 +224,9 @@ void main() {
       final s = Fake();
       final out = <String>[];
       await showTall(t, InventoryDashboard(env: InvEnv(api: s.api, onNavigate: out.add)));
-      await t.tap(find.byKey(const ValueKey('inv-tab-money')));
+      await t.tap(find.byKey(const ValueKey('inv-tab-home')));
       await t.tap(find.byKey(const ValueKey('inv-tab-online')));
-      expect(out, ['money', 'online']);
+      expect(out, ['home', 'online']);
     });
   });
 

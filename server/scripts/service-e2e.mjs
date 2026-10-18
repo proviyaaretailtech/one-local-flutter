@@ -77,8 +77,14 @@ try {
   const move = await rpc(A, 'svc_appointment_act', { id: apptId, action: 'reschedule', starts_at: at(3, '11:00'), expected_version: 1 }, k());
   ok('A reschedules', move.s === 200 && move.j.version === 2, move);
 
+  const dash = await rpc(A, 'svc_dashboard', {});
+  ok('A dashboard: visits, money, providers', dash.s === 200 && Number(dash.j.money.today) === 1180 && dash.j.next_up.some(v => v.id === apptId) && dash.j.plans.packages_active === 1 && dash.j.providers.all === 1, dash);
+  ok('viewer cannot open the service dashboard', refused(await rpc(V, 'svc_dashboard', {})));
+
   // ---- B against A
   const x = (fn, args, key) => rpc(B, fn, args, key);
+  const bd = await x('svc_dashboard', {});
+  ok('B: dashboard holds nothing of A', bd.s === 200 && bd.j.today.visits === 0 && Number(bd.j.money.month) === 0 && !JSON.stringify(bd.j).includes(apptId) && (await x('svc_dashboard', { location_id: locA })).s === 404, bd);
   ok('B: A appointment not found', (await x('svc_appointment_view', { id: apptId })).s === 404);
   ok('B: cannot move, cancel, update or bill A appointment', (await x('svc_appointment_act', { id: apptId, action: 'cancel', reason: 'zz test', expected_version: 2 }, k())).s === 404
     && (await x('svc_job_update', { id: apptId, expected_version: 2, provider_notes: 'x' }, k())).s === 404

@@ -18,6 +18,7 @@ const obj = <T extends z.ZodRawShape>(shape: T) => z.object(shape).loose();
 const fulfilment = z.enum(['appointment', 'event', 'on_location', 'on_demand'], { message: 'Unknown fulfilment.' });
 
 export const Catalogue = obj({ location_id: id.nullish() });
+export const Dashboard = obj({ location_id: id.nullish() });
 export const Calendar = obj({ date: day.nullish(), view: z.enum(['day', 'week']).optional(), location_id: id.nullish(), staff_id: id.nullish() });
 export const Quote = obj({ service_id: id, addon_ids: ids.optional(), staff_id: id.nullish() });
 export const Slots = obj({ date: day, service_id: id, addon_ids: ids.optional(), staff_id: id.nullish(), location_id: id.nullish() });

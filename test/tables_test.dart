@@ -524,9 +524,9 @@ void main() {
       final s = Fake();
       final taps = <String>[];
       await show(t, FloorScreen(env: TablesEnv(api: s.api, onNavigate: taps.add)));
-      await tapKey(t, 'tbl-tab-money');
+      await tapKey(t, 'tbl-tab-home');
       await tapKey(t, 'tbl-tab-stock');
-      expect(taps, ['money', 'stock']);
+      expect(taps, ['home', 'stock']);
     });
   });
 }

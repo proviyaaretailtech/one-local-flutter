@@ -219,7 +219,7 @@ void main() {
       expect(find.text('Deposit pending'), findsOneWidget);
       expect(find.text('Neha Rao · Chair 2'), findsOneWidget);
       expect(find.text('+ Book appointment'), findsOneWidget);
-      for (final tab in ['Money', 'Item', 'Bill', 'Online order', 'Stock']) {
+      for (final tab in ['Home', 'Item', 'Bill', 'Online order', 'Stock']) {
         expect(find.text(tab), findsOneWidget, reason: tab);
       }
     });

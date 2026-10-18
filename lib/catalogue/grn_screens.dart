@@ -22,8 +22,8 @@ String _errText(Object e) => e is CatalogueApiException ? e.message : 'Could not
 void _tab(BuildContext context, String id, {String active = 'bill'}) {
   if (id == active) return;
   switch (id) {
-    case 'money':
-      HomeNav.go(context, HomeNav.money, 'Money');
+    case 'home':
+      HomeNav.go(context, HomeNav.home, 'Home');
     case 'item':
       HomeNav.go(context, HomeNav.items, 'Items');
     case 'bill':

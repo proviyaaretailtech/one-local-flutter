@@ -143,6 +143,7 @@ export const MANIFEST: Entry[] = [
   //      (book: owner/admin/manager/biller/captain/...; manage: owner/admin/manager). Writes carry the Idempotency-Key header and the
   //      database refuses a replayed key with a different body (OL_IDEMPOTENCY_MISMATCH).
   db('svc_catalogue', { args: svc.Catalogue, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_dashboard', { args: svc.Dashboard, map: P, rate: 'read', roles: 'staff who may book' }),
   db('svc_calendar', { args: svc.Calendar, map: P, rate: 'read', roles: STAFF }),
   db('svc_quote', { args: svc.Quote, map: P, rate: 'read', roles: 'staff who may book' }),
   db('svc_slots', { args: svc.Slots, map: P, rate: 'read', roles: 'staff who may book' }),

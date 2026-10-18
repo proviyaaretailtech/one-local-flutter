@@ -11,7 +11,7 @@ import 'purchase_suggestions_screen.dart';
 
 /// Figma "OneLocal · Low Stock" (section J): items needing replenishment at this location, critical first, with search and
 /// All / Critical / Low Stock. Every level, cover and shortfall comes from the server; missing facts read "Not set" / "Not recorded".
-/// [onNavigate] gets the bottom-bar tabs ('money', 'item', 'bill', 'online', 'stock'); [onViewItem] opens section H's stock detail.
+/// [onNavigate] gets the bottom-bar tabs ('home', 'item', 'bill', 'online', 'stock'); [onViewItem] opens section H's stock detail.
 class LowStockScreen extends StatefulWidget {
   const LowStockScreen({super.key, this.api, this.onNavigate, this.onMenu, this.onItems, this.onViewItem});
   final BackofficeApi? api;

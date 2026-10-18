@@ -12,7 +12,7 @@ class TablesEnv {
   TablesEnv({TablesApi? api, this.onNavigate, this.onStartOrder, this.initials = '', this.onMenu}) : api = api ?? TablesApi();
   final TablesApi api;
 
-  /// Bottom-bar tabs this section does not own: 'money', 'menu', 'orders', 'stock'.
+  /// Bottom-bar tabs this section does not own: 'home', 'menu', 'orders', 'stock'.
   final ValueChanged<String>? onNavigate;
 
   /// "Start New Order" on a table (the counter-bill flow of section F). Null until the host plugs it in.
@@ -150,7 +150,7 @@ class TablesNav extends StatelessWidget {
   const TablesNav({super.key, required this.onTap});
   final ValueChanged<String> onTap;
   static const tabs = [
-    ('money', 'Money', LucideIcons.indianRupee),
+    ('home', 'Home', LucideIcons.house),
     ('menu', 'Menu', LucideIcons.bookOpen),
     ('pos', 'POS', LucideIcons.receiptText),
     ('orders', 'Orders', LucideIcons.shoppingBag),

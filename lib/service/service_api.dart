@@ -142,6 +142,24 @@ class SlotProvider {
   List<Map<String, dynamic>> get slots => _list(raw['slots']);
 }
 
+/// The service business home screen (`svc_dashboard`): today's visits, money, free slots, what needs attention, the next visits.
+class ServiceDashboardData extends SvcData {
+  const ServiceDashboardData(super.raw);
+  String get business => s('business');
+  String get locationName => m('location').s('name');
+  String get dateLabel => s('date_label');
+  String? get closed => so('closed');
+  SvcData get today => m('today');
+  SvcData get money => m('money');
+  SvcData get attention => m('attention');
+  SvcData get providers => m('providers');
+  SvcData get month => m('month');
+  SvcData get plans => m('plans');
+  int get availableSlots => i('available_slots');
+  List<AppointmentView> get nextUp => l('next_up').map((e) => AppointmentView(e.raw)).toList();
+  List<SvcData> get topServices => l('top_services');
+}
+
 /// Frame 108: the filtered list plus its count (`svc_history`).
 class HistoryData extends SvcData {
   const HistoryData(super.raw);
@@ -245,6 +263,8 @@ class ServiceApi {
   }
 
   Future<Catalogue> catalogue({String? locationId}) async => Catalogue(await _call('svc_catalogue', {'location_id': locationId}));
+
+  Future<ServiceDashboardData> dashboard({String? locationId}) async => ServiceDashboardData(await _call('svc_dashboard', {'location_id': locationId}));
 
   Future<CalendarData> calendar({required String date, String view = 'day', String? locationId, String? staffId}) async =>
       CalendarData(await _call('svc_calendar', {'date': date, 'view': view, 'location_id': locationId, 'staff_id': staffId}));

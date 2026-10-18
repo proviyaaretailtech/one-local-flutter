@@ -248,9 +248,9 @@ void main() {
     testWidgets('bottom bar: other tabs go to their sections', (t) async {
       final tabs = <String>[];
       await showTall(t, LowStockScreen(api: FakeBackoffice(server()).api, onNavigate: tabs.add));
-      await t.tap(find.text('Money'));
+      await t.tap(find.text('Home'));
       await t.tap(find.text('Stock'));
-      expect(tabs, ['money']);
+      expect(tabs, ['home']);
     });
 
     testWidgets('nothing low: an honest empty state', (t) async {
