@@ -436,7 +436,7 @@ class PosBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SafeArea(
         top: false,
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        minimum: const EdgeInsets.fromLTRB(16, 12, 16, 12), // 12 above: the last button of a page never touches the bar
         child: Container(
           height: 72,
           decoration: BoxDecoration(color: kDark, borderRadius: BorderRadius.circular(30)),

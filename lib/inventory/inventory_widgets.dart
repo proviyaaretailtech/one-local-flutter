@@ -172,7 +172,7 @@ class InvBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SafeArea(
         top: false,
-        minimum: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        minimum: const EdgeInsets.fromLTRB(14, 12, 14, 14), // 12 above: the last button of a page never touches the bar
         child: Container(
           height: 78,
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
