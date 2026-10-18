@@ -564,7 +564,7 @@ class _RevenueCard extends StatelessWidget {
         _InsightRow(
           dot: kGreenDot,
           label: 'GRN received',
-          value: grnBills == null ? 'Not reported' : grnBills == 0 ? 'None today' : '$grnBills bill${grnBills == 1 ? '' : 's'} · ${rupees(s.grnAmount ?? 0)}',
+          value: grnBills == null ? 'Not reported' : grnBills == 0 ? 'None today' : '$grnBills bill${grnBills == 1 ? '' : 's'} · ${s.grnAmount == null ? 'cost not entered' : rupees(s.grnAmount!)}',
           valueColor: kInk,
         ),
       ]),

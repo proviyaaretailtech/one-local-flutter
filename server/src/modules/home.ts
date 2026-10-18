@@ -2,7 +2,7 @@
 // Read-only. Every query is scoped to the caller's organisation, and to the outlets they are
 // assigned to in org_user_locations when they have any assignment. Numbers come straight from the
 // source tables (Commerce = orders/order_items, Inventory = inventory_* / pos_raw_materials,
-// Purchasing = pos_goods_receipts). A figure with no source is sent as null, never as a guess.
+// Purchasing = posted receipt documents with their recorded unit costs, plus legacy pos_goods_receipts). A figure with no source is sent as null, never as a guess.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { db, fromDbError } from '../db.ts';
 import { HttpError } from '../http.ts';
@@ -157,6 +157,24 @@ export function cardStatus(pos: string, ol: string | null): string {
   return pos === 'sent_to_kitchen' ? 'preparing' : pos;
 }
 
+// Goods received: bills = old device receipts + posted receipts. Amount = the old receipts' totals + accepted units x the unit cost
+// recorded at receiving (grn_receipt_costs, paise). If any accepted line of a posted receipt has no cost yet the amount is null
+// (not reported), never a partial sum shown as the whole.
+export function goodsReceived(legacy: Row[], receiptCount: number, lines: Row[], costs: Row[]): { bills: number; amount: number | null } {
+  const cost = new Map(costs.map(c => [String(c.line_id), c.unit_cost_minor == null ? null : Number(c.unit_cost_minor)]));
+  let paise = 0;
+  let known = true;
+  for (const l of lines) {
+    const accepted = Math.max(num(l.qty) - num(l.rejected_qty), 0);
+    if (accepted === 0) continue;
+    const c = cost.get(String(l.id));
+    if (c == null || !Number.isFinite(c)) { known = false; continue; }
+    paise += Math.round(accepted * c);
+  }
+  const legacyRupees = legacy.reduce((n, g) => n + num(g.total), 0);
+  return { bills: legacy.length + receiptCount, amount: known ? money(legacyRupees + paise / 100) : null };
+}
+
 export function fulfilment(channel: string, hasAddress: boolean): string {
   if (channel === 'pickup' || channel === 'dine_in' || channel === 'delivery') return channel;
   if (channel === 'online' || channel === 'swiggy' || channel === 'zomato') return hasAddress ? 'delivery' : 'pickup';
@@ -243,9 +261,16 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
   const cancelledIds = day.filter(o => o.status === 'cancelled').map(o => o.id as string);
   const kots = await rowsFor(d, 'kot_tickets', 'order_id', cancelledIds, 'id', q => q.eq('organization_id', staff.organizationId).neq('status', 'cancelled'));
 
-  // Goods received today (Purchasing).
-  const grn = must(await scoped(d.from('pos_goods_receipts').select('total'), s).is('deleted_at', null)
+  // Goods received today (Purchasing): receipts posted into stock today (section H/G documents, the record of what arrived) plus any
+  // receipt still synced by the old device app (pos_goods_receipts).
+  const legacyGrn = must(await scoped(d.from('pos_goods_receipts').select('total'), s).is('deleted_at', null)
     .gte('received_at', from.toISOString()).lt('received_at', to.toISOString())) as Row[];
+  const receipts = await all((a, b) => scoped(d.from('inventory_documents').select('id'), s).eq('doc_type', 'receipt').in('status', ['posted', 'completed'])
+    .gte('posted_at', from.toISOString()).lt('posted_at', to.toISOString()).order('id').range(a, b));
+  const receiptIds = receipts.map(r => String(r.id));
+  const receiptLines = await rowsFor(d, 'inventory_document_lines', 'document_id', receiptIds, 'id, qty, rejected_qty', q => q.eq('organization_id', staff.organizationId));
+  const receiptCosts = await rowsFor(d, 'grn_receipt_costs', 'receipt_document_id', receiptIds, 'line_id, unit_cost_minor', q => q.eq('organization_id', staff.organizationId));
+  const grn = goodsReceived(legacyGrn, receiptIds.length, receiptLines, receiptCosts);
 
   const one = s.outlets.length === 1 ? s.outlets[0] : null;
   return {
@@ -285,7 +310,7 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
       // No expense ledger exists in the schema yet (pos_expense_heads holds budgets, not spending).
       expenses: null,
       kot_not_billed: kots.length,
-      grn: { bills: grn.length, amount: money(grn.reduce((n, g) => n + num(g.total), 0)) },
+      grn,
       // No purchase price history is stored (pos_supplier_prices keeps only the latest price).
       price_trend: null,
     },
