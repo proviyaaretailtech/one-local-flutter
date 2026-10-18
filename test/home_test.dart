@@ -228,16 +228,12 @@ void main() {
       expect(find.text('Store Closed'), findsOneWidget);
     });
 
-    testWidgets('item data gaps: store hides recipes, restaurant shows them, none means no card', (t) async {
+    testWidgets('item data gaps: the store card hides recipes, none means no card (a restaurant has its own dashboard)', (t) async {
       await showHome(t);
       expect(find.text('Item data needs attention'), findsOneWidget);
       expect(find.text('77 items'), findsOneWidget);
       expect(find.text('18 items'), findsOneWidget);
       expect(find.text('Missing recipes'), findsNothing);
-
-      await showHome(t, summary: summaryJson(kind: 'restaurant'));
-      expect(find.text('Missing recipes'), findsOneWidget);
-      expect(find.text('6 items'), findsOneWidget);
 
       await showHome(t, summary: summaryJson(catalogue: {'items': 10, 'missing_descriptions': 0, 'missing_photos': 0, 'missing_recipes': null}));
       expect(find.text('Item data needs attention'), findsNothing);
@@ -290,13 +286,9 @@ void main() {
       expect(find.text('None today'), findsOneWidget);
     });
 
-    testWidgets('store and restaurant tab bars', (t) async {
+    testWidgets('store tab bar (the restaurant bar is checked in restaurant_dashboard_test.dart)', (t) async {
       await showHome(t);
       for (final l in ['Home', 'Item', 'Bill', 'Online order', 'Stock']) {
-        expect(find.byKey(ValueKey('tab-$l')), findsOneWidget);
-      }
-      await showHome(t, summary: summaryJson(kind: 'restaurant'));
-      for (final l in ['Home', 'Menu', 'POS', 'Orders', 'Stock']) {
         expect(find.byKey(ValueKey('tab-$l')), findsOneWidget);
       }
     });

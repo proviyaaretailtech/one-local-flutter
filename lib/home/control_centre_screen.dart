@@ -11,13 +11,16 @@ import 'hub_screen.dart';
 import '../service/history_screen.dart';
 import '../service/service_api.dart';
 import '../service/service_dashboard.dart';
+import '../restaurant/restaurant_api.dart';
+import '../restaurant/restaurant_dashboard.dart';
 
 /// Figma section D "Seller Admin Dashboard / POS control center". Every figure comes from
 /// `GET /api/partner/home`; a tile without a data source says so instead of showing a number.
-/// Restaurants get the same screen (their own dashboard is not drawn yet) with the restaurant tab set.
+/// A restaurant gets its own dashboard ([RestaurantHomeBody], from `rst_dashboard`) with the restaurant tab set.
 /// A service business gets its own dashboard ([ServiceHomeBody], from `svc_dashboard`) inside the same shell.
 class ControlCentreScreen extends StatefulWidget {
-  const ControlCentreScreen({super.key, this.api, this.auth, this.now, this.serviceApi});
+  const ControlCentreScreen({super.key, this.api, this.auth, this.now, this.serviceApi, this.restaurantApi});
+  final RestaurantApi? restaurantApi;
   final HomeApi? api;
   final ServiceApi? serviceApi;
   final AuthRepository? auth;
@@ -145,6 +148,13 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
                             personName: s.personName,
                             onMenu: _openMenu,
                             onInsights: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ServiceHistoryScreen(api: widget.serviceApi ?? ServiceApi()))),
+                          )
+                        : s.outletKind == 'restaurant'
+                        ? RestaurantHomeBody(
+                            api: widget.restaurantApi ?? RestaurantApi(),
+                            personName: s.personName,
+                            onMenu: _openMenu,
+                            onInsights: _openHub,
                           )
                         : RefreshIndicator(
                         color: kLink,

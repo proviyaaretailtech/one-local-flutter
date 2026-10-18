@@ -23,6 +23,7 @@ import * as grn from './schemas/grn.ts';
 import * as tbl from './schemas/tables.ts';
 import * as bo from './schemas/backoffice.ts';
 import * as svc from './schemas/service.ts';
+import * as rst from './schemas/restaurant.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -144,6 +145,8 @@ export const MANIFEST: Entry[] = [
   //      database refuses a replayed key with a different body (OL_IDEMPOTENCY_MISMATCH).
   db('svc_catalogue', { args: svc.Catalogue, map: P, rate: 'read', roles: 'staff who may book' }),
   db('svc_dashboard', { args: svc.Dashboard, map: P, rate: 'read', roles: 'staff who may book' }),
+  // ---- Restaurant dashboard (0491): the home screen of a restaurant; each block is read as the caller, a block the role may not read is null.
+  db('rst_dashboard', { args: rst.Dashboard, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
   db('svc_calendar', { args: svc.Calendar, map: P, rate: 'read', roles: STAFF }),
   db('svc_quote', { args: svc.Quote, map: P, rate: 'read', roles: 'staff who may book' }),
   db('svc_slots', { args: svc.Slots, map: P, rate: 'read', roles: 'staff who may book' }),
