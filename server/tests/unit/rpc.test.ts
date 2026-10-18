@@ -46,6 +46,10 @@ test('database error prefixes of every family map to a status and a code', () =>
   t('INV_SHORT: only 3 left', 409, 'short');
   t('INV_CAPACITY: bin full', 422, 'capacity');
   t('INV_STALE: changed', 409, 'version_conflict');
+  t('PS_FORBIDDEN: choose your store', 403, 'forbidden');
+  t('PS_CONFLICT: x is already ordered', 409, 'conflict');
+  t('PS_SCOPE: choose your store', 403, 'store_scope');
+  t('PS_NOT_FOUND: suggestion not found', 404, 'not_found');
   t('OL_BAD_REQUEST: x', 400, 'bad_request');
   assert.throws(() => mapDbError({ message: 'new row violates row-level security policy', code: '42501' }), (e: HttpError) => e.status === 403);
   assert.throws(() => mapDbError({ message: 'PLAN_LIMIT: x' }), (e: HttpError) => e.status === 500);
@@ -77,12 +81,31 @@ test('inventory (section H): every function is listed, reads are "read", writes 
   assert.ok(keep.success && keep.data.title === 'x' && keep.data.lines.length === 1);   // fields the schema does not name still reach the database
 });
 
-test('purchasing (section H): eight functions listed, reads are "read", writes carry the Idempotency-Key where they create, shapes are checked', async () => {
+test('back office (section J): four functions listed, writes are "write", close carries the Idempotency-Key, shapes are checked', async () => {
+  assert.equal(lookup('backoffice_low_stock')?.rate, 'read');
+  assert.equal(lookup('purchase_suggestions_list')?.rate, 'read');
+  assert.equal(lookup('purchase_suggestions_refresh')?.rate, 'write');
+  const close = lookup('purchase_suggestions_close');
+  assert.ok(close && close.kind === 'db' && close.idem && close.rate === 'write');
+  for (const helper of ['backoffice_low_stock_rows', 'backoffice_stock_rows', 'backoffice_org_wide', 'backoffice_location', 'purchase_suggestions_create_po']) assert.equal(lookup(helper), undefined, helper);
+  assert.equal((await post('/rpc/backoffice_low_stock')).status, 401);
+  const parse = (alias: string, body: unknown) => (lookup(alias) as { args: { safeParse(v: unknown): { success: boolean } } }).args.safeParse(body);
+  const id = '42000000-0000-0000-0000-0000000000c1';
+  assert.equal(parse('backoffice_low_stock', { filter: 'zomato' }).success, false);
+  assert.equal(parse('backoffice_low_stock', { location_id: 'x' }).success, false);
+  assert.ok(parse('backoffice_low_stock', { location_id: id, filter: 'low', q: 'pan' }).success);
+  assert.equal(parse('purchase_suggestions_close', { ids: [], outcome: 'dismissed' }).success, false);
+  assert.equal(parse('purchase_suggestions_close', { ids: [id], outcome: 'deleted' }).success, false);
+  assert.equal(parse('purchase_suggestions_close', { ids: [id], outcome: 'ordered', purchase_order_ref: 'PO-1', quantities: { [id]: -2 } }).success, false);
+  assert.ok(parse('purchase_suggestions_close', { ids: [id], outcome: 'ordered', purchase_order_ref: 'PO-1', quantities: { [id]: 6 } }).success);
+});
+
+test('purchasing (section H): nine functions listed, reads are "read", writes carry the Idempotency-Key where they create, shapes are checked', async () => {
   const reads = ['pur_options', 'pur_po_list', 'pur_po_view', 'pur_price_view'];
-  const writes = ['pur_po_create', 'pur_po_receive', 'pur_sourcing_select', 'pur_audit_record'];
+  const writes = ['pur_po_create', 'pur_po_act', 'pur_po_receive', 'pur_sourcing_select', 'pur_audit_record'];
   for (const a of reads) assert.equal(lookup(a)?.rate, 'read', a);
   for (const a of writes) { const e = lookup(a); assert.ok(e && e.kind === 'db' && e.rate === 'write', a); }
-  for (const a of ['pur_po_create', 'pur_po_receive', 'pur_sourcing_select']) assert.ok((lookup(a) as { idem?: boolean }).idem, a);
+  for (const a of ['pur_po_create', 'pur_po_receive', 'pur_sourcing_select', 'pur_audit_record']) assert.ok((lookup(a) as { idem?: boolean }).idem, a);
   assert.equal(lookup('pur_po_json'), undefined);               // service-only helpers are not reachable
   assert.equal(lookup('purchasing_receipt_posted'), undefined);
   assert.equal((await post('/rpc/pur_po_list')).status, 401);
@@ -95,6 +118,9 @@ test('purchasing (section H): eight functions listed, reads are "read", writes c
   assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [{ ...line, unit_cost_minor: 1.5 }] }).success, false);
   assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [{ ...line, gst_pct: 101 }] }).success, false);
   assert.equal(parse('pur_po_view', {}).success, false);
+  assert.equal(parse('pur_po_act', { id: '40000000-0000-0000-0000-0000000000a1', action: 'approve' }).success, true);
+  assert.equal(parse('pur_po_act', { id: '40000000-0000-0000-0000-0000000000a1', action: 'delete' }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', submit: true, lines: [line] }).success, true);
   assert.equal(parse('pur_po_list', { status: 'weird' }).success, false);
   assert.equal(parse('pur_audit_record', { price_id: '40000000-0000-0000-0000-0000000000a1', checks: [{ name: 'x', result: 'maybe' }] }).success, false);
   assert.equal(parse('pur_audit_record', { price_id: '40000000-0000-0000-0000-0000000000a1', checks: [{ name: 'Temp', result: 'fail', detail: '8.1C' }] }).success, true);

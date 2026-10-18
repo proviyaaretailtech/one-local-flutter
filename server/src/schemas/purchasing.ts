@@ -26,13 +26,15 @@ export const PoLine = z.object({
 export const PoCreate = obj({
   supplier_id: z.string({ message: 'Choose a supplier.' }).trim().min(1, 'Choose a supplier.').max(100),
   expected_delivery: z.string().max(40).nullish(), notes: z.string().max(500).nullish(),
+  submit: z.boolean().optional(),   // true = Pending (awaiting approval), otherwise a Draft
   lines: z.array(PoLine).min(1, 'Add at least one item.').max(100, 'An order can have at most 100 items.'), ...key,
 });
+export const PoAct = obj({ id, action: z.enum(['submit', 'approve', 'reject', 'cancel'], { message: 'Unknown action.' }), note: z.string().max(200).nullish() });
 export const PoReceive = obj({ id, ...key });
 export const PriceView = obj({ price_id: id });
 export const SourcingSelect = obj({ price_id: id, note: z.string().max(200).nullish(), ...key });
 export const AuditRecord = obj({
-  price_id: id,
+  price_id: id, ...key,
   checks: z.array(z.object({
     name: z.string().trim().min(1, 'Each check needs a name.').max(80),
     detail: z.string().max(200).optional(),
