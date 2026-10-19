@@ -24,6 +24,7 @@ import * as tbl from './schemas/tables.ts';
 import * as bo from './schemas/backoffice.ts';
 import * as svc from './schemas/service.ts';
 import * as rst from './schemas/restaurant.ts';
+import * as ord from './schemas/orders.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -92,6 +93,11 @@ export const MANIFEST: Entry[] = [
   db('pos_refund', { args: 'passthrough', map: P, rate: 'money', idem: true, roles: 'manager roles only' }),
   db('pos_home_online', { args: 'passthrough', map: P, rate: 'read', roles: STAFF }),
   db('pos_home_channel', { args: 'passthrough', map: () => ({}), rate: 'read', roles: STAFF }),
+  // ---- Orders tab: Live orders and Hold orders (0530-0531). Resume POS = pos_hold_update (same order, re-priced lines), then pos_checkout_pay.
+  //      Save & Hold with a reason is POST /api/partner/pos-orders/hold (pos_hold_place); cancel stays pos_set_order_status.
+  db('pos_orders_board', { args: ord.Board, map: P, rate: 'read', roles: STAFF }),
+  db('pos_hold_list', { args: ord.HoldList, map: P, rate: 'read', roles: STAFF }),
+  db('pos_hold_update', { args: ord.HoldUpdate, map: P, rate: 'write', idem: true, roles: 'staff allowed to place orders' }),
   // ---- store inventory, section H (0400-0403). Body = the function's `p` object (location_id, ids, filters); the database validates it and
   //      checks organisation, location and role (inventory:read / record / approve). Writes carry the Idempotency-Key header.
   db('inv_options', { args: inv.Options, map: P, rate: 'read', roles: 'staff who may see or record stock' }),

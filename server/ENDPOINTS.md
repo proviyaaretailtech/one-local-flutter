@@ -65,11 +65,21 @@ Staff only. Every database call runs AS the signed-in staff member (their token 
 | GET | `/api/partner/pos-orders/catalog` | `q?` | `menu_items` (RLS) |
 | POST | `/api/partner/pos-orders/quote` | `{lines:[{menu_item_id,qty}], coupon_code?}` | `pos_quote_order` (writes nothing) |
 | POST | `/api/partner/pos-orders/checkout` (key) | `{lines, method, tendered?, reference?}` | `pos_checkout` |
-| POST | `/api/partner/pos-orders/hold` (key) | `{lines}` | `pos_checkout` (hold) |
+| POST | `/api/partner/pos-orders/hold` (key) | `{lines, reason?}` | `pos_hold_place` (0530: `pos_checkout` hold + the hold reason) |
 | GET | `/api/partner/pos-orders/:id` | – | `pos_order_view` |
 | POST | `/api/partner/pos-orders/:id/pay` (key) | `{method, tendered?, reference?, version}` | `pos_checkout_pay` |
 | POST | `/api/partner/pos-orders/:id/cancel` | `{reason, version}` | `pos_set_order_status` |
 | POST | `/api/partner/pos-orders/:id/act` (key) | `{action, version, lines?, delivery?, note?, reason?}` | `pos_fulfilment_act`; `online_accept/online_reject/online_ready` → `ol_partner_act` |
+
+## Orders tab: Live orders and Hold orders — `lib/orders/orders_api.dart` → `POST /rpc/<name>`, migrations 0530, 0531
+
+Spec: `specs/orders-live-hold/spec.md`. Body = the function's `p` object, shape checked by `src/schemas/orders.ts`; every rule is in the database.
+
+| Name | Request | Answer |
+|---|---|---|
+| `pos_orders_board` | `{channel?: all\|dine_in\|takeaway\|delivery\|zomato\|swiggy, status?: new\|preparing\|ready\|dispatched\|completed, q?, location_id?}` | `{header, counts, channels[], integrations[], orders[]}` |
+| `pos_hold_list` | `{channel?, q?, location_id?}` | `{delayed_after_minutes, oldest, count, holds[]}` |
+| `pos_hold_update` (key) | `{order_id, expected_updated_at, lines?, reason?}` | `{order_id, updated_at, changed, replayed}` — same order; then pay with `/pos-orders/:id/pay` and `version = updated_at` |
 
 ## Section G: store catalogue and GRN matching — `lib/catalogue/catalogue_api.dart` → `POST /rpc/<name>`, migrations 0390, 0391, 0409
 
