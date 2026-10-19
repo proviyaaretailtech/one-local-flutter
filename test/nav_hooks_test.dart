@@ -40,6 +40,7 @@ void main() {
     HomeNav.storefront = rec('storefront');
     HomeNav.deliverySettings = rec('delivery');
     HomeNav.kitchen = rec('kitchen');
+    HomeNav.tableQr = rec('tableQr');
     HomeNav.settings = rec('settings');
     HomeNav.setup = rec('setup');
     HomeNav.support = rec('support');
@@ -120,6 +121,7 @@ void main() {
         'OneLocal manager': 'storefront',
         'Delivery settings': 'delivery',
         'Kitchen display': 'kitchen',
+        'Table QR codes': 'tableQr',
         'Payout': 'money:payouts',
         'Invoices': 'money:invoices',
         'Fees & charges': 'money:settlements',
@@ -154,7 +156,7 @@ void main() {
 
     testWidgets('with no hooks plugged every link says "Soon"', (t) async {
       await showMore(t);
-      expect(find.text('Soon'), findsNWidgets(16));
+      expect(find.text('Soon'), findsNWidgets(17));
     });
   });
 }
