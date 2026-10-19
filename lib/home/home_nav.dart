@@ -56,6 +56,10 @@ class HomeNav {
   static HomeRoute? lowStock;
   // Restaurant: the kitchen display (KOT queue). Plugged in by the kitchen section; until then the button says so.
   static HomeRoute? kitchen;
+  // Side nav: customers, the One Local Wallet and Manage account (plugged by lib/account/routes.dart).
+  static HomeRoute? customers;
+  static HomeRoute? wallet;
+  static HomeRoute? account;
 
   /// Opens [route], or tells the person that [what] is not available yet.
   static void go(BuildContext context, HomeRoute? route, String what) {
@@ -71,6 +75,6 @@ class HomeNav {
     stockItem = null;
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
-    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = customers = wallet = account = null;
   }
 }

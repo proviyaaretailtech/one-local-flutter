@@ -34,10 +34,9 @@ Future<void> showStoreSideNav(
     SideNavEntry(LucideIcons.package, 'GRN', hook(HomeNav.grn)),
     SideNavEntry(LucideIcons.clipboardList, 'Stock management', hook(HomeNav.stock)),
     SideNavEntry(LucideIcons.qrCode, 'All Orders', hook(HomeNav.orderHistory ?? HomeNav.orders)),
-    // No wallet or customer screen on this line yet (built in their own sections): they stay "Soon".
-    const SideNavEntry(LucideIcons.wallet, 'One Local Wallet', null),
+    SideNavEntry(LucideIcons.wallet, 'One Local Wallet', hook(HomeNav.wallet)),
     SideNavEntry(LucideIcons.indianRupee, 'Money', hook(HomeNav.money)),
-    const SideNavEntry(LucideIcons.circleUser, 'Customer', null),
+    SideNavEntry(LucideIcons.circleUser, 'Customer', hook(HomeNav.customers)),
     // Founder flow (19 Oct 2026): Team, the OneLocal page, Reports, Settings and Help live in this menu.
     SideNavEntry(LucideIcons.users, 'Team', hook(HomeNav.team)),
     SideNavEntry(LucideIcons.globe, 'OneLocal page', hook(HomeNav.storefront)),
@@ -57,6 +56,7 @@ Future<void> showStoreSideNav(
         name: name,
         email: email,
         entries: entries,
+        onAccount: hook(HomeNav.account),
         onSignOut: onSignOut,
       ),
     ),
@@ -68,11 +68,12 @@ Future<void> showStoreSideNav(
 }
 
 class _StoreSideNav extends StatelessWidget {
-  const _StoreSideNav({required this.name, required this.email, required this.entries, required this.onSignOut});
+  const _StoreSideNav({required this.name, required this.email, required this.entries, required this.onSignOut, this.onAccount});
   final String name;
   final String? email;
   final List<SideNavEntry> entries;
   final VoidCallback onSignOut;
+  final VoidCallback? onAccount;
 
   // Close the panel first, then open the screen from the page underneath.
   void _go(BuildContext context, VoidCallback open) {
@@ -133,7 +134,7 @@ class _StoreSideNav extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              const _NavRow(icon: LucideIcons.user, label: 'Manage account', soon: true, onTap: null, light: true),
+              _NavRow(icon: LucideIcons.user, label: 'Manage account', soon: onAccount == null, onTap: onAccount == null ? null : () => _go(context, onAccount!), light: true),
               const SizedBox(height: 8),
               _NavRow(icon: LucideIcons.logOut, label: 'Sign out', danger: true, onTap: () => _go(context, onSignOut)),
             ]),

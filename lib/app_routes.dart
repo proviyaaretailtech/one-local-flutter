@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'account/routes.dart';
 import 'auth/auth_repository.dart';
 import 'auth/partner_api.dart';
 import 'backoffice/low_stock_screen.dart';
@@ -75,6 +76,7 @@ void installRoutes() {
   HomeNav.settings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SettingsScreen()));
   HomeNav.support = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SupportScreen()));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
+  installAccountRoutes(); // side nav: Customer, One Local Wallet, Manage account
 }
 
 /// Bottom-bar tabs of the order screens that belong to other sections.

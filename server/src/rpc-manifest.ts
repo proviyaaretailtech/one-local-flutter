@@ -34,6 +34,7 @@ import * as nt from './schemas/notices.ts';
 import * as st from './schemas/settings.ts';
 import { helpContent } from './modules/help.ts';
 import * as out from './schemas/outlets.ts';
+import * as cu from './schemas/customers.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -312,6 +313,20 @@ export const MANIFEST: Entry[] = [
   sec('pos_settings_file_slot', { args: st.FileAsk, rate: 'secure', roles: STAFF }),
   sec('pos_settings_file_attach', { args: st.FileAttach, rate: 'secure', roles: STAFF }),
   sec('pos_settings_file_link', { args: st.FileLink, rate: 'secure', roles: STAFF }),
+  // ---- Customers, One Local Wallet, Manage account (0510-0512). Body = the function's `p` object; the database checks organisation, outlet and
+  //      role (customers: order:place, edit pos_customers:manage; wallet: settlements:read; account: the signed-in person only).
+  db('cust_list', { args: cu.List, map: P, rate: 'read', roles: 'staff who may place orders, or customer managers' }),
+  db('cust_lookup', { args: cu.Lookup, map: P, rate: 'read', roles: 'staff who may place orders, or customer managers' }),
+  db('cust_view', { args: cu.View, map: P, rate: 'read', roles: 'staff who may place orders, or customer managers' }),
+  db('cust_save', { args: cu.Save, map: P, rate: 'write', roles: 'new: order:place; change: pos_customers:manage' }),
+  db('cust_attach_order', { args: cu.Attach, map: P, rate: 'write', roles: 'order:place (changing a set customer: order:adjust_bill)' }),
+  db('wallet_overview', { args: cu.WalletOverview, map: P, rate: 'read', roles: 'owner and finance roles (settlements:read)' }),
+  db('wallet_movements', { args: cu.WalletMovements, map: P, rate: 'read', roles: 'owner and finance roles (settlements:read)' }),
+  db('wallet_settlement_view', { args: cu.WalletSettlement, map: P, rate: 'read', roles: 'owner and finance roles (settlements:read)' }),
+  db('acct_get', { ...empty, map: () => ({}), roles: ANY }),
+  db('acct_save_name', { args: cu.SaveName, map: P, rate: 'write', roles: ANY }),
+  db('acct_sync_contact', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
+  db('acct_signed_out_everywhere', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
   // ---- Outlets (0520-0522): the outlet header, Restaurant status (Delivery status, Rush mode per outlet) and adding an outlet, which stays
   //      pending until Master Admin approves it. The database checks organisation, outlet, role and verification. outlet_json is internal.
