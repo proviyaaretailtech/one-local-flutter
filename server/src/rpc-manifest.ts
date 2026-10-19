@@ -35,6 +35,7 @@ import * as st from './schemas/settings.ts';
 import { helpContent } from './modules/help.ts';
 import * as out from './schemas/outlets.ts';
 import * as cu from './schemas/customers.ts';
+import * as sh from './schemas/shift.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -327,6 +328,20 @@ export const MANIFEST: Entry[] = [
   db('acct_save_name', { args: cu.SaveName, map: P, rate: 'write', roles: ANY }),
   db('acct_sync_contact', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
   db('acct_signed_out_everywhere', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
+  // ---- store cash shift, payment pending, refund check (0500-0502). Body = the function's `p` object; the database checks organisation,
+  //      store, role and every amount. Writes carry the Idempotency-Key header; approving a cash difference is manager-only (403 otherwise).
+  db('pos_shift_current', { args: sh.Current, map: P, rate: 'read', roles: STAFF }),
+  db('pos_shift_list', { args: sh.List, map: P, rate: 'read', roles: STAFF }),
+  db('pos_shift_open', { args: sh.Open, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_shift_cash_move', { args: sh.CashMove, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_shift_close', { args: sh.Close, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_shift_approve', { args: sh.Approve, map: P, rate: 'money', roles: 'manager roles only, not the person who counted' }),
+  db('pos_till_policy_set', { args: sh.Policy, map: P, rate: 'write', roles: 'manager roles only' }),
+  db('pos_payment_start', { args: sh.PayStart, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_payment_confirm', { args: sh.PayConfirm, map: P, rate: 'money', roles: 'staff allowed to take payment' }),
+  db('pos_payment_fail', { args: sh.PayFail, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
+  db('pos_payment_status', { args: sh.PayStatus, map: P, rate: 'read', roles: STAFF }),
+  db('pos_refund_check', { args: sh.RefundCheck, map: P, rate: 'read', roles: STAFF }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
   // ---- Outlets (0520-0522): the outlet header, Restaurant status (Delivery status, Rush mode per outlet) and adding an outlet, which stays
   //      pending until Master Admin approves it. The database checks organisation, outlet, role and verification. outlet_json is internal.

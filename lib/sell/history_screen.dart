@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
+import '../shift/refund_blocked_screen.dart';
 import 'sell_api.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
@@ -92,12 +93,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
       showToast(context, 'Enter the amount to refund.');
       return;
     }
+    if (await _blocked(r.id, value) || !mounted) return;
     try {
       await env.sell.refundOrder(r.id, amount: value, method: method, kind: kind, reason: reason.text.trim(), key: OrdersApi.newKey());
       if (mounted) showToast(context, '${rupees(value)} refunded on ${r.displayNo}.');
       await _load();
     } catch (e) {
       if (mounted) showToast(context, sellErrorText(e)); // e.g. only a manager, or more than was taken
+    }
+  }
+
+  /// S6.5: asks the database whether this refund may be given and, if not, shows why. The refund call still decides; a check that
+  /// cannot be read lets the refund call answer for itself.
+  Future<bool> _blocked(String orderId, num amount) async {
+    try {
+      final c = await env.shift.refundCheck(orderId, purpose: 'refund', amount: amount);
+      if (c.allowed || !mounted) return false;
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => RefundBlockedScreen(check: c, initials: env.initials)));
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

@@ -7,6 +7,8 @@ import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
 import 'carts_screen.dart';
+import '../shift/shift_api.dart';
+import '../shift/shift_screens.dart';
 import 'pay_screen.dart';
 import 'search_screen.dart';
 import 'sell_api.dart';
@@ -34,12 +36,14 @@ class _SellScreenState extends State<SellScreen> {
   Quote? _quote;
   int _seq = 0, _quoteSeq = 0;
   bool _busy = false;
+  ShiftState? _shift; // the store's cash drawer (S5.1); null until read, or when it could not be read
 
   @override
   void initState() {
     super.initState();
     env.carts.addListener(_cartChanged);
     _load();
+    _loadShift();
     _requote();
   }
 
@@ -80,6 +84,21 @@ class _SellScreenState extends State<SellScreen> {
     } catch (_) {
       if (mounted && mine == _quoteSeq) setState(() => _quote = null);
     }
+  }
+
+  Future<void> _loadShift() async {
+    try {
+      final s = await env.shift.current();
+      if (mounted) setState(() => _shift = s);
+    } catch (_) {
+      if (mounted) setState(() => _shift = null); // the banner stays hidden; a payment that needs a shift is refused by the database anyway
+    }
+  }
+
+  Future<void> _openShift() async {
+    final ok = await Navigator.of(context).push<bool>(MaterialPageRoute(
+        builder: (_) => OpenShiftScreen(api: env.shift, storeLine: env.storeLine, initials: env.initials, required: _shift?.mustOpen == true)));
+    if (ok == true && mounted) await _loadShift();
   }
 
   void _add(SellItem item) {
@@ -162,12 +181,35 @@ class _SellScreenState extends State<SellScreen> {
             },
           ),
         ),
+        if (_shift != null && _shift!.shift == null) _shiftBanner(_shift!),
         Expanded(child: _body()),
         _cartBar(units),
         PosBottomNav(active: 'bill', onTap: (id) => env.tab(context, id)),
       ]),
     );
   }
+
+  /// S5.1: no cash shift is open at this store. When the store requires one the database refuses payments until it is opened.
+  Widget _shiftBanner(ShiftState s) => Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        child: Material(
+          color: s.mustOpen ? kWarnBg : kLimeSoft,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: _openShift,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(children: [
+                Icon(LucideIcons.wallet, size: 18, color: s.mustOpen ? kWarnText : kGreenText),
+                const SizedBox(width: 10),
+                Expanded(child: Text(s.mustOpen ? 'Open the cash shift before the first bill' : 'No cash shift open', style: inter(13.5, 600, color: s.mustOpen ? kWarnText : kInk))),
+                Text('Open shift', style: inter(13.5, 800, color: s.mustOpen ? kWarnText : kGreenText)),
+              ]),
+            ),
+          ),
+        ),
+      );
 
   Widget _body() {
     if (_error != null) {
