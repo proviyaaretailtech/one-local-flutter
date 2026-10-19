@@ -5,6 +5,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
+import '../shift/shift_screens.dart';
+import 'payment_pending_screen.dart';
 import 'razorpay_screen.dart';
 import 'result_screens.dart';
 import 'sell_carts.dart';
@@ -163,6 +165,10 @@ class _PayScreenState extends State<PayScreen> {
       await job();
     } on OrdersApiException catch (e) {
       if (mounted) showToast(context, e.message);
+      if (mounted && e.code == 'no_shift') {
+        // the store takes no payment without an open cash shift (S5.1): open it, then the person presses Pay again
+        await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => OpenShiftScreen(api: env.shift, storeLine: env.storeLine, initials: env.initials, required: true)));
+      }
     } catch (e) {
       if (mounted) showToast(context, sellErrorText(e));
     } finally {
@@ -178,6 +184,7 @@ class _PayScreenState extends State<PayScreen> {
 
   Future<void> _pay() => _guard(() async {
         if (_method == 'split') return _paySplit();
+        if (_method == 'card' || _method == 'upi') return _collect();
         if (_method == 'cash' && (_tendered == null || _tendered! < _total)) {
           showToast(context, _tendered == null ? 'Enter the cash received.' : 'The cash received is less than ${rupees(_total)}.');
           return;
@@ -192,6 +199,13 @@ class _PayScreenState extends State<PayScreen> {
                 customerName: widget.cart!.customerName, customerPhone: widget.cart!.customerPhone, couponCode: widget.cart!.couponCode);
         if (mounted) _done(v);
       });
+
+  /// UPI and card wait for confirmation (S5.14): the bill is saved unpaid and the pending screen confirms or fails the payment.
+  Future<void> _collect() async {
+    final order = await _ensurePlaced();
+    if (!mounted) return;
+    await Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => PaymentPendingScreen(env: env, order: order, method: _method)));
+  }
 
   num get _splitSum => _parts.fold<num>(0, (n, p) => n + (num.tryParse(p.amount.text.trim()) ?? 0));
 
@@ -427,7 +441,7 @@ class _PayScreenState extends State<PayScreen> {
           ]),
         ] else ...[
           const SizedBox(height: 10),
-          Text(_method == 'card' ? 'Take the card on the machine, then press Pay.' : 'Show the UPI QR, wait for the payment, then press Pay.', style: inter(13, 400, color: kMuted)),
+          Text(_method == 'card' ? 'Press Pay, take the card on the machine, then confirm with the approval code.' : 'Press Pay, show the UPI QR, then confirm with the UPI reference once the customer has paid.', style: inter(13, 400, color: kMuted)),
         ],
       ]),
     );

@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
+import '../shift/refund_blocked_screen.dart';
 import 'sell_api.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
@@ -241,6 +242,20 @@ class _NewReturnState extends State<_NewReturn> {
     }
   }
 
+  /// S6.5: before items are chosen, ask the database whether this bill can take a return at all (return days, paid in full, already
+  /// refunded, role). If not, show why instead of the item list. pos_return_create checks again.
+  Future<void> _choose(Receipt b) async {
+    try {
+      final c = await widget.env.shift.refundCheck(b.id, purpose: 'return');
+      if (!mounted) return;
+      if (!c.allowed) {
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => RefundBlockedScreen(check: c, initials: widget.env.initials)));
+        return;
+      }
+    } catch (_) {/* the check could not be read: the return itself is still checked by the database */}
+    if (mounted) setState(() => _bill = b);
+  }
+
   Future<void> _submit() async {
     final lines = [for (final e in _qty.entries.where((e) => e.value > 0)) {'order_item_id': e.key, 'qty': e.value, if (_damaged.contains(e.key)) 'restock': false}];
     if (lines.isEmpty) {
@@ -278,7 +293,7 @@ class _NewReturnState extends State<_NewReturn> {
           ConstrainedBox(
             constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.5),
             child: ListView(shrinkWrap: true, children: [
-              for (final b in _bills!) ListTile(contentPadding: EdgeInsets.zero, title: Text('${b.displayNo} · ${b.customer}', style: inter(14, 600)), subtitle: Text('${b.when} · ${b.counts}', style: inter(12, 400, color: kMuted)), trailing: Text(rupees(b.total), style: inter(14, 700)), onTap: () => setState(() => _bill = b)),
+              for (final b in _bills!) ListTile(contentPadding: EdgeInsets.zero, title: Text('${b.displayNo} · ${b.customer}', style: inter(14, 600)), subtitle: Text('${b.when} · ${b.counts}', style: inter(12, 400, color: kMuted)), trailing: Text(rupees(b.total), style: inter(14, 700)), onTap: () => _choose(b)),
             ]),
           ),
       ]);

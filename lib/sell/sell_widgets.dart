@@ -186,6 +186,7 @@ Future<String?> showSellMenu(BuildContext context) => showOrderSheet<String>(
           ('history', 'Transaction history', LucideIcons.history),
           ('returns', 'Returns & refunds', LucideIcons.undo2),
           ('receipts', 'Invoices & receipts', LucideIcons.receiptText),
+          ('shift', 'Cash shift', LucideIcons.wallet),
         ])
           ListTile(contentPadding: EdgeInsets.zero, leading: Icon(icon, color: kInk), title: Text(label, style: inter(15, 600)), onTap: () => Navigator.pop(ctx, id)),
       ]),

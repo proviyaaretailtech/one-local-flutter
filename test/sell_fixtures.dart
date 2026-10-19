@@ -7,6 +7,7 @@ import 'package:vinii_pos/sell/sell_api.dart';
 import 'package:vinii_pos/sell/sell_carts.dart';
 import 'package:vinii_pos/sell/sell_env.dart';
 import 'package:vinii_pos/sell/sell_widgets.dart' show SellNavigate;
+import 'package:vinii_pos/shift/shift_api.dart';
 
 import 'order_fixtures.dart';
 
@@ -38,8 +39,29 @@ Map<String, dynamic> retRow(String id, String no, String status, {num amount = 3
       'lines': [{'name': 'Horlicks 500g', 'qty': 1, 'amount': amount}],
     };
 
+Map<String, dynamic> shiftRow({String status = 'open', num expected = 1310, num? counted, num? variance, String? reason}) => {
+      // a shift as pos_till_shift_json describes it
+      'id': 's1', 'shift_no': 'SH-0003', 'status': status, 'version': status == 'open' ? 1 : 2, 'location_name': 'Latur Main Branch', 'opening_float': 1000,
+      'opened_at': '2026-10-20T03:30:00Z', 'closed_at': status == 'open' ? null : '2026-10-20T15:30:00Z', 'expected_cash': status == 'open' ? null : expected,
+      'counted_cash': counted, 'variance': variance, 'variance_reason': reason, 'approval_note': null,
+      'totals': {'opening_float': 1000, 'cash_sales': 210, 'sales_by_method': {'cash': 210, 'upi': 420}, 'bills': 3, 'cash_refunds': 0, 'refunds': 0, 'cash_in': 200, 'cash_out': 100, 'expected_cash': expected},
+      'cash_moves': [{'id': 'm1', 'kind': 'in', 'amount': 200, 'reason': 'Change from bank', 'created_at': '2026-10-20T04:00:00Z'}, {'id': 'm2', 'kind': 'out', 'amount': 100, 'reason': 'Milk for tea', 'created_at': '2026-10-20T05:00:00Z'}],
+    };
+
+Map<String, dynamic> shiftCurrent({Map<String, dynamic>? shift, bool require = false, bool canApprove = false, List<Map<String, dynamic>> pending = const []}) => {
+      'location_id': 'l1', 'location_name': 'Latur Main Branch', 'policy': {'require_open_shift': require, 'variance_limit': 500, 'return_days': 7},
+      'shift': shift, 'must_open': shift == null && require, 'can_approve': canApprove, 'pending_approval': pending,
+    };
+
+Map<String, dynamic> intentRow({String status = 'pending', String method = 'upi', bool stale = false, Map<String, dynamic>? attempt}) => {
+      'id': 'pi1', 'order_id': orderId, 'display_no': 'P-01087', 'method': method, 'amount': 630, 'status': status, 'reference': status == 'succeeded' ? 'UPI98765' : null,
+      'created_at': '2026-10-20T06:00:00Z', 'resolved_at': null, 'age_seconds': stale ? 1000 : 42, 'stale': stale, 'order_status': status == 'succeeded' ? 'paid' : 'awaiting_payment',
+      'total': 630, 'paid': status == 'succeeded' ? 630 : 0, 'due': status == 'succeeded' ? 0 : 630, 'attempt': attempt,
+    };
+
 /// A fake POS server for the till screens: answers section E's and section F's routes and records every request.
 class Till {
+  Map<String, dynamic> shift = shiftCurrent(shift: shiftRow());
   final calls = <http.Request>[];
   http.Response? Function(http.Request r)? override;
   List<Map<String, dynamic>> receipts = [receipt('r1', 'P-00087', 'Rahul Patil', 630), receipt('r2', 'P-00086', 'Priya Shah', 920, label: 'Paid · Card')];
@@ -89,6 +111,17 @@ class Till {
     if (p.endsWith('/rpc/pos_return_decide')) return ok({'return_id': 't1', 'status': body()['decision'] == 'approve' ? 'approved' : 'rejected'});
     if (p.endsWith('/rpc/pos_return_issue_refund')) return ok({'return_id': 't1', 'status': 'refunded'});
     if (p.endsWith('/rpc/pos_refund')) return ok({'refund_id': 'f1', 'order_id': orderId, 'amount': 50});
+    // cash shift, payment pending, refund check (0500-0502)
+    if (p.endsWith('/rpc/pos_shift_current')) return ok(shift);
+    if (p.endsWith('/rpc/pos_shift_list')) return ok([]);
+    if (p.endsWith('/rpc/pos_shift_open')) return ok(shiftRow());
+    if (p.endsWith('/rpc/pos_payment_start') || p.endsWith('/rpc/pos_payment_status')) return ok(intentRow(method: '${body()['method'] ?? 'upi'}'));
+    if (p.endsWith('/rpc/pos_payment_confirm')) return ok(intentRow(status: 'succeeded'));
+    if (p.endsWith('/rpc/pos_payment_fail')) {
+      final st = '${body()['status'] ?? 'failed'}';
+      return ok(intentRow(status: st == 'cancelled' ? 'cancelled' : 'failed', attempt: {'status': st, 'code': '', 'message': 'Not received'}));
+    }
+    if (p.endsWith('/rpc/pos_refund_check')) return ok({'allowed': true, 'purpose': body()['purpose'] ?? 'refund', 'reasons': [], 'display_no': 'P-00087', 'total': 630, 'taken': 630, 'refunded': 0, 'refundable_left': 630, 'return_days': 7, 'days_since_paid': 0});
     if (p.contains('/pos-orders/') && m == 'GET') return ok(view('checkout'));
     return err(404, 'unexpected ${r.method} $p');
   });
@@ -98,6 +131,7 @@ class Till {
   SellEnv env({SellCarts? carts, SellNavigate? onTab, List<Uri>? opened}) => SellEnv(
         sell: SellApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
         orders: OrdersApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
+        shift: ShiftApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
         carts: carts ?? SellCarts(),
         onTab: onTab,
         branchName: 'Latur Main Branch',

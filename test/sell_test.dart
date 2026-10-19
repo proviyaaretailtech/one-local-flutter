@@ -278,7 +278,7 @@ void main() {
       expect(cart.couponCode, 'WELCOME10'); // the code that worked stays
     });
 
-    testWidgets('UPI checks out with the method and no tender', (t) async {
+    testWidgets('UPI is never paid on the tap: the bill is held unpaid and waits for confirmation (S5.14)', (t) async {
       final till = Till();
       final env = till.env();
       final cart = cartWith(env.carts);
@@ -287,10 +287,13 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Pay ₹630'));
       await t.pumpAndSettle();
-      final b = jsonDecode(till.where('POST', '/checkout').single.body);
-      expect(b['method'], 'upi');
-      expect(b.containsKey('tendered'), isFalse);
-      expect(find.text('Transaction Successful'), findsOneWidget);
+      expect(till.where('POST', '/checkout'), isEmpty); // nothing is recorded as paid
+      expect(till.where('POST', '/hold'), hasLength(1));
+      final start = till.where('POST', '/pos_payment_start').single;
+      expect(jsonDecode(start.body), {'order_id': orderId, 'method': 'upi'});
+      expect(start.headers['Idempotency-Key'], isNotEmpty);
+      expect(find.text('Payment pending'), findsOneWidget);
+      expect(find.text('Not paid yet · P-01087'), findsOneWidget);
     });
 
     testWidgets('split: parts that do not add up are refused on the phone; correct parts hold the bill then split-pay it once', (t) async {
@@ -363,7 +366,9 @@ void main() {
       expect(find.text('Pay ₹1,840'), findsOneWidget); // the held bill's own total
       await t.tap(find.text('Pay ₹1,840'));
       await t.pumpAndSettle();
-      expect(till.where('POST', '/pay'), hasLength(1));
+      expect(till.where('POST', '/pay'), isEmpty); // a card retry waits for confirmation on the same held bill (S5.14)
+      expect(jsonDecode(till.where('POST', '/pos_payment_start').single.body), {'order_id': orderId, 'method': 'card'});
+      expect(find.text('Payment pending'), findsOneWidget);
     });
 
     testWidgets('cancel from the failure screen cancels the held bill', (t) async {
