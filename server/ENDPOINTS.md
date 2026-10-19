@@ -123,3 +123,27 @@ Through the generic endpoint `POST /rpc/<name>` (body = the function's `p` objec
 | `pos_coupon_save` | `{code, label?, kind: percent\|flat, value, min_order?, max_discount?, max_uses?, max_uses_per_customer?, active?, starts_at?, ends_at?}` | the coupon. Limits count open and paid bills and are given back when a bill is cancelled; a per-customer limit needs the customer's mobile on the bill | write | managers |
 
 New error codes: `coupon_minimum`, `coupon_limit`, `coupon_customer`, `coupon_zero` (a coupon that would make the bill free is refused), `over_refund`, `over_return` (422), `provider_not_configured` (503). Tests: `node scripts/sell-e2e.mjs` (74 checks, through the gateway) and the F block in `scripts/gateway-e2e.mjs` (cross-tenant: B against A's bill, returns, receipts, coupons; viewer and applicant refused); `node scripts/manifest-audit.mjs` must PASS.
+
+## Store cash shift, payment pending, refund not allowed — `lib/shift/shift_api.dart`, `src/schemas/shift.ts`, migrations 0500 to 0502
+
+Through `POST /rpc/<name>` (body = the function's `p` object; the database checks organisation, store, role and every amount again). `location_id`
+is optional everywhere: without it the business's main store allowed to the caller is used. Spec: `specs/store-shift-payments/spec.md`.
+
+| Name | Request (`p`) | Answer | Rate / key | Who |
+|---|---|---|---|---|
+| `pos_shift_current` | `{location_id?}` | `{location_id, location_name, policy:{require_open_shift, variance_limit, return_days}, shift: null \| shift, must_open, can_approve, pending_approval:[shift]}` | read | staff |
+| `pos_shift_list` | `{location_id?, limit?, before?}` | `[shift]` newest first | read | staff |
+| `pos_shift_open` | `{location_id?, opening_float}` | shift (`status:'open'`, `shift_no`, `totals`) + `replayed` | money, key | staff who take payment |
+| `pos_shift_cash_move` | `{shift_id, kind: in\|out, amount, reason}` | shift with `cash_moves` | money, key | staff who take payment |
+| `pos_shift_close` | `{shift_id, counted_cash, variance_reason? (needed when counted ≠ expected), expected_version?}` | shift (`closed` or `pending_approval`) + `needs_approval`, `variance_limit` | money, key | staff who take payment |
+| `pos_shift_approve` | `{shift_id, note}` | shift (`closed`, `approved_by`) | money | managers, not the person who counted (unless the only manager) |
+| `pos_till_policy_set` | `{location_id?, require_open_shift?, variance_limit?, return_days?}` | the store policy | write | managers |
+| `pos_payment_start` | `{order_id, method: upi\|card}` | intent `{id, status:'pending', amount, due, order_status, age_seconds, stale}` | money, key | staff who take payment |
+| `pos_payment_confirm` | `{intent_id, reference}` (UPI reference / card approval code, 4 to 40) | intent `succeeded`, the bill paid through `pos_checkout_pay` | money | staff who take payment |
+| `pos_payment_fail` | `{intent_id, status?: declined\|failed\|cancelled, code?, message?}` | intent `failed` / `cancelled` with `attempt` | write | staff who take payment |
+| `pos_payment_status` | `{intent_id}` or `{order_id}` (latest) | intent, or `{status:'none'}` | read | staff |
+| `pos_refund_check` | `{order_id, purpose?: refund\|return, amount?}` | `{allowed, reasons:[{code, message}], taken, refunded, refundable_left, return_days, days_since_paid, is_manager}`; codes `over_paid`, `outside_return_days`, `needs_manager`, `not_paid_in_full`, `online_order`, `cancelled`, `nothing_taken` | read | staff |
+
+A shift holds no copy of money: `totals` are read from `payments` and `pos_refunds` at that store in the shift window (frozen on the row at close).
+New error codes: `shift_open`, `no_shift`, `payment_pending` (409); `reason_required`, `not_enough_cash`, `return_window` (422).
+E2E + cross-tenant: `node scripts/shift-e2e.mjs` (39 checks).

@@ -45,6 +45,7 @@ const STATUS: Record<string, number> = {
   CONFLICT: 409, SCOPE: 403,                                                                                     // purchase suggestions (section J), tables (H)
   MERGED: 409, NOT_OCCUPIED: 409, BUSY: 409, CLOSED: 422,                                                                   // tables and floor (section H)
   COUPON_UNKNOWN: 422, COUPON_MIN: 422, COUPON_LIMIT: 422, COUPON_CUSTOMER: 422, COUPON_ZERO: 422, OVER_REFUND: 422, OVER_RETURN: 422, PROVIDER_OFF: 503, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
+  SHIFT_OPEN: 409, NO_SHIFT: 409, PAYMENT_PENDING: 409, NOT_ENOUGH_CASH: 422, REASON_REQUIRED: 422, RETURN_WINDOW: 422,       // store shift, payment pending, refunds (0500-0502)
 };
 const CODE: Record<string, string> = {
   NOT_DELIVERABLE: 'order_not_deliverable', PICKED_UP: 'already_picked_up', EXPIRED: 'offer_expired', TAKEN: 'already_taken',

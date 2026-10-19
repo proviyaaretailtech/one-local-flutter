@@ -27,6 +27,7 @@ import * as svc from './schemas/service.ts';
 import * as rst from './schemas/restaurant.ts';
 import * as sell from './schemas/sell.ts';
 import * as pur from './schemas/purchasing.ts';
+import * as sh from './schemas/shift.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -199,6 +200,20 @@ export const MANIFEST: Entry[] = [
   db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
   db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),
   db('pur_audit_record', { args: pur.AuditRecord, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
+  // ---- store cash shift, payment pending, refund check (0500-0502). Body = the function's `p` object; the database checks organisation,
+  //      store, role and every amount. Writes carry the Idempotency-Key header; approving a cash difference is manager-only (403 otherwise).
+  db('pos_shift_current', { args: sh.Current, map: P, rate: 'read', roles: STAFF }),
+  db('pos_shift_list', { args: sh.List, map: P, rate: 'read', roles: STAFF }),
+  db('pos_shift_open', { args: sh.Open, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_shift_cash_move', { args: sh.CashMove, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_shift_close', { args: sh.Close, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_shift_approve', { args: sh.Approve, map: P, rate: 'money', roles: 'manager roles only, not the person who counted' }),
+  db('pos_till_policy_set', { args: sh.Policy, map: P, rate: 'write', roles: 'manager roles only' }),
+  db('pos_payment_start', { args: sh.PayStart, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_payment_confirm', { args: sh.PayConfirm, map: P, rate: 'money', roles: 'staff allowed to take payment' }),
+  db('pos_payment_fail', { args: sh.PayFail, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
+  db('pos_payment_status', { args: sh.PayStatus, map: P, rate: 'read', roles: STAFF }),
+  db('pos_refund_check', { args: sh.RefundCheck, map: P, rate: 'read', roles: STAFF }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 
