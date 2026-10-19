@@ -30,6 +30,7 @@ const POS_ERRORS: Record<string, { status: number; code: string }> = {
   POS_STALE: { status: 409, code: 'version_conflict' }, POS_WRONG_STATE: { status: 409, code: 'wrong_state' }, POS_ITEM_UNAVAILABLE: { status: 409, code: 'item_unavailable' },
   POS_HAS_PAYMENTS: { status: 409, code: 'has_payments' }, POS_NOT_PAID_IN_FULL: { status: 409, code: 'not_paid_in_full' },
   POS_UNDERPAID: { status: 422, code: 'underpaid' }, POS_OVERPAY: { status: 422, code: 'overpay' }, POS_COUPON_UNKNOWN: { status: 422, code: 'coupon_unknown' },
+  POS_COUPON_MIN: { status: 422, code: 'coupon_minimum' }, POS_COUPON_LIMIT: { status: 422, code: 'coupon_limit' }, POS_COUPON_CUSTOMER: { status: 422, code: 'coupon_customer' }, POS_COUPON_ZERO: { status: 422, code: 'coupon_zero' }, POS_IDEMPOTENCY_MISMATCH: { status: 422, code: 'idempotency_mismatch' },
   OL_IDEMPOTENCY_MISMATCH: { status: 422, code: 'idempotency_mismatch' }, OL_IN_PROGRESS: { status: 409, code: 'in_progress' },
   OL_STATUS_AUTHORITY: { status: 409, code: 'wrong_state' }, OL_ORDER_FROZEN: { status: 409, code: 'wrong_state' },
 };

@@ -102,3 +102,24 @@ Stable item fields (section F reads these): `id`, `name`, `sku`, `barcode`, `cat
 ## Not called by the app today (exist in the customer app for the OLD partner app, not ported)
 
 `/api/partner/outlet`, `/items`, `/orders`, `/payments`, `/devices`, `/test-order`, `/account/*`. The new POS has no Dart caller for them. If a future screen needs one, port it here against the same database functions rather than calling the customer app.
+
+## Section F: the till on top of E (search, split payment, receipts, returns, coupons) — `lib/sell/sell_api.dart`, `src/schemas/sell.ts`, migrations 0380 to 0383
+
+Through the generic endpoint `POST /rpc/<name>` (body = the function's `p` object; zod shape in `src/schemas/sell.ts`; the database checks organisation, store, role and every amount again). Money calls carry `Idempotency-Key` (copied into the body). Manager-only rules (refund, approve a return, coupons) answer 403 for anyone else. The per-feature `/api/partner/sell/*` routes no longer exist. `POST /api/partner/pos-orders/quote | checkout | hold` (section E) also take `coupon_code` (checkout and hold also `customer_name`, `customer_phone`); the discount is worked out by `pos_place_order` (0380).
+
+| Name | Request (`p`) | Answer | Rate / key | Who |
+|---|---|---|---|---|
+| `pos_sell_catalog` | `q?` (name or SKU), `category?`, `available?`, `sort?: name\|price_asc\|price_desc` | `{items:[{id,name,sku,price,category,image_url,available}], categories}`; unavailable items are listed, flagged | read | staff |
+| `pos_split_pay` | `{order_id, payments:[{method: cash\|card\|upi, amount, tendered?, reference?}] (2 to 4, must add up to the amount due), expected_updated_at?}` | `{order_id, replayed, parts}` (read the bill with `GET /pos-orders/:id`) | money, key | staff who take payment |
+| `pos_refund` (0371) | `{order_id, amount, method: cash\|upi\|card\|other, kind?: goodwill\|cancel\|missing_items, reason}` | refund record | money, key | managers; capped to money taken |
+| `pos_payment_attempt_record` | `{order_id, method: cash\|upi\|card\|online, status?: declined\|failed\|cancelled, code?, message?}` | `{attempt_id, order_id, display_no, method, status, code, message, amount_due, charged:false}`; moves no money | write | staff who take payment |
+| `pos_online_checkout` | `{order_id}` | always **503 `provider_not_configured`** for the caller's own bill (404 for anyone else's) until a payment provider (Razorpay, test mode) is wired here | money | staff who take payment |
+| `pos_receipt_list` | `q?`, `status?: all\|paid\|part_paid\|unpaid\|refunded\|cancelled`, `from?`, `to?` (2026-10-09, India time), `before?` | array of bills with lines (`items[].order_item_id`), money, methods, status | read | staff |
+| `pos_return_list` | `status?`, `q?` | array of returns with lines and refund method | read | staff |
+| `pos_return_create` | `{order_id, lines:[{order_item_id, qty, restock?: false for a damaged item}], reason, note?}` | `{return_id, return_no, amount, status, replayed}`; amount = the items' share of the bill, set by the database; refused when more than is still refundable; the same key with other lines is 422 | write, key | staff who take payment |
+| `pos_return_decide` | `{return_id, decision: approve\|reject, note?}` (reject needs a note) | `{return_id, status}`; whoever recorded the return cannot approve it while another manager exists; approval puts the goods back in stock through section H (same shelf and lot; expired lot to quarantine; damaged lines post nothing) | write | managers |
+| `pos_return_issue_refund` | `{return_id, method}` | `{return_id, status:'refunded', amount, refund_id, replayed}`; calls `pos_refund` | money, key | managers |
+| `pos_coupon_list` | `{}` | `{coupons:[...]}` | read | staff |
+| `pos_coupon_save` | `{code, label?, kind: percent\|flat, value, min_order?, max_discount?, max_uses?, max_uses_per_customer?, active?, starts_at?, ends_at?}` | the coupon. Limits count open and paid bills and are given back when a bill is cancelled; a per-customer limit needs the customer's mobile on the bill | write | managers |
+
+New error codes: `coupon_minimum`, `coupon_limit`, `coupon_customer`, `coupon_zero` (a coupon that would make the bill free is refused), `over_refund`, `over_return` (422), `provider_not_configured` (503). Tests: `node scripts/sell-e2e.mjs` (74 checks, through the gateway) and the F block in `scripts/gateway-e2e.mjs` (cross-tenant: B against A's bill, returns, receipts, coupons; viewer and applicant refused); `node scripts/manifest-audit.mjs` must PASS.
