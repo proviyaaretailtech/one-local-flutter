@@ -9,6 +9,7 @@ import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
 import 'inventory/inventory_dashboard.dart';
 import 'inventory/stock_detail_screen.dart';
+import 'menu/menu_screen.dart';
 import 'orders/cart_screen.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
@@ -20,19 +21,20 @@ import 'tables/floor_screen.dart';
 import 'tables/table_widgets.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
-/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G) and low stock (J) into the [HomeNav] hooks.
+/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J) and the restaurant menu into the [HomeNav] hooks.
 void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
   HomeNav.orders = HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
   HomeNav.bill = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CartScreen(onNavigate: (id) => _tab(c, id))));
   HomeNav.items = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CatalogueScreen(onNavigate: (id) => _tab(c, id))));
+  HomeNav.menu = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuScreen()));
   HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const GrnQueueScreen()));
   InvEnv inventoryEnv(BuildContext c) => InvEnv(
       onNavigate: (id) => _tab(c, id),
       onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
   HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
   HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
-  HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id == 'menu' ? 'item' : id)))));
+  HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id)))));
   HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
   HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
@@ -43,6 +45,7 @@ void installRoutes() {
 void _tab(BuildContext context, String id) => switch (id) {
       'home' => HomeNav.go(context, HomeNav.home, 'Home'),
       'item' => HomeNav.go(context, HomeNav.items, 'Items'),
+      'menu' => HomeNav.go(context, HomeNav.menu ?? HomeNav.items, 'The menu'),
       'bill' => HomeNav.go(context, HomeNav.bill, 'Bill'),
       'stock' => HomeNav.go(context, HomeNav.stock, 'Stock'),
       _ => HomeNav.go(context, null, 'Online orders'),

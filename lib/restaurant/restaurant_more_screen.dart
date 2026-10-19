@@ -36,7 +36,7 @@ class RestaurantMoreScreen extends StatelessWidget {
       (LucideIcons.bell, 'Notifications', HomeNav.notifications),
       (LucideIcons.file, 'Invoices', HomeNav.money),
       (LucideIcons.chartPie, 'Taxes', HomeNav.money),
-      (LucideIcons.coffee, 'Menu', HomeNav.items),
+      (LucideIcons.coffee, 'Menu', HomeNav.menu ?? HomeNav.items),
       (LucideIcons.list, 'Fees & charges', HomeNav.money),
     ];
     final initial = outletName.trim().isEmpty ? 'O' : outletName.trim()[0].toUpperCase();
