@@ -25,6 +25,7 @@ import * as tbl from './schemas/tables.ts';
 import * as bo from './schemas/backoffice.ts';
 import * as svc from './schemas/service.ts';
 import * as rst from './schemas/restaurant.ts';
+import * as gst from './schemas/guest.ts';
 import * as sell from './schemas/sell.ts';
 import * as pur from './schemas/purchasing.ts';
 
@@ -199,6 +200,16 @@ export const MANIFEST: Entry[] = [
   db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
   db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),
   db('pur_audit_record', { args: pur.AuditRecord, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
+  // ---- table QR codes and guest orders (0560, 0561; spec specs/table-qr-guest-menu). Body = the function's `p` object; the database checks
+  //      organisation, store and role (floor staff read; table managers issue / replace / switch codes; order:place accepts guest orders).
+  //      The guest's own calls do not come through here: they use the guest door (src/guest-door.ts, POST /guest/<name>).
+  db('tbl_qr_list', { args: gst.QrList, map: P, rate: 'read', roles: 'floor staff (the code itself: table managers only)' }),
+  db('tbl_qr_issue', { args: gst.QrIssue, map: P, rate: 'write', roles: 'table managers; replacing names the table' }),
+  db('tbl_qr_set_enabled', { args: gst.QrEnabled, map: P, rate: 'write', roles: 'table managers' }),
+  db('guest_requests_list', { args: gst.Requests, map: P, rate: 'read', roles: 'floor staff' }),
+  db('guest_request_decide', { args: gst.Decide, map: P, rate: 'write', roles: 'staff with order:place (accepting places the order as them)' }),
+  db('guest_staff_menu', { args: gst.StaffMenu, map: P, rate: 'read', roles: 'staff with order:place' }),
+  db('guest_staff_place', { args: gst.StaffPlace, map: P, rate: 'write', idem: true, roles: 'staff with order:place (Hand to guest)' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 

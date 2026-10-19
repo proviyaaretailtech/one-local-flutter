@@ -5,5 +5,12 @@ import { isProduction } from './config.ts';
 
 if (isProduction() && !process.env.PARTNER_PII_KEY?.trim()) console.error('[env] PARTNER_PII_KEY is not set: onboarding tax/bank saves answer 503.');
 
-export default { fetch: (request: Request) => handle(request) };
-export const GET = handle, POST = handle, PUT = handle, OPTIONS = handle;
+// x-ol-peer is the node server's socket address (src/server.ts); a caller must not be able to send one here
+const run = (request: Request) => {
+  if (!request.headers.has('x-ol-peer')) return handle(request);
+  const headers = new Headers(request.headers); headers.delete('x-ol-peer');
+  const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
+  return handle(new Request(request.url, { method: request.method, headers, body: hasBody ? request.body : undefined, duplex: hasBody ? 'half' : undefined } as RequestInit));
+};
+export default { fetch: run };
+export const GET = run, POST = run, PUT = run, OPTIONS = run;

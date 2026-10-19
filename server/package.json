@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/unit/*.test.ts",
     "audit": "node scripts/manifest-audit.mjs",
-    "e2e": "node scripts/manifest-audit.mjs && node scripts/gateway-e2e.mjs && python3 ../tool/onboarding_e2e.py && python3 ../tool/setup_e2e.py && node scripts/orders-e2e.mjs && node scripts/catalogue-e2e.mjs && node --env-file-if-exists=.env scripts/home-checks.ts",
+    "e2e": "node scripts/manifest-audit.mjs && node scripts/gateway-e2e.mjs && python3 ../tool/onboarding_e2e.py && python3 ../tool/setup_e2e.py && node scripts/orders-e2e.mjs && node scripts/catalogue-e2e.mjs && node scripts/guest-e2e.mjs && node --env-file-if-exists=.env scripts/home-checks.ts",
     "build:vercel": "esbuild src/vercel.ts --bundle --platform=node --format=esm --target=node22 --outfile=api/index.js --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
     "vercel-build": "npm run build:vercel"
   },

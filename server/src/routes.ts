@@ -9,6 +9,8 @@ import * as home from './modules/home.ts';
 import * as orders from './modules/orders.ts';
 import { rpcBatch, rpcOne } from './rpc.ts';
 import { webhookRoutes } from './modules/secure/index.ts';
+import { guestCall } from './guest-door.ts';
+import { guestWeb } from './guest-web.ts';
 
 // Health probe: version and whether the database answers. Uses the public key only; nothing secret is read or shown.
 add('GET', '/health', async () => {
@@ -24,6 +26,10 @@ add('GET', '/health', async () => {
 add('POST', '/rpc/:name', rpcOne);
 add('POST', '/rpc', rpcBatch);
 for (const w of webhookRoutes) add('POST', w.path, w.handler);
+
+// ---- the guest door and the guest menu page (table QR codes, 0561): no sign-in; see src/guest-door.ts and src/guest-web.ts
+add('POST', '/guest/:name', guestCall);
+for (const path of ['/t', '/t/:a', '/t/:a/:b', '/t/:a/:b/:c', '/t/:a/:b/:c/:d', '/t/:a/:b/:c/:d/:e']) add('GET', path, guestWeb);
 
 // ---- (the sign-in check `me`, onboarding and setup moved to the gateway: POST /rpc/<name>, see src/rpc-manifest.ts)
 

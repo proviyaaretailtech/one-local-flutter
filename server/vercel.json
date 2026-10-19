@@ -4,7 +4,23 @@
   "buildCommand": "npm run build:vercel",
   "installCommand": "npm ci",
   "outputDirectory": "public",
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
-  "functions": { "api/index.js": { "maxDuration": 30, "memory": 512 } },
-  "regions": ["bom1"]
+  "rewrites": [
+    {
+      "source": "/t/:code([0-9a-f]{32,128})",
+      "destination": "/t/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ],
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 30,
+      "memory": 512
+    }
+  },
+  "regions": [
+    "bom1"
+  ]
 }

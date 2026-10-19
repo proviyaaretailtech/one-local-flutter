@@ -34,7 +34,7 @@ export function userClient(request: Request): SupabaseClient {
 
 // Database functions raise errors like "OL_STALE: this order was already changed on another phone": a family prefix (OL, POS, INV,
 // GRN, SVC, PS, TBL, PUR), a reason, then the sentence the app shows. The reason decides the HTTP status; an unknown reason is a plain 400.
-const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC', 'PS', 'TBL', 'PUR'];
+const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC', 'PS', 'TBL', 'PUR', 'GUEST'];
 const STATUS: Record<string, number> = {
   BAD_REQUEST: 400, BAD_QTY: 400, EMPTY: 400, BAD_TABLE: 400, FORBIDDEN: 403, NOT_FOUND: 404, NOT_ONE_LOCAL: 404,
   NOT_ACCEPTING: 409, ITEM_UNAVAILABLE: 409, STALE: 409, WRONG_STATE: 409, EXPIRED: 409, NOT_DELIVERABLE: 409, PICKED_UP: 409, TAKEN: 409,
@@ -44,6 +44,7 @@ const STATUS: Record<string, number> = {
   SHORT: 409, ALLOCATION: 409, CAPACITY: 422, STORAGE: 422, TENANT: 403,                                   // inventory (section H)
   CONFLICT: 409, SCOPE: 403,                                                                                     // purchase suggestions (section J), tables (H)
   MERGED: 409, NOT_OCCUPIED: 409, BUSY: 409, CLOSED: 422,                                                                   // tables and floor (section H)
+  RATE_LIMITED: 429, NOT_PUBLISHED: 409, CONFIRM: 422,                                                                   // table QR codes and guest orders (0560, 0561)
   COUPON_UNKNOWN: 422, COUPON_MIN: 422, COUPON_LIMIT: 422, COUPON_CUSTOMER: 422, COUPON_ZERO: 422, OVER_REFUND: 422, OVER_RETURN: 422, PROVIDER_OFF: 503, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
 };
 const CODE: Record<string, string> = {

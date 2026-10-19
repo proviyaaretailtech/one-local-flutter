@@ -18,6 +18,8 @@ function cors(origin: string | undefined): Record<string, string> {
 function toRequest(req: IncomingMessage, port: number): Request {
   const headers = new Headers();
   for (const [k, v] of Object.entries(req.headers)) if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
+  // the socket's own address, for limits that must not trust the caller (clientIp); a client-sent copy is replaced
+  headers.set('x-ol-peer', req.socket.remoteAddress ?? 'direct');
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
   return new Request(`http://localhost:${port}${req.url ?? '/'}`, {
     method: req.method, headers,
