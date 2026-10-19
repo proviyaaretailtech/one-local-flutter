@@ -3,14 +3,15 @@
 import { db, fromDbError } from '../../db.ts';
 import { HttpError } from '../../http.ts';
 import type { SecureCtx } from './index.ts';
+import { kindOf } from '../home.ts';
 
 export async function me({ userId }: SecureCtx) {
   const { data, error } = await db().from('org_users')
-    .select('user_id, email, full_name, role:roles(slug), organization:organizations(id, name)')
+    .select('user_id, email, full_name, role:roles(slug), organization:organizations(id, name, business_domain)')
     .eq('user_id', userId).eq('status', 'active').order('created_at', { ascending: true }).limit(1).maybeSingle();
   if (error) fromDbError(error);
   if (!data) throw new HttpError(403, 'You are not a staff member of any restaurant on One Local.');
-  const org = data.organization as { id?: string; name?: string } | null;
+  const org = data.organization as { id?: string; name?: string; business_domain?: string | null } | null;
   if (!org?.id) throw new HttpError(403, 'Restaurant not found.');
   const { data: ch, error: e2 } = await db().from('ol_merchant_channels').select('*').eq('organization_id', org.id).maybeSingle();
   if (e2) fromDbError(e2);
@@ -20,5 +21,7 @@ export async function me({ userId }: SecureCtx) {
   return {
     person: { id: userId, email: data.email ?? '', name: data.full_name ?? '', role: (data.role as { slug?: string } | null)?.slug ?? '', organization_id: org.id },
     restaurant: { id: org.id, name: org.name ?? '', ...outlet },
+    // store | restaurant | service: decides the wording on the sign-in screens and which home opens.
+    business_kind: kindOf(org.business_domain, null),
   };
 }

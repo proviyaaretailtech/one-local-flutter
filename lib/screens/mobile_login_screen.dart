@@ -70,7 +70,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
         const BrandNav(),
         FormContent(children: [
           const Kicker('Sign in · Mobile'),
-          const PageIntro(title: 'Your number. Your store.', subtitle: 'Use the mobile number registered with your OneLocal account.'),
+          const PageIntro(title: 'Your number. Your business.', subtitle: 'Use the mobile number registered with your OneLocal account.'),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

@@ -14,8 +14,11 @@ class PartnerApi {
 }
 
 class PartnerMe {
-  PartnerMe({required this.name, required this.email, required this.outlet});
+  PartnerMe({required this.name, required this.email, required this.outlet, this.kind = 'store'});
   final String name;
+
+  /// store | restaurant | service, from the server.
+  final String kind;
   final String email;
   final String outlet;
 
@@ -26,6 +29,7 @@ class PartnerMe {
       name: (person['name'] ?? '') as String,
       email: (person['email'] ?? '') as String,
       outlet: (outlet['name'] ?? '') as String,
+      kind: (j['business_kind'] ?? 'store') as String,
     );
   }
 }

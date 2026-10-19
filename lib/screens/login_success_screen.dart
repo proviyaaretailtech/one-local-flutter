@@ -95,7 +95,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
                     Text('Welcome back, ${first.isEmpty ? 'there' : first}.', textAlign: TextAlign.center, style: inter(24, 700)),
                     const SizedBox(height: 12),
                     Text(
-                      'You’re signed in to ${me.outlet.isEmpty ? 'OneLocal' : me.outlet}. Your store is ready to open.',
+                      'You’re signed in to ${me.outlet.isEmpty ? 'OneLocal' : me.outlet}. Your ${_kindLabel(me.kind)} is ready to open.',
                       textAlign: TextAlign.center,
                       style: inter(14, 400, color: kMuted, height: 1.5),
                     ),
@@ -114,7 +114,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    PrimaryAction(label: 'Continue to store', onPressed: () => openWorkspace(context, auth: _auth)),
+                    PrimaryAction(label: 'Continue to ${_kindLabel(me.kind)}', onPressed: () => openWorkspace(context, auth: _auth)),
                     const SizedBox(height: 12),
                     SecondaryAction(label: 'Switch account', onPressed: () => _auth.signOut()),
                   ],
@@ -129,3 +129,6 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
     );
   }
 }
+
+/// The words for the business on the sign-in screens: Restaurant POS, Store POS or Service POS.
+String _kindLabel(String kind) => switch (kind) { 'restaurant' => 'Restaurant POS', 'service' => 'Service POS', _ => 'Store POS' };

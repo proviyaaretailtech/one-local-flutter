@@ -43,7 +43,7 @@ void main() {
       await show(t, const SigninChooserScreen());
       await t.tap(find.text('Send code'));
       await t.pumpAndSettle();
-      expect(find.text('Your number. Your store.'), findsOneWidget);
+      expect(find.text('Your number. Your business.'), findsOneWidget);
     });
     testWidgets('email goes to email login', (t) async {
       await show(t, const SigninChooserScreen());
@@ -113,7 +113,7 @@ void main() {
       await t.tap(find.text('Send sign-in code'));
       await t.pump();
       expect(toast('No internet connection. Check your network and try again.'), findsOneWidget);
-      expect(find.text('Your number. Your store.'), findsOneWidget);
+      expect(find.text('Your number. Your business.'), findsOneWidget);
     });
     testWidgets('rate limit gets its own message', (t) async {
       final a = FakeAuth()..failWith = AuthApiException('rate limit', statusCode: '429', code: 'over_sms_send_rate_limit');
@@ -181,7 +181,7 @@ void main() {
       await show(t, EmailLoginScreen(auth: FakeAuth()));
       await t.tap(find.text('Use mobile instead'));
       await t.pumpAndSettle();
-      expect(find.text('Your number. Your store.'), findsOneWidget);
+      expect(find.text('Your number. Your business.'), findsOneWidget);
     });
   });
 
@@ -476,7 +476,7 @@ void main() {
       final api = FakeApi(() async => PartnerMe(name: 'Riya', email: 'r@x.in', outlet: ''));
       await show(t, LoginSuccessScreen(api: api, auth: FakeAuth()));
       await t.pumpAndSettle();
-      await t.tap(find.text('Continue to store'));
+      await t.tap(find.text('Continue to Store POS'));
       await t.pump();
       await t.pump(const Duration(milliseconds: 400));
       expect(find.byType(ControlCentreScreen), findsOneWidget);
