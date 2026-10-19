@@ -363,7 +363,7 @@ try {
     && refused(await rpc(B, 'pur_po_create', { supplier_id: supB, lines: [{ inventory_item_id: itemA, qty: 1, unit_cost_minor: 1 }] }, `gw-pur-${randomUUID()}`))
     && refused(await rpc(B, 'pur_po_create', { location_id: locA, supplier_id: supB, lines: [{ inventory_item_id: itemA, qty: 1, unit_cost_minor: 1 }] }, `gw-pur-${randomUUID()}`)));
   ok('purchasing: A order, preferred supplier and audit untouched after all of that', sql(`select count(*) from pos_purchase_orders where organization_id='${orgA}'`) === '1' && sql(`select approved from pos_supplier_prices where row_id='${priceA}'`) === 't'
-    && sql(`select count(*) from supplier_quality_checks where price_row_id='${priceA}'`) === '1' && sql(`select count(*) from inventory_documents where po_ref='${po1.j.number}' and status='draft'`) === '1' && sql(`select status from pos_purchase_orders where row_id='${po1.j.id}'`) === 'Approved');
+    && sql(`select count(*) from supplier_quality_checks where price_row_id='${priceA}'`) === '1' && sql(`select count(*) from inventory_documents where organization_id='${orgA}' and po_ref='${po1.j.number}' and status='draft'`) === '1' && sql(`select status from pos_purchase_orders where row_id='${po1.j.id}'`) === 'Approved');
   ok('purchasing: A viewer (no purchasing role) is refused; applicant with no business gets nothing', refused(await rpc(V, 'pur_po_list')) && refused(await rpc(V, 'pur_po_create', { supplier_id: supA, lines: poLines }, `gw-pur-${randomUUID()}`))
     && refused(await rpc(P1, 'pur_po_list')) && refused(await rpc(P1, 'pur_price_view', { price_id: priceA })));
   ok('payment webhook hook answers 501 (not connected)', (await fetch(`${API}/webhooks/razorpay`, { method: 'POST' })).status === 501);
