@@ -45,6 +45,7 @@ const STATUS: Record<string, number> = {
   CONFLICT: 409, SCOPE: 403,                                                                                     // purchase suggestions (section J), tables (H)
   MERGED: 409, NOT_OCCUPIED: 409, BUSY: 409, CLOSED: 422,                                                                   // tables and floor (section H)
   COUPON_UNKNOWN: 422, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
+  RATE_LIMITED: 429,                                                                                             // Write with AI per business (0541)
 };
 const CODE: Record<string, string> = {
   NOT_DELIVERABLE: 'order_not_deliverable', PICKED_UP: 'already_picked_up', EXPIRED: 'offer_expired', TAKEN: 'already_taken',

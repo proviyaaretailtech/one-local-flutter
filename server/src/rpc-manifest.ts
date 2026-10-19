@@ -147,6 +147,13 @@ export const MANIFEST: Entry[] = [
   db('svc_dashboard', { args: svc.Dashboard, map: P, rate: 'read', roles: 'staff who may book' }),
   // ---- Restaurant dashboard (0491): the home screen of a restaurant; each block is read as the caller, a block the role may not read is null.
   db('rst_dashboard', { args: rst.Dashboard, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  // ---- Restaurant menu and dish detail (0540-0541): reads for any staff member, writes need menu.update. Write with AI is a secure handler
+  //      (ANTHROPIC_API_KEY on this server; the database gates who, the dish facts and the per-business rate limit; nothing is saved by it).
+  db('rst_menu', { args: rst.Menu, map: P, rate: 'read', roles: STAFF }),
+  db('rst_menu_item_view', { args: rst.MenuItemView, map: P, rate: 'read', roles: STAFF }),
+  db('rst_menu_item_save', { args: rst.MenuItemSave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
+  db('rst_menu_stock_set', { args: rst.MenuStockSet, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
+  sec('menu_ai_describe', { args: rst.AiDescribe, rate: 'secure', roles: 'menu editors (menu.update; checked in the database)', maxBytes: 8 * 1024 }),
   db('svc_calendar', { args: svc.Calendar, map: P, rate: 'read', roles: STAFF }),
   db('svc_quote', { args: svc.Quote, map: P, rate: 'read', roles: 'staff who may book' }),
   db('svc_slots', { args: svc.Slots, map: P, rate: 'read', roles: 'staff who may book' }),
