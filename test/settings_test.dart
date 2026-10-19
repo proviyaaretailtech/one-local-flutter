@@ -591,12 +591,12 @@ void main() {
       expect(clock12(null), 'Not set');
     });
 
-    test('installRoutes plugs the Settings page and Support & Help; Team stays for section L', () {
+    test('installRoutes plugs the Settings page and Support & Help, and Team (section L) is plugged in too', () {
       HomeNav.reset();
       installRoutes();
       expect(HomeNav.settings, isNotNull);
       expect(HomeNav.support, isNotNull);
-      expect(HomeNav.team, isNull);
+      expect(HomeNav.team, isNotNull);
     });
 
     test('SettingsState hides bank details from a person who may not see them', () {
