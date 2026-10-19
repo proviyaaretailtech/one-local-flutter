@@ -24,6 +24,7 @@ import * as tbl from './schemas/tables.ts';
 import * as bo from './schemas/backoffice.ts';
 import * as svc from './schemas/service.ts';
 import * as rst from './schemas/restaurant.ts';
+import * as out from './schemas/outlets.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -168,6 +169,11 @@ export const MANIFEST: Entry[] = [
   db('svc_schedule_save', { args: svc.ScheduleSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('svc_plan_save', { args: svc.PlanSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
+  // ---- Outlets (0520-0522): the outlet header, Restaurant status (Delivery status, Rush mode per outlet) and adding an outlet, which stays
+  //      pending until Master Admin approves it. The database checks organisation, outlet, role and verification. outlet_json is internal.
+  db('outlet_list', { args: out.List, map: P, rate: 'read', roles: STAFF }),
+  db('outlet_set_channel', { args: out.SetChannel, map: P, rate: 'write', roles: 'channel_integrations:update at that outlet (owner, admin, managers)' }),
+  db('outlet_add', { args: out.Add, map: P, rate: 'write', idem: true, roles: 'locations:manage (owner, admin, business manager) of an approved business' }),
 ];
 
 const byAlias = new Map<string, Entry>(MANIFEST.map(e => [e.alias, e]));
