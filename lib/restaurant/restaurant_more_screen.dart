@@ -30,7 +30,7 @@ class RestaurantMoreScreen extends StatelessWidget {
       (LucideIcons.user, 'OneLocal manager', null),
       (LucideIcons.house, 'Delivery settings', null),
       (LucideIcons.fileText, 'Order history', HomeNav.orderHistory ?? HomeNav.orders),
-      (LucideIcons.squarePen, 'Share feedback', null),
+      (LucideIcons.chefHat, 'Kitchen display', HomeNav.kitchen), // KDS; replaces "Share feedback" (founder, 2026-10-20)
       (LucideIcons.creditCard, 'Payout', HomeNav.money),
       (LucideIcons.circleQuestionMark, 'Customer support', HomeNav.support),
       (LucideIcons.bell, 'Notifications', HomeNav.notifications),
