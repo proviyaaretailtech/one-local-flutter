@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'account/routes.dart';
 import 'auth/auth_repository.dart';
 import 'auth/partner_api.dart';
 import 'catalogue/catalogue_screen.dart';
@@ -37,6 +38,7 @@ void installRoutes() {
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
   HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
+  installAccountRoutes(); // side nav: Customer, One Local Wallet, Manage account
 }
 
 /// Bottom-bar tabs of the order screens that belong to other sections.

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../customers/customer_picker.dart';
+import '../customers/customers_api.dart';
 import '../ui/theme.dart';
 import 'order_screen.dart';
 import 'order_widgets.dart';
@@ -12,8 +14,9 @@ import 'orders_api.dart';
 /// Figma "Cart" and "Checkout" for a new counter bill. Nothing is placed until Complete Payment (or Save & Hold).
 /// Every total on screen is the server's quote; the phone only keeps which items and how many.
 class CartScreen extends StatefulWidget {
-  const CartScreen({super.key, this.api, this.initialLines = const [], this.onNavigate});
+  const CartScreen({super.key, this.api, this.initialLines = const [], this.onNavigate, this.customersApi});
   final OrdersApi? api;
+  final CustomersApi? customersApi; // S5.5: the bill's customer
   final List<CartLine> initialLines;
   final ValueChanged<String>? onNavigate;
   @override
@@ -33,6 +36,7 @@ class _CartScreenState extends State<CartScreen> {
   String? _key; // one key per payment intent: kept for a retry, dropped when the cart, method or amount changes
   Timer? _debounce;
   int _seq = 0;
+  CustomerChoice? _customer; // S5.5: null = not asked yet (a guest), walk-in, or a customer of the business
 
   static const _methods = [('cash', 'Cash'), ('card', 'Card'), ('upi', 'UPI / QR'), ('split', 'Split Pay')];
 
@@ -112,6 +116,22 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  // S5.5 Customer: existing, walk-in or new. Linked to the bill once it is placed (the database records it on the order).
+  Future<void> _pickCustomer() async {
+    final c = await showCustomerPicker(context, api: widget.customersApi);
+    if (c != null && mounted) setState(() => _customer = c);
+  }
+
+  Future<void> _linkCustomer(String orderId) async {
+    final c = _customer?.customer;
+    if (c == null) return;
+    try {
+      await (widget.customersApi ?? CustomersApi()).attach(orderId, c.id);
+    } catch (e) {
+      if (mounted) showToast(context, 'Bill saved, but the customer was not linked: $e');
+    }
+  }
+
   Future<void> _complete() async {
     final q = _quote;
     if (q == null || _busy) return;
@@ -123,6 +143,7 @@ class _CartScreenState extends State<CartScreen> {
     _key ??= OrdersApi.newKey();
     try {
       final view = await _api.checkout(lines: _lines, method: _method, tendered: _method == 'cash' ? _tendered : null, key: _key!);
+      await _linkCustomer(view.id);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => OrderScreen(api: _api, orderId: view.id, initial: view, onNavigate: widget.onNavigate)));
     } catch (e) {
@@ -138,6 +159,7 @@ class _CartScreenState extends State<CartScreen> {
     final key = OrdersApi.newKey();
     try {
       final view = await _api.hold(lines: _lines, key: key);
+      await _linkCustomer(view.id);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => OrderScreen(api: _api, orderId: view.id, initial: view, onNavigate: widget.onNavigate)));
     } catch (e) {
@@ -159,7 +181,12 @@ class _CartScreenState extends State<CartScreen> {
         OrdersTopBar(title: _checkout ? 'Checkout · new bill' : 'Cart · new bill', onBack: () => _checkout ? setState(() => _checkout = false) : Navigator.maybePop(context)),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(12, 14, 12, 16), children: [
-            OrderHeaderCard(number: 'New bill', channel: 'Store Checkout', subtitle: 'Customer: Guest · ${_placedAt.format(context)}'),
+            InkWell(
+              key: const ValueKey('cart-customer'),
+              borderRadius: BorderRadius.circular(18),
+              onTap: _busy ? null : _pickCustomer,
+              child: OrderHeaderCard(number: 'New bill', channel: 'Store Checkout', subtitle: 'Customer: ${_customer?.label ?? 'Guest'} · ${_placedAt.format(context)}'),
+            ),
             const SizedBox(height: 14),
             StateHeader(
               title: title,
