@@ -288,7 +288,7 @@ class _QuickLinks extends StatelessWidget {
       (LucideIcons.star, 'Reviews', () => HomeNav.go(context, HomeNav.reviews, 'Reviews')),
       (LucideIcons.users, 'Team', () => HomeNav.go(context, HomeNav.team, 'Team')),
       (LucideIcons.settings, 'Settings', () => HomeNav.go(context, HomeNav.setup, 'Settings')),
-      (LucideIcons.info, 'Outlet info', () => HomeNav.go(context, HomeNav.setup, 'Outlet info')),
+      (LucideIcons.store, 'Storefront', () => HomeNav.go(context, HomeNav.storefront, 'Storefront')),
       (LucideIcons.layoutGrid, 'Show all', () => HomeNav.go(context, null, 'The full list')),
     ];
     return GridView.count(

@@ -14,7 +14,7 @@
 // is copied into args.idempotency_key when the body has none).
 // scripts/manifest-audit.mjs reads this file and fails on any function that is unsafe for the `authenticated` role.
 import type { z } from 'zod';
-import { secureHandlers, withImageLinks, type SecureHandler } from './modules/secure/index.ts';
+import { secureHandlers, withImageLinks, withStorefrontLinks, type SecureHandler } from './modules/secure/index.ts';
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
@@ -29,6 +29,7 @@ import * as sell from './schemas/sell.ts';
 import * as pur from './schemas/purchasing.ts';
 import * as mo from './schemas/money.ts';
 import * as team from './schemas/team.ts';
+import * as sf from './schemas/storefront.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -48,6 +49,8 @@ const db = (alias: string, e: Omit<DbEntry, 'kind' | 'alias' | 'fn'> & { fn?: st
 const sec = (alias: string, e: Omit<SecureEntry, 'kind' | 'alias' | 'handler'>): SecureEntry => ({ kind: 'secure', alias, handler: (secureHandlers as Record<string, SecureHandler>)[alias], ...e });
 const P = (a: unknown) => ({ p: a });
 const links = (r: unknown) => withImageLinks(r);
+const links2 = (r: unknown) => withStorefrontLinks(r);
+const STOREFRONT = 'owner, admin, manager, business manager, location manager, operations or marketing manager (the function checks)';
 
 const empty = { rate: 'read' as Rate, args: 'passthrough' as const };
 
@@ -240,6 +243,30 @@ export const MANIFEST: Entry[] = [
   db('team_user_act', { args: team.UserAct, map: P, rate: 'write', roles: 'owner or admin (org_invitations:manage); never on yourself' }),
   db('team_task_save', { args: team.TaskSave, map: P, rate: 'write', idem: true, roles: 'task managers (owner, admin, manager, business / operations / location manager)' }),
   db('team_task_act', { args: team.TaskAct, map: P, rate: 'write', roles: 'task managers; the assigned person may start and submit' }),
+  // ---- storefront, section M (0450-0451). Body = the function's `p` object; the database validates it and checks organisation and role
+  //      (owner / admin / manager / marketing roles edit; storefront:publish publishes). Results carry storage paths: post turns them into short links.
+  //      Pictures go through the two secure handlers below (signed slot, then confirm); the app never holds a storage key.
+  db('sf_options', { args: sf.None, map: P, rate: 'read', roles: STOREFRONT }),
+  db('sf_builder_get', { args: sf.None, map: P, rate: 'read', roles: STOREFRONT }),
+  db('sf_settings_get', { args: sf.None, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  db('sf_products', { args: sf.Products, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  db('sf_preview', { args: sf.Preview, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  db('sf_image_library', { args: sf.ImageLibrary, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  db('sf_offer_list', { args: sf.None, map: P, rate: 'read', roles: STOREFRONT }),
+  db('sf_ad_list', { args: sf.None, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  db('sf_draft_save', { args: sf.DraftSave, map: P, rate: 'write', roles: STOREFRONT }),
+  db('sf_draft_discard', { args: sf.DraftDiscard, map: P, rate: 'write', roles: STOREFRONT }),
+  db('sf_publish', { args: sf.Publish, map: P, rate: 'write', roles: 'staff with storefront:publish' }),
+  db('sf_product_save', { args: sf.ProductSave, map: P, rate: 'write', post: links2, roles: 'storefront roles; catalogue facts need menu:update' }),
+  db('sf_profile_save', { args: 'passthrough', map: P, rate: 'write', post: links2, roles: STOREFRONT }),
+  db('sf_hours_save', { args: 'passthrough', map: P, rate: 'write', post: links2, roles: STOREFRONT }),
+  db('sf_delivery_save', { args: 'passthrough', map: P, rate: 'write', post: links2, roles: STOREFRONT }),
+  db('sf_offer_save', { args: 'passthrough', map: P, rate: 'write', roles: STOREFRONT }),
+  db('sf_offer_act', { args: sf.OfferAct, map: P, rate: 'write', roles: STOREFRONT }),
+  db('sf_ad_save', { args: 'passthrough', map: P, rate: 'write', post: links2, roles: STOREFRONT }),
+  db('sf_ad_act', { args: sf.AdAct, map: P, rate: 'write', post: links2, roles: STOREFRONT }),
+  sec('storefront_image_slot', { args: sf.ImageAsk, rate: 'secure', roles: STOREFRONT }),
+  sec('storefront_image_attach', { args: sf.ImageAttach, rate: 'secure', roles: STOREFRONT }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 

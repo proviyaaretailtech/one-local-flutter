@@ -27,9 +27,11 @@ import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 import 'tables/floor_screen.dart';
 import 'tables/table_widgets.dart';
+import 'storefront/builder_screen.dart';
+import 'storefront/storefront_api.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
-/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K) and the team (L) into the [HomeNav] hooks.
+/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K), the team (L) and the storefront (M) into the [HomeNav] hooks.
 import 'team/team_screens.dart';
 import 'team/team_widgets.dart';
 void installRoutes() {
@@ -55,6 +57,8 @@ void installRoutes() {
   // Section K: money. The server says which screens this person may open; the bottom bar's other tabs go back through _tab.
   HomeNav.money = (c) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
   HomeNav.team = (c) => Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id))));
+  // Section M: the storefront page builder (profile, hours, delivery, offers, ads and publishing hang off it).
+  HomeNav.storefront = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'storefront'), builder: (_) => StorePageBuilder(api: StorefrontApi())));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 

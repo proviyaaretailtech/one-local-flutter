@@ -1,0 +1,896 @@
+{
+ "options": {
+  "limits": {
+   "title": 40,
+   "slides": 8,
+   "sections": 20,
+   "subtitle": 60,
+   "categories": 24,
+   "category_name": 30,
+   "products_per_section": 60
+  },
+  "can_edit": true,
+  "can_publish": true,
+  "section_types": [
+   {
+    "hint": "Add promotional banners",
+    "type": "banner",
+    "label": "Banner / Slider"
+   },
+   {
+    "hint": "Show product categories",
+    "type": "category_grid",
+    "label": "Category Grid"
+   },
+   {
+    "hint": "Show products in a grid or list",
+    "type": "product_list",
+    "label": "Product List"
+   },
+   {
+    "hint": "Show discounted products",
+    "type": "deals",
+    "label": "Deals / Offer Section"
+   },
+   {
+    "hint": "Image + text card",
+    "type": "custom_card",
+    "label": "Custom Card"
+   },
+   {
+    "hint": "Feature your brand or products",
+    "type": "brand",
+    "label": "Brand Section"
+   },
+   {
+    "hint": "Add space between sections",
+    "type": "divider",
+    "label": "Divider"
+   },
+   {
+    "hint": "Boost your visibility with ads",
+    "type": "ads",
+    "label": "Ads"
+   }
+  ],
+  "published_version": 0,
+  "can_edit_catalogue": true,
+  "catalogue_categories": [
+   {
+    "id": "b23f374d-20d8-4824-951e-ad341fda8ba4",
+    "name": "Best Deals"
+   },
+   {
+    "id": "91f24269-ae21-43a5-9fc5-b792d4d517eb",
+    "name": "Indian sweets"
+   }
+  ]
+ },
+ "builder_starter": {
+  "store": {
+   "name": null,
+   "slug": null
+  },
+  "source": "starter",
+  "definition": {
+   "theme": {
+    "primary": "#76EC00",
+    "secondary": "#0A0A0A",
+    "background": "#FFFFFF",
+    "section_style": "rounded"
+   },
+   "sections": [
+    {
+     "id": "header",
+     "type": "header",
+     "title": "Header",
+     "config": {},
+     "enabled": true
+    }
+   ]
+  },
+  "can_publish": true,
+  "published_at": null,
+  "published_by": null,
+  "draft_version": 0,
+  "published_version": 0,
+  "has_unpublished_changes": false
+ },
+ "settings": {
+  "hours": {
+   "days": [
+    {
+     "day": 1,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 2,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 3,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 4,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 5,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 6,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 7,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    }
+   ],
+   "show": true,
+   "configured": true
+  },
+  "profile": {
+   "phone": "+919876543210",
+   "saved": true,
+   "store_slug": "noice-mvbzg6og",
+   "description": "Best snacks. Lowest prices. Discover Indian sweets, everyday munchies and more.",
+   "public_name": "The NOICE Store",
+   "address_line": "24 Market Road, Indiranagar, Bengaluru",
+   "business_category": "Snacks & Grocery",
+   "logo_url": null,
+   "cover_url": null
+  },
+  "delivery": {
+   "method": "own",
+   "pickup": true,
+   "radius_km": 5,
+   "configured": true,
+   "delivery_to": null,
+   "delivery_from": null,
+   "home_delivery": true,
+   "est_max_minutes": 45,
+   "est_min_minutes": 30,
+   "min_order_minor": 9900,
+   "free_above_minor": 49900,
+   "delivery_fee_minor": 3000,
+   "use_business_hours": true
+  }
+ },
+ "products_all": {
+  "items": [
+   {
+    "id": "b43b1bd9-3805-44ae-9e19-8c4e4b49fb6a",
+    "name": "NOICE Cashews Salted",
+    "version": 1,
+    "visible": true,
+    "category": null,
+    "image_id": null,
+    "sold_30d": 0,
+    "available": true,
+    "mrp_minor": 12000,
+    "description": "Crispy snack",
+    "price_minor": 12000,
+    "discount_pct": null,
+    "image_url": null
+   },
+   {
+    "id": "109c844f-9af2-4729-b05f-a9f0a5d1e7f4",
+    "name": "NOICE Cookies",
+    "version": 1,
+    "visible": true,
+    "category": null,
+    "image_id": null,
+    "sold_30d": 0,
+    "available": true,
+    "mrp_minor": 4500,
+    "description": "Crispy snack",
+    "price_minor": 4500,
+    "discount_pct": null,
+    "image_url": null
+   },
+   {
+    "id": "2cdf1de4-56c6-4c25-a986-f6d40eb089b1",
+    "name": "NOICE Masala Chana Dal",
+    "version": 1,
+    "visible": true,
+    "category": null,
+    "image_id": null,
+    "sold_30d": 0,
+    "available": true,
+    "mrp_minor": 4200,
+    "description": "Crispy snack",
+    "price_minor": 3500,
+    "discount_pct": 17,
+    "image_url": null
+   },
+   {
+    "id": "608da358-6ea1-452a-a3db-e3efdb6991bb",
+    "name": "NOICE Oats",
+    "version": 1,
+    "visible": true,
+    "category": null,
+    "image_id": null,
+    "sold_30d": 0,
+    "available": true,
+    "mrp_minor": 9900,
+    "description": "Crispy snack",
+    "price_minor": 9900,
+    "discount_pct": null,
+    "image_url": null
+   },
+   {
+    "id": "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+    "name": "NOICE Rajasthani Aloo Bhujia",
+    "version": 1,
+    "visible": true,
+    "category": null,
+    "image_id": null,
+    "sold_30d": 0,
+    "available": true,
+    "mrp_minor": 4200,
+    "description": "Crispy snack",
+    "price_minor": 2100,
+    "discount_pct": 50,
+    "image_url": null
+   }
+  ],
+  "limit": 30,
+  "total": 5,
+  "filter": "all",
+  "offset": 0
+ },
+ "products_on_offer": {
+  "items": [
+   {
+    "id": "2cdf1de4-56c6-4c25-a986-f6d40eb089b1",
+    "name": "NOICE Masala Chana Dal",
+    "version": 1,
+    "visible": true,
+    "category": null,
+    "image_id": null,
+    "sold_30d": 0,
+    "available": true,
+    "mrp_minor": 4200,
+    "description": "Crispy snack",
+    "price_minor": 3500,
+    "discount_pct": 17,
+    "image_url": null
+   },
+   {
+    "id": "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+    "name": "NOICE Rajasthani Aloo Bhujia",
+    "version": 1,
+    "visible": true,
+    "category": null,
+    "image_id": null,
+    "sold_30d": 0,
+    "available": true,
+    "mrp_minor": 4200,
+    "description": "Crispy snack",
+    "price_minor": 2100,
+    "discount_pct": 50,
+    "image_url": null
+   }
+  ],
+  "limit": 30,
+  "total": 2,
+  "filter": "on_offer",
+  "offset": 0
+ },
+ "product_saved": {
+  "id": "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+  "name": "NOICE Rajasthani Aloo Bhujia",
+  "hidden": false,
+  "version": 1,
+  "visible": true,
+  "category": null,
+  "image_id": "1fceae29-d6d4-4f22-848b-c9fb6ce0e075",
+  "available": true,
+  "mrp_minor": 4200,
+  "description": "Crispy potato and gram flour sticks with a bold Rajasthani spice blend.",
+  "price_minor": 2100,
+  "discount_pct": 50,
+  "image_url": null
+ },
+ "offer": {
+  "id": "sf-ce8e1265-f5f7-4a3a-a77f-3f7dfdb5f6c5",
+  "phase": "live",
+  "title": "Weekend Binge, Lowest Prices!",
+  "status": "active",
+  "message": "Best snacks. Lowest prices.",
+  "version": "2026-10-17T05:55:34.810908+00:00",
+  "editable": true,
+  "end_date": "2099-10-31T00:00:00+00:00",
+  "start_date": "2026-10-10T00:00:00+00:00",
+  "product_ids": [
+   "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+   "2cdf1de4-56c6-4c25-a986-f6d40eb089b1"
+  ],
+  "usage_count": 0,
+  "discount_type": "percent",
+  "discount_value": 0,
+  "show_on_storefront": true
+ },
+ "offers": {
+  "offers": [
+   {
+    "id": "sf-ce8e1265-f5f7-4a3a-a77f-3f7dfdb5f6c5",
+    "phase": "live",
+    "title": "Weekend Binge, Lowest Prices!",
+    "status": "active",
+    "message": "Best snacks. Lowest prices.",
+    "version": "2026-10-17T05:55:34.810908+00:00",
+    "editable": true,
+    "end_date": "2099-10-31T00:00:00+00:00",
+    "start_date": "2026-10-10T00:00:00+00:00",
+    "product_ids": [
+     "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+     "2cdf1de4-56c6-4c25-a986-f6d40eb089b1"
+    ],
+    "usage_count": 0,
+    "discount_type": "percent",
+    "discount_value": 0,
+    "show_on_storefront": true
+   }
+  ]
+ },
+ "ad": {
+  "id": "bd3da9bf-2752-4483-97da-109509e6ff07",
+  "title": "The NOICE Store",
+  "clicks": 0,
+  "orders": 0,
+  "status": "pending",
+  "enabled": true,
+  "ends_on": "2026-10-31",
+  "message": "Best snacks. Lowest prices.",
+  "running": false,
+  "version": "2026-10-17T05:55:34.842399+00:00",
+  "image_id": "1b1f3fa0-4463-41ce-91a4-2430a0d15c87",
+  "link_type": "category",
+  "starts_on": "2026-10-10",
+  "impressions": 0,
+  "link_target": "Best Deals",
+  "review_note": "",
+  "spend_minor": 0,
+  "daily_budget_minor": 10000,
+  "image_url": null
+ },
+ "ads": {
+  "ads": [
+   {
+    "id": "bd3da9bf-2752-4483-97da-109509e6ff07",
+    "title": "The NOICE Store",
+    "clicks": 0,
+    "orders": 0,
+    "status": "pending",
+    "enabled": true,
+    "ends_on": "2026-10-31",
+    "message": "Best snacks. Lowest prices.",
+    "running": false,
+    "version": "2026-10-17T05:55:34.842399+00:00",
+    "image_id": "1b1f3fa0-4463-41ce-91a4-2430a0d15c87",
+    "link_type": "category",
+    "starts_on": "2026-10-10",
+    "impressions": 0,
+    "link_target": "Best Deals",
+    "review_note": "",
+    "spend_minor": 0,
+    "daily_budget_minor": 10000,
+    "image_url": null
+   }
+  ]
+ },
+ "images": {
+  "images": [
+   {
+    "id": "1b1f3fa0-4463-41ce-91a4-2430a0d15c87",
+    "kind": "ad",
+    "created_at": "2026-10-17T05:55:34.393779+00:00",
+    "image_url": null
+   },
+   {
+    "id": "1fceae29-d6d4-4f22-848b-c9fb6ce0e075",
+    "kind": "product",
+    "created_at": "2026-10-17T05:55:34.313267+00:00",
+    "image_url": null
+   },
+   {
+    "id": "b321685e-fa7a-4d62-a09e-5817b1901318",
+    "kind": "category",
+    "created_at": "2026-10-17T05:55:34.22898+00:00",
+    "image_url": null
+   },
+   {
+    "id": "19ab10a5-5c61-46cc-a73a-44a4e2815f54",
+    "kind": "category",
+    "created_at": "2026-10-17T05:55:34.140071+00:00",
+    "image_url": null
+   },
+   {
+    "id": "18a62015-b8d5-4515-a68d-dbb820976abb",
+    "kind": "banner",
+    "created_at": "2026-10-17T05:55:34.063959+00:00",
+    "image_url": null
+   }
+  ]
+ },
+ "draft_saved": {
+  "store": {
+   "name": "The NOICE Store",
+   "slug": "noice-mvbzg6og"
+  },
+  "source": "draft",
+  "definition": {
+   "theme": {
+    "primary": "#76EC00",
+    "secondary": "#0A0A0A",
+    "background": "#FFFFFF",
+    "section_style": "rounded"
+   },
+   "sections": [
+    {
+     "id": "hdr",
+     "type": "header",
+     "title": "Header",
+     "config": {},
+     "enabled": true
+    },
+    {
+     "id": "ban",
+     "type": "banner",
+     "title": "Banner / Slider",
+     "config": {
+      "slides": [
+       {
+        "id": "a62a9c7e-023e-4f5e-adb1-99ced32011e1",
+        "title": "The NOICE Store",
+        "image_id": "18a62015-b8d5-4515-a68d-dbb820976abb",
+        "subtitle": "Best snacks. Lowest prices.",
+        "link_type": "category",
+        "link_target": "c-best"
+       }
+      ]
+     },
+     "enabled": true
+    },
+    {
+     "id": "cat",
+     "type": "category_grid",
+     "title": "Shop by Category",
+     "config": {
+      "layout": "grid",
+      "columns": 3,
+      "categories": [
+       {
+        "id": "c-best",
+        "name": "Best Deals",
+        "image_id": "19ab10a5-5c61-46cc-a73a-44a4e2815f54"
+       },
+       {
+        "id": "c-sweets",
+        "name": "Indian sweets",
+        "image_id": "b321685e-fa7a-4d62-a09e-5817b1901318"
+       }
+      ]
+     },
+     "enabled": true
+    },
+    {
+     "id": "pl",
+     "type": "product_list",
+     "title": "Weekend Binge, Lowest Prices!",
+     "config": {
+      "layout": "grid",
+      "columns": 3,
+      "product_ids": [
+       "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+       "2cdf1de4-56c6-4c25-a986-f6d40eb089b1"
+      ],
+      "show_ratings": true,
+      "show_discount": true,
+      "show_add_button": true,
+      "show_delivery_time": true
+     },
+     "enabled": true
+    },
+    {
+     "id": "dl",
+     "type": "deals",
+     "title": "Deals",
+     "config": {
+      "message": null,
+      "offer_id": "sf-ce8e1265-f5f7-4a3a-a77f-3f7dfdb5f6c5",
+      "product_ids": []
+     },
+     "enabled": true
+    }
+   ]
+  },
+  "can_publish": true,
+  "published_at": null,
+  "published_by": null,
+  "draft_version": 1,
+  "published_version": 0,
+  "has_unpublished_changes": true
+ },
+ "preview": {
+  "hours": {
+   "days": [
+    {
+     "day": 1,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 2,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 3,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 4,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 5,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 6,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    },
+    {
+     "day": 7,
+     "open": true,
+     "opens": "09:00",
+     "closes": "21:00"
+    }
+   ],
+   "show": true,
+   "configured": true
+  },
+  "store": {
+   "phone": "+919876543210",
+   "saved": true,
+   "store_slug": "noice-mvbzg6og",
+   "description": "Best snacks. Lowest prices. Discover Indian sweets, everyday munchies and more.",
+   "public_name": "The NOICE Store",
+   "address_line": "24 Market Road, Indiranagar, Bengaluru",
+   "business_category": "Snacks & Grocery",
+   "logo_url": null,
+   "cover_url": null
+  },
+  "theme": {
+   "primary": "#76EC00",
+   "secondary": "#0A0A0A",
+   "background": "#FFFFFF",
+   "section_style": "rounded"
+  },
+  "source": "draft",
+  "version": 1,
+  "delivery": {
+   "method": "own",
+   "pickup": true,
+   "radius_km": 5,
+   "configured": true,
+   "delivery_to": null,
+   "delivery_from": null,
+   "home_delivery": true,
+   "est_max_minutes": 45,
+   "est_min_minutes": 30,
+   "min_order_minor": 9900,
+   "free_above_minor": 49900,
+   "delivery_fee_minor": 3000,
+   "use_business_hours": true
+  },
+  "sections": [
+   {
+    "id": "hdr",
+    "type": "header",
+    "title": "Header",
+    "config": {},
+    "enabled": true
+   },
+   {
+    "id": "ban",
+    "type": "banner",
+    "title": "Banner / Slider",
+    "config": {
+     "slides": [
+      {
+       "id": "a62a9c7e-023e-4f5e-adb1-99ced32011e1",
+       "title": "The NOICE Store",
+       "image_id": "18a62015-b8d5-4515-a68d-dbb820976abb",
+       "subtitle": "Best snacks. Lowest prices.",
+       "link_type": "category",
+       "link_target": "c-best",
+       "image_url": null
+      }
+     ]
+    },
+    "enabled": true
+   },
+   {
+    "id": "cat",
+    "type": "category_grid",
+    "title": "Shop by Category",
+    "config": {
+     "layout": "grid",
+     "columns": 3,
+     "categories": [
+      {
+       "id": "c-best",
+       "name": "Best Deals",
+       "image_id": "19ab10a5-5c61-46cc-a73a-44a4e2815f54",
+       "image_url": null
+      },
+      {
+       "id": "c-sweets",
+       "name": "Indian sweets",
+       "image_id": "b321685e-fa7a-4d62-a09e-5817b1901318",
+       "image_url": null
+      }
+     ]
+    },
+    "enabled": true
+   },
+   {
+    "id": "pl",
+    "type": "product_list",
+    "title": "Weekend Binge, Lowest Prices!",
+    "config": {
+     "items": [
+      {
+       "id": "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+       "name": "NOICE Rajasthani Aloo Bhujia",
+       "version": 1,
+       "visible": true,
+       "category": null,
+       "image_id": "1fceae29-d6d4-4f22-848b-c9fb6ce0e075",
+       "available": true,
+       "mrp_minor": 4200,
+       "description": "Crispy potato and gram flour sticks with a bold Rajasthani spice blend.",
+       "price_minor": 2100,
+       "discount_pct": 50,
+       "image_url": null
+      },
+      {
+       "id": "2cdf1de4-56c6-4c25-a986-f6d40eb089b1",
+       "name": "NOICE Masala Chana Dal",
+       "version": 1,
+       "visible": true,
+       "category": null,
+       "image_id": null,
+       "available": true,
+       "mrp_minor": 4200,
+       "description": "Crispy snack",
+       "price_minor": 3500,
+       "discount_pct": 17,
+       "image_url": null
+      }
+     ],
+     "layout": "grid",
+     "columns": 3,
+     "product_ids": [
+      "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+      "2cdf1de4-56c6-4c25-a986-f6d40eb089b1"
+     ],
+     "show_ratings": true,
+     "show_discount": true,
+     "show_add_button": true,
+     "show_delivery_time": true
+    },
+    "enabled": true
+   },
+   {
+    "id": "dl",
+    "type": "deals",
+    "title": "Deals",
+    "config": {
+     "items": [
+      {
+       "id": "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+       "name": "NOICE Rajasthani Aloo Bhujia",
+       "version": 1,
+       "visible": true,
+       "category": null,
+       "image_id": "1fceae29-d6d4-4f22-848b-c9fb6ce0e075",
+       "available": true,
+       "mrp_minor": 4200,
+       "description": "Crispy potato and gram flour sticks with a bold Rajasthani spice blend.",
+       "price_minor": 2100,
+       "discount_pct": 50,
+       "image_url": null
+      },
+      {
+       "id": "2cdf1de4-56c6-4c25-a986-f6d40eb089b1",
+       "name": "NOICE Masala Chana Dal",
+       "version": 1,
+       "visible": true,
+       "category": null,
+       "image_id": null,
+       "available": true,
+       "mrp_minor": 4200,
+       "description": "Crispy snack",
+       "price_minor": 3500,
+       "discount_pct": 17,
+       "image_url": null
+      }
+     ],
+     "offer": {
+      "id": "sf-ce8e1265-f5f7-4a3a-a77f-3f7dfdb5f6c5",
+      "phase": "live",
+      "title": "Weekend Binge, Lowest Prices!",
+      "status": "active",
+      "message": "Best snacks. Lowest prices.",
+      "version": "2026-10-17T05:55:34.810908+00:00",
+      "editable": true,
+      "end_date": "2099-10-31T00:00:00+00:00",
+      "start_date": "2026-10-10T00:00:00+00:00",
+      "product_ids": [
+       "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+       "2cdf1de4-56c6-4c25-a986-f6d40eb089b1"
+      ],
+      "usage_count": 0,
+      "discount_type": "percent",
+      "discount_value": 0,
+      "show_on_storefront": true
+     },
+     "message": null,
+     "offer_id": "sf-ce8e1265-f5f7-4a3a-a77f-3f7dfdb5f6c5",
+     "offer_live": true,
+     "product_ids": []
+    },
+    "enabled": true
+   }
+  ],
+  "published_version": 0
+ },
+ "published": {
+  "path": "/noice-mvbzg6og",
+  "slug": "noice-mvbzg6og",
+  "version": 1,
+  "store_name": "The NOICE Store",
+  "published_at": "2026-10-17T05:55:34.929235+00:00"
+ },
+ "builder_live": {
+  "store": {
+   "name": "The NOICE Store",
+   "slug": "noice-mvbzg6og"
+  },
+  "source": "published",
+  "definition": {
+   "theme": {
+    "primary": "#76EC00",
+    "secondary": "#0A0A0A",
+    "background": "#FFFFFF",
+    "section_style": "rounded"
+   },
+   "sections": [
+    {
+     "id": "hdr",
+     "type": "header",
+     "title": "Header",
+     "config": {},
+     "enabled": true
+    },
+    {
+     "id": "ban",
+     "type": "banner",
+     "title": "Banner / Slider",
+     "config": {
+      "slides": [
+       {
+        "id": "a62a9c7e-023e-4f5e-adb1-99ced32011e1",
+        "title": "The NOICE Store",
+        "image_id": "18a62015-b8d5-4515-a68d-dbb820976abb",
+        "subtitle": "Best snacks. Lowest prices.",
+        "link_type": "category",
+        "link_target": "c-best"
+       }
+      ]
+     },
+     "enabled": true
+    },
+    {
+     "id": "cat",
+     "type": "category_grid",
+     "title": "Shop by Category",
+     "config": {
+      "layout": "grid",
+      "columns": 3,
+      "categories": [
+       {
+        "id": "c-best",
+        "name": "Best Deals",
+        "image_id": "19ab10a5-5c61-46cc-a73a-44a4e2815f54"
+       },
+       {
+        "id": "c-sweets",
+        "name": "Indian sweets",
+        "image_id": "b321685e-fa7a-4d62-a09e-5817b1901318"
+       }
+      ]
+     },
+     "enabled": true
+    },
+    {
+     "id": "pl",
+     "type": "product_list",
+     "title": "Weekend Binge, Lowest Prices!",
+     "config": {
+      "layout": "grid",
+      "columns": 3,
+      "product_ids": [
+       "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+       "2cdf1de4-56c6-4c25-a986-f6d40eb089b1"
+      ],
+      "show_ratings": true,
+      "show_discount": true,
+      "show_add_button": true,
+      "show_delivery_time": true
+     },
+     "enabled": true
+    },
+    {
+     "id": "dl",
+     "type": "deals",
+     "title": "Deals",
+     "config": {
+      "message": null,
+      "offer_id": "sf-ce8e1265-f5f7-4a3a-a77f-3f7dfdb5f6c5",
+      "product_ids": []
+     },
+     "enabled": true
+    }
+   ]
+  },
+  "can_publish": true,
+  "published_at": "2026-10-17T05:55:34.929235+00:00",
+  "published_by": "ZZ mgr-a",
+  "draft_version": 1,
+  "published_version": 1,
+  "has_unpublished_changes": false
+ },
+ "ids": {
+  "products": [
+   "3fdee4ea-aec0-4da8-a1d2-5e1bfe20ea56",
+   "2cdf1de4-56c6-4c25-a986-f6d40eb089b1",
+   "b43b1bd9-3805-44ae-9e19-8c4e4b49fb6a",
+   "608da358-6ea1-452a-a3db-e3efdb6991bb",
+   "109c844f-9af2-4729-b05f-a9f0a5d1e7f4"
+  ],
+  "banner": "18a62015-b8d5-4515-a68d-dbb820976abb",
+  "cat1": "19ab10a5-5c61-46cc-a73a-44a4e2815f54",
+  "cat2": "b321685e-fa7a-4d62-a09e-5817b1901318"
+ }
+}

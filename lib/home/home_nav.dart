@@ -37,6 +37,8 @@ class HomeNav {
   // Section I: the Service POS calendar, used instead of `bill` by service partners (partner_type 'service').
   static HomeRoute? service;
   static String? partnerType;
+  // Section M: the storefront page builder and its settings.
+  static HomeRoute? storefront;
   static HomeRoute? money;
   static HomeRoute? notifications;
   static HomeRoute? complaints;
@@ -64,6 +66,6 @@ class HomeNav {
   static void reset() {
     home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = lowStock = null;
     stockItem = null;
-    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = null;
   }
 }

@@ -4,6 +4,7 @@
 import type { Handler } from '../../http.ts';
 import * as pii from './pii.ts';
 import * as storage from './storage.ts';
+import * as storefront from './storefront.ts';
 import { me } from './me.ts';
 import { webhook } from './payments.ts';
 
@@ -20,6 +21,8 @@ export const secureHandlers = {
   partner_app_document_preview: storage.documentPreview,
   partner_setup_image_slot: storage.imageSlot,
   partner_setup_image_attach: storage.imageAttach,
+  storefront_image_slot: storefront.imageSlot,
+  storefront_image_attach: storefront.imageAttach,
 } satisfies Record<string, SecureHandler>;
 
 /** Real HTTP endpoints (no user token): provider webhooks. */
@@ -29,3 +32,4 @@ export const webhookRoutes: { path: string; handler: Handler }[] = [
 ];
 
 export { withImageLinks } from './storage.ts';
+export { withStorefrontLinks } from './storefront.ts';
