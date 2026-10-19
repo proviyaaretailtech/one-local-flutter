@@ -82,6 +82,25 @@ class TablesApi {
   /// "Split Existing Merges": by the joined group or by one of its tables.
   Future<Facts> split({String? mergeId, String? tableId}) async => Facts(await _call('tbl_split', {'merge_id': mergeId, 'table_id': tableId}));
 
+  // ---- take an order at a table (migration 0485)
+
+  /// The dishes and their categories (the till's catalogue read, `pos_sell_catalog`); only dishes on sale.
+  Future<Facts> menu() async => Facts(await _call('pos_sell_catalog', {'available': true}));
+
+  /// Add dishes to the table: [send] true fires a KOT for every dish not yet sent ("Send to kitchen"), false holds them ("Save and hold").
+  /// [key] is one per tap: a retry sends the same key and gets the same answer.
+  Future<Facts> addDishes(String tableId, List<Map<String, Object?>> lines, {required bool send, required String key, int? guests}) async =>
+      Facts(await _call('tbl_order_add', {'table_id': tableId, 'lines': lines, 'send': send, 'guest_count': guests}, key: key));
+
+  /// Send the held dishes of the table's order as a new KOT.
+  Future<Facts> sendHeld(String tableId, {required String key}) async => Facts(await _call('tbl_kot_send', {'table_id': tableId}, key: key));
+
+  /// Ready to serve: the store's table dishes in the kitchen or ready.
+  Future<Facts> readyList() async => Facts(await _call('tbl_ready_list', {}));
+
+  /// Mark dishes as served. Safe to repeat: dishes already served are counted, not refused.
+  Future<Facts> markServed(List<String> itemIds) async => Facts(await _call('tbl_mark_served', {'item_ids': itemIds}));
+
   /// Send KOT / Generate Bill: the existing order status move (`pos_set_order_status`); the database checks the transition and the role.
   Future<void> setOrderStatus(String orderId, String to, {String? expectedUpdatedAt}) async {
     await _call('pos_set_order_status', {'order_id': orderId, 'to': to, 'expected_updated_at': expectedUpdatedAt});

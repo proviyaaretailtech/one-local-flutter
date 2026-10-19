@@ -6,10 +6,12 @@ import '../ui/theme.dart';
 import 'actions_screen.dart';
 import 'merge_screen.dart';
 import 'table_widgets.dart';
+import 'tables_api.dart';
+import 'take_order_screens.dart';
 
 /// Figma "Table T12 Order" (screen-order-detail): the open order of a table: status banner, items with kitchen status, operational timeline, subtotal,
 /// Add Items, Send KOT, Print KOT, Change Table, Merge Table, Generate Bill. Which buttons work comes from the server (`can`); the ones it
-/// switches off say why. Send KOT and Generate Bill use the existing order status move; the database checks the transition.
+/// switches off say why. Add Items opens Add dishes and Send KOT sends the held dishes (0485); Generate Bill uses the order status move.
 class TableOrderScreen extends StatefulWidget {
   const TableOrderScreen({super.key, required this.env, required this.tableId});
   final TablesEnv env;
@@ -51,6 +53,22 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
         await widget.env.api.setOrderStatus(o.s('id'), to, expectedUpdatedAt: o.so('updated_at'));
       }
       if (mounted) showToast(context, done);
+    } catch (e) {
+      if (mounted) showToast(context, sayError(e));
+    }
+    if (mounted) setState(() => _busy = false);
+    await _load();
+  }
+
+  // Send KOT: the held dishes become a new KOT (tbl_kot_send). One key per tap, kept for a retry of that tap.
+  String? _sendKey;
+  Future<void> _sendHeld() async {
+    final label = 'Table ${_d!.m('table').s('label')}';
+    setState(() => _busy = true);
+    try {
+      final r = await widget.env.api.sendHeld(widget.tableId, key: _sendKey ??= TablesApi.newKey());
+      _sendKey = null;
+      if (mounted) await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SentToKitchenScreen(env: widget.env, tableLabel: label, kot: r.m('kot'))));
     } catch (e) {
       if (mounted) showToast(context, sayError(e));
     }
@@ -138,9 +156,12 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
           ),
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: _limeOrOutline('Add Items', 'add_items', can, () {})),
+            Expanded(child: _limeOrOutline('Add Items', 'add_items', can, () async {
+              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddDishesScreen(env: widget.env, tableId: widget.tableId, tableLabel: 'Table ${t!.s('label')}')));
+              if (mounted) _load();
+            })),
             const SizedBox(width: 8),
-            Expanded(child: btn('Send KOT', 'send_kot', () => _move({'new', 'in_billing'}, 'sent_to_kitchen', 'KOT sent to the kitchen.'))),
+            Expanded(child: btn('Send KOT', 'send_kot', _sendHeld)),
             const SizedBox(width: 8),
             Expanded(child: btn('Print KOT', 'print_kot', () {})),
           ]),

@@ -125,6 +125,21 @@ void main() {
       expect(find.text('Add station'), findsOneWidget);
     });
 
+    testWidgets('kitchen setup is optional: it says so and "Skip for now" leaves (founder, 2026-10-20)', (t) async {
+      t.view.physicalSize = const Size(780, 4000);
+      t.view.devicePixelRatio = 2;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(theme: posTheme(), home: Builder(builder: (c) => TextButton(
+          onPressed: () => Navigator.of(c).push(MaterialPageRoute(builder: (_) => KitchenSetupScreen(env: Fake().env()))), child: const Text('open')))));
+      await t.tap(find.text('open'));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('kitchen-optional')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('kitchen-skip')));
+      await t.pumpAndSettle();
+      expect(find.text('Kitchen Setup'), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+    });
+
     testWidgets('warns about a menu station that has no station row (its orders show as Unassigned)', (t) async {
       await show(t, KitchenSetupScreen(env: Fake().env()));
       expect(find.byKey(const ValueKey('unassigned-warning')), findsOneWidget);

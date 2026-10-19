@@ -111,6 +111,15 @@ class _KitchenSetupScreenState extends State<KitchenSetupScreen> {
           for (var i = 0; i < areas.length; i++) _Row(title: areas[i].s('name'), sub: 'Preparation area', last: i == areas.length - 1),
         ],
       ),
+      // Kitchen setup is optional (founder, 2026-10-20): with nothing set up, every order goes to the Main Kitchen queue and billing and KOTs work.
+      Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Column(children: [
+          Text('Optional. Until you add stations, every order goes to the Main Kitchen on the kitchen display.',
+              key: const ValueKey('kitchen-optional'), textAlign: TextAlign.center, style: inter(13, 400, color: kMuted)),
+          TextButton(key: const ValueKey('kitchen-skip'), onPressed: () => Navigator.of(context).maybePop(), child: Text('Skip for now', style: inter(15, 600, color: kLink))),
+        ]),
+      ),
     ];
   }
 }

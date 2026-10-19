@@ -1,0 +1,313 @@
+{
+    "menu": {
+        "items": [
+            {
+                "id": "47a00000-0000-0000-0000-000000000003",
+                "sku": "",
+                "name": "Butter Naan",
+                "price": 60.0,
+                "category": "Breads",
+                "available": true,
+                "image_url": null
+            },
+            {
+                "id": "47a00000-0000-0000-0000-000000000002",
+                "sku": "",
+                "name": "Dal Makhani",
+                "price": 220.0,
+                "category": "Mains",
+                "available": true,
+                "image_url": null
+            },
+            {
+                "id": "47a00000-0000-0000-0000-000000000001",
+                "sku": "",
+                "name": "Paneer Tikka",
+                "price": 240.0,
+                "category": "Starters",
+                "available": true,
+                "image_url": null
+            }
+        ],
+        "categories": [
+            "Breads",
+            "Mains",
+            "Starters"
+        ]
+    },
+    "ready": {
+        "can": {
+            "serve": true
+        },
+        "items": [
+            {
+                "qty": 1,
+                "name": "Paneer Tikka",
+                "notes": null,
+                "kot_no": 1,
+                "status": "ready",
+                "item_id": "c4050a8f-ea5c-4a2e-b0a9-60a741223aaf",
+                "minutes": 0,
+                "station": "Main Kitchen",
+                "order_id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+                "ready_at": "2026-10-19T20:36:23.828038+00:00",
+                "table_id": "47b00000-0000-0000-0000-000000000001",
+                "ticket_id": "3b81fab4-0e5b-44b1-8be0-25d2761e78c6",
+                "display_no": "P-00001",
+                "table_label": "Table 4",
+                "status_label": "Ready"
+            },
+            {
+                "qty": 1,
+                "name": "Dal Makhani",
+                "notes": null,
+                "kot_no": 1,
+                "status": "ready",
+                "item_id": "7da85fd9-744f-4b7a-8248-5d80da60e0f8",
+                "minutes": 0,
+                "station": "Main Kitchen",
+                "order_id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+                "ready_at": "2026-10-19T20:36:23.828038+00:00",
+                "table_id": "47b00000-0000-0000-0000-000000000001",
+                "ticket_id": "3b81fab4-0e5b-44b1-8be0-25d2761e78c6",
+                "display_no": "P-00001",
+                "table_label": "Table 4",
+                "status_label": "Ready"
+            },
+            {
+                "qty": 2,
+                "name": "Butter Naan",
+                "notes": "less butter",
+                "kot_no": 1,
+                "status": "ready",
+                "item_id": "cd2658fe-6ff2-4ef4-984b-97b65cb0d003",
+                "minutes": 0,
+                "station": "Main Kitchen",
+                "order_id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+                "ready_at": "2026-10-19T20:36:23.828038+00:00",
+                "table_id": "47b00000-0000-0000-0000-000000000001",
+                "ticket_id": "3b81fab4-0e5b-44b1-8be0-25d2761e78c6",
+                "display_no": "P-00001",
+                "table_label": "Table 4",
+                "status_label": "Ready"
+            },
+            {
+                "qty": 2,
+                "name": "Butter Naan",
+                "notes": null,
+                "kot_no": 2,
+                "status": "waiting",
+                "item_id": "8fd358f0-07a2-4230-8663-6e264d869a30",
+                "minutes": 0,
+                "station": "Main Kitchen",
+                "order_id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+                "ready_at": null,
+                "table_id": "47b00000-0000-0000-0000-000000000001",
+                "ticket_id": "94d31c6b-d538-40ca-8b4a-d741eaeb18f9",
+                "display_no": "P-00001",
+                "table_label": "Table 4",
+                "status_label": "Waiting"
+            }
+        ],
+        "ready_count": 3
+    },
+    "served": {
+        "orders": [
+            {
+                "order_id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+                "all_served": false,
+                "display_no": "P-00001",
+                "table_label": "Table 4"
+            }
+        ],
+        "served": 3,
+        "not_ready": [],
+        "already_served": 0
+    },
+    "add_hold": {
+        "kot": null,
+        "held": true,
+        "order": {
+            "total": 735.0,
+            "status": "sent_to_kitchen",
+            "subtotal": 700.0,
+            "display_no": "P-00001"
+        },
+        "table": {
+            "id": "47b00000-0000-0000-0000-000000000001",
+            "label": "Table 4"
+        },
+        "order_id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+        "replayed": false,
+        "new_order": false,
+        "dishes_added": 1
+    },
+    "add_send": {
+        "kot": {
+            "dishes": 3,
+            "kot_no": 1,
+            "sent_at": "2026-10-19T20:36:23.828038+00:00",
+            "quantity": 4,
+            "stations": [
+                "Main Kitchen"
+            ],
+            "ticket_id": "3b81fab4-0e5b-44b1-8be0-25d2761e78c6",
+            "table_label": "Table 4"
+        },
+        "held": false,
+        "order": {
+            "total": 609.0,
+            "status": "sent_to_kitchen",
+            "subtotal": 580.0,
+            "display_no": "P-00001"
+        },
+        "table": {
+            "id": "47b00000-0000-0000-0000-000000000001",
+            "label": "Table 4"
+        },
+        "order_id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+        "replayed": false,
+        "new_order": true,
+        "dishes_added": 3
+    },
+    "send_held": {
+        "kot": {
+            "dishes": 1,
+            "kot_no": 2,
+            "sent_at": "2026-10-19T20:36:23.828038+00:00",
+            "quantity": 2,
+            "stations": [
+                "Main Kitchen"
+            ],
+            "ticket_id": "94d31c6b-d538-40ca-8b4a-d741eaeb18f9",
+            "table_label": "Table 4"
+        },
+        "order_id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+        "replayed": false
+    },
+    "served_all": {
+        "orders": [
+            {
+                "order_id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+                "all_served": true,
+                "display_no": "P-00001",
+                "table_label": "Table 4"
+            }
+        ],
+        "served": 1,
+        "not_ready": [],
+        "already_served": 0
+    },
+    "served_again": {
+        "orders": [
+            {
+                "order_id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+                "all_served": false,
+                "display_no": "P-00001",
+                "table_label": "Table 4"
+            }
+        ],
+        "served": 0,
+        "not_ready": [],
+        "already_served": 3
+    },
+    "order_view_held": {
+        "can": {
+            "send_kot": true,
+            "add_items": true,
+            "print_kot": false,
+            "merge_table": true,
+            "change_table": true,
+            "generate_bill": true
+        },
+        "items": [
+            {
+                "id": "7da85fd9-744f-4b7a-8248-5d80da60e0f8",
+                "qty": 1,
+                "name": "Dal Makhani",
+                "sent": true,
+                "notes": null,
+                "status": "pending",
+                "variant": null,
+                "line_total": 220.0,
+                "unit_price": 220.0,
+                "status_label": "Pending"
+            },
+            {
+                "id": "8fd358f0-07a2-4230-8663-6e264d869a30",
+                "qty": 2,
+                "name": "Butter Naan",
+                "sent": false,
+                "notes": null,
+                "status": "pending",
+                "variant": null,
+                "line_total": 120.0,
+                "unit_price": 60.0,
+                "status_label": "Not sent"
+            },
+            {
+                "id": "c4050a8f-ea5c-4a2e-b0a9-60a741223aaf",
+                "qty": 1,
+                "name": "Paneer Tikka",
+                "sent": true,
+                "notes": null,
+                "status": "pending",
+                "variant": null,
+                "line_total": 240.0,
+                "unit_price": 240.0,
+                "status_label": "Pending"
+            },
+            {
+                "id": "cd2658fe-6ff2-4ef4-984b-97b65cb0d003",
+                "qty": 2,
+                "name": "Butter Naan",
+                "sent": true,
+                "notes": "less butter",
+                "status": "pending",
+                "variant": null,
+                "line_total": 120.0,
+                "unit_price": 60.0,
+                "status_label": "Pending"
+            }
+        ],
+        "table": {
+            "id": "47b00000-0000-0000-0000-000000000001",
+            "label": "Table 4",
+            "seats": 4,
+            "area_name": null,
+            "main_table_id": "47b00000-0000-0000-0000-000000000001"
+        },
+        "orders": [
+            {
+                "id": "547cb2bb-4668-4e00-95d4-4d7b2ca46fdc",
+                "total": 735.0,
+                "status": "sent_to_kitchen",
+                "subtotal": 700.0,
+                "display_no": "P-00001",
+                "updated_at": "2026-10-19T20:36:23.828038+00:00"
+            }
+        ],
+        "status": {
+            "key": "sent_to_kitchen",
+            "label": "ACTIVE IN KITCHEN"
+        },
+        "subtotal": 700.0,
+        "timeline": [
+            {
+                "at": "2026-10-19T20:36:23.828038+00:00",
+                "message": "Order P-00001 placed - 4 items"
+            },
+            {
+                "at": "2026-10-19T20:36:23.828038+00:00",
+                "message": "1 dishes added to P-00001"
+            },
+            {
+                "at": "2026-10-19T20:36:23.828038+00:00",
+                "message": "KOT 1 sent to the kitchen - 3 dishes"
+            }
+        ],
+        "unavailable": {
+            "print_kot": "Printing a KOT is not in this release."
+        }
+    }
+}
