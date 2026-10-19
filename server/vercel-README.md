@@ -1,7 +1,7 @@
 # Hosting the POS server on Vercel
 
 One codebase: `npm run dev` (node:http, local) and the Vercel function (`api/index.js`) both call `handle()` in `src/server.ts`, which uses the same router.
-`vercel.json` rewrites every path to that one function. `npm run build:vercel` (run by Vercel as the build command) bundles `src/vercel.ts` into `api/index.js` with esbuild; the file is not committed.
+`vercel.json` rewrites every path to that one function. `npm run build:vercel` (run by Vercel as the build command) bundles `src/vercel.ts` into `dist/vercel.js` with esbuild (not committed). `api/index.js` is committed and only re-exports it, because Vercel checks the `functions` pattern against the source before it builds.
 
 ## Settings
 - Framework preset: Other. Build command and install command come from `vercel.json`. Node.js 22.x (`engines`).

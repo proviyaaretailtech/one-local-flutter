@@ -1,4 +1,4 @@
-// Vercel entry: the SAME router as `npm run dev`, exposed as web-standard handlers. Built to api/index.js by `npm run build:vercel`.
+// Vercel entry: the SAME router as `npm run dev`, exposed as web-standard handlers. Bundled to dist/vercel.js by `npm run build:vercel`; api/index.js re-exports it.
 import './routes.ts';
 import { handle } from './server.ts';
 import { isProduction } from './config.ts';

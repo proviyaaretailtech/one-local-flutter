@@ -2,7 +2,7 @@ node_modules/
 .env
 .env.*
 !.env.example
-api/index.js
+dist/
 .vercel
 # the guest menu web build (../tool/build_guest_web.sh)
 public/t/
