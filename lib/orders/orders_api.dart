@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/partner_api.dart';
+import '../api/app_env.dart';
 
 /// One order as the server describes it (`GET /api/partner/pos-orders/:id`). Read-only: the stage, every label, the bill,
 /// the payment record and the actions allowed right now all come from the server; the app only draws them.
@@ -114,7 +115,7 @@ class OrdersApi {
   OrdersApi({http.Client? client, String? baseUrl, String? Function()? accessToken})
       : _http = client ?? http.Client(),
         _token = accessToken ?? (() => Supabase.instance.client.auth.currentSession?.accessToken),
-        _base = (baseUrl ?? const String.fromEnvironment('PARTNER_API_BASE_URL')).replaceAll(RegExp(r'/+$'), '');
+        _base = (baseUrl ?? AppEnv.apiBaseUrl).replaceAll(RegExp(r'/+$'), '');
 
   final http.Client _http;
   final String? Function() _token;
