@@ -14,7 +14,7 @@
 // is copied into args.idempotency_key when the body has none).
 // scripts/manifest-audit.mjs reads this file and fails on any function that is unsafe for the `authenticated` role.
 import type { z } from 'zod';
-import { secureHandlers, withImageLinks, withStorefrontLinks, type SecureHandler } from './modules/secure/index.ts';
+import { dropRemovedFile, secureHandlers, withImageLinks, withStorefrontLinks, type SecureHandler } from './modules/secure/index.ts';
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
@@ -31,7 +31,6 @@ import * as mo from './schemas/money.ts';
 import * as team from './schemas/team.ts';
 import * as sf from './schemas/storefront.ts';
 import * as nt from './schemas/notices.ts';
-import { dropRemovedFile, secureHandlers, withImageLinks, type SecureHandler } from './modules/secure/index.ts';
 import * as st from './schemas/settings.ts';
 import { helpContent } from './modules/help.ts';
 
