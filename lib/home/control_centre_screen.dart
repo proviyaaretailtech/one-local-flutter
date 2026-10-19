@@ -8,11 +8,13 @@ import 'home_api.dart';
 import 'home_nav.dart';
 import 'home_widgets.dart';
 import 'hub_screen.dart';
+import 'side_nav.dart';
 import '../service/history_screen.dart';
 import '../service/service_api.dart';
 import '../service/service_dashboard.dart';
 import '../restaurant/restaurant_api.dart';
 import '../restaurant/restaurant_dashboard.dart';
+import '../restaurant/restaurant_more_screen.dart';
 
 /// Figma section D "Seller Admin Dashboard / POS control center". Every figure comes from
 /// `GET /api/partner/home`; a tile without a data source says so instead of showing a number.
@@ -36,6 +38,8 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
   late final HomeApi _api = widget.api ?? HomeApi();
   late Future<HomeSummary> _summary = _api.summary();
   String? _location;
+  String? _personName;
+  String? _outletName;
   String? _kind; // the kind of business the summary reported (decides what the centre tab opens)
 
   Future<void> _reload() async {
@@ -74,7 +78,29 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
     _reload();
   }
 
+  void _signOut() {
+    (widget.auth ?? AuthRepository()).signOut();
+    Navigator.of(context).popUntil((r) => r.isFirst);
+  }
+
   void _openMenu() {
+    // A store gets the Figma side nav (section D 39:7416); restaurant and service keep the short sheet for now.
+    if (_kind != 'restaurant' && _kind != 'service') {
+      showStoreSideNav(
+        context,
+        name: _personName ?? 'Partner',
+        email: (widget.auth ?? AuthRepository()).currentEmail,
+        onDashboard: () {},
+        onReports: _openHub,
+        onSignOut: _signOut,
+      );
+      return;
+    }
+    // A restaurant gets the Figma More page (section D 45:7539).
+    if (_kind == 'restaurant') {
+      Navigator.of(context).push(RestaurantMoreScreen.route(outletName: _outletName ?? 'My outlet', outletLine: 'Restaurant', onLogout: _signOut));
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
@@ -93,8 +119,7 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
             }),
             _MenuRow(icon: LucideIcons.logOut, label: 'Sign out', onTap: () {
               Navigator.pop(ctx);
-              (widget.auth ?? AuthRepository()).signOut();
-              Navigator.of(context).popUntil((r) => r.isFirst);
+              _signOut();
             }),
           ]),
         ),
@@ -129,7 +154,11 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
       future: _summary,
       builder: (context, snap) {
         final s = snap.data;
-        if (s != null) _kind = s.outletKind;
+        if (s != null) {
+          _kind = s.outletKind;
+          _personName = s.personName;
+          _outletName = s.outletName;
+        }
         final loading = snap.connectionState != ConnectionState.done;
         final tabs = s?.outletKind == 'restaurant' ? kHubTabs : kStoreTabs;
         return Scaffold(

@@ -90,6 +90,7 @@ class _HubScreenState extends State<HubScreen> {
     switch (label) {
       case 'Orders':
         HomeNav.go(context, HomeNav.orders, 'Orders');
+      case 'Bill':
       case 'POS':
         HomeNav.go(context, HomeNav.bill, 'Billing');
       case 'Menu':

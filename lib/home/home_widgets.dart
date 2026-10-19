@@ -183,7 +183,7 @@ const kStoreTabs = [
 const kHubTabs = [
   BarTab('Home', LucideIcons.house),
   BarTab('Menu', LucideIcons.bookOpenText),
-  BarTab('POS', LucideIcons.receiptText, hero: true),
+  BarTab('Bill', LucideIcons.receiptText, hero: true),
   BarTab('Orders', LucideIcons.shoppingBag),
   BarTab('Stock', LucideIcons.boxes),
 ];

@@ -311,15 +311,22 @@ void main() {
       expect(toast('Billing opens in a later release.'), findsOneWidget);
     });
 
-    testWidgets('menu offers settings (section C hook) and sign out', (t) async {
+    testWidgets('menu: store side nav (Figma 39:7416) with settings (section C hook) and sign out', (t) async {
+      var setup = 0;
+      HomeNav.setup = (_) => setup++;
       await showHome(t);
       await t.tap(find.byKey(const ValueKey('home-menu')));
       await t.pumpAndSettle();
-      var setup = 0;
-      HomeNav.setup = (_) => setup++;
+      expect(find.byKey(const ValueKey('side-nav')), findsOneWidget);
+      for (final l in ['Dashboard', 'Store POS', 'Catalogue', 'GRN', 'Stock management', 'All Orders', 'One Local Wallet', 'Money', 'Customer', 'Reports', 'Settings', 'Manage account', 'Sign out']) {
+        expect(find.text(l), findsOneWidget, reason: l);
+      }
+      // Screens that are not built say so instead of looking live.
+      expect(find.text('Soon'), findsWidgets);
       await t.tap(find.text('Settings'));
       await t.pumpAndSettle();
       expect(setup, 1);
+      expect(find.byKey(const ValueKey('side-nav')), findsNothing);
 
       final auth = FakeAuth();
       await showTall(t, ControlCentreScreen(api: FakeHome(), auth: auth, now: () => _clock));
@@ -385,7 +392,7 @@ void main() {
       expect(find.text('8.4%'), findsOneWidget);
       expect(find.text('1.2%'), findsOneWidget);
       expect(find.byType(SalesBars), findsOneWidget);
-      for (final l in ['Home', 'Menu', 'POS', 'Orders', 'Stock']) {
+      for (final l in ['Home', 'Menu', 'Bill', 'Orders', 'Stock']) {
         expect(find.byKey(ValueKey('tab-$l')), findsOneWidget);
       }
     });

@@ -128,10 +128,26 @@ void main() {
 
     testWidgets('the bar is the restaurant bar with Home first', (t) async {
       await showRst(t);
-      for (final l in ['Home', 'Menu', 'POS', 'Orders', 'Stock']) {
+      for (final l in ['Home', 'Menu', 'Bill', 'Orders', 'Stock']) {
         expect(find.byKey(ValueKey('tab-$l')), findsOneWidget);
       }
       expect(find.byKey(const ValueKey('tab-Money')), findsNothing);
+    });
+    testWidgets('menu opens the restaurant More page (Figma 45:7539); unbuilt links say Soon', (t) async {
+      var history = 0;
+      HomeNav.orderHistory = (_) => history++;
+      await showRst(t);
+      await t.tap(find.byKey(const ValueKey('home-menu')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('restaurant-more')), findsOneWidget);
+      for (final l in ['Outlet timings', 'Manage staff', 'Order history', 'Payout', 'Notifications', 'Menu', 'Fees & charges']) {
+        expect(find.text(l), findsWidgets, reason: l);
+      }
+      expect(find.text('Soon'), findsWidgets);
+      await t.tap(find.text('Order history'));
+      await t.pumpAndSettle();
+      expect(history, 1);
+      expect(find.byKey(const ValueKey('restaurant-logout')), findsOneWidget);
     });
   });
 }

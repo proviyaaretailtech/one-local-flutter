@@ -40,6 +40,15 @@ class AuthRepository {
   Future<bool> signInWithApple() => _auth.signInWithOAuth(OAuthProvider.apple, redirectTo: kOAuthRedirect);
 
   Future<void> signOut() => _auth.signOut();
+
+  /// The signed-in person's email, for the side nav profile. Null when Supabase has not started (tests).
+  String? get currentEmail {
+    try {
+      return _auth.currentUser?.email;
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 /// One plain sentence for any sign-in failure. [fallback] is used when the cause is unknown.

@@ -145,14 +145,14 @@ class TablesPage extends StatelessWidget {
   }
 }
 
-/// Floating dark bottom bar of the POS frames: Money, Menu, POS (active), Orders, Stock.
+/// Floating dark bottom bar of the POS frames: Home, Menu, Bill (active), Orders, Stock.
 class TablesNav extends StatelessWidget {
   const TablesNav({super.key, required this.onTap});
   final ValueChanged<String> onTap;
   static const tabs = [
     ('home', 'Home', LucideIcons.house),
     ('menu', 'Menu', LucideIcons.bookOpen),
-    ('pos', 'POS', LucideIcons.receiptText),
+    ('pos', 'Bill', LucideIcons.receiptText),
     ('orders', 'Orders', LucideIcons.shoppingBag),
     ('stock', 'Stock', LucideIcons.boxes),
   ];
