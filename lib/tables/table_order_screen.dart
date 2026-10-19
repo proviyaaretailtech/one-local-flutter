@@ -4,6 +4,9 @@ import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
 import 'actions_screen.dart';
+import 'bill_api.dart';
+import 'bill_pay_screen.dart';
+import 'bill_widgets.dart' show billRouteName;
 import 'merge_screen.dart';
 import 'table_widgets.dart';
 import 'tables_api.dart';
@@ -12,10 +15,13 @@ import 'take_order_screens.dart';
 /// Figma "Table T12 Order" (screen-order-detail): the open order of a table: status banner, items with kitchen status, operational timeline, subtotal,
 /// Add Items, Send KOT, Print KOT, Change Table, Merge Table, Generate Bill. Which buttons work comes from the server (`can`); the ones it
 /// switches off say why. Add Items opens Add dishes and Send KOT sends the held dishes (0485); Generate Bill uses the order status move.
+/// switches off say why. Send KOT and Generate Bill use the existing order status move; the database checks the transition.
+/// Generate Bill then opens the restaurant Checkout ("Bill and pay", 0550); once a bill is generated the button reads Take Payment.
 class TableOrderScreen extends StatefulWidget {
-  const TableOrderScreen({super.key, required this.env, required this.tableId});
+  const TableOrderScreen({super.key, required this.env, required this.tableId, this.bill});
   final TablesEnv env;
   final String tableId;
+  final BillApi? bill;
   @override
   State<TableOrderScreen> createState() => _TableOrderScreenState();
 }
@@ -45,19 +51,34 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     }
   }
 
-  Future<void> _move(Set<String> from, String to, String done) async {
+  Future<bool> _move(Set<String> from, String to, String done) async {
     final d = _d!;
+    var ok = false;
     setState(() => _busy = true);
     try {
       for (final o in d.l('orders').where((o) => from.contains(o.s('status')))) {
         await widget.env.api.setOrderStatus(o.s('id'), to, expectedUpdatedAt: o.so('updated_at'));
       }
+      ok = true;
       if (mounted) showToast(context, done);
     } catch (e) {
       if (mounted) showToast(context, sayError(e));
     }
     if (mounted) setState(() => _busy = false);
     await _load();
+    return ok;
+  }
+
+  /// Checkout for this table. "Back to tables" / "New Order" there answer 'tables': this screen then closes too, back to the floor.
+  Future<void> _openBill() async {
+    final r = await Navigator.of(context).push(MaterialPageRoute(
+        settings: const RouteSettings(name: billRouteName), builder: (_) => BillPayScreen(env: widget.env, tableId: widget.tableId, bill: widget.bill ?? BillApi())));
+    if (!mounted) return;
+    if (r == 'tables') {
+      Navigator.of(context).maybePop();
+    } else {
+      await _load();
+    }
   }
 
   // Send KOT: the held dishes become a new KOT (tbl_kot_send). One key per tap, kept for a retry of that tap.
@@ -174,7 +195,15 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
               if (mounted) _load();
             })),
             const SizedBox(width: 8),
-            Expanded(child: LimeButton('Generate Bill', height: 56, busy: _busy, onPressed: can?.b('generate_bill') == true ? () => _move({'in_billing', 'sent_to_kitchen', 'ready', 'delivered'}, 'awaiting_payment', 'Bill generated.') : () => _off('generate_bill'))),
+            Expanded(
+              child: can?.b('generate_bill') != true && d.l('orders').any((o) => o.s('status') == 'awaiting_payment')
+                  ? LimeButton('Take Payment', key: const ValueKey('take-payment'), height: 56, busy: _busy, onPressed: _openBill)
+                  : LimeButton('Generate Bill', height: 56, busy: _busy, onPressed: can?.b('generate_bill') == true
+                      ? () async {
+                          if (await _move({'in_billing', 'sent_to_kitchen', 'ready', 'delivered'}, 'awaiting_payment', 'Bill generated.') && mounted) await _openBill();
+                        }
+                      : () => _off('generate_bill')),
+            ),
           ]),
         ],
       ],

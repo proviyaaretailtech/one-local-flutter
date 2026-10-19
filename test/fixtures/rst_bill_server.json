@@ -1,0 +1,571 @@
+{
+ "coupon": {
+  "bill_generated": false,
+  "coupon_code": "DINE10",
+  "created_at": "2026-10-19T20:15:07.60149+00:00",
+  "customer_phone": null,
+  "discount": 100.0,
+  "display_no": "R5504",
+  "due": 945.0,
+  "gst_amount": 45.0,
+  "gst_pct": 5.0,
+  "id": "55000000-0000-0000-0000-0000000000d4",
+  "items": [
+   {
+    "id": "55000000-0000-0000-0000-0000000000e5",
+    "line_total": 1000.0,
+    "name": "Thali",
+    "qty": 4,
+    "unit_price": 250.0,
+    "variant": null
+   }
+  ],
+  "notes": null,
+  "paid": 0,
+  "payments": [],
+  "replayed": false,
+  "round_off": 0.0,
+  "service_charge": 0.0,
+  "split": null,
+  "status": "sent_to_kitchen",
+  "subtotal": 1000.0,
+  "total": 945.0,
+  "updated_at": "2026-10-19T20:15:07.60149+00:00"
+ },
+ "paylast": {
+  "amount": 420.0,
+  "change": 80.0,
+  "display_no": "R5501",
+  "due": 0.0,
+  "location_name": "Dosa House 550 - Main",
+  "method": "cash",
+  "next_order_id": null,
+  "order_id": "55000000-0000-0000-0000-0000000000d1",
+  "order_paid": true,
+  "order_total": 1050.0,
+  "paid_at": "2026-10-19T20:15:07.60149+00:00",
+  "part_id": "53841450-cfc8-4b07-bed7-f56483c022dc",
+  "part_label": "Guest 2",
+  "payment_method": "split",
+  "replayed": false,
+  "table_settled": true,
+  "tendered": 500.0
+ },
+ "paynext": {
+  "amount": 300.0,
+  "change": 200.0,
+  "display_no": "R5502",
+  "due": 0.0,
+  "location_name": "Dosa House 550 - Main",
+  "method": "cash",
+  "next_order_id": "55000000-0000-0000-0000-0000000000d3",
+  "order_id": "55000000-0000-0000-0000-0000000000d2",
+  "order_paid": true,
+  "order_total": 300.0,
+  "paid_at": "2026-10-19T20:15:07.60149+00:00",
+  "part_id": null,
+  "part_label": null,
+  "payment_method": "cash",
+  "replayed": false,
+  "table_settled": false,
+  "tendered": 500.0
+ },
+ "paypart": {
+  "amount": 630.0,
+  "change": 0,
+  "display_no": "R5501",
+  "due": 420.0,
+  "location_name": "Dosa House 550 - Main",
+  "method": "upi",
+  "next_order_id": null,
+  "order_id": "55000000-0000-0000-0000-0000000000d1",
+  "order_paid": false,
+  "order_total": 1050.0,
+  "paid_at": "2026-10-19T20:15:07.60149+00:00",
+  "part_id": "02ce0664-eaf0-45a8-9048-80a908131cee",
+  "part_label": "Guest 1",
+  "payment_method": "upi",
+  "replayed": false,
+  "table_settled": false,
+  "tendered": null
+ },
+ "receipt": {
+  "bill_generated": false,
+  "business": "Dosa House 550",
+  "coupon_code": null,
+  "created_at": "2026-10-19T19:45:07.60149+00:00",
+  "customer_phone": "9876543210",
+  "discount": 0.0,
+  "display_no": "R5501",
+  "due": 0.0,
+  "gst_amount": 50.0,
+  "gst_pct": 5.0,
+  "id": "55000000-0000-0000-0000-0000000000d1",
+  "items": [
+   {
+    "id": "55000000-0000-0000-0000-0000000000e1",
+    "line_total": 600.0,
+    "name": "Paneer Butter Masala",
+    "qty": 2,
+    "unit_price": 300.0,
+    "variant": null
+   },
+   {
+    "id": "55000000-0000-0000-0000-0000000000e2",
+    "line_total": 400.0,
+    "name": "Chicken Tikka",
+    "qty": 1,
+    "unit_price": 400.0,
+    "variant": null
+   }
+  ],
+  "location": {
+   "id": "451c4225-b925-4d67-951d-2f4e576aabbe",
+   "name": "Dosa House 550 - Main"
+  },
+  "notes": null,
+  "paid": 1050.0,
+  "paid_at": "2026-10-19T20:15:07.60149+00:00",
+  "payment_method": "split",
+  "payments": [
+   {
+    "amount": 630.0,
+    "at": "2026-10-19T20:15:07.60149+00:00",
+    "id": "8b4d7b2e-2986-4ce3-90e0-85fa1f36651d",
+    "method": "upi",
+    "tendered": null
+   },
+   {
+    "amount": 420.0,
+    "at": "2026-10-19T20:15:07.60149+00:00",
+    "id": "ba62c8bf-ee6a-4a82-bc23-5ed7214d5697",
+    "method": "cash",
+    "tendered": 500.0
+   }
+  ],
+  "receipt_printer": "Counter printer 1",
+  "round_off": 0.0,
+  "sent": [],
+  "service_charge": 0.0,
+  "split": {
+   "due": 1050.0,
+   "id": "8bd8d8c2-0bf7-4178-a9cd-87f17fe06f68",
+   "mode": "item",
+   "open_parts": 0,
+   "order_id": "55000000-0000-0000-0000-0000000000d1",
+   "paid_parts": 2,
+   "parts": [
+    {
+     "amount": 630.0,
+     "id": "02ce0664-eaf0-45a8-9048-80a908131cee",
+     "item_ids": [
+      "55000000-0000-0000-0000-0000000000e1"
+     ],
+     "label": "Guest 1",
+     "method": "upi",
+     "paid_at": "2026-10-19T20:15:07.60149+00:00",
+     "paid_method": "upi",
+     "part_no": 1,
+     "status": "paid"
+    },
+    {
+     "amount": 420.0,
+     "id": "53841450-cfc8-4b07-bed7-f56483c022dc",
+     "item_ids": [
+      "55000000-0000-0000-0000-0000000000e2"
+     ],
+     "label": "Guest 2",
+     "method": "cash",
+     "paid_at": "2026-10-19T20:15:07.60149+00:00",
+     "paid_method": "cash",
+     "part_no": 2,
+     "status": "paid"
+    }
+   ],
+   "status": "completed"
+  },
+  "status": "paid",
+  "subtotal": 1000.0,
+  "table_label": "T1",
+  "total": 1050.0,
+  "updated_at": "2026-10-19T20:15:07.60149+00:00"
+ },
+ "split": {
+  "due": 1050.0,
+  "id": "8bd8d8c2-0bf7-4178-a9cd-87f17fe06f68",
+  "mode": "item",
+  "open_parts": 2,
+  "order_id": "55000000-0000-0000-0000-0000000000d1",
+  "paid_parts": 0,
+  "parts": [
+   {
+    "amount": 630.0,
+    "id": "02ce0664-eaf0-45a8-9048-80a908131cee",
+    "item_ids": [
+     "55000000-0000-0000-0000-0000000000e1"
+    ],
+    "label": "Guest 1",
+    "method": "upi",
+    "paid_at": null,
+    "paid_method": null,
+    "part_no": 1,
+    "status": "open"
+   },
+   {
+    "amount": 420.0,
+    "id": "53841450-cfc8-4b07-bed7-f56483c022dc",
+    "item_ids": [
+     "55000000-0000-0000-0000-0000000000e2"
+    ],
+    "label": "Guest 2",
+    "method": "cash",
+    "paid_at": null,
+    "paid_method": null,
+    "part_no": 2,
+    "status": "open"
+   }
+  ],
+  "replayed": false,
+  "status": "active"
+ },
+ "view1": {
+  "can": {
+   "coupon": true,
+   "note": true,
+   "pay": true,
+   "split": true
+  },
+  "current_order_id": "55000000-0000-0000-0000-0000000000d1",
+  "location": {
+   "id": "451c4225-b925-4d67-951d-2f4e576aabbe",
+   "name": "Dosa House 550 - Main"
+  },
+  "orders": [
+   {
+    "bill_generated": true,
+    "coupon_code": null,
+    "created_at": "2026-10-19T19:45:07.60149+00:00",
+    "customer_phone": "9876543210",
+    "discount": 0.0,
+    "display_no": "R5501",
+    "due": 1050.0,
+    "gst_amount": 50.0,
+    "gst_pct": 5.0,
+    "id": "55000000-0000-0000-0000-0000000000d1",
+    "items": [
+     {
+      "id": "55000000-0000-0000-0000-0000000000e1",
+      "line_total": 600.0,
+      "name": "Paneer Butter Masala",
+      "qty": 2,
+      "unit_price": 300.0,
+      "variant": null
+     },
+     {
+      "id": "55000000-0000-0000-0000-0000000000e2",
+      "line_total": 400.0,
+      "name": "Chicken Tikka",
+      "qty": 1,
+      "unit_price": 400.0,
+      "variant": null
+     }
+    ],
+    "notes": null,
+    "paid": 0,
+    "payments": [],
+    "round_off": 0.0,
+    "service_charge": 0.0,
+    "split": null,
+    "status": "awaiting_payment",
+    "subtotal": 1000.0,
+    "total": 1050.0,
+    "updated_at": "2026-10-19T20:15:07.60149+00:00"
+   }
+  ],
+  "receipt_printer": "Counter printer 1",
+  "table": {
+   "area_name": null,
+   "id": "55000000-0000-0000-0000-0000000000c1",
+   "label": "T1",
+   "labels": [
+    "T1"
+   ],
+   "main_table_id": "55000000-0000-0000-0000-0000000000c1",
+   "seats": 4
+  },
+  "unavailable": {
+   "coupon": null,
+   "pay": null
+  }
+ },
+ "view1s": {
+  "can": {
+   "coupon": false,
+   "note": true,
+   "pay": true,
+   "split": false
+  },
+  "current_order_id": "55000000-0000-0000-0000-0000000000d1",
+  "location": {
+   "id": "451c4225-b925-4d67-951d-2f4e576aabbe",
+   "name": "Dosa House 550 - Main"
+  },
+  "orders": [
+   {
+    "bill_generated": true,
+    "coupon_code": null,
+    "created_at": "2026-10-19T19:45:07.60149+00:00",
+    "customer_phone": "9876543210",
+    "discount": 0.0,
+    "display_no": "R5501",
+    "due": 420.0,
+    "gst_amount": 50.0,
+    "gst_pct": 5.0,
+    "id": "55000000-0000-0000-0000-0000000000d1",
+    "items": [
+     {
+      "id": "55000000-0000-0000-0000-0000000000e1",
+      "line_total": 600.0,
+      "name": "Paneer Butter Masala",
+      "qty": 2,
+      "unit_price": 300.0,
+      "variant": null
+     },
+     {
+      "id": "55000000-0000-0000-0000-0000000000e2",
+      "line_total": 400.0,
+      "name": "Chicken Tikka",
+      "qty": 1,
+      "unit_price": 400.0,
+      "variant": null
+     }
+    ],
+    "notes": null,
+    "paid": 630.0,
+    "payments": [
+     {
+      "amount": 630.0,
+      "at": "2026-10-19T20:15:07.60149+00:00",
+      "id": "8b4d7b2e-2986-4ce3-90e0-85fa1f36651d",
+      "method": "upi",
+      "tendered": null
+     }
+    ],
+    "round_off": 0.0,
+    "service_charge": 0.0,
+    "split": {
+     "due": 1050.0,
+     "id": "8bd8d8c2-0bf7-4178-a9cd-87f17fe06f68",
+     "mode": "item",
+     "open_parts": 1,
+     "order_id": "55000000-0000-0000-0000-0000000000d1",
+     "paid_parts": 1,
+     "parts": [
+      {
+       "amount": 630.0,
+       "id": "02ce0664-eaf0-45a8-9048-80a908131cee",
+       "item_ids": [
+        "55000000-0000-0000-0000-0000000000e1"
+       ],
+       "label": "Guest 1",
+       "method": "upi",
+       "paid_at": "2026-10-19T20:15:07.60149+00:00",
+       "paid_method": "upi",
+       "part_no": 1,
+       "status": "paid"
+      },
+      {
+       "amount": 420.0,
+       "id": "53841450-cfc8-4b07-bed7-f56483c022dc",
+       "item_ids": [
+        "55000000-0000-0000-0000-0000000000e2"
+       ],
+       "label": "Guest 2",
+       "method": "cash",
+       "paid_at": null,
+       "paid_method": null,
+       "part_no": 2,
+       "status": "open"
+      }
+     ],
+     "status": "active"
+    },
+    "status": "awaiting_payment",
+    "subtotal": 1000.0,
+    "total": 1050.0,
+    "updated_at": "2026-10-19T20:15:07.60149+00:00"
+   }
+  ],
+  "receipt_printer": "Counter printer 1",
+  "table": {
+   "area_name": null,
+   "id": "55000000-0000-0000-0000-0000000000c1",
+   "label": "T1",
+   "labels": [
+    "T1"
+   ],
+   "main_table_id": "55000000-0000-0000-0000-0000000000c1",
+   "seats": 4
+  },
+  "unavailable": {
+   "coupon": "A payment was already taken; a code can no longer be added.",
+   "pay": null
+  }
+ },
+ "view2": {
+  "can": {
+   "coupon": true,
+   "note": true,
+   "pay": true,
+   "split": true
+  },
+  "current_order_id": "55000000-0000-0000-0000-0000000000d2",
+  "location": {
+   "id": "451c4225-b925-4d67-951d-2f4e576aabbe",
+   "name": "Dosa House 550 - Main"
+  },
+  "orders": [
+   {
+    "bill_generated": true,
+    "coupon_code": null,
+    "created_at": "2026-10-19T19:55:07.60149+00:00",
+    "customer_phone": null,
+    "discount": 0.0,
+    "display_no": "R5502",
+    "due": 300.0,
+    "gst_amount": 0.0,
+    "gst_pct": 0.0,
+    "id": "55000000-0000-0000-0000-0000000000d2",
+    "items": [
+     {
+      "id": "55000000-0000-0000-0000-0000000000e3",
+      "line_total": 300.0,
+      "name": "Dosa",
+      "qty": 3,
+      "unit_price": 100.0,
+      "variant": null
+     }
+    ],
+    "notes": null,
+    "paid": 0,
+    "payments": [],
+    "round_off": 0.0,
+    "service_charge": 0.0,
+    "split": null,
+    "status": "awaiting_payment",
+    "subtotal": 300.0,
+    "total": 300.0,
+    "updated_at": "2026-10-19T20:15:07.60149+00:00"
+   },
+   {
+    "bill_generated": true,
+    "coupon_code": null,
+    "created_at": "2026-10-19T20:05:07.60149+00:00",
+    "customer_phone": null,
+    "discount": 0.0,
+    "display_no": "R5503",
+    "due": 200.0,
+    "gst_amount": 0.0,
+    "gst_pct": 0.0,
+    "id": "55000000-0000-0000-0000-0000000000d3",
+    "items": [
+     {
+      "id": "55000000-0000-0000-0000-0000000000e4",
+      "line_total": 200.0,
+      "name": "Idli",
+      "qty": 2,
+      "unit_price": 100.0,
+      "variant": null
+     }
+    ],
+    "notes": null,
+    "paid": 0,
+    "payments": [],
+    "round_off": 0.0,
+    "service_charge": 0.0,
+    "split": null,
+    "status": "awaiting_payment",
+    "subtotal": 200.0,
+    "total": 200.0,
+    "updated_at": "2026-10-19T20:15:07.60149+00:00"
+   }
+  ],
+  "receipt_printer": "Counter printer 1",
+  "table": {
+   "area_name": null,
+   "id": "55000000-0000-0000-0000-0000000000c2",
+   "label": "T2",
+   "labels": [
+    "T2"
+   ],
+   "main_table_id": "55000000-0000-0000-0000-0000000000c2",
+   "seats": 4
+  },
+  "unavailable": {
+   "coupon": null,
+   "pay": null
+  }
+ },
+ "view3": {
+  "can": {
+   "coupon": true,
+   "note": true,
+   "pay": false,
+   "split": false
+  },
+  "current_order_id": "55000000-0000-0000-0000-0000000000d4",
+  "location": {
+   "id": "451c4225-b925-4d67-951d-2f4e576aabbe",
+   "name": "Dosa House 550 - Main"
+  },
+  "orders": [
+   {
+    "bill_generated": false,
+    "coupon_code": null,
+    "created_at": "2026-10-19T20:15:07.60149+00:00",
+    "customer_phone": null,
+    "discount": 0.0,
+    "display_no": "R5504",
+    "due": 1050.0,
+    "gst_amount": 50.0,
+    "gst_pct": 5.0,
+    "id": "55000000-0000-0000-0000-0000000000d4",
+    "items": [
+     {
+      "id": "55000000-0000-0000-0000-0000000000e5",
+      "line_total": 1000.0,
+      "name": "Thali",
+      "qty": 4,
+      "unit_price": 250.0,
+      "variant": null
+     }
+    ],
+    "notes": null,
+    "paid": 0,
+    "payments": [],
+    "round_off": 0.0,
+    "service_charge": 0.0,
+    "split": null,
+    "status": "sent_to_kitchen",
+    "subtotal": 1000.0,
+    "total": 1050.0,
+    "updated_at": "2026-10-19T20:15:07.60149+00:00"
+   }
+  ],
+  "receipt_printer": "Counter printer 1",
+  "table": {
+   "area_name": null,
+   "id": "55000000-0000-0000-0000-0000000000c3",
+   "label": "T3",
+   "labels": [
+    "T3"
+   ],
+   "main_table_id": "55000000-0000-0000-0000-0000000000c3",
+   "seats": 4
+  },
+  "unavailable": {
+   "coupon": null,
+   "pay": "Generate the bill first."
+  }
+ }
+}

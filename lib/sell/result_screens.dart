@@ -21,9 +21,6 @@ class SuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pay = view.payment;
-    final total = (view.bill['total'] as num?) ?? 0;
-    final tendered = pay['tendered'] as num?;
-    final change = (pay['change'] as num?) ?? 0;
     final cash = '${pay['method']}'.toLowerCase().contains('cash');
     return Scaffold(
       backgroundColor: kBg,
@@ -31,32 +28,20 @@ class SuccessScreen extends StatelessWidget {
         SellTopBar(onMenu: () => env.menu(context), initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(24, 24, 24, 16), children: [
-            OrderCardBox(
-              radius: 30,
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-              child: Column(children: [
-                Container(width: 72, height: 72, decoration: const BoxDecoration(color: kChipGreen, shape: BoxShape.circle), child: const Icon(LucideIcons.check, size: 30, color: Color(0xFF3DB800))),
-                const SizedBox(height: 16),
-                Text('Transaction Successful', textAlign: TextAlign.center, style: inter(24, 800, color: const Color(0xFF3DB800))),
-                const SizedBox(height: 4),
-                Text('Receipt generated and sent to customer queue', textAlign: TextAlign.center, style: inter(13.5, 400, color: kMuted)),
-                const Divider(height: 28, color: kLine),
-                KeyValue('Order Number', view.displayNo, size: 15),
-                KeyValue('Total Amount Paid', rupees(total), size: 15),
-                KeyValue('Payment Method', '${pay['method']}', size: 15),
-                if (cash && tendered != null) ...[KeyValue('Amount Tendered', rupees(tendered), size: 15), KeyValue('Change Returned', rupees(change), size: 15)],
-                if (env.branchName != null) KeyValue('Terminal Branch', env.branchName!, size: 15),
-                KeyValue('Date & Time', view.placedAt, size: 15),
-                const Divider(height: 28, color: kLine),
-                DarkCta(label: 'New Order', onPressed: () => _backToTill(context)),
-                const SizedBox(height: 12),
-                LightCta(label: 'Print Receipt', onPressed: () {
-                  Clipboard.setData(ClipboardData(text: view.receiptText));
-                  showToast(context, 'Receipt text copied. Printers connect in a later release.');
-                }),
-                const SizedBox(height: 14),
-                Text('Use New Order to start the next sale.', style: inter(12.5, 400, color: kKicker)),
-              ]),
+            TransactionSuccessCard(
+              orderNo: view.displayNo,
+              amountPaid: (view.bill['total'] as num?) ?? 0,
+              method: '${pay['method']}',
+              tendered: cash ? pay['tendered'] as num? : null,
+              change: (pay['change'] as num?) ?? 0,
+              branch: env.branchName,
+              when: view.placedAt,
+              onNewOrder: () => _backToTill(context),
+              onPrintReceipt: () {
+                Clipboard.setData(ClipboardData(text: view.receiptText));
+                showToast(context, 'Receipt text copied. Printers connect in a later release.');
+              },
+              footnote: 'Use New Order to start the next sale.',
             ),
           ]),
         ),
@@ -64,6 +49,43 @@ class SuccessScreen extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// The body of "448 Transaction Success", shared by the store till ([SuccessScreen]) and the restaurant's table bill. The figures are the
+/// server's; [tendered] (cash only) shows "Amount Tendered" and "Change Returned".
+class TransactionSuccessCard extends StatelessWidget {
+  const TransactionSuccessCard({super.key, required this.orderNo, required this.amountPaid, required this.method, this.tendered, this.change = 0, this.branch,
+      required this.when, required this.onNewOrder, required this.onPrintReceipt, this.footnote});
+  final String orderNo, method, when;
+  final num amountPaid, change;
+  final num? tendered;
+  final String? branch, footnote;
+  final VoidCallback onNewOrder, onPrintReceipt;
+
+  @override
+  Widget build(BuildContext context) => OrderCardBox(
+        radius: 30,
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+        child: Column(children: [
+          Container(width: 72, height: 72, decoration: const BoxDecoration(color: kChipGreen, shape: BoxShape.circle), child: const Icon(LucideIcons.check, size: 30, color: Color(0xFF3DB800))),
+          const SizedBox(height: 16),
+          Text('Transaction Successful', textAlign: TextAlign.center, style: inter(24, 800, color: const Color(0xFF3DB800))),
+          const SizedBox(height: 4),
+          Text('Receipt generated and sent to customer queue', textAlign: TextAlign.center, style: inter(13.5, 400, color: kMuted)),
+          const Divider(height: 28, color: kLine),
+          KeyValue('Order Number', orderNo, size: 15),
+          KeyValue('Total Amount Paid', rupees(amountPaid), size: 15),
+          KeyValue('Payment Method', method, size: 15),
+          if (tendered != null) ...[KeyValue('Amount Tendered', rupees(tendered!), size: 15), KeyValue('Change Returned', rupees(change), size: 15)],
+          if (branch != null) KeyValue('Terminal Branch', branch!, size: 15),
+          KeyValue('Date & Time', when, size: 15),
+          const Divider(height: 28, color: kLine),
+          DarkCta(label: 'New Order', onPressed: onNewOrder),
+          const SizedBox(height: 12),
+          LightCta(label: 'Print Receipt', onPressed: onPrintReceipt),
+          if (footnote != null) ...[const SizedBox(height: 14), Text(footnote!, style: inter(12.5, 400, color: kKicker))],
+        ]),
+      );
 }
 
 /// Figma "449 Transaction Failed" (and its negative frame): what was declined, that nothing was charged, and the way out.
