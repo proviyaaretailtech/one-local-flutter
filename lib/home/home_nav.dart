@@ -26,6 +26,9 @@ class HomeNav {
   static HomeRoute? stock;
   // Section H: one item's stock detail (section J's low-stock "view item" uses it).
   static ItemRoute? stockItem;
+  // Section H kitchen: stations setup and the Kitchen Display System.
+  static HomeRoute? kitchenSetup;
+  static HomeRoute? kitchenDisplay;
   // Section H: tables and floor (the POS tab).
   static HomeRoute? tables;
   static HomeRoute? bill;
