@@ -40,6 +40,12 @@ class HomeNav {
   // Section M: the storefront page builder and its settings.
   static HomeRoute? storefront;
   static HomeRoute? money;
+  // Section K: one Money screen by its key ('payouts', 'invoices', 'settlements', ...), for links that name a screen.
+  static void Function(BuildContext context, String screen)? moneyScreen;
+  // Section M: the storefront's delivery settings (radius, delivery window, pickup).
+  static HomeRoute? deliverySettings;
+  // Section P: the "share feedback" sheet (feedback to One Local, same record as a support request).
+  static HomeRoute? shareFeedback;
   static HomeRoute? notifications;
   static HomeRoute? complaints;
   static HomeRoute? reviews;
@@ -64,8 +70,9 @@ class HomeNav {
 
   /// Clears every hook (tests).
   static void reset() {
-    home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = lowStock = null;
     stockItem = null;
+    moneyScreen = null;
+    kitchenSetup = kitchenDisplay = deliverySettings = shareFeedback = null;
     home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = null;
   }
 }

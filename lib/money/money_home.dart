@@ -25,10 +25,14 @@ Widget moneyScreenFor(MoneyEnv env, String key) => switch (key) {
 /// Entry of the bottom bar's Money tab: asks the server what this person may open, then shows the first screen it allows. A person with no money
 /// permission sees a plain sentence instead of a screen that would only be refused.
 class MoneyHome extends StatefulWidget {
-  const MoneyHome({super.key, required this.env});
+  const MoneyHome({super.key, required this.env, this.start});
   final MoneyEnv env;
 
-  static Route<void> route(MoneyEnv env) => MaterialPageRoute(settings: const RouteSettings(name: MoneyEnv.homeRoute), builder: (_) => MoneyHome(env: env));
+  /// The screen to open first ('payouts', 'invoices', ...); the first screen the server allows when null or not allowed.
+  final String? start;
+
+  static Route<void> route(MoneyEnv env, {String? start}) =>
+      MaterialPageRoute(settings: const RouteSettings(name: MoneyEnv.homeRoute), builder: (_) => MoneyHome(env: env, start: start));
 
   @override
   State<MoneyHome> createState() => _MoneyHomeState();
@@ -59,7 +63,7 @@ class _MoneyHomeState extends State<MoneyHome> {
       if (screens.isEmpty) {
         setState(() => denied = true);
       } else {
-        Navigator.of(context).pushReplacement(MaterialPageRoute(settings: const RouteSettings(name: MoneyEnv.homeRoute), builder: (_) => moneyScreenFor(widget.env, screens.first)));
+        Navigator.of(context).pushReplacement(MaterialPageRoute(settings: const RouteSettings(name: MoneyEnv.homeRoute), builder: (_) => moneyScreenFor(widget.env, screens.contains(widget.start) ? widget.start! : screens.first)));
       }
     } on RpcException catch (e) {
       if (mounted) setState(() => error = e.message);

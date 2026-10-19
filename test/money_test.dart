@@ -427,6 +427,19 @@ void main() {
       expect(f.env.allowed, contains('settlements'));
     });
 
+    testWidgets('a link that names a screen (More page: Payout, Invoices, Fees) opens that screen', (t) async {
+      final f = Fake();
+      await show(t, MoneyHome(env: f.env, start: 'payouts'));
+      expect(find.text('Money / Payouts'), findsOneWidget);
+    });
+
+    testWidgets('a named screen the person may not open falls back to their first screen', (t) async {
+      final f = Fake((r) => fnOf(r) == 'money_options' ? ok(fx['options_manager']) : null);
+      await show(t, MoneyHome(env: f.env, start: 'payouts'));
+      expect(find.text('Money / Payouts'), findsNothing);
+      expect(find.text('Money / Overview'), findsOneWidget);
+    });
+
     testWidgets('a person with no money permission gets a plain sentence', (t) async {
       final f = Fake((r) => fnOf(r) == 'money_options' ? ok({...(fx['options_owner'] as Map<String, dynamic>), 'screens': <String>[]}) : null);
       await show(t, MoneyHome(env: f.env));

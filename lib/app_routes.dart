@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'auth/auth_repository.dart';
 import 'auth/partner_api.dart';
+import 'backoffice/low_stock_screen.dart';
 import 'catalogue/catalogue_screen.dart';
 import 'catalogue/grn_screens.dart';
-import 'backoffice/low_stock_screen.dart';
 import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
 import 'inventory/inventory_dashboard.dart';
@@ -12,9 +12,6 @@ import 'inventory/stock_detail_screen.dart';
 import 'kitchen/kds_screen.dart';
 import 'kitchen/kitchen_setup_screen.dart';
 import 'kitchen/kitchen_widgets.dart';
-import 'purchasing/po_history_screen.dart';
-import 'purchasing/purchasing_api.dart';
-import 'orders/cart_screen.dart';
 import 'money/money_env.dart';
 import 'money/money_home.dart';
 import 'notices/feedback_screen.dart';
@@ -22,23 +19,27 @@ import 'notices/notices_api.dart';
 import 'notices/notices_home.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
+import 'purchasing/po_history_screen.dart';
+import 'purchasing/purchasing_api.dart';
 import 'sell/sell_env.dart';
 import 'sell/sell_screen.dart';
 import 'service/calendar_screen.dart';
 import 'service/service_widgets.dart' show ServiceRoutes;
+import 'settings/settings_api.dart';
 import 'settings/settings_screen.dart';
 import 'settings/support_screens.dart';
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
+import 'storefront/builder_screen.dart';
+import 'storefront/settings_screens.dart';
+import 'storefront/storefront_api.dart';
 import 'tables/floor_screen.dart';
 import 'tables/table_widgets.dart';
-import 'storefront/builder_screen.dart';
-import 'storefront/storefront_api.dart';
+import 'team/team_screens.dart';
+import 'team/team_widgets.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
 /// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K), the team (L), the storefront (M), notices (N) and settings and support (P) into the [HomeNav] hooks.
-import 'team/team_screens.dart';
-import 'team/team_widgets.dart';
 void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
   HomeNav.orders = HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
@@ -61,15 +62,18 @@ void installRoutes() {
   HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
   // Section K: money. The server says which screens this person may open; the bottom bar's other tabs go back through _tab.
   HomeNav.money = (c) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
+  HomeNav.moneyScreen = (c, screen) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id)), start: screen));
   HomeNav.team = (c) => Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id))));
   // Section M: the storefront page builder (profile, hours, delivery, offers, ads and publishing hang off it).
   HomeNav.storefront = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'storefront'), builder: (_) => StorePageBuilder(api: StorefrontApi())));
+  HomeNav.deliverySettings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => DeliveryScreen(api: StorefrontApi())));
   // Section N: notification and announcement centres, customer messages and feedback.
   HomeNav.notifications = (c) => Navigator.of(c).push(NoticesHome.route());
   HomeNav.reviews = HomeNav.complaints = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FeedbackScreen(api: NoticesApi())));
   // Section P: the Settings page and Support & Help. The Team hook (users, roles, invites) belongs to section L.
   HomeNav.settings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SettingsScreen()));
   HomeNav.support = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SupportScreen()));
+  HomeNav.shareFeedback = (c) => openFeedbackSheet(c, SettingsEnv());
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
