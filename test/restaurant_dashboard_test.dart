@@ -80,7 +80,7 @@ void main() {
       expect(r.calls.first.$2['location_id'], 'all');
       for (final text in [
         // tabs, title
-        'My Feed', 'Sales', 'Funnel', 'Service Quality', 'Restaurant Dashboard', 'Sunday, 18 October 2026 · Restaurant operations', 'LIVE',
+        'My Feed', 'Sales', 'Funnel', 'Service Quality', 'Restaurant Dashboard', 'Today · Restaurant operations', 'LIVE',
         // orders and KOTs
         'Live orders', '1 new', '3 in progress', 'Pending', '2 critical', 'Kitchen queue',
         // kitchen, tables, sales today

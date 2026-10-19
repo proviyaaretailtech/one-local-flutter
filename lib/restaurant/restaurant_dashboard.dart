@@ -109,7 +109,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
   Widget _chip(String label, Color bg, Color ink, {Key? key}) => Container(
     key: key,
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
     child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10, 600, color: ink)),
   );
 
@@ -208,7 +208,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
               children: [
                 Text('Restaurant Dashboard', style: inter(18, 800)),
                 const SizedBox(height: 2),
-                Text('${d.dateLabel} · Restaurant operations', style: inter(11, 400, color: kMuted)),
+                Text('Today · Restaurant operations', style: inter(11, 400, color: kMuted)),
               ],
             ),
           ),
@@ -451,7 +451,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
       const SizedBox(height: 10),
       _todaySoFar(d),
       const SizedBox(height: 18),
-      Text('Quick Links', style: inter(16, 800)),
+      Text('Quick Links', style: inter(18, 800)),
       Text('Manage daily operations', style: inter(11, 400, color: kMuted)),
       const SizedBox(height: 10),
       GridView.count(
@@ -461,7 +461,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
         crossAxisCount: 3,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
-        childAspectRatio: 1.0,
+        childAspectRatio: 1.05,
         children: [
           _link(LucideIcons.history, 'Order history', () => HomeNav.go(context, HomeNav.orderHistory, 'Order history')),
           _link(LucideIcons.triangleAlert, 'Complaints', () => HomeNav.go(context, HomeNav.complaints, 'Complaints'),
@@ -495,8 +495,10 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
     }
     final reorder = r['reorder_level'] is num ? 'reorder at ${q(r['reorder_level'])}' : 'no reorder level set';
     final critical = r['level'] == 'critical';
-    return Padding(
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.only(top: 10),
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: kLine))),
       child: Row(
         children: [
           Expanded(
@@ -548,20 +550,24 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
         : 'Paused';
     return HomeCard(
       key: const ValueKey('rst-today-so-far'),
+      padding: const EdgeInsets.all(20),
+      radius: 20,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(child: _label('Today so far')),
-              Dot(ch == null ? kMuted : open > 0 ? kGreenDot : kAmber, size: 10),
+              Expanded(child: Text('Today so far', style: inter(13, 500, color: kMuted))),
+              Dot(ch == null ? kMuted : open > 0 ? kUp : kAmber, size: 18),
               const SizedBox(width: 6),
               Text(status, key: const ValueKey('rst-open'), style: inter(11.5, 600)),
             ],
           ),
           const SizedBox(height: 4),
-          Text(svcRupees(d.sales.n('today')), style: inter(26, 800)),
-          Text('${d.orders.i('today')} orders received', style: inter(10.5, 400, color: kMuted)),
+          const SizedBox(height: 10),
+          Text(svcRupees(d.sales.n('today')), style: inter(32, 800)),
+          const SizedBox(height: 4),
+          Text('${d.orders.i('today')} orders received', style: inter(13, 400, color: kMuted)),
         ],
       ),
     );
@@ -576,9 +582,11 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
   Widget _metric(String label, String value, num now, num? before, {required Key key}) {
     final pct = _compare ? _change(now, before) : null;
     final up = before != null && now >= before;
-    return Padding(
+    return Container(
       key: key,
+      margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.only(bottom: 10),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: kLine))),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -597,7 +605,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
                 : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(up ? LucideIcons.trendingUp : LucideIcons.trendingDown, size: 14, color: up ? kUp : kRed),
+                      Icon(up ? LucideIcons.arrowUpRight : LucideIcons.arrowDownRight, size: 14, color: up ? kUp : kRed),
                       const SizedBox(width: 4),
                       Text(pct, style: inter(11.5, 700, color: up ? kUp : kRed)),
                     ],
@@ -615,11 +623,12 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
     final pAov = p == null || p.n('orders') == 0 ? null : p.n('sales') / p.n('orders');
     return HomeCard(
       key: const ValueKey('rst-analytics'),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(18),
+      radius: 20,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Sales Analytics', style: inter(14, 800)),
+          Row(children: [Expanded(child: Text('Sales Analytics', style: inter(15, 800))), const Icon(LucideIcons.ellipsis, size: 18, color: kMuted)]),
           Text('Last 7 days${_compare ? ' vs the 7 days before' : ''}', style: inter(10, 400, color: kMuted)),
           const SizedBox(height: 12),
           _metric('Net sales', svcRupees(sales), sales, p?.n('sales'), key: const ValueKey('rst-net-sales')),
@@ -658,7 +667,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
         children: [
           Icon(icon, size: 20, color: kNavy),
           const SizedBox(height: 6),
-          Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(11, 600)),
+          Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(12, 600)),
           if (note != null) Text(note, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(9, 500, color: kMuted)),
         ],
       ),
@@ -666,7 +675,30 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
   );
 
   /// The 7-day bars: today in lime, the tallest earlier day dark, the rest grey (as the frame).
+  String _axis(num v) => v >= 1000 ? '₹${(v / 1000).round()}k' : '₹${v.round()}';
+
   Widget _chart(List<Map<String, dynamic>> days) {
+    num top0 = days.fold<num>(0, (m, e) => e['sales'] is num && (e['sales'] as num) > m ? e['sales'] as num : m);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 82,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final f in [1, 0.5, 0]) Text(_axis(top0 * f), style: inter(8, 500, color: kMuted)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(child: _bars(days)),
+      ],
+    );
+  }
+
+  Widget _bars(List<Map<String, dynamic>> days) {
     num v(Map<String, dynamic> e) => e['sales'] is num ? e['sales'] as num : 0;
     final top = days.fold<num>(0, (m, e) => v(e) > m ? v(e) : m);
     final earlier = days.take(days.length - 1).fold<num>(0, (m, e) => v(e) > m ? v(e) : m);
@@ -695,7 +727,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text('${e['label']}', style: inter(9, 500, color: kMuted)),
+                    Text('${e['label']}', style: inter(9, i == days.length - 1 ? 700 : 500, color: i == days.length - 1 ? kInk : kMuted)),
                   ],
                 ),
               ),
