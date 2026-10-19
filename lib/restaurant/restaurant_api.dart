@@ -36,6 +36,13 @@ class RestaurantDashboardData {
   RstBlock? get tables => _opt('tables');
   RstBlock? get ingredientsLow => _opt('ingredients_low');
   RstBlock? get onelocal => _opt('onelocal');
+  /// 0570: the 7 days before [last7] ({sales, orders}); null from an older server.
+  RstBlock? get prev7 => _opt('prev7');
+  /// 0570: outlets taking One Local orders ({open_outlets, outlets}); null from an older server.
+  RstBlock? get channel => _opt('channel');
+  /// 0570: up to three low-stock rows; null when the role cannot read stock (or an older server).
+  List<Map<String, dynamic>>? get ingredientRows =>
+      raw['ingredients_items'] is List ? (raw['ingredients_items'] as List).whereType<Map>().map(_map).toList() : null;
   List<Map<String, dynamic>> get last7 =>
       ((raw['last7'] as List?) ?? const []).whereType<Map>().map(_map).toList();
   List<String> get notReported =>
