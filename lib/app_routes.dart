@@ -12,6 +12,8 @@ import 'inventory/stock_detail_screen.dart';
 import 'kitchen/kds_screen.dart';
 import 'kitchen/kitchen_setup_screen.dart';
 import 'kitchen/kitchen_widgets.dart';
+import 'purchasing/po_history_screen.dart';
+import 'purchasing/purchasing_api.dart';
 import 'orders/cart_screen.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
@@ -35,6 +37,7 @@ void installRoutes() {
   HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const GrnQueueScreen()));
   InvEnv inventoryEnv(BuildContext c) => InvEnv(
       onNavigate: (id) => _tab(c, id),
+      onOpenPurchasing: (ctx) => Navigator.of(ctx).push(PoHistoryScreen.pageRoute(PurEnv(inv: inventoryEnv(ctx)))),
       onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
   HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
   HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));

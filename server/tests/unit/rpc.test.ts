@@ -117,3 +117,31 @@ test('back office (section J): four functions listed, writes are "write", close 
   assert.equal(parse('purchase_suggestions_close', { ids: [id], outcome: 'ordered', purchase_order_ref: 'PO-1', quantities: { [id]: -2 } }).success, false);
   assert.ok(parse('purchase_suggestions_close', { ids: [id], outcome: 'ordered', purchase_order_ref: 'PO-1', quantities: { [id]: 6 } }).success);
 });
+
+test('purchasing (section H): nine functions listed, reads are "read", writes carry the Idempotency-Key where they create, shapes are checked', async () => {
+  const reads = ['pur_options', 'pur_po_list', 'pur_po_view', 'pur_price_view'];
+  const writes = ['pur_po_create', 'pur_po_act', 'pur_po_receive', 'pur_sourcing_select', 'pur_audit_record'];
+  for (const a of reads) assert.equal(lookup(a)?.rate, 'read', a);
+  for (const a of writes) { const e = lookup(a); assert.ok(e && e.kind === 'db' && e.rate === 'write', a); }
+  for (const a of ['pur_po_create', 'pur_po_receive', 'pur_sourcing_select', 'pur_audit_record']) assert.ok((lookup(a) as { idem?: boolean }).idem, a);
+  assert.equal(lookup('pur_po_json'), undefined);               // service-only helpers are not reachable
+  assert.equal(lookup('purchasing_receipt_posted'), undefined);
+  assert.equal((await post('/rpc/pur_po_list')).status, 401);
+  const parse = (alias: string, body: unknown) => (lookup(alias) as { args: { safeParse(v: unknown): { success: boolean; data?: any } } }).args.safeParse(body);
+  const line = { inventory_item_id: '40000000-0000-0000-0000-0000000000a1', qty: 10, unit_cost_minor: 36000, gst_pct: 5 };
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [line] }).success, true);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [] }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: '', lines: [line] }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [{ ...line, qty: 0 }] }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [{ ...line, unit_cost_minor: 1.5 }] }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [{ ...line, gst_pct: 101 }] }).success, false);
+  assert.equal(parse('pur_po_view', {}).success, false);
+  assert.equal(parse('pur_po_act', { id: '40000000-0000-0000-0000-0000000000a1', action: 'approve' }).success, true);
+  assert.equal(parse('pur_po_act', { id: '40000000-0000-0000-0000-0000000000a1', action: 'delete' }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', submit: true, lines: [line] }).success, true);
+  assert.equal(parse('pur_po_list', { status: 'weird' }).success, false);
+  assert.equal(parse('pur_audit_record', { price_id: '40000000-0000-0000-0000-0000000000a1', checks: [{ name: 'x', result: 'maybe' }] }).success, false);
+  assert.equal(parse('pur_audit_record', { price_id: '40000000-0000-0000-0000-0000000000a1', checks: [{ name: 'Temp', result: 'fail', detail: '8.1C' }] }).success, true);
+  const keep = parse('pur_po_create', { supplier_id: 'abc', notes: 'n', lines: [{ ...line, extra: 1 }] });
+  assert.ok(keep.success && keep.data.lines[0].extra === 1);
+});
