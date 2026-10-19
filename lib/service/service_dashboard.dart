@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../home/home_nav.dart';
 import '../home/home_widgets.dart';
 import '../outlets/outlet_header.dart';
+import '../outlets/outlet_scope.dart';
 import '../ui/theme.dart';
 import 'service_api.dart';
 import 'service_widgets.dart' show svcRupees, svcStatus;
@@ -21,10 +22,28 @@ class ServiceHomeBody extends StatefulWidget {
 }
 
 class _ServiceHomeBodyState extends State<ServiceHomeBody> {
-  late Future<ServiceDashboardData> _f = widget.api.dashboard();
+  // the outlet chosen in the header's switcher (a service home shows one outlet; "all" is not summed yet)
+  late Future<ServiceDashboardData> _f = widget.api.dashboard(locationId: OutletScope.selected.value);
+
+  @override
+  void initState() {
+    super.initState();
+    OutletScope.selected.addListener(_followScope);
+  }
+
+  @override
+  void dispose() {
+    OutletScope.selected.removeListener(_followScope);
+    super.dispose();
+  }
+
+  void _followScope() {
+    if (!mounted) return;
+    _reload();
+  }
 
   Future<void> _reload() async {
-    final next = widget.api.dashboard();
+    final next = widget.api.dashboard(locationId: OutletScope.selected.value);
     setState(() {
       _f = next;
     });
@@ -80,7 +99,7 @@ class _ServiceHomeBodyState extends State<ServiceHomeBody> {
       padding: const EdgeInsets.only(bottom: 132),
       children: [
         // the outlet header (specs/outlets-multi)
-        OutletHeader(title: d.locationName, onMenu: widget.onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), initials: outletInitials(widget.personName)),
+        OutletHeader(title: d.locationName, onMenu: widget.onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), dashboard: true, allowAll: false),
         Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), child: Text('OneLocal', style: inter(24, 800, height: 1.1))),
         Container(
           color: kNavy,

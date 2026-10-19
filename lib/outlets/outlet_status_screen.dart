@@ -5,7 +5,7 @@ import '../auth/partner_api.dart';
 import '../home/home_nav.dart';
 import '../ui/theme.dart';
 import 'add_outlet_screen.dart';
-import 'outlet_header.dart' show outletStatusColor, kOutletSquare, kOutletChipBg, kOutletChipText, kOutletOnline;
+import 'outlet_header.dart' show OutletHeader, outletStatusColor, kOutletSquare, kOutletChipBg, kOutletChipText, kOutletOnline;
 import 'outlets_api.dart';
 
 /// Restaurant status (Figma `ALL ONLINE`): every outlet the person may see, searchable by name, ID or locality. Each card: name, ID,
@@ -67,10 +67,9 @@ class _OutletStatusScreenState extends State<OutletStatusScreen> {
     final o = _o;
     final added = await Navigator.of(context).push<Outlet>(
         MaterialPageRoute(builder: (_) => AddOutletScreen(api: widget.api, needsFssai: o?.needsFssai ?? false)));
-    if (added != null) {
-      await _load();
-      if (mounted) showToast(context, '${added.name} was sent to One Local for verification.');
-    }
+    await _load();
+    OutletHeader.refresh();
+    if (added != null && mounted) showToast(context, '${added.name} was sent to One Local for verification.');
   }
 
   List<Outlet> get _shown {
@@ -150,6 +149,34 @@ class _OutletStatusScreenState extends State<OutletStatusScreen> {
                       child: Text(o.outlets.isEmpty ? 'No outlet yet.' : 'No outlet matches “${_search.text.trim()}”.',
                           textAlign: TextAlign.center, style: inter(14, 500, color: kMuted)),
                     ),
+                  if (o.canAdd && o.draft != null) ...[
+                    Semantics(
+                      button: true,
+                      label: 'Continue adding ${o.draft!['name'] ?? 'the new outlet'}',
+                      excludeSemantics: true,
+                      child: InkWell(
+                        key: const ValueKey('outlets-continue-draft'),
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: _add,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(color: const Color(0xFFFFF7E6), borderRadius: BorderRadius.circular(16)),
+                          child: Row(children: [
+                            const Icon(LucideIcons.filePen, size: 20, color: Color(0xFF92400E)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text('Continue: ${(o.draft!['name'] ?? '').toString().isEmpty ? 'new outlet' : o.draft!['name']}', style: inter(15, 600, color: const Color(0xFF92400E))),
+                                Text('Saved draft · not sent to One Local yet', style: inter(12.5, 400, color: const Color(0xFF92400E))),
+                              ]),
+                            ),
+                            const Icon(LucideIcons.chevronRight, size: 18, color: Color(0xFF92400E)),
+                          ]),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   if (o.canAdd)
                     Semantics(
                       button: true,

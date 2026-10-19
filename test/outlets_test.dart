@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/outlets/add_outlet_screen.dart';
 import 'package:vinii_pos/outlets/outlet_header.dart';
+import 'package:vinii_pos/outlets/outlet_scope.dart';
 import 'package:vinii_pos/outlets/outlet_status_screen.dart';
 import 'package:vinii_pos/outlets/outlets_api.dart';
 
@@ -52,6 +53,7 @@ class FakeOutlets {
   FakeOutlets({this.failSet});
   bool branchOn = false;
   bool added = false;
+  Map<String, dynamic>? draft;
   final String? failSet;
   final calls = <(String, Map<String, dynamic>, String?)>[];
   late final api = OutletsApi(
@@ -64,12 +66,43 @@ class FakeOutlets {
       switch (fn) {
         case 'outlet_list':
           final o = overview(branchOn: branchOn);
+          if (draft != null) o['draft'] = {'id': draft!['id'], 'name': draft!['name'], 'step': draft!['step']};
           if (added) (o['outlets'] as List).add(outlet('l4', 'Niks Latur Highway', status: 'pending', verification: 'pending', accepting: false, canToggle: false));
           return ok(o);
         case 'outlet_set_channel':
           if (failSet != null) return http.Response(jsonEncode({'detail': failSet}), 409, headers: _json);
           if (body['accepting'] == true) branchOn = true;
           return ok({'outlet': outlet(body['location_id'] as String, 'x'), 'changed': true});
+        case 'outlet_draft_get':
+          return ok({
+            'draft': draft,
+            'states': [
+              {'code': '29', 'name': 'Karnataka'},
+              {'code': '27', 'name': 'Maharashtra'},
+            ],
+            'home_state_code': '27',
+            'home_state_name': 'Maharashtra',
+            'needs_fssai': true,
+          });
+        case 'outlet_draft_save':
+          final d = <String, dynamic>{...?draft, 'id': 'd1', 'status': 'draft'};
+          for (final e in body.entries) {
+            if (e.key == 'id' || e.key == 'idempotency_key') continue;
+            d[e.key == 'step' ? 'step' : e.key] = e.value;
+          }
+          d['inter_state'] = d['state_code'] != null && d['state_code'] != '27';
+          d['state_name'] = d['state_code'] == '29' ? 'Karnataka' : 'Maharashtra';
+          d['missing'] = <String>[];
+          draft = d;
+          return ok({'draft': d, 'replayed': false});
+        case 'outlet_draft_submit':
+          added = true;
+          final name = (draft?['name'] ?? 'x') as String;
+          draft = null;
+          return ok({'outlet': outlet('l4', name, status: 'pending', verification: 'pending', accepting: false, canToggle: false), 'reference': 'OLO-9'});
+        case 'outlet_draft_discard':
+          draft = null;
+          return ok({'discarded': true});
         case 'outlet_add':
           added = true;
           return ok({'outlet': outlet('l4', body['name'] as String, status: 'pending', verification: 'pending', accepting: false, canToggle: false), 'reference': 'OLO-9'});
@@ -89,6 +122,7 @@ void main() {
   late FakeOutlets f;
   setUp(() {
     HomeNav.reset();
+    OutletScope.reset();
     f = FakeOutlets();
     OutletHeader.api = () => f.api;
     OutletHeader.refresh();
@@ -138,11 +172,13 @@ void main() {
       expect(find.text('Restaurant status'), findsOneWidget);
     });
 
-    testWidgets('tapping the outlet name opens Restaurant status too, and the header reloads on return', (t) async {
+    testWidgets('the outlet name opens the switcher; "Manage outlets" opens Restaurant status and the header reloads on return', (t) async {
       await tall(t);
       await t.pumpWidget(const MaterialApp(home: Scaffold(body: OutletHeader(title: 'Orders'))));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('outlet-header-name')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('outlet-pick-manage')));
       await t.pumpAndSettle();
       expect(find.byType(OutletStatusScreen), findsOneWidget);
       final before = f.calls.length;
@@ -226,32 +262,6 @@ void main() {
       expect(find.text('Outlet settings opens in a later release.'), findsOneWidget);
     });
 
-    testWidgets('Add another restaurant/store sends the form and shows the new outlet as pending', (t) async {
-      await show(t);
-      await t.ensureVisible(find.byKey(const ValueKey('outlets-add')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('outlets-add')));
-      await t.pumpAndSettle();
-      expect(find.byType(AddOutletScreen), findsOneWidget);
-      await t.enterText(find.byKey(const ValueKey('outlet-name')), 'Niks Latur Highway');
-      await t.enterText(find.byKey(const ValueKey('outlet-address')), '5 Latur Highway, near toll');
-      await t.enterText(find.byKey(const ValueKey('outlet-pin')), '413512');
-      await t.enterText(find.byKey(const ValueKey('outlet-lat')), '18.41');
-      await t.enterText(find.byKey(const ValueKey('outlet-lng')), '76.57');
-      await t.enterText(find.byKey(const ValueKey('outlet-fssai')), '12345678901234');
-      await t.ensureVisible(find.byKey(const ValueKey('outlet-submit')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('outlet-submit')));
-      await t.pumpAndSettle();
-      final add = f.calls.firstWhere((c) => c.$1 == 'outlet_add');
-      expect(add.$2['name'], 'Niks Latur Highway');
-      expect(add.$2['hours'], {'opens': '09:00', 'closes': '23:00', 'days': ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']});
-      expect(add.$3, startsWith('outlet-'), reason: 'the form carries an Idempotency-Key');
-      expect(find.byType(AddOutletScreen), findsNothing);
-      expect(find.text('Niks Latur Highway'), findsOneWidget);
-      expect(find.text('Pending verification'), findsNWidgets(2));
-    });
-
     testWidgets('no add button for a person who may not add outlets', (t) async {
       final x = FakeOutlets();
       final api = OutletsApi(baseUrl: 'http://pos.test', accessToken: () => 't', client: MockClient((_) async => ok(overview(canAdd: false))));
@@ -263,60 +273,191 @@ void main() {
     });
   });
 
-  group('Add outlet form', () {
-    Future<void> show(WidgetTester t, {bool fssai = true, Locate? locate}) async {
+  group('Add another restaurant/store (stepped, saved as a draft)', () {
+    Future<void> openForm(WidgetTester t, FakeOutlets x) async {
       await tall(t);
-      await t.pumpWidget(MaterialApp(home: AddOutletScreen(api: f.api, needsFssai: fssai, locate: locate)));
+      await t.pumpWidget(MaterialApp(home: OutletStatusScreen(api: x.api)));
+      await t.pumpAndSettle();
+      await t.ensureVisible(find.byKey(const ValueKey('outlets-add')));
+      await t.tap(find.byKey(const ValueKey('outlets-add')));
+      await t.pumpAndSettle();
     }
 
-    testWidgets('says what is missing before sending anything', (t) async {
-      await show(t);
+    Future<void> chooseState(WidgetTester t, String name) async {
+      await t.tap(find.byKey(const ValueKey('outlet-state')));
+      await t.pumpAndSettle();
+      await t.tap(find.text(name).last);
+      await t.pumpAndSettle();
+    }
+
+    Future<void> next(WidgetTester t) async {
+      await t.ensureVisible(find.byKey(const ValueKey('outlet-submit')));
       await t.tap(find.byKey(const ValueKey('outlet-submit')));
-      await t.pump();
-      expect(find.text('Enter the outlet name.'), findsOneWidget);
-      await t.enterText(find.byKey(const ValueKey('outlet-name')), 'Niks Two');
-      await t.enterText(find.byKey(const ValueKey('outlet-address')), '5 Latur Highway');
+      await t.pumpAndSettle();
+    }
+
+    Future<void> details(WidgetTester t, String name) async {
+      await t.enterText(find.byKey(const ValueKey('outlet-name')), name);
+      await t.enterText(find.byKey(const ValueKey('outlet-address')), '5 Latur Highway, near toll');
+      await t.enterText(find.byKey(const ValueKey('outlet-locality')), 'Highway');
       await t.enterText(find.byKey(const ValueKey('outlet-pin')), '413512');
-      await t.tap(find.byKey(const ValueKey('outlet-submit')));
-      await t.pump();
-      expect(find.text('Place the map pin on the outlet.'), findsOneWidget);
-      await t.enterText(find.byKey(const ValueKey('outlet-lat')), '18.4');
-      await t.enterText(find.byKey(const ValueKey('outlet-lng')), '76.5');
-      await t.tap(find.byKey(const ValueKey('outlet-submit')));
-      await t.pump();
-      expect(find.text('Enter the 14-digit FSSAI licence number.'), findsOneWidget);
-      expect(f.calls, isEmpty);
+      await t.enterText(find.byKey(const ValueKey('outlet-lat')), '18.41');
+      await t.enterText(find.byKey(const ValueKey('outlet-lng')), '76.57');
+    }
+
+    List<Map<String, dynamic>> saves(FakeOutlets x) => [for (final c in x.calls) if (c.$1 == 'outlet_draft_save') c.$2];
+
+    testWidgets('same state: four steps, the business GSTIN is used, the outlet is sent as pending', (t) async {
+      await openForm(t, f);
+      expect(find.text('Step 1 of 4 · Where is the new outlet?'), findsOneWidget);
+      expect(find.text('Your business GSTIN is registered in Maharashtra.'), findsOneWidget);
+      await next(t);
+      expect(find.text('Choose the state the outlet is in.'), findsOneWidget, reason: 'nothing is sent before a state is chosen');
+      expect(saves(f), isEmpty);
+      await chooseState(t, 'Maharashtra');
+      expect(find.textContaining('Same state: your business GSTIN is used'), findsOneWidget);
+      await next(t);
+      expect(saves(f).single, {'state_code': '27', 'step': 'details'});
+      expect(f.calls.firstWhere((c) => c.$1 == 'outlet_draft_save').$3, startsWith('outlet-'), reason: 'a new draft carries an Idempotency-Key');
+      await details(t, 'Niks Latur Highway');
+      await next(t);
+      expect(saves(f).last['step'], 'tax');
+      expect(saves(f).last['hours'], {'opens': '09:00', 'closes': '23:00', 'days': ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']});
+      expect(find.byKey(const ValueKey('outlet-gstin')), findsNothing);
+      expect(find.text('GSTIN: your business GSTIN (Maharashtra) is used.'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('outlet-fssai')), '12345678901234');
+      await next(t);
+      expect(find.text('Step 4 of 4 · Check and send'), findsOneWidget);
+      await next(t);
+      expect(f.calls.last.$1, 'outlet_list');
+      expect(f.calls.any((c) => c.$1 == 'outlet_draft_submit'), isTrue);
+      expect(find.byType(AddOutletScreen), findsNothing);
+      expect(find.text('Niks Latur Highway'), findsOneWidget);
+      expect(find.text('Pending verification'), findsNWidgets(2));
     });
 
-    testWidgets('a store does not need FSSAI; "use my location" fills the pin', (t) async {
-      await show(t, fssai: false, locate: () async => (18.412345, 76.567891));
-      expect(find.text('FSSAI licence number (optional)'), findsOneWidget);
+    testWidgets('another state: its own GSTIN with that state code and a contact who will run it', (t) async {
+      await openForm(t, f);
+      await chooseState(t, 'Karnataka');
+      expect(find.textContaining('Another state: this outlet needs its own GSTIN (starting 29)'), findsOneWidget);
+      await next(t);
+      expect(find.text('Step 2 of 5 · Outlet details'), findsOneWidget);
+      await details(t, 'Niks Indiranagar');
+      await next(t);
+      await t.enterText(find.byKey(const ValueKey('outlet-gstin')), '27ABCDE1234F1Z5');
+      await t.enterText(find.byKey(const ValueKey('outlet-fssai')), '12345678901234');
+      await next(t);
+      expect(find.text('A GSTIN for this state starts with 29.'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('outlet-gstin')), '29abcde1234f1z5');
+      await next(t);
+      expect(saves(f).last['gstin'], '29ABCDE1234F1Z5');
+      expect(find.text('Step 4 of 5 · Who runs this outlet?'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('outlet-contact-name')), 'Ravi Kumar');
+      await t.enterText(find.byKey(const ValueKey('outlet-contact-mobile')), '+91 98450 12345');
+      await next(t);
+      expect(find.text('Enter the contact\'s email: the invitation is sent there.'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('outlet-contact-email')), 'ravi@niks.in');
+      await next(t);
+      expect(saves(f).last, containsPair('contact_email', 'ravi@niks.in'));
+      expect(find.text('Outlet admin'), findsOneWidget);
+      expect(find.text('Step 5 of 5 · Check and send'), findsOneWidget);
+    });
+
+    testWidgets('save and continue later: the draft opens again at the same step with what was typed', (t) async {
+      await openForm(t, f);
+      await chooseState(t, 'Maharashtra');
+      await next(t);
+      await t.enterText(find.byKey(const ValueKey('outlet-name')), 'Niks Half Done');
+      await t.ensureVisible(find.byKey(const ValueKey('outlet-save-later')));
+      await t.tap(find.byKey(const ValueKey('outlet-save-later')));
+      await t.pumpAndSettle();
+      expect(find.byType(AddOutletScreen), findsNothing);
+      expect(saves(f).last, containsPair('name', 'Niks Half Done'));
+      expect(saves(f).last['step'], 'details', reason: 'the step the owner was on');
+      expect(find.text('Continue: Niks Half Done'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('outlets-continue-draft')));
+      await t.pumpAndSettle();
+      expect(find.text('Step 2 of 4 · Outlet details'), findsOneWidget);
+      expect(find.text('Niks Half Done'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('outlet-start-over')));
+      await t.pumpAndSettle();
+      expect(f.calls.last.$1, 'outlet_draft_discard');
+      expect(find.text('Step 1 of 4 · Where is the new outlet?'), findsOneWidget);
+    });
+
+    testWidgets('a server refusal is shown on the step, nothing is assumed', (t) async {
+      final api = OutletsApi(
+        baseUrl: 'http://pos.test',
+        accessToken: () => 't',
+        client: MockClient((r) async => r.url.pathSegments.last == 'outlet_draft_save'
+            ? http.Response(jsonEncode({'detail': 'Your business must be approved before it can add outlets.'}), 403, headers: _json)
+            : ok({'draft': null, 'states': [{'code': '27', 'name': 'Maharashtra'}], 'home_state_code': '27', 'needs_fssai': false})),
+      );
+      await tall(t);
+      await t.pumpWidget(MaterialApp(home: AddOutletScreen(api: api, needsFssai: false)));
+      await t.pumpAndSettle();
+      await chooseState(t, 'Maharashtra');
+      await next(t);
+      expect(find.text('Your business must be approved before it can add outlets.'), findsOneWidget);
+      expect(find.text('Step 1 of 4 · Where is the new outlet?'), findsOneWidget, reason: 'stays on the step');
+    });
+
+    testWidgets('"use my location" fills the map pin', (t) async {
+      await tall(t);
+      await t.pumpWidget(MaterialApp(home: AddOutletScreen(api: f.api, needsFssai: true, locate: () async => (18.412345, 76.567891))));
+      await t.pumpAndSettle();
+      await chooseState(t, 'Maharashtra');
+      await next(t);
       await t.tap(find.byKey(const ValueKey('outlet-pin-here')));
       await t.pumpAndSettle();
       expect(find.text('18.412345'), findsOneWidget);
       expect(find.text('76.567891'), findsOneWidget);
     });
+  });
 
-    testWidgets('a day can be switched off and the server answer ends the form', (t) async {
-      await show(t);
-      await t.enterText(find.byKey(const ValueKey('outlet-name')), 'Niks Two');
-      await t.enterText(find.byKey(const ValueKey('outlet-address')), '5 Latur Highway');
-      await t.enterText(find.byKey(const ValueKey('outlet-pin')), '413512');
-      await t.enterText(find.byKey(const ValueKey('outlet-lat')), '18.4');
-      await t.enterText(find.byKey(const ValueKey('outlet-lng')), '76.5');
-      await t.enterText(find.byKey(const ValueKey('outlet-fssai')), '12345678901234');
-      await t.enterText(find.byKey(const ValueKey('outlet-gstin')), '27abcde1234f1z5');
-      await t.ensureVisible(find.byKey(const ValueKey('outlet-day-sun')));
+  group('Outlet switcher (header)', () {
+    testWidgets('Home look: "SHOWING DATA FOR / All outlets (2)", bell and ☰; picking an outlet scopes the app', (t) async {
+      await tall(t);
+      await t.pumpWidget(const MaterialApp(home: Scaffold(body: OutletHeader(title: 'Home', dashboard: true))));
       await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('outlet-day-sun')));
-      await t.pump();
-      await t.ensureVisible(find.byKey(const ValueKey('outlet-submit')));
+      expect(find.text('SHOWING DATA FOR'), findsOneWidget);
+      expect(find.text('All outlets (2)'), findsOneWidget);
+      expect(find.text('1 of 2 online'), findsOneWidget);
+      expect(find.byKey(const ValueKey('outlet-header-bell')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('outlet-header-name')));
       await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('outlet-submit')));
+      expect(find.byKey(const ValueKey('outlet-pick-all')), findsOneWidget);
+      expect(find.byKey(const ValueKey('outlet-pick-l3')), findsNothing, reason: 'a pending outlet cannot be chosen');
+      await t.tap(find.byKey(const ValueKey('outlet-pick-l2')));
       await t.pumpAndSettle();
-      final add = f.calls.single;
-      expect((add.$2['hours'] as Map)['days'], ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']);
-      expect(add.$2['gstin'], '27ABCDE1234F1Z5');
+      expect(OutletScope.selected.value, 'l2');
+      expect(f.calls.last.$2['location_id'], 'l2', reason: 'the header reads the chosen outlet');
+      await t.tap(find.byKey(const ValueKey('outlet-header-name')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('outlet-pick-all')));
+      await t.pumpAndSettle();
+      expect(OutletScope.selected.value, isNull);
+    });
+
+    testWidgets('a one-outlet screen (Orders, Bill) has no "All outlets" choice', (t) async {
+      await tall(t);
+      await t.pumpWidget(const MaterialApp(home: Scaffold(body: OutletHeader(title: 'Orders'))));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('outlet-header-name')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('outlet-pick-all')), findsNothing);
+      expect(find.byKey(const ValueKey('outlet-pick-l1')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('outlet-pick-manage')));
+      await t.pumpAndSettle();
+      expect(find.byType(OutletStatusScreen), findsOneWidget);
+    });
+
+    testWidgets('a screen that cannot sum shows its outlet even when "all" is chosen', (t) async {
+      await tall(t);
+      await t.pumpWidget(const MaterialApp(home: Scaffold(body: OutletHeader(title: 'Home', dashboard: true, allowAll: false))));
+      await t.pumpAndSettle();
+      expect(find.text('Niks Browni And Burger'), findsOneWidget);
+      expect(find.text('All outlets (2)'), findsNothing);
     });
   });
 }

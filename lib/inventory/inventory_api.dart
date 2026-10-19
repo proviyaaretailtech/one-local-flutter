@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 
 import '../api/rpc_client.dart';
+import '../outlets/outlet_scope.dart';
 import '../auth/partner_api.dart';
 
 /// A server answer read as typed fields. Every number, status and permission comes from the server; the app only draws them.
@@ -105,7 +106,8 @@ class InventoryApi {
 
   Future<Map<String, dynamic>> _call(String fn, Map<String, Object?> args, {String? key}) async {
     final body = <String, dynamic>{
-      if (locationId != null && locationId!.isNotEmpty) 'location_id': locationId,
+      // the outlet chosen in the header's switcher when the screen names none (specs/outlets-multi)
+      if (OutletScope.pick(locationId) != null) 'location_id': OutletScope.pick(locationId),
       ...args,
     }..removeWhere((_, v) => v == null);
     try {

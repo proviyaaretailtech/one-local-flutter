@@ -8,6 +8,7 @@ import 'home_api.dart';
 import 'home_nav.dart';
 import 'home_widgets.dart';
 import '../outlets/outlet_header.dart';
+import '../outlets/outlet_scope.dart';
 import 'hub_screen.dart';
 import 'side_nav.dart';
 import '../service/history_screen.dart';
@@ -37,8 +38,27 @@ class ControlCentreScreen extends StatefulWidget {
 
 class _ControlCentreScreenState extends State<ControlCentreScreen> {
   late final HomeApi _api = widget.api ?? HomeApi();
-  late Future<HomeSummary> _summary = _api.summary();
-  String? _location;
+  // the outlet chosen in the header's switcher (null = all outlets, summed by the server)
+  String? _location = OutletScope.selected.value;
+  late Future<HomeSummary> _summary = _api.summary(location: _location);
+
+  @override
+  void initState() {
+    super.initState();
+    OutletScope.selected.addListener(_followScope);
+  }
+
+  @override
+  void dispose() {
+    OutletScope.selected.removeListener(_followScope);
+    super.dispose();
+  }
+
+  void _followScope() {
+    if (!mounted || OutletScope.selected.value == _location) return;
+    _location = OutletScope.selected.value;
+    _reload();
+  }
   String? _personName;
   String? _outletName;
   String? _kind; // the kind of business the summary reported (decides what the centre tab opens)
@@ -75,8 +95,7 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
       ),
     );
     if (picked == null || !mounted) return;
-    _location = picked.isEmpty ? null : picked;
-    _reload();
+    OutletScope.selected.value = picked.isEmpty ? null : picked;   // every header and outlet-aware screen follows
   }
 
   void _signOut() {
@@ -225,7 +244,7 @@ class _Body extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 132),
       children: [
         // Top bar: the outlet header (outlet name, live status, all-outlets chip, initials) — specs/outlets-multi.
-        OutletHeader(title: s.outletName, onMenu: onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), initials: initials(s.personName)),
+        OutletHeader(title: s.outletName, onMenu: onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), dashboard: true),
         Padding(
           padding: const EdgeInsets.fromLTRB(0, 4, 16, 0),
           child: Text('OneLocal', style: inter(24, 800, height: 1.1)),

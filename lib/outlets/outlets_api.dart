@@ -47,6 +47,42 @@ class OutletOverview {
   String get businessName => (_map(raw['business'])['name'] ?? '').toString();
   bool get needsFssai => _map(raw['business'])['needs_fssai'] == true;
   bool get canAdd => raw['can_add'] == true;
+
+  /// The open add-outlet draft of the business (id, name, step), or null.
+  Map<String, dynamic>? get draft => raw['draft'] is Map ? _map(raw['draft']) : null;
+
+  /// Verified outlets (the switcher's list).
+  List<Outlet> get verified => outlets.where((o) => o.verified).toList();
+}
+
+/// An add-outlet draft (`outlet_draft_*`, migration 0523): what was typed so far, the step reached and what is still missing.
+class OutletDraft {
+  const OutletDraft(this.raw);
+  final Map<String, dynamic> raw;
+  String _s(String k) => (raw[k] ?? '').toString();
+  String get id => _s('id');
+  String get status => _s('status');
+  String get step => raw['step'] == null ? 'state' : _s('step');
+  String get stateCode => _s('state_code');
+  String get stateName => _s('state_name');
+  bool get interState => raw['inter_state'] == true;
+  String s(String k) => _s(k);
+  double? d(String k) => (raw[k] as num?)?.toDouble();
+  Map<String, dynamic> get hours => _map(raw['hours']);
+  List<String> get missing => ((raw['missing'] as List?) ?? const []).map((e) => '$e').toList();
+  Outlet? get outlet => raw['outlet'] is Map ? Outlet(_map(raw['outlet'])) : null;
+}
+
+/// `outlet_draft_get`: the draft to continue (or null), the GST state list and the business's home state.
+class DraftStart {
+  const DraftStart(this.raw);
+  final Map<String, dynamic> raw;
+  OutletDraft? get draft => raw['draft'] is Map ? OutletDraft(_map(raw['draft'])) : null;
+  List<(String, String)> get states =>
+      ((raw['states'] as List?) ?? const []).whereType<Map>().map((m) => ('${m['code']}', '${m['name']}')).toList();
+  String? get homeStateCode => raw['home_state_code'] as String?;
+  String? get homeStateName => raw['home_state_name'] as String?;
+  bool get needsFssai => raw['needs_fssai'] == true;
 }
 
 class OutletsApi {
@@ -76,6 +112,23 @@ class OutletsApi {
         });
         return Outlet(_map(r['outlet']));
       });
+
+  /// The draft to continue ([id], else the newest open one) with the state list.
+  Future<DraftStart> draftGet({String? id}) => _wrap(() async => DraftStart(await _rpc.callMap('outlet_draft_get', {'id': ?id})));
+
+  /// Saves what was typed so far. A new draft needs [key] (the same key on a retry finds the same draft).
+  Future<OutletDraft> draftSave(Map<String, dynamic> fields, {String? id, String? key}) => _wrap(() async {
+        final r = await _rpc.callMap('outlet_draft_save', {...fields, 'id': ?id}, id == null ? key : null);
+        return OutletDraft(_map(r['draft']));
+      });
+
+  /// Sends a complete draft for verification: the outlet is created as pending.
+  Future<Outlet> draftSubmit(String id) => _wrap(() async {
+        final r = await _rpc.callMap('outlet_draft_submit', {'id': id});
+        return Outlet(_map(r['outlet']));
+      });
+
+  Future<void> draftDiscard(String id) => _wrap(() => _rpc.callMap('outlet_draft_discard', {'id': id}));
 
   /// A new outlet, saved as pending until One Local verifies it. [key] makes a retry of the same form safe.
   Future<Outlet> add(Map<String, dynamic> form, {required String key}) => _wrap(() async {

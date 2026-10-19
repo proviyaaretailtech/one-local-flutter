@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vinii_pos/home/control_centre_screen.dart';
 import 'package:vinii_pos/home/home_nav.dart';
+import 'package:vinii_pos/outlets/outlet_scope.dart';
 
 import 'home_test.dart' show FakeHome, summaryJson, showTall;
 import 'service_screens_test.dart' show FakeRpc, appointment, refuse;
@@ -34,7 +35,10 @@ Future<FakeRpc> showService(WidgetTester t, {Map<String, dynamic>? dash, Object?
 }
 
 void main() {
-  setUp(HomeNav.reset);
+  setUp(() {
+    HomeNav.reset();
+    OutletScope.reset(); // the header's outlet switcher is app-wide
+  });
 
   group('Service dashboard (home of a service business)', () {
     testWidgets('a service business gets its own dashboard, not the store one', (t) async {
