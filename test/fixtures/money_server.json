@@ -1,0 +1,991 @@
+{
+ "payouts": {
+  "bank": null,
+  "rows": [
+   {
+    "id": "b8be9d4a-0c38-427f-8ca4-96f5baf596c4",
+    "ref": "PO-B8BE9D4A",
+    "payee": "Org A 430",
+    "status": "paid",
+    "account": null,
+    "paid_at": "2026-10-17T05:54:24.290419+00:00",
+    "reference": "N278260104821",
+    "created_at": "2026-10-17T05:54:24.290419+00:00",
+    "payee_type": "merchant",
+    "amount_minor": 540000,
+    "settlement_id": "43c00000-0000-0000-0000-000000000001"
+   },
+   {
+    "id": "cfb94651-00a2-48e0-8ae9-9b315af265dd",
+    "ref": "PO-CFB94651",
+    "payee": "Org A 430",
+    "status": "pending",
+    "account": null,
+    "paid_at": null,
+    "reference": null,
+    "created_at": "2026-10-17T05:54:24.290419+00:00",
+    "payee_type": "merchant",
+    "amount_minor": 288433,
+    "settlement_id": null
+   }
+  ],
+  "total": 2,
+  "pending": {
+   "minor": 288433,
+   "rider_minor": 0,
+   "merchant_minor": 288433
+  },
+  "last_paid": {
+   "id": "b8be9d4a-0c38-427f-8ca4-96f5baf596c4",
+   "minor": 540000,
+   "paid_on": "2026-10-17"
+  },
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00"
+ },
+ "refunds": {
+  "page": 1,
+  "rows": [
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "06e77824-b9a9-4d2c-aad3-830d4b0ac6f1",
+    "ref": "ADJ-001",
+    "kind": "adjustment",
+    "method": null,
+    "reason": "Price correction",
+    "status": "approved",
+    "order_id": "43a00000-0000-0000-0000-000000000002",
+    "order_ref": "ORD-2",
+    "can_decide": false,
+    "amount_minor": -25000,
+    "requested_by": "43000000-0000-0000-0000-000000000001"
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "39f25854-922c-4e81-a687-0372ed5a4cb8",
+    "ref": "ADJ-002",
+    "kind": "adjustment",
+    "method": null,
+    "reason": "Duplicate fee reversal",
+    "status": "review",
+    "order_id": "43a00000-0000-0000-0000-000000000001",
+    "order_ref": "ORD-1",
+    "can_decide": false,
+    "amount_minor": 8000,
+    "requested_by": "43000000-0000-0000-0000-000000000001"
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "73d1e7aa-e4fe-44d3-ab3c-e15bc5554b63",
+    "ref": "REF-73D1E7AA",
+    "kind": "refund",
+    "method": "cash",
+    "reason": "Missing item",
+    "status": "refunded",
+    "order_id": "43a00000-0000-0000-0000-000000000002",
+    "order_ref": "ORD-2",
+    "can_decide": false,
+    "amount_minor": -10000,
+    "requested_by": null
+   }
+  ],
+  "total": 3,
+  "review": {
+   "count": 1,
+   "minor": 8000
+  },
+  "window": {
+   "to": "2026-10-17",
+   "from": "2026-10-01"
+  },
+  "refunded": {
+   "count": 1,
+   "minor": 10000
+  },
+  "page_size": 20,
+  "can_decide": true,
+  "can_record": true,
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00"
+ },
+ "reports": {
+  "window": {
+   "to": "2026-10-17",
+   "from": "2026-10-01"
+  },
+  "reports": [
+   {
+    "key": "payments_commission",
+    "ready": true,
+    "title": "Payments & commission",
+    "format": "csv",
+    "records": 3
+   },
+   {
+    "key": "settlements_payouts",
+    "ready": true,
+    "title": "Settlements & payouts",
+    "format": "csv",
+    "records": 1
+   },
+   {
+    "key": "wallet_ledger",
+    "ready": true,
+    "title": "Wallet & ledger",
+    "format": "csv",
+    "records": 0
+   }
+  ],
+  "currency": "INR",
+  "payments": {
+   "count": 3,
+   "minor": 259000
+  },
+  "commission": {
+   "minor": 0,
+   "rate_bps": null
+  },
+  "generated_at": "2026-10-17T05:54:24.290419+00:00",
+  "estimated_payout_minor": 0
+ },
+ "cashbook": {
+  "day": "2026-10-17",
+  "entries": [
+   {
+    "by": "Rohan Shah",
+    "id": "1444d194-9224-45a9-a48f-84828b76580e",
+    "no": "CASH-002",
+    "date": "2026-10-17",
+    "note": "",
+    "title": "Opening float",
+    "source": "manual",
+    "status": "posted",
+    "category": "Opening",
+    "direction": "in",
+    "expense_no": null,
+    "location_id": "43000000-0000-0000-0000-00000000010a",
+    "amount_minor": 100000
+   },
+   {
+    "by": "Rohan Shah",
+    "id": "215d29ce-4a01-4a5a-8258-7ae534ce9599",
+    "no": "CASH-001",
+    "date": "2026-10-17",
+    "note": "",
+    "title": "Carry bags for the shop",
+    "source": "expense",
+    "status": "posted",
+    "category": "Packaging",
+    "direction": "out",
+    "expense_no": "EXP-001",
+    "location_id": "43000000-0000-0000-0000-00000000010a",
+    "amount_minor": 30000
+   }
+  ],
+  "started": true,
+  "can_void": true,
+  "breakdown": {
+   "manual_in_minor": 100000,
+   "manual_out_minor": 30000,
+   "sales_cash_minor": 125000,
+   "cash_refunds_minor": 10000
+  },
+  "can_record": true,
+  "paid_minor": 40000,
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00",
+  "closing_minor": 185000,
+  "opening_minor": 0,
+  "received_minor": 225000
+ },
+ "expenses": {
+  "day": "2026-10-17",
+  "rows": [
+   {
+    "by": "Rohan Shah",
+    "id": "3fcfd6c7-5c86-4708-a0a2-61953b3422c6",
+    "no": "EXP-001",
+    "date": "2026-10-17",
+    "note": "",
+    "title": "Carry bags for the shop",
+    "method": "cash",
+    "status": "posted",
+    "category": "Packaging",
+    "location_id": "43000000-0000-0000-0000-00000000010a",
+    "void_reason": null,
+    "amount_minor": 30000
+   },
+   {
+    "by": "Rohan Shah",
+    "id": "52d12837-d67d-4e24-b668-a25173d0b464",
+    "no": "EXP-002",
+    "date": "2026-10-17",
+    "note": "",
+    "title": "Local delivery charges",
+    "method": "upi",
+    "status": "posted",
+    "category": "Transport",
+    "location_id": "43000000-0000-0000-0000-00000000010a",
+    "void_reason": null,
+    "amount_minor": 20000
+   },
+   {
+    "by": "Mina",
+    "id": "7a5fbfe9-f252-45e6-a495-6d034e9c6720",
+    "no": "EXP-003",
+    "date": "2026-10-17",
+    "note": "",
+    "title": "Soap",
+    "method": "upi",
+    "status": "posted",
+    "category": "Supplies",
+    "location_id": "43000000-0000-0000-0000-00000000010a",
+    "void_reason": null,
+    "amount_minor": 5000
+   }
+  ],
+  "count": 3,
+  "can_void": true,
+  "can_record": true,
+  "categories": [
+   "Packaging",
+   "Supplies",
+   "Transport"
+  ],
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00",
+  "total_minor": 55000
+ },
+ "invoices": {
+  "page": 1,
+  "rows": [
+   {
+    "id": "43a00000-0000-0000-0000-000000000001",
+    "day": "2026-10-17",
+    "ref": "INV-S-0001",
+    "kind": "sales",
+    "party": "Asha Patil",
+    "number": "1",
+    "status": "paid",
+    "due_date": null,
+    "paid_minor": 84000,
+    "party_label": "Customer",
+    "total_minor": 84000
+   },
+   {
+    "id": "43a00000-0000-0000-0000-000000000002",
+    "day": "2026-10-17",
+    "ref": "INV-S-0002",
+    "kind": "sales",
+    "party": "Rahul Shah",
+    "number": "2",
+    "status": "paid",
+    "due_date": null,
+    "paid_minor": 125000,
+    "party_label": "Customer",
+    "total_minor": 125000
+   },
+   {
+    "id": "43a00000-0000-0000-0000-000000000003",
+    "day": "2026-10-17",
+    "ref": "INV-S-0003",
+    "kind": "sales",
+    "party": "Kiosk guest",
+    "number": "3",
+    "status": "paid",
+    "due_date": null,
+    "paid_minor": 50000,
+    "party_label": "Customer",
+    "total_minor": 50000
+   },
+   {
+    "id": "43e00000-0000-0000-0000-000000000001",
+    "day": "2026-10-17",
+    "ref": "INV-P-0208",
+    "kind": "purchases",
+    "party": "Latur Dairy",
+    "number": "INV-P-0208",
+    "status": "overdue",
+    "due_date": "2026-10-14",
+    "paid_minor": 180000,
+    "party_label": "Supplier",
+    "total_minor": 480000
+   }
+  ],
+  "total": 4,
+  "window": {
+   "to": "2026-10-17",
+   "from": "2000-01-01"
+  },
+  "page_size": 20,
+  "can_record": true,
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00"
+ },
+ "overview": {
+  "cash": {
+   "minor": 185000,
+   "started": true
+  },
+  "window": {
+   "to": "2026-10-17",
+   "days": 17,
+   "from": "2026-10-01"
+  },
+  "payouts": {
+   "count": 1,
+   "rider_minor": 0,
+   "pending_minor": 288433,
+   "merchant_minor": 288433
+  },
+  "awaiting": {
+   "count": 1,
+   "minor": 42000
+  },
+  "payments": {
+   "count": 3,
+   "minor": 259000,
+   "trend": [
+    {
+     "date": "2026-10-01",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-02",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-03",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-04",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-05",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-06",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-07",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-08",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-09",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-10",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-11",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-12",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-13",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-14",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-15",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-16",
+     "minor": 0
+    },
+    {
+     "date": "2026-10-17",
+     "minor": 259000
+    }
+   ],
+   "change_pct": null,
+   "previous_minor": 0
+  },
+  "locations": [
+   "43000000-0000-0000-0000-00000000010a",
+   "43000000-0000-0000-0000-00000000020a"
+  ],
+  "commission": {
+   "minor": 0,
+   "rate_bps": null
+  },
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00",
+  "next_settlement": {
+   "last": {
+    "id": "43c00000-0000-0000-0000-000000000001",
+    "paid_on": "2026-10-17",
+    "net_minor": 540000,
+    "period_end": "2026-10-04",
+    "period_start": "2026-09-28"
+   },
+   "orders": 0,
+   "accrued_since": null,
+   "estimate_minor": 0
+  }
+ },
+ "payments": {
+  "page": 1,
+  "rows": [
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "050e5954-3deb-4d04-ba20-92a8f14923b7",
+    "ref": "PAY-050E5954",
+    "kind": "payment",
+    "method": "cash",
+    "status": "paid",
+    "order_id": "43a00000-0000-0000-0000-000000000002",
+    "order_ref": "ORD-2",
+    "location_id": "43000000-0000-0000-0000-00000000010a",
+    "amount_minor": 125000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "6de231b1-c524-4e01-ab9a-4f12d7f9b7aa",
+    "ref": "PAY-6DE231B1",
+    "kind": "payment",
+    "method": "cash",
+    "status": "paid",
+    "order_id": "43a00000-0000-0000-0000-000000000003",
+    "order_ref": "ORD-3",
+    "location_id": "43000000-0000-0000-0000-00000000020a",
+    "amount_minor": 50000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "70aab6a4-1a87-4149-b36c-c9e74e1a3eb7",
+    "ref": "PAY-70AAB6A4",
+    "kind": "attempt",
+    "method": "online",
+    "status": "pending",
+    "order_id": "43a00000-0000-0000-0000-000000000001",
+    "order_ref": "ORD-1",
+    "location_id": "43000000-0000-0000-0000-00000000010a",
+    "amount_minor": 42000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "dbddcaef-b8fc-4ff9-9bc3-197c2338971e",
+    "ref": "PAY-DBDDCAEF",
+    "kind": "payment",
+    "method": "upi",
+    "status": "paid",
+    "order_id": "43a00000-0000-0000-0000-000000000001",
+    "order_ref": "ORD-1",
+    "location_id": "43000000-0000-0000-0000-00000000010a",
+    "amount_minor": 84000
+   }
+  ],
+  "total": 4,
+  "window": {
+   "to": "2026-10-17",
+   "from": "2026-10-01"
+  },
+  "awaiting": {
+   "count": 1,
+   "minor": 42000
+  },
+  "received": {
+   "count": 3,
+   "minor": 259000
+  },
+  "page_size": 20,
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00"
+ },
+ "report_rows": {
+  "rows": [
+   [
+    "PAY-050E5954",
+    "ORD-2",
+    "cash",
+    "2026-10-17 11:24",
+    125000
+   ],
+   [
+    "PAY-6DE231B1",
+    "ORD-3",
+    "cash",
+    "2026-10-17 11:24",
+    50000
+   ],
+   [
+    "PAY-DBDDCAEF",
+    "ORD-1",
+    "upi",
+    "2026-10-17 11:24",
+    84000
+   ]
+  ],
+  "title": "Payments",
+  "report": "payments",
+  "window": {
+   "to": "2026-10-17",
+   "from": "2026-10-01"
+  },
+  "columns": [
+   {
+    "key": "ref",
+    "type": "text",
+    "label": "Payment"
+   },
+   {
+    "key": "order",
+    "type": "text",
+    "label": "Order"
+   },
+   {
+    "key": "method",
+    "type": "text",
+    "label": "Method"
+   },
+   {
+    "key": "at",
+    "type": "text",
+    "label": "Paid at"
+   },
+   {
+    "key": "amount",
+    "type": "money",
+    "label": "Amount (INR)"
+   }
+  ],
+  "currency": "INR",
+  "generated_at": "2026-10-17T05:54:24.290419+00:00"
+ },
+ "settlements": {
+  "last": {
+   "id": "43c00000-0000-0000-0000-000000000001",
+   "ref": "SET-20260928",
+   "paid_on": "2026-10-17",
+   "net_minor": 540000
+  },
+  "rows": [
+   {
+    "id": "43c00000-0000-0000-0000-000000000001",
+    "ref": "SET-20260928",
+    "orders": 0,
+    "status": "settled",
+    "paid_on": "2026-10-17",
+    "net_minor": 540000,
+    "period_end": "2026-10-04",
+    "gross_minor": 600000,
+    "period_start": "2026-09-28",
+    "commission_minor": 60000
+   }
+  ],
+  "total": 1,
+  "estimate": {
+   "minor": 0,
+   "since": null,
+   "orders": 0
+  },
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00"
+ },
+ "transactions": {
+  "page": 1,
+  "rows": [
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "050e5954-3deb-4d04-ba20-92a8f14923b7",
+    "day": "2026-10-17",
+    "ref": "PAY-050E5954",
+    "kind": "payment",
+    "party": null,
+    "title": "Payment received \u00b7 ORD-2",
+    "method": "cash",
+    "status": "paid",
+    "direction": "in",
+    "amount_minor": 125000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "1444d194-9224-45a9-a48f-84828b76580e",
+    "day": "2026-10-17",
+    "ref": "CASH-002",
+    "kind": "cash",
+    "party": null,
+    "title": "Opening float",
+    "method": "cash",
+    "status": "posted",
+    "direction": "in",
+    "amount_minor": 100000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "3fcfd6c7-5c86-4708-a0a2-61953b3422c6",
+    "day": "2026-10-17",
+    "ref": "EXP-001",
+    "kind": "expense",
+    "party": null,
+    "title": "Carry bags for the shop",
+    "method": "cash",
+    "status": "posted",
+    "direction": "out",
+    "amount_minor": 30000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "52d12837-d67d-4e24-b668-a25173d0b464",
+    "day": "2026-10-17",
+    "ref": "EXP-002",
+    "kind": "expense",
+    "party": null,
+    "title": "Local delivery charges",
+    "method": "upi",
+    "status": "posted",
+    "direction": "out",
+    "amount_minor": 20000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "6de231b1-c524-4e01-ab9a-4f12d7f9b7aa",
+    "day": "2026-10-17",
+    "ref": "PAY-6DE231B1",
+    "kind": "payment",
+    "party": null,
+    "title": "Payment received \u00b7 ORD-3",
+    "method": "cash",
+    "status": "paid",
+    "direction": "in",
+    "amount_minor": 50000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "73d1e7aa-e4fe-44d3-ab3c-e15bc5554b63",
+    "day": "2026-10-17",
+    "ref": "REF-73D1E7AA",
+    "kind": "refund",
+    "party": null,
+    "title": "Refund \u00b7 Missing item",
+    "method": "cash",
+    "status": "refunded",
+    "direction": "out",
+    "amount_minor": 10000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "7a5fbfe9-f252-45e6-a495-6d034e9c6720",
+    "day": "2026-10-17",
+    "ref": "EXP-003",
+    "kind": "expense",
+    "party": null,
+    "title": "Soap",
+    "method": "upi",
+    "status": "posted",
+    "direction": "out",
+    "amount_minor": 5000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "87cf1a8c-4b24-47e0-9a11-640d9aed7b40",
+    "day": "2026-10-17",
+    "ref": "PTY-002",
+    "kind": "party",
+    "party": "Krishna",
+    "title": "Amount received from Krishna",
+    "method": "unspecified",
+    "status": "recorded",
+    "direction": "in",
+    "amount_minor": 85000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "c016d390-5b52-496a-85ab-28ebabf7c81a",
+    "day": "2026-10-17",
+    "ref": "PTY-001",
+    "kind": "party",
+    "party": "Krishna",
+    "title": "Amount given to Krishna",
+    "method": "unspecified",
+    "status": "recorded",
+    "direction": "out",
+    "amount_minor": 200000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "dbddcaef-b8fc-4ff9-9bc3-197c2338971e",
+    "day": "2026-10-17",
+    "ref": "PAY-DBDDCAEF",
+    "kind": "payment",
+    "party": null,
+    "title": "Payment received \u00b7 ORD-1",
+    "method": "upi",
+    "status": "paid",
+    "direction": "in",
+    "amount_minor": 84000
+   }
+  ],
+  "party": null,
+  "total": 10,
+  "window": {
+   "to": "2026-10-17",
+   "from": "2000-01-01"
+  },
+  "parties": [
+   "Krishna"
+  ],
+  "page_size": 50,
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00"
+ },
+ "options_owner": {
+  "can": {
+   "read": true,
+   "record": true,
+   "wallet": true,
+   "approve": true,
+   "payouts": true,
+   "commission": true,
+   "settlements": true,
+   "payment_ledger": true
+  },
+  "methods": {
+   "party": [
+    "cash",
+    "upi",
+    "card",
+    "bank",
+    "other",
+    "unspecified"
+   ],
+   "expense": [
+    "cash",
+    "upi",
+    "card",
+    "bank",
+    "other"
+   ],
+   "payment": [
+    "cash",
+    "upi",
+    "card",
+    "wallet",
+    "online",
+    "due",
+    "other"
+   ]
+  },
+  "screens": [
+   "overview",
+   "payments",
+   "transactions",
+   "invoices",
+   "cashbook",
+   "expenses",
+   "settlements",
+   "payouts",
+   "refunds",
+   "reports"
+  ],
+  "locations": [
+   {
+    "id": "43000000-0000-0000-0000-00000000010a",
+    "code": "MAIN",
+    "name": "Latur Main Branch"
+   },
+   {
+    "id": "43000000-0000-0000-0000-00000000020a",
+    "code": "KIO",
+    "name": "Latur Kiosk"
+   }
+  ],
+  "categories": [
+   "Other",
+   "Packaging",
+   "Rent",
+   "Repairs",
+   "Supplies",
+   "Transport",
+   "Utilities"
+  ],
+  "server_time": "2026-10-17T05:54:24.290419+00:00",
+  "whole_business": true,
+  "adjustment_kinds": [
+   "price_correction",
+   "fee_reversal",
+   "discount",
+   "other"
+  ]
+ },
+ "settlement_detail": {
+  "id": "43c00000-0000-0000-0000-000000000001",
+  "ref": "SET-20260928",
+  "lines": [],
+  "orders": 0,
+  "payout": {
+   "method": "bank",
+   "status": "paid",
+   "paid_on": "2026-10-17",
+   "bank_name": null,
+   "reference": "N278260104821",
+   "amount_minor": 540000,
+   "account_last4": null
+  },
+  "status": "settled",
+  "breakdown": [
+   {
+    "key": "gross",
+    "kind": "info",
+    "label": "Gross order value",
+    "minor": 600000
+   },
+   {
+    "key": "food_due",
+    "kind": "plus",
+    "label": "Restaurant share",
+    "minor": 600000
+   },
+   {
+    "key": "commission",
+    "kind": "minus",
+    "label": "Commission",
+    "minor": 60000
+   },
+   {
+    "key": "commission_gst",
+    "kind": "minus",
+    "label": "GST on commission",
+    "minor": 0
+   },
+   {
+    "key": "net",
+    "kind": "total",
+    "label": "Net payable",
+    "minor": 540000
+   }
+  ],
+  "net_minor": 540000,
+  "period_end": "2026-10-04",
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00",
+  "period_start": "2026-09-28"
+ },
+ "transactions_party": {
+  "page": 1,
+  "rows": [
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "87cf1a8c-4b24-47e0-9a11-640d9aed7b40",
+    "day": "2026-10-17",
+    "ref": "PTY-002",
+    "kind": "party",
+    "party": "Krishna",
+    "title": "Amount received from Krishna",
+    "method": "unspecified",
+    "status": "recorded",
+    "direction": "in",
+    "amount_minor": 85000
+   },
+   {
+    "at": "2026-10-17T05:54:24.290419+00:00",
+    "id": "c016d390-5b52-496a-85ab-28ebabf7c81a",
+    "day": "2026-10-17",
+    "ref": "PTY-001",
+    "kind": "party",
+    "party": "Krishna",
+    "title": "Amount given to Krishna",
+    "method": "unspecified",
+    "status": "recorded",
+    "direction": "out",
+    "amount_minor": 200000
+   }
+  ],
+  "party": {
+   "name": "Krishna",
+   "count": 2,
+   "got_minor": 85000,
+   "gave_minor": 200000,
+   "balance_minor": 115000
+  },
+  "total": 2,
+  "window": {
+   "to": "2026-10-17",
+   "from": "2000-01-01"
+  },
+  "parties": [
+   "Krishna"
+  ],
+  "page_size": 20,
+  "snapshot_at": "2026-10-17T05:54:24.290419+00:00"
+ },
+ "options_manager": {
+  "can": {
+   "read": true,
+   "record": true,
+   "wallet": true,
+   "approve": false,
+   "payouts": false,
+   "commission": false,
+   "settlements": false,
+   "payment_ledger": false
+  },
+  "methods": {
+   "party": [
+    "cash",
+    "upi",
+    "card",
+    "bank",
+    "other",
+    "unspecified"
+   ],
+   "expense": [
+    "cash",
+    "upi",
+    "card",
+    "bank",
+    "other"
+   ],
+   "payment": [
+    "cash",
+    "upi",
+    "card",
+    "wallet",
+    "online",
+    "due",
+    "other"
+   ]
+  },
+  "screens": [
+   "overview",
+   "payments",
+   "transactions",
+   "invoices",
+   "cashbook",
+   "expenses",
+   "refunds"
+  ],
+  "locations": [
+   {
+    "id": "43000000-0000-0000-0000-00000000010a",
+    "code": "MAIN",
+    "name": "Latur Main Branch"
+   }
+  ],
+  "categories": [
+   "Other",
+   "Packaging",
+   "Rent",
+   "Repairs",
+   "Supplies",
+   "Transport",
+   "Utilities"
+  ],
+  "server_time": "2026-10-17T05:54:24.290419+00:00",
+  "whole_business": false,
+  "adjustment_kinds": [
+   "price_correction",
+   "fee_reversal",
+   "discount",
+   "other"
+  ]
+ }
+}

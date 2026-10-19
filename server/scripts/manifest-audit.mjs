@@ -7,11 +7,11 @@ import { execFileSync } from 'node:child_process';
 import { dbFunctions, MANIFEST } from '../src/rpc-manifest.ts';
 
 const psql = q => execFileSync('docker', ['exec', 'supabase_db_onelocal-dev', 'psql', '-U', 'postgres', '-d', 'postgres', '-At', '-F', '\t', '-c', q], { encoding: 'utf8' }).trim();
-const CALLER = /auth\.uid\(\)|current_org_id\(\)|has_permission\(|has_org_role\(|location_is_allowed\(|gw__uid\(\)|pos_order_view\(/;
+const CALLER = /auth\.uid\(\)|current_org_id\(\)|has_permission\(|has_org_role\(|location_is_allowed\(|gw__uid\(\)|pos_order_view\(|money_require(_org)?\(/;
 let bad = 0;
 const rows = [];
 for (const fn of dbFunctions()) {
-  const head = psql(`select p.oid::regprocedure::text||E'\\t'||p.prosecdef||E'\\t'||coalesce((select c from unnest(p.proconfig) c where c like 'search_path=%'),'')||E'\\t'||has_function_privilege('anon',p.oid,'execute')||E'\\t'||has_function_privilege('authenticated',p.oid,'execute')||E'\\t'||exists(select 1 from aclexplode(coalesce(p.proacl, acldefault('f',p.proowner))) a where a.grantee=0 and a.privilege_type='EXECUTE')||E'\\t'||(p.prosrc ~* 'create\\s+(local\\s+|global\\s+)?temp(orary)?\\s+table')||E'\\t'||(p.prosrc ~ '(auth\\.uid\\(\\)|current_org_id\\(\\)|has_permission\\(|has_org_role\\(|location_is_allowed\\(|gw__uid\\(\\)|pos_order_view\\()') from pg_proc p where p.pronamespace='public'::regnamespace and p.proname='${fn}'`);
+  const head = psql(`select p.oid::regprocedure::text||E'\\t'||p.prosecdef||E'\\t'||coalesce((select c from unnest(p.proconfig) c where c like 'search_path=%'),'')||E'\\t'||has_function_privilege('anon',p.oid,'execute')||E'\\t'||has_function_privilege('authenticated',p.oid,'execute')||E'\\t'||exists(select 1 from aclexplode(coalesce(p.proacl, acldefault('f',p.proowner))) a where a.grantee=0 and a.privilege_type='EXECUTE')||E'\\t'||(p.prosrc ~* 'create\\s+(local\\s+|global\\s+)?temp(orary)?\\s+table')||E'\\t'||(p.prosrc ~ '(auth\\.uid\\(\\)|current_org_id\\(\\)|has_permission\\(|has_org_role\\(|location_is_allowed\\(|gw__uid\\(\\)|pos_order_view\\(|money_require(_org)?\\()') from pg_proc p where p.pronamespace='public'::regnamespace and p.proname='${fn}'`);
   for (const line of head.split('\n')) {
     if (!line) { rows.push({ fn, problem: 'MISSING in database' }); bad++; continue; }
     const [sig, definer, sp, anon, authd, pub, temp, looks] = line.split('\t');

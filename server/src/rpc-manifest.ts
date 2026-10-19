@@ -27,6 +27,7 @@ import * as svc from './schemas/service.ts';
 import * as rst from './schemas/restaurant.ts';
 import * as sell from './schemas/sell.ts';
 import * as pur from './schemas/purchasing.ts';
+import * as mo from './schemas/money.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -199,6 +200,30 @@ export const MANIFEST: Entry[] = [
   db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
   db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),
   db('pur_audit_record', { args: pur.AuditRecord, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
+  // ---- money, section K (0430). Body = the function's `p` object; the database checks organisation, location and permission (money:read / record /
+  //      approve; settlements, payouts and reports need the organisation-level settlements:read / payouts:read). Writes carry the Idempotency-Key header.
+  db('money_options', { args: mo.Options, map: P, rate: 'read', roles: ANY }),
+  db('money_overview', { args: mo.Window, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_payments_list', { args: mo.Payments, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_transactions_list', { args: mo.Transactions, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_invoices_list', { args: mo.Invoices, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_cashbook', { args: mo.Day, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_expenses_list', { args: mo.Expenses, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_refunds_list', { args: mo.Refunds, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_settlements_list', { args: mo.Settlements, map: P, rate: 'read', roles: 'whole-business roles with settlements:read' }),
+  db('money_settlement_detail', { args: mo.IdOnly, map: P, rate: 'read', roles: 'whole-business roles with settlements:read' }),
+  db('money_payouts_list', { args: mo.Payouts, map: P, rate: 'read', roles: 'whole-business roles with payouts:read' }),
+  db('money_reports', { args: mo.Window, map: P, rate: 'read', roles: 'whole-business roles with settlements:read and payment_ledger:read' }),
+  db('money_report_rows', { args: mo.ReportRows, map: P, rate: 'read', roles: 'staff with the permission of that report' }),
+  db('money_expense_record', { args: mo.ExpenseRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('money_expense_void', { args: mo.Void, map: P, rate: 'money', idem: true, roles: 'staff with money:approve' }),
+  db('money_cash_record', { args: mo.CashRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('money_cash_void', { args: mo.Void, map: P, rate: 'money', idem: true, roles: 'staff with money:approve' }),
+  db('money_party_record', { args: mo.PartyRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('money_adjustment_request', { args: mo.AdjustmentRequest, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('money_adjustment_decide', { args: mo.AdjustmentDecide, map: P, rate: 'money', idem: true, roles: 'staff with money:approve (not the requester)' }),
+  db('money_invoice_pay', { args: mo.InvoicePay, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('money_invoice_set_due', { args: mo.InvoiceDue, map: P, rate: 'write', roles: 'staff with money:record' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 

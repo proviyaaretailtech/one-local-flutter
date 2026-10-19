@@ -15,6 +15,8 @@ import 'kitchen/kitchen_widgets.dart';
 import 'purchasing/po_history_screen.dart';
 import 'purchasing/purchasing_api.dart';
 import 'orders/cart_screen.dart';
+import 'money/money_env.dart';
+import 'money/money_home.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
 import 'sell/sell_env.dart';
@@ -27,7 +29,7 @@ import 'tables/floor_screen.dart';
 import 'tables/table_widgets.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
-/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G) and low stock (J) into the [HomeNav] hooks.
+/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J) and money (K) into the [HomeNav] hooks.
 void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
   HomeNav.orders = HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
@@ -48,6 +50,8 @@ void installRoutes() {
   HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
   HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
+  // Section K: money. The server says which screens this person may open; the bottom bar's other tabs go back through _tab.
+  HomeNav.money = (c) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
