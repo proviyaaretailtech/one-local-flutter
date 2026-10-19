@@ -33,8 +33,8 @@ export function userClient(request: Request): SupabaseClient {
 }
 
 // Database functions raise errors like "OL_STALE: this order was already changed on another phone": a family prefix (OL, POS, INV,
-// GRN, SVC, PS, TBL), a reason, then the sentence the app shows. The reason decides the HTTP status; an unknown reason is a plain 400.
-const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC', 'PS', 'TBL'];
+// GRN, SVC, PS, TBL, PUR), a reason, then the sentence the app shows. The reason decides the HTTP status; an unknown reason is a plain 400.
+const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC', 'PS', 'TBL', 'PUR'];
 const STATUS: Record<string, number> = {
   BAD_REQUEST: 400, BAD_QTY: 400, EMPTY: 400, BAD_TABLE: 400, FORBIDDEN: 403, NOT_FOUND: 404, NOT_ONE_LOCAL: 404,
   NOT_ACCEPTING: 409, ITEM_UNAVAILABLE: 409, STALE: 409, WRONG_STATE: 409, EXPIRED: 409, NOT_DELIVERABLE: 409, PICKED_UP: 409, TAKEN: 409,
@@ -44,13 +44,13 @@ const STATUS: Record<string, number> = {
   SHORT: 409, ALLOCATION: 409, CAPACITY: 422, STORAGE: 422, TENANT: 403,                                   // inventory (section H)
   CONFLICT: 409, SCOPE: 403,                                                                                     // purchase suggestions (section J), tables (H)
   MERGED: 409, NOT_OCCUPIED: 409, BUSY: 409, CLOSED: 422,                                                                   // tables and floor (section H)
-  COUPON_UNKNOWN: 422, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
+  COUPON_UNKNOWN: 422, COUPON_MIN: 422, COUPON_LIMIT: 422, COUPON_CUSTOMER: 422, COUPON_ZERO: 422, OVER_REFUND: 422, OVER_RETURN: 422, PROVIDER_OFF: 503, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
 };
 const CODE: Record<string, string> = {
   NOT_DELIVERABLE: 'order_not_deliverable', PICKED_UP: 'already_picked_up', EXPIRED: 'offer_expired', TAKEN: 'already_taken',
   STALE: 'version_conflict', GONE: 'offer_withdrawn', BAD_STEP: 'invalid_transition', BAD_QTY: 'bad_quantity', EMPTY: 'empty_cart',
   IDEMPOTENCY: 'idempotency_mismatch', IDEMPOTENCY_MISMATCH: 'idempotency_mismatch', STATUS_AUTHORITY: 'wrong_state', ORDER_FROZEN: 'wrong_state', FROZEN: 'wrong_state',
-  ITEM_UNAVAILABLE: 'item_unavailable', SCOPE: 'store_scope',
+  ITEM_UNAVAILABLE: 'item_unavailable', SCOPE: 'store_scope', COUPON_MIN: 'coupon_minimum', PROVIDER_OFF: 'provider_not_configured',
 };
 const sentence = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) + (/[.!?]$/.test(s) ? '' : '.') : 'Request refused.');
 

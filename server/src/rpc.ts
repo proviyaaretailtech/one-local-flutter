@@ -4,7 +4,7 @@
 //   3. the body is checked against the entry's schema;
 //   4. a `db` entry calls the database function AS THE CALLER, so row-level security and the function's own checks decide. The
 //      service-role key is never touched on this path. A `secure` entry runs its handler with the verified user id.
-// Errors are always { detail, code? }; database errors map from their OL_/POS_/INV_/GRN_/SVC_ prefix (see db.ts).
+// Errors are always { detail, code? }; database errors map from their OL_/POS_/INV_/GRN_/SVC_/PUR_ prefix (see db.ts).
 import { signedInUserId } from './auth.ts';
 import { mapDbError, userClient } from './db.ts';
 import { HttpError, json, limit, readBody, readText } from './http.ts';
