@@ -47,6 +47,7 @@ const STATUS: Record<string, number> = {
   COUPON_UNKNOWN: 422, COUPON_MIN: 422, COUPON_LIMIT: 422, COUPON_CUSTOMER: 422, COUPON_ZERO: 422, OVER_REFUND: 422, OVER_RETURN: 422, PROVIDER_OFF: 503, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
   CEILING: 403, SELF: 403, DUPLICATE_MOBILE: 409, DUPLICATE_EMAIL: 409, ALREADY_MEMBER: 409,  // team (section L)
   NOT_READY: 409, NOTHING_TO_PUBLISH: 409, BAD_STATE: 409,  // storefront (section M)
+  NO_AUDIENCE: 422,                                         // notices (section N)
 };
 const CODE: Record<string, string> = {
   NOT_DELIVERABLE: 'order_not_deliverable', PICKED_UP: 'already_picked_up', EXPIRED: 'offer_expired', TAKEN: 'already_taken',

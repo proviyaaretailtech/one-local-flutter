@@ -434,12 +434,41 @@ try {
     && !JSON.stringify((await rpc(B, 'team_activity', { range: '7d' })).j).includes('ZZ Pooja'));
   ok('team: A pay and bank data never leave the database', !uids.includes('998877665544') && !JSON.stringify(tk.j).includes('25000') && !JSON.stringify((await rpc(OA, 'team_options')).j).includes('998877665544'));
   ok('team: applicant with no business gets nothing', refused(await rpc(P1, 'team_dashboard')) && refused(await rpc(P1, 'team_user_view', { id: memberA })));
+  // ---- customer communication, section N (0460): notices, announcements, queued customer messages, feedback
+  const segA = randomUUID(), fbA = randomUUID(), annAll = randomUUID(), annB = randomUUID();
+  sql(`insert into pos_customers(organization_id,first_name,phone,tags,allow_sms) values ('${orgA}','ZZ Asha','+919000000001','{vip}',true),('${orgA}','ZZ Bhim','+919000000002','{vip}',false),('${orgB}','ZZ Bob','+919000000009','{vip}',true)`);
+  sql(`insert into pos_customer_segments(id,organization_id,name,rules) values ('${segA}','${orgA}','ZZ VIPs','{"tags":["vip"]}')`);
+  sql(`insert into pos_customer_feedback(id,organization_id,customer_name,rating,comment) values ('${fbA}','${orgA}','ZZ Asha',4,'ZZ nice'),(gen_random_uuid(),'${orgB}','ZZ Bob',1,'ZZ b only')`);
+  sql(`insert into platform_announcements(id,organization_id,category,title,body,important) values ('${annAll}',null,'maintenance','ZZ all ${run}','x',true),('${annB}','${orgB}','policy_update','ZZ B only ${run}','secret',false)`);
+  ok('notices: no token is 401', (await rpc(null, 'notice_list')).s === 401 && (await rpc(null, 'comm_queue', { channel: 'sms', message: 'x' })).s === 401);
+  ok('notices: bad shape is a 400 with a sentence', await (async () => { const r = await rpc(A, 'notice_list', { category: 'nope' }); return r.s === 400 && r.j.code === 'validation'; })());
+  const nA = await rpc(A, 'notice_list'); ok('notices: A reads its centre', nA.s === 200 && Array.isArray(nA.j.items) && nA.j.counts && typeof nA.j.unread === 'number', nA);
+  const aA = await rpc(A, 'announce_list'); ok('announcements: A sees the platform-wide one, not B\'s', aA.s === 200 && JSON.stringify(aA.j).includes(annAll) && !JSON.stringify(aA.j).includes(annB), aA);
+  ok('announcements: B sees its own and the platform-wide one', JSON.stringify((await rpc(B, 'announce_list')).j).includes(annB) && JSON.stringify((await rpc(B, 'announce_list')).j).includes(annAll));
+  ok('announcements: mark read is per person', (await rpc(A, 'announce_mark_read', { id: annAll })).j?.marked === 1 && (await rpc(A, 'announce_list')).j.important[0].is_read === true && (await rpc(B, 'announce_list')).j.important[0].is_read === false);
+  ok('announcements: B cannot mark an A-only or absent id; A cannot mark B\'s', (await rpc(A, 'announce_mark_read', { id: annB })).s === 404);
+  const aud = await rpc(A, 'comm_audience', { segment: segA, channel: 'sms' });
+  ok('messages: audience = consenting customers of the segment', aud.s === 200 && aud.j.in_segment === 2 && aud.j.reachable === 1 && aud.j.without_consent === 1, aud);
+  ok('messages: B cannot use A segment (404) and sees no A campaign', (await rpc(B, 'comm_audience', { segment: segA, channel: 'sms' })).s === 404 && (await rpc(B, 'comm_queue', { channel: 'sms', segment: segA, message: 'zz' }, `gw-n-${randomUUID()}`)).s === 404);
+  const qkey = `gw-n-${randomUUID()}`, q1 = await rpc(A, 'comm_queue', { channel: 'sms', segment: segA, message: 'ZZ hello' }, qkey);
+  ok('messages: A queues (status queued, audience 1, nothing sent)', q1.s === 200 && q1.j.status === 'queued' && q1.j.audience_count === 1 && /Nothing has been sent/.test(q1.j.status_note), q1);
+  ok('messages: same Idempotency-Key replays the same campaign', (await rpc(A, 'comm_queue', { channel: 'sms', segment: segA, message: 'ZZ hello' }, qkey)).j?.id === q1.j.id && sql(`select count(*) from pos_campaigns where organization_id='${orgA}'`) === '1');
+  ok('messages: audit row written', sql(`select count(*) from audit_logs where action='comm.queued' and entity_id='${q1.j.id}'`) === '1');
+  ok('messages: empty audience is 422 no_audience', await (async () => { const r = await rpc(A, 'comm_queue', { channel: 'whatsapp', message: 'x' }, `gw-n-${randomUUID()}`); return r.s === 422 && r.j.code === 'no_audience'; })());
+  ok('messages: viewer cannot queue or list (403)', (await rpc(V, 'comm_queue', { channel: 'sms', message: 'x' }, `gw-n-${randomUUID()}`)).s === 403 && (await rpc(V, 'comm_list')).s === 403);
+  ok('messages: B list has none of A, cannot cancel A message', !JSON.stringify((await rpc(B, 'comm_list')).j).includes(q1.j.id) && (await rpc(B, 'comm_cancel', { id: q1.j.id })).s === 404);
+  ok('messages: A cancels its queued message', (await rpc(A, 'comm_cancel', { id: q1.j.id })).j?.status === 'cancelled');
+  const fl = await rpc(A, 'comm_feedback_list'); ok('feedback: A sees its own only', fl.s === 200 && JSON.stringify(fl.j).includes(fbA) && !JSON.stringify(fl.j).includes('b only'), fl);
+  ok('feedback: B cannot see or answer A feedback', !JSON.stringify((await rpc(B, 'comm_feedback_list')).j).includes(fbA) && (await rpc(B, 'comm_feedback_respond', { id: fbA, status: 'resolved' })).s === 404);
+  ok('feedback: A answers', (await rpc(A, 'comm_feedback_respond', { id: fbA, status: 'resolved', response: 'Thanks' })).j?.status === 'resolved');
+  ok('notices: allowlisted only (no internal helper reachable)', (await rpc(A, 'notice_notify')).s === 404 && (await rpc(A, 'comm_audience_counts')).s === 404);
   ok('payment webhook hook answers 501 (not connected)', (await fetch(`${API}/webhooks/razorpay`, { method: 'POST' })).status === 501);
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.stack?.slice(0, 600));
 } finally {
   for (const t of ['sell_return_lines', 'sell_returns', 'sell_payment_attempts']) { try { sql(`alter table ${t} disable trigger user`); sql(`delete from ${t} where organization_id in ('${orgA}','${orgB}')`); sql(`alter table ${t} enable trigger user`); } catch { /* table absent */ } }
   try { sql(`delete from sell_coupons where organization_id in ('${orgA}','${orgB}')`); } catch { /* table absent */ }
+  try { sql(`delete from platform_announcements where title like 'ZZ %${run}'`); sql(`delete from pos_campaigns where organization_id in ('${orgA}','${orgB}')`); sql(`delete from pos_customer_feedback where organization_id in ('${orgA}','${orgB}')`); sql(`delete from pos_customers where organization_id in ('${orgA}','${orgB}')`); sql(`delete from pos_customer_segments where organization_id in ('${orgA}','${orgB}')`); } catch (e) { console.log('note: comm cleanup', e.message.slice(0, 120)); }
   try { sql(`delete from ol_partner_applications where business_name='ZZ GW Cafe ${run}'`); } catch (e) { console.log('note: application cleanup', e.message.slice(0, 120)); }
   for (const id of users) { try { sql(`delete from org_users where user_id='${id}'`); sql(`delete from auth.users where id='${id}'`); } catch { /* kept rows are test users */ } }
   try { sql(`update orders set notes='ZZ-TEST gw' where organization_id in ('${orgA}','${orgB}') and coalesce(notes,'') not like 'ZZ-TEST%'`); } catch {}

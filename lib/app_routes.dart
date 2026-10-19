@@ -17,6 +17,9 @@ import 'purchasing/purchasing_api.dart';
 import 'orders/cart_screen.dart';
 import 'money/money_env.dart';
 import 'money/money_home.dart';
+import 'notices/feedback_screen.dart';
+import 'notices/notices_api.dart';
+import 'notices/notices_home.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
 import 'sell/sell_env.dart';
@@ -31,7 +34,7 @@ import 'storefront/builder_screen.dart';
 import 'storefront/storefront_api.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
-/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K), the team (L) and the storefront (M) into the [HomeNav] hooks.
+/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K), the team (L), the storefront (M) and notices (N) into the [HomeNav] hooks.
 import 'team/team_screens.dart';
 import 'team/team_widgets.dart';
 void installRoutes() {
@@ -59,6 +62,9 @@ void installRoutes() {
   HomeNav.team = (c) => Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id))));
   // Section M: the storefront page builder (profile, hours, delivery, offers, ads and publishing hang off it).
   HomeNav.storefront = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'storefront'), builder: (_) => StorePageBuilder(api: StorefrontApi())));
+  // Section N: notification and announcement centres, customer messages and feedback.
+  HomeNav.notifications = (c) => Navigator.of(c).push(NoticesHome.route());
+  HomeNav.reviews = HomeNav.complaints = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FeedbackScreen(api: NoticesApi())));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 
