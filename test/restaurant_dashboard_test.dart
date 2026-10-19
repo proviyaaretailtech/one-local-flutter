@@ -154,5 +154,15 @@ void main() {
       expect(history, 1);
       expect(find.byKey(const ValueKey('restaurant-logout')), findsOneWidget);
     });
+    testWidgets('Bill on a restaurant opens the tables floor, not the store cart', (t) async {
+      var tables = 0, cart = 0;
+      HomeNav.tables = (_) => tables++;
+      HomeNav.bill = (_) => cart++;
+      await showRst(t);
+      await t.tap(find.byKey(const ValueKey('tab-Bill')));
+      await t.pumpAndSettle();
+      expect(tables, 1);
+      expect(cart, 0);
+    });
   });
 }

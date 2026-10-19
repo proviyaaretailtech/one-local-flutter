@@ -137,7 +137,13 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
       case 'Bill':
       case 'POS':
         final service = HomeNav.partnerType == 'service' || _kind == 'service';
-        HomeNav.go(context, service ? HomeNav.service : HomeNav.bill, service ? 'Appointments' : 'Billing');
+        // A restaurant bills from a table: Bill opens the floor (founder, 2026-10-20). Store bills from the cart.
+        final restaurant = _kind == 'restaurant';
+        HomeNav.go(
+          context,
+          service ? HomeNav.service : restaurant ? (HomeNav.tables ?? HomeNav.bill) : HomeNav.bill,
+          service ? 'Appointments' : restaurant ? 'Tables' : 'Billing',
+        );
       case 'Item':
       case 'Menu':
         HomeNav.go(context, HomeNav.items, label == 'Menu' ? 'The menu' : 'Items');
