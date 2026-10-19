@@ -43,7 +43,7 @@ const form = name => ({ name, address_line: '21 Barshi Road, near bus stand', lo
 
 try {
   if (sql(`select to_regprocedure('public.outlet_list(jsonb)') is not null`) !== 't') throw new Error('0520-0522 are not installed on this database');
-  sql(`insert into organizations(id,name,slug,type,business_domain,control_status) values ('${orgA}','Golden ZZ Outlets A ${run}','zz-outlets-a-${run}','franchise','Restaurant','Approved'),('${orgB}','Golden ZZ Outlets B ${run}','zz-outlets-b-${run}','franchise','Restaurant','Approved')`);
+  sql(`insert into organizations(id,name,slug,type,business_domain,control_status,gstin) values ('${orgA}','Golden ZZ Outlets A ${run}','zz-outlets-a-${run}','franchise','Restaurant','Approved','27ABCDE1234F1Z5'),('${orgB}','Golden ZZ Outlets B ${run}','zz-outlets-b-${run}','franchise','Restaurant','Approved',null)`);
   sql(`insert into locations(id,organization_id,name,code,status,area) values ('${branch}','${orgA}','ZZ A Ausa Road ${run}','BR2','active','Ausa Road')`);
   sql(`insert into ol_merchant_channels(organization_id,accepting) values ('${orgA}',true),('${orgB}',true)`);
   const owner = await staff(orgA, 'org_owner', 'owner-a'), mgr = await staff(orgA, 'location_manager', 'mgr-a', branch), other = await staff(orgB, 'org_owner', 'owner-b');
@@ -79,12 +79,42 @@ try {
   ok('same form with the same Idempotency-Key: same outlet, replayed', again.s === 200 && again.j.outlet.id === add.j.outlet.id && again.j.replayed === true, again);
   ok('a pending outlet cannot be switched on (409)', (await rpc(owner, 'outlet_set_channel', { location_id: add.j.outlet.id, accepting: true })).s === 409);
   ok('the branch manager cannot add outlets (403)', (await rpc(mgr, 'outlet_add', form('ZZ manager'), `e2e-${randomUUID()}`)).s === 403);
-  ok('missing FSSAI for a restaurant 400', (await rpc(owner, 'outlet_add', { ...form('ZZ no fssai'), fssai: null }, `e2e-${randomUUID()}`)).s === 400);
+  ok('missing FSSAI for a restaurant 422 (still missing)', (await rpc(owner, 'outlet_add', { ...form('ZZ no fssai'), fssai: null }, `e2e-${randomUUID()}`)).s === 422);
   ok('B cannot see A\'s new outlet', !(await rpc(other, 'outlet_list')).j.outlets.some(o => o.id === add.j.outlet.id));
   const dec = JSON.parse(sql(`select public.master_partner_application_decide('${add.j.application_id}','approve',null,'${staffUser.id}')`));
   ok('Master Admin approves through the partner decide path', dec.kind === 'outlet' && dec.status === 'approved', dec);
   const on2 = await rpc(owner, 'outlet_set_channel', { location_id: add.j.outlet.id, accepting: true });
   ok('after approval the owner switches it on', on2.s === 200 && on2.j.outlet.status === 'online', on2);
+
+  // drafts, the state rule and the inter-state outlet admin (0523)
+  const g0 = await rpc(owner, 'outlet_draft_get');
+  ok('draft start: no draft, home state Maharashtra, state list', g0.s === 200 && g0.j.draft === null && g0.j.home_state_name === 'Maharashtra' && g0.j.states.length === 36, g0.j);
+  const dk = `e2e-${randomUUID()}`;
+  const d1 = await rpc(owner, 'outlet_draft_save', { state_code: '29', step: 'details' }, dk);
+  ok('Karnataka is inter-state; the draft keeps its step', d1.s === 200 && d1.j.draft.inter_state === true && d1.j.draft.step === 'details', d1);
+  const did = d1.j.draft.id;
+  ok('saving the first step again with the same key finds the same draft', (await rpc(owner, 'outlet_draft_save', { state_code: '29', step: 'details' }, dk)).j.draft.id === did);
+  ok('B cannot open A\'s draft (404)', (await rpc(other, 'outlet_draft_get', { id: did })).s === 404 && (await rpc(other, 'outlet_draft_save', { id: did, name: 'x' })).s === 404);
+  ok('the branch manager cannot use drafts (403)', (await rpc(mgr, 'outlet_draft_get')).s === 403);
+  ok('a GSTIN of the wrong state is refused (400)', (await rpc(owner, 'outlet_draft_save', { id: did, gstin: '27ABCDE1234F1Z5' })).s === 400);
+  await rpc(owner, 'outlet_draft_save', { id: did, name: `ZZ A Indiranagar ${run}`, address_line: '5 100 Feet Road', locality: 'Indiranagar', pin_code: '560038', lat: 12.97, lng: 77.64,
+    hours: { opens: '09:00', closes: '23:00', days: ['mon'] }, fssai: '12345678901234', gstin: '29ABCDE1234F1Z5', step: 'contact' });
+  ok('incomplete: the contact is still missing (422)', (await rpc(owner, 'outlet_draft_submit', { id: did })).s === 422);
+  ok('owner comes back to the same step', (await rpc(owner, 'outlet_draft_get')).j.draft.step === 'contact');
+  const cmail = `zz-outlet-admin-${run}@example.test`;
+  await rpc(owner, 'outlet_draft_save', { id: did, contact_name: 'Ravi Kumar', contact_mobile: '9845012345', contact_email: cmail, step: 'review' });
+  const sub = await rpc(owner, 'outlet_draft_submit', { id: did });
+  ok('inter-state outlet submitted as pending with its own GSTIN', sub.s === 200 && sub.j.outlet.verification === 'pending'
+    && sql(`select gstin from locations where id='${sub.j.outlet.id}'`) === '29ABCDE1234F1Z5', sub);
+  const dec2 = JSON.parse(sql(`select public.master_partner_application_decide('${sub.j.application_id}','approve',null,'${staffUser.id}')`));
+  ok('approval invites the contact as outlet admin of that outlet', dec2.outlet_admin === 'invited'
+    && sql(`select r.slug||':'||i.location_id from org_invitations i join roles r on r.id=i.role_id where i.id='${dec2.invitation_id}'`) === `outlet_admin:${sub.j.outlet.id}`, dec2);
+
+  // the restaurant home for all outlets (0524)
+  const all = await rpc(owner, 'rst_dashboard_scope', { location_id: 'all' });
+  ok('all outlets: one summed dashboard over the 4 active outlets (main, branch, two approved)', all.s === 200 && all.j.scope === 'all' && all.j.outlet_count === 4 && /^All outlets \(4\)$/.test(all.j.location.name), all.j?.location);
+  ok('a bad scope value is refused by the gateway (400)', (await rpc(owner, 'rst_dashboard_scope', { location_id: 'everything' })).s === 400);
+  ok('B\'s all-outlets home has none of A', (await rpc(other, 'rst_dashboard_scope', { location_id: 'all' })).j.outlet_count === 1);
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.message);
 } finally {

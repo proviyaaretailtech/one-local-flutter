@@ -46,3 +46,24 @@ test('outlet database errors map to HTTP statuses with a sentence', () => {
   assert.equal(t('OUTLET_CONFLICT: you already have an outlet called X')[0], 409);
   assert.equal(t('OUTLET_BAD_REQUEST: place the map pin on the outlet')[0], 400);
 });
+
+test('drafts and the all-outlets home are in the manifest with friendly shapes', () => {
+  for (const a of ['outlet_draft_get', 'outlet_draft_save', 'outlet_draft_submit', 'outlet_draft_discard', 'rst_dashboard_scope']) assert.equal(lookup(a)?.kind, 'db', a);
+  assert.equal((lookup('outlet_draft_save') as any).idem, true);
+  for (const h of ['outlet_draft_json', 'outlet_draft_missing', 'outlet_draft_guard_caller', 'outlet_home_state', 'jsonb_num_sum', 'gst_states']) assert.ok(!dbFunctions().includes(h), h);
+  assert.ok(out.DraftSave.safeParse({ idempotency_key: 'key-12345678', state_code: '29', step: 'details' }).success, 'a draft may be partial');
+  assert.ok(out.DraftSave.safeParse({ id: ID, name: '', gstin: null }).success, 'empty clears a field');
+  assert.ok(!out.DraftSave.safeParse({ id: ID, state_code: 'KA' }).success);
+  assert.ok(!out.DraftSave.safeParse({ id: ID, step: 'payment' }).success);
+  assert.ok(!out.DraftRef.safeParse({}).success);
+  assert.ok(out.Add.safeParse({ ...form, state_code: '29', gstin: '29ABCDE1234F1Z5', contact_name: 'Ravi', contact_mobile: '9845012345', contact_email: 'r@x.in' }).success);
+  const rs = lookup('rst_dashboard_scope') as any;
+  assert.ok(rs.args.safeParse({ location_id: 'all' }).success && rs.args.safeParse({ location_id: ID }).success && !rs.args.safeParse({ location_id: 'some' }).success);
+});
+
+test('an incomplete draft is 422 with the missing fields in words', () => {
+  try { mapDbError({ message: 'OUTLET_INCOMPLETE: still missing: map pin, fssai' }); } catch (e) {
+    assert.ok(e instanceof HttpError); assert.equal(e.status, 422); assert.equal(e.message, 'Still missing: map pin, fssai.'); return;
+  }
+  assert.fail('no error');
+});

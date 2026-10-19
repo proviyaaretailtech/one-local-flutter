@@ -174,6 +174,13 @@ export const MANIFEST: Entry[] = [
   db('outlet_list', { args: out.List, map: P, rate: 'read', roles: STAFF }),
   db('outlet_set_channel', { args: out.SetChannel, map: P, rate: 'write', roles: 'channel_integrations:update at that outlet (owner, admin, managers)' }),
   db('outlet_add', { args: out.Add, map: P, rate: 'write', idem: true, roles: 'locations:manage (owner, admin, business manager) of an approved business' }),
+  // ---- Outlet drafts (0523): save and continue later; where the outlet is (same state reuses the business GSTIN, another state needs its own
+  //      GSTIN and a contact who becomes the outlet admin). Submit makes the pending outlet. The "all outlets" restaurant home (0524).
+  db('outlet_draft_get', { args: out.DraftGet, map: P, rate: 'read', roles: 'locations:manage of an approved business' }),
+  db('outlet_draft_save', { args: out.DraftSave, map: P, rate: 'write', idem: true, roles: 'locations:manage of an approved business' }),
+  db('outlet_draft_submit', { args: out.DraftRef, map: P, rate: 'write', roles: 'locations:manage of an approved business' }),
+  db('outlet_draft_discard', { args: out.DraftRef, map: P, rate: 'write', roles: 'locations:manage of an approved business' }),
+  db('rst_dashboard_scope', { args: rst.DashboardScope, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
 ];
 
 const byAlias = new Map<string, Entry>(MANIFEST.map(e => [e.alias, e]));
