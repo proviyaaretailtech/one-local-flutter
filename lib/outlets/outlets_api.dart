@@ -1,0 +1,85 @@
+import 'package:http/http.dart' as http;
+
+import '../api/rpc_client.dart';
+import '../auth/partner_api.dart';
+
+Map<String, dynamic> _map(Object? v) => (v as Map?)?.cast<String, dynamic>() ?? const {};
+
+/// One outlet as the server describes it (`outlet_list`, migration 0522). Every word on the card (status, delivery label, why a
+/// toggle is off) comes from the server; the app only draws it.
+class Outlet {
+  const Outlet(this.raw);
+  final Map<String, dynamic> raw;
+  String _s(String k) => (raw[k] ?? '').toString();
+  String get id => _s('id');
+  String get code => _s('code');
+  String get name => _s('name');
+  String get locality => _s('locality');
+  String get city => _s('city');
+
+  /// approved | pending | rejected | inactive
+  String get verification => _s('verification');
+
+  /// online | offline | paused | pending | rejected | inactive
+  String get status => _s('status');
+  String get statusLabel => _s('status_label');
+  String get deliveryLabel => _s('delivery_label');
+  String get reference => _s('reference');
+  String get reviewNote => _s('review_note');
+  String get toggleNote => _s('toggle_note');
+  bool get accepting => raw['accepting'] == true;
+  bool get rushMode => raw['rush_mode'] == true;
+  int get rushExtraMinutes => (raw['rush_extra_minutes'] as num?)?.toInt() ?? 15;
+  bool get canToggle => raw['can_toggle'] == true;
+  bool get verified => verification == 'approved';
+}
+
+/// The answer of `outlet_list`: the outlets the person may see, the one the app works in, the summary chip and what they may do.
+class OutletOverview {
+  const OutletOverview(this.raw);
+  final Map<String, dynamic> raw;
+  List<Outlet> get outlets => ((raw['outlets'] as List?) ?? const []).whereType<Map>().map((m) => Outlet(_map(m))).toList();
+  Outlet? get current => raw['current'] is Map ? Outlet(_map(raw['current'])) : null;
+  Map<String, dynamic> get summary => _map(raw['summary']);
+  String get chip => (summary['chip'] ?? '').toString();
+  int get pending => (summary['pending'] as num?)?.toInt() ?? 0;
+  String get personName => (_map(raw['person'])['name'] ?? '').toString();
+  String get businessName => (_map(raw['business'])['name'] ?? '').toString();
+  bool get needsFssai => _map(raw['business'])['needs_fssai'] == true;
+  bool get canAdd => raw['can_add'] == true;
+}
+
+class OutletsApi {
+  OutletsApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc})
+      : _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken);
+  final RpcClient _rpc;
+
+  Future<T> _wrap<T>(Future<T> Function() f) async {
+    try {
+      return await f();
+    } on RpcException catch (e) {
+      throw PartnerApiException(e.status, e.message);
+    }
+  }
+
+  /// Every outlet the person may see. [locationId] picks the outlet shown in the header (the server falls back to the default one).
+  Future<OutletOverview> list({String? q, String? locationId}) =>
+      _wrap(() async => OutletOverview(await _rpc.callMap('outlet_list', {'q': ?q, 'location_id': ?locationId})));
+
+  /// Delivery status (accepting One Local orders) and Rush mode of one verified outlet. Answers the outlet as it now is.
+  Future<Outlet> setChannel(String locationId, {bool? accepting, bool? rushMode, int? rushExtraMinutes}) => _wrap(() async {
+        final r = await _rpc.callMap('outlet_set_channel', {
+          'location_id': locationId,
+          'accepting': ?accepting,
+          'rush_mode': ?rushMode,
+          'rush_extra_minutes': ?rushExtraMinutes,
+        });
+        return Outlet(_map(r['outlet']));
+      });
+
+  /// A new outlet, saved as pending until One Local verifies it. [key] makes a retry of the same form safe.
+  Future<Outlet> add(Map<String, dynamic> form, {required String key}) => _wrap(() async {
+        final r = await _rpc.callMap('outlet_add', form, key);
+        return Outlet(_map(r['outlet']));
+      });
+}

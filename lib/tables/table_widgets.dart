@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../auth/partner_api.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
+import '../outlets/outlet_header.dart';
 import '../ui/theme.dart';
 import 'tables_api.dart';
 
@@ -100,7 +101,8 @@ class TablesPage extends StatelessWidget {
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          Container(
+          // the floor (first-level) shows the outlet header (specs/outlets-multi); inner screens keep back arrow and title
+          if (!back) OutletHeader(title: title, onMenu: env.onMenu, safeTop: false, initials: env.initials) else Container(
             color: subtitle == null ? kBg : Colors.white,
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [

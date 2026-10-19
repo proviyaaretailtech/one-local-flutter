@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../ui/theme.dart';
+import '../outlets/outlet_header.dart';
 import 'orders_api.dart';
 
 // Section E colours, sampled from the exported frames (assets/figma_ref_e). Shared tokens (kBg, kInk, kMuted, kLine) come from ui/theme.dart.
@@ -28,6 +29,8 @@ class OrdersTopBar extends StatelessWidget {
   final VoidCallback? onMenu, onBack;
   @override
   Widget build(BuildContext context) {
+    // first-level screens show the outlet header (specs/outlets-multi); inner screens keep the back arrow and title
+    if (onBack == null) return OutletHeader(title: title, onMenu: onMenu, rounded: true);
     return Container(
       padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 10, 16, 12),
       decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),

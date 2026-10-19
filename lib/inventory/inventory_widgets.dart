@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../ui/theme.dart';
+import '../outlets/outlet_header.dart';
 import 'inventory_api.dart';
 
 // Section H tokens, sampled from the exported frames (assets/figma_ref_h, 2x PNG). Shared tokens (kBg, kInk, kMuted, kLine, kPrimary) come from ui/theme.dart.
@@ -224,7 +225,8 @@ class InvPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        InvTopBar(onMenu: onMenu ?? () => Navigator.of(context).maybePop(), onItems: onItems, onBell: onBell),
+        // the outlet header (specs/outlets-multi) replaces InvTopBar on every section H screen
+        OutletHeader(title: 'Stock', onMenu: onMenu ?? () => Navigator.of(context).maybePop(), rounded: true),
         Expanded(child: list),
       ]),
       bottomNavigationBar: InvBottomNav(onTap: onTab),

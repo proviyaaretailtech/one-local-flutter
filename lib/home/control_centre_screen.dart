@@ -7,6 +7,7 @@ import '../ui/theme.dart';
 import 'home_api.dart';
 import 'home_nav.dart';
 import 'home_widgets.dart';
+import '../outlets/outlet_header.dart';
 import 'hub_screen.dart';
 import 'side_nav.dart';
 import '../service/history_screen.dart';
@@ -223,36 +224,8 @@ class _Body extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.only(bottom: 132),
       children: [
-        // Top bar: menu and the person's initials.
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(children: [
-            Semantics(
-              button: true,
-              label: 'Menu',
-              child: InkWell(
-                key: const ValueKey('home-menu'),
-                customBorder: const CircleBorder(),
-                onTap: onMenu,
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(color: kBg, shape: BoxShape.circle, border: Border.all(color: kLine)),
-                  child: const Icon(LucideIcons.menu, size: 18, color: kMuted),
-                ),
-              ),
-            ),
-            const Spacer(),
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: kLime, borderRadius: BorderRadius.circular(8)),
-              child: Text(initials(s.personName), style: inter(10, 700, color: kNavy)),
-            ),
-          ]),
-        ),
+        // Top bar: the outlet header (outlet name, live status, all-outlets chip, initials) — specs/outlets-multi.
+        OutletHeader(title: s.outletName, onMenu: onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), initials: initials(s.personName)),
         Padding(
           padding: const EdgeInsets.fromLTRB(0, 4, 16, 0),
           child: Text('OneLocal', style: inter(24, 800, height: 1.1)),

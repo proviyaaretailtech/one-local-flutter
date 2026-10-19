@@ -141,7 +141,8 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: 'VINII Store POS', onMenu: widget.onMenu, onBack: Navigator.of(context).canPop() ? () => Navigator.of(context).maybePop() : null),
+        // Item is a main tab: the outlet header (specs/outlets-multi); ☰ falls back to Home when the screen has no menu of its own
+        OrdersTopBar(title: 'VINII Store POS', onMenu: widget.onMenu),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,

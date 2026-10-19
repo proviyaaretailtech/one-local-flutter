@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart' show kDark, kLime;
 import '../ui/theme.dart';
+import '../outlets/outlet_header.dart';
 
 // Section J colours, read from the exported frames (assets/figma_ref_j). Shared tokens come from ui/theme.dart and section E.
 const kBoRed = Color(0xFFDC2626);
@@ -12,57 +13,15 @@ const kBoAmberBg = Color(0xFFFEF3C7);
 const kBoCardLine = Color(0xFFE5E7EB);
 const kBoTile = Color(0xFFF3F4F6);
 
-/// Top bar of the back-office screens: menu circle, dark "Items" pill, lime initials square. White, rounded at the bottom.
+/// Top bar of the back-office screens: the shared outlet header.
 class BackofficeTopBar extends StatelessWidget {
   const BackofficeTopBar({super.key, required this.initials, this.onMenu, this.onItems});
   final String initials;
   final VoidCallback? onMenu, onItems;
+  // the outlet header (specs/outlets-multi) is the top bar of the back-office screens;
+  // [initials] shows until the server answers; [onItems] is no longer drawn
   @override
-  Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.fromLTRB(14, MediaQuery.paddingOf(context).top + 10, 14, 10),
-        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),
-        child: Row(children: [
-          Semantics(
-            button: true,
-            label: 'Menu',
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onMenu,
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(color: const Color(0xFFF3F4F1), shape: BoxShape.circle, border: Border.all(color: kLine)),
-                child: const Icon(LucideIcons.menu, size: 15, color: kInk),
-              ),
-            ),
-          ),
-          const Spacer(),
-          Material(
-            color: kDark,
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: onItems,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(LucideIcons.camera, size: 15, color: kLime),
-                  const SizedBox(width: 10),
-                  Text('Items', style: inter(15, 600, color: kLime)),
-                ]),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: kLime, borderRadius: BorderRadius.circular(8)),
-            child: Text(initials, style: inter(13, 700, color: kDark)),
-          ),
-        ]),
-      );
+  Widget build(BuildContext context) => OutletHeader(title: 'Back office', onMenu: onMenu, rounded: true, initials: initials);
 }
 
 /// OneLocal wordmark, breadcrumb, page title and the snapshot line.
