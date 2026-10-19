@@ -252,6 +252,18 @@ try {
     && sql(`select status from pos_reservations where row_id='${tr1.j.reservation.id}'`) === 'confirmed');
   ok('tables: A viewer (no order rights) is refused; applicant with no business gets nothing', (await rpc(V, 'tbl_floor')).s === 403 && refused(await rpc(P1, 'tbl_floor')) && refused(await rpc(P1, 'tbl_view', { table_id: tA1 })));
   ok('tables: A splits its merge', (await rpc(A, 'tbl_split', { merge_id: mg.j.merge_id })).s === 200);
+  // ---- take an order at a table (0485): A's table, dishes and kitchen tickets against B's token
+  const dishA = sql(`insert into menu_items(organization_id,name,price) values ('${orgA}','ZZ Dosa ${run}',120) returning id`).split('\n')[0];
+  const tFree = tbl('ZT9');
+  const okey = `gw-tord-${randomUUID()}`, obody = { table_id: tFree, lines: [{ menu_item_id: dishA, qty: 2, notes: 'crisp' }] };
+  const oa1 = await rpc(A, 'tbl_order_add', obody, okey), oa2 = await rpc(A, 'tbl_order_add', obody, okey);
+  ok('table order: A sends dishes to the kitchen (KOT on the default queue); a retry with the same key is the same answer', oa1.s === 200 && oa1.j.kot?.kot_no && oa2.s === 200 && oa2.j.replayed === true && oa2.j.order_id === oa1.j.order_id, oa1);
+  ok('table order: the same key with other dishes is a 422', (await rpc(A, 'tbl_order_add', { ...obody, lines: [{ menu_item_id: dishA, qty: 5 }] }, okey)).s === 422);
+  ok('table order: no token is 401; helpers are not on the allowlist', (await rpc(null, 'tbl_order_add', obody, okey)).s === 401 && (await rpc(A, 'tbl_kot_fire')).s === 404);
+  ok('table order: B cannot add to, send or serve anything of A', (await rpc(B, 'tbl_order_add', obody, `gw-tord-${randomUUID()}`)).s === 404
+    && (await rpc(B, 'tbl_kot_send', { order_id: oa1.j.order_id }, `gw-tord-${randomUUID()}`)).s === 404
+    && (await rpc(B, 'tbl_mark_served', { item_ids: [sql(`select id from order_items where order_id='${oa1.j.order_id}' limit 1`)] })).s === 404);
+  ok('table order: B Ready to serve has none of A', await (async () => { const r = await rpc(B, 'tbl_ready_list'); return r.s === 200 && !JSON.stringify(r.j).includes(oa1.j.order_id); })());
   // ---- back office, section J (0420): low stock and purchase suggestions, A's against B's token and against a manager bound to one store
   sql(`update inventory_items set reorder_level = 20 where id = '${itemA}'`);
   const locA2 = sql(`insert into locations(organization_id,name,code) values ('${orgA}','ZZ GW Second ${run}','ZZ2-${run}') returning id`).split('\n')[0];

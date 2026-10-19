@@ -166,3 +166,21 @@ test('section P: the server checks the shape of the request, the database checks
   assert.equal(FileAsk.safeParse({ kind: 'store_qr', content_type: 'application/pdf', size: 10 }).success, true);
   assert.equal(FileAsk.safeParse({ kind: 'store_qr', content_type: 'image/png', size: 6 * 1024 * 1024 }).success, false);
 });
+
+test('take an order at a table (0485): four functions listed, adds and sends carry the Idempotency-Key, shapes are checked', async () => {
+  for (const a of ['tbl_order_add', 'tbl_kot_send']) { const e = lookup(a); assert.ok(e && e.kind === 'db' && e.idem && e.rate === 'write', a); }
+  assert.equal(lookup('tbl_ready_list')?.rate, 'read');
+  assert.equal(lookup('tbl_mark_served')?.rate, 'write');
+  for (const a of ['tbl_kot_fire', 'tbl_order_reprice', 'tbl_req_replay', 'tbl_station_label']) assert.equal(lookup(a), undefined, a);   // helpers are not reachable
+  assert.equal((await post('/rpc/tbl_order_add')).status, 401);
+  const parse = (alias: string, body: unknown) => (lookup(alias) as { args: { safeParse(v: unknown): { success: boolean } } }).args.safeParse(body);
+  const id = '40000000-0000-0000-0000-0000000000a1';
+  assert.equal(parse('tbl_order_add', { table_id: id, lines: [{ menu_item_id: id, qty: 2, notes: 'less butter' }] }).success, true);
+  assert.equal(parse('tbl_order_add', { table_id: id, lines: [] }).success, false);
+  assert.equal(parse('tbl_order_add', { table_id: id, lines: [{ menu_item_id: id, qty: 0 }] }).success, false);
+  assert.equal(parse('tbl_order_add', { table_id: id, send: 'yes', lines: [{ menu_item_id: id, qty: 1 }] }).success, false);
+  assert.equal(parse('tbl_kot_send', {}).success, false);
+  assert.equal(parse('tbl_kot_send', { table_id: id }).success, true);
+  assert.equal(parse('tbl_mark_served', { item_ids: [] }).success, false);
+  assert.equal(parse('tbl_mark_served', { item_ids: ['nope'] }).success, false);
+});

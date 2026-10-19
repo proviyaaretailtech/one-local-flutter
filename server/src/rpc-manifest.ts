@@ -165,6 +165,12 @@ export const MANIFEST: Entry[] = [
   db('tbl_transfer', { args: tbl.Transfer, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('tbl_merge', { args: tbl.Merge, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('tbl_split', { args: tbl.Split, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
+  // ---- take an order at a table (0485): add dishes (send or hold), send held dishes, Ready to serve, Mark as served. Writes carry the Idempotency-Key
+  //      header (the database refuses a reused key with another body); Mark as served is safe to repeat (dishes already served are counted, not refused).
+  db('tbl_order_add', { args: tbl.OrderAdd, map: P, rate: 'write', idem: true, roles: 'staff with order:place' }),
+  db('tbl_kot_send', { args: tbl.KotSend, map: P, rate: 'write', idem: true, roles: 'staff with order:place or order:update_status' }),
+  db('tbl_ready_list', { args: tbl.ReadyList, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_mark_served', { args: tbl.MarkServed, map: P, rate: 'write', roles: 'staff with order:update_status' }),
   // ---- back office, section J (0420): Low Stock and Purchase Suggestions, read from section H's stock numbers. Body = the function's `p`
   //      object; no location_id = the whole business, which the database allows only for a business-wide person.
   db('backoffice_low_stock', { args: bo.LowStock, map: P, rate: 'read', roles: 'staff with inventory:read' }),
