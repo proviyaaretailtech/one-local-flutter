@@ -26,6 +26,8 @@ import 'sell/sell_env.dart';
 import 'sell/sell_screen.dart';
 import 'service/calendar_screen.dart';
 import 'service/service_widgets.dart' show ServiceRoutes;
+import 'settings/settings_screen.dart';
+import 'settings/support_screens.dart';
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 import 'tables/floor_screen.dart';
@@ -34,7 +36,7 @@ import 'storefront/builder_screen.dart';
 import 'storefront/storefront_api.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
-/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K), the team (L), the storefront (M) and notices (N) into the [HomeNav] hooks.
+/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K), the team (L), the storefront (M), notices (N) and settings and support (P) into the [HomeNav] hooks.
 import 'team/team_screens.dart';
 import 'team/team_widgets.dart';
 void installRoutes() {
@@ -65,6 +67,9 @@ void installRoutes() {
   // Section N: notification and announcement centres, customer messages and feedback.
   HomeNav.notifications = (c) => Navigator.of(c).push(NoticesHome.route());
   HomeNav.reviews = HomeNav.complaints = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FeedbackScreen(api: NoticesApi())));
+  // Section P: the Settings page and Support & Help. The Team hook (users, roles, invites) belongs to section L.
+  HomeNav.settings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SettingsScreen()));
+  HomeNav.support = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SupportScreen()));
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 

@@ -145,3 +145,24 @@ test('purchasing (section H): nine functions listed, reads are "read", writes ca
   const keep = parse('pur_po_create', { supplier_id: 'abc', notes: 'n', lines: [{ ...line, extra: 1 }] });
   assert.ok(keep.success && keep.data.lines[0].extra === 1);
 });
+
+test('section P: every settings function is listed, bank saves stay on the secure handler, file handlers exist, static help is served', () => {
+  for (const a of ['pos_settings_get', 'pos_settings_save_hours', 'pos_settings_save_readiness', 'pos_settings_save_help', 'pos_settings_save_owner', 'pos_settings_save_staff_phone',
+    'pos_settings_set_pickup', 'pos_settings_set_qr_checkout', 'pos_settings_save_location', 'pos_settings_save_language', 'pos_settings_documents',
+    'pos_settings_document_remove', 'pos_settings_remove_qr', 'pos_support_list', 'pos_support_create']) assert.equal(lookup(a)?.kind, 'db', a);
+  for (const a of ['pos_settings_file_slot', 'pos_settings_file_attach', 'pos_settings_file_link', 'partner_setup_save_payment']) assert.equal(lookup(a)?.kind, 'secure', a);
+  assert.equal(lookup('pos_settings_save_bank'), undefined);
+  assert.equal(lookup('pos_settings__org'), undefined);
+  const help = (lookup('pos_help_content') as { run: () => { faq: unknown[]; categories: unknown[] } }).run();
+  assert.ok(help.faq.length >= 3 && help.categories.length === 4);
+});
+
+test('section P: the server checks the shape of the request, the database checks the rules', async () => {
+  const { Hours, SupportCreate, FileAsk } = await import('../../src/schemas/settings.ts');
+  assert.equal(Hours.safeParse({ opens_at: '09:00', closes_at: '21:30' }).success, true);
+  assert.equal(Hours.safeParse({ opens_at: '9am', closes_at: '21:30' }).success, false);
+  assert.equal(SupportCreate.safeParse({ message: 'no' }).success, false);
+  assert.equal(FileAsk.safeParse({ kind: 'document', content_type: 'text/plain', size: 10 }).success, false);
+  assert.equal(FileAsk.safeParse({ kind: 'store_qr', content_type: 'application/pdf', size: 10 }).success, true);
+  assert.equal(FileAsk.safeParse({ kind: 'store_qr', content_type: 'image/png', size: 6 * 1024 * 1024 }).success, false);
+});
