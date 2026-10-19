@@ -31,6 +31,8 @@ class HomeNav {
   static HomeRoute? kitchenDisplay;
   // Section H: tables and floor (the POS tab).
   static HomeRoute? tables;
+  // Table QR codes (0560): print, share, switch, replace the codes guests scan to order.
+  static HomeRoute? tableQr;
   static HomeRoute? bill;
   // Section I: the Service POS calendar, used instead of `bill` by service partners (partner_type 'service').
   static HomeRoute? service;
@@ -62,6 +64,7 @@ class HomeNav {
   static void reset() {
     home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = lowStock = null;
     stockItem = null;
+    tableQr = null;
     home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = null;
   }
 }

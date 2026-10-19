@@ -24,6 +24,7 @@ import 'service/service_widgets.dart' show ServiceRoutes;
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 import 'tables/floor_screen.dart';
+import 'tables/table_qr_screen.dart';
 import 'tables/table_widgets.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
@@ -45,6 +46,7 @@ void installRoutes() {
   HomeNav.kitchenSetup = (c) => Navigator.of(c).push(KitchenSetupScreen.route(kitchenEnv(c)));
   HomeNav.kitchenDisplay = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => KdsScreen(env: kitchenEnv(c))));
   HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id == 'menu' ? 'item' : id)))));
+  HomeNav.tableQr = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => TableQrScreen(env: TablesEnv())));
   HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
   HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));

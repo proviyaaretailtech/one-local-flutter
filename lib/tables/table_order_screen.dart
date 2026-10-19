@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
 import 'actions_screen.dart';
+import 'guest_orders.dart';
 import 'merge_screen.dart';
 import 'table_widgets.dart';
 
@@ -22,6 +24,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
   Facts? _d;
   String? _error;
   bool _busy = false;
+  final _guests = GlobalKey<GuestOrdersPanelState>();
 
   @override
   void initState() {
@@ -41,6 +44,12 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     } catch (e) {
       if (mounted) setState(() => _error = sayError(e));
     }
+    _guests.currentState?.reload();
+  }
+
+  Future<void> _handToGuest() async {
+    await Navigator.of(context).push(GuestHostScreen.route(widget.env, widget.tableId));
+    if (mounted) _load();
   }
 
   Future<void> _move(Set<String> from, String to, String done) async {
@@ -79,6 +88,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
         if (d == null && _error == null) tablesLoading(),
         if (_error != null) TablesError(_error!, onRetry: _load),
         if (d != null) ...[
+          GuestOrdersPanel(key: _guests, env: widget.env, tableId: widget.tableId, onChanged: _load),
           if (status == null) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text('No open order on this table.', style: inter(15, 400, color: kMuted)))),
           if (status != null)
             Container(
@@ -155,6 +165,9 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
             const SizedBox(width: 8),
             Expanded(child: LimeButton('Generate Bill', height: 56, busy: _busy, onPressed: can?.b('generate_bill') == true ? () => _move({'in_billing', 'sent_to_kitchen', 'ready', 'delivered'}, 'awaiting_payment', 'Bill generated.') : () => _off('generate_bill'))),
           ]),
+          const SizedBox(height: 8),
+          // "Hand to guest": the guest orders on this phone with the table's published menu (0561, guest_staff_place)
+          OutlineButtonT('Hand to guest', key: const ValueKey('hand-to-guest'), icon: LucideIcons.smartphone, dark: true, height: 56, onPressed: _busy ? null : _handToGuest),
         ],
       ],
     );
