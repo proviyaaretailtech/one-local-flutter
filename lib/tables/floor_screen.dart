@@ -4,7 +4,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
-import 'actions_screen.dart';
 import 'reserve_screen.dart';
 import 'table_order_screen.dart';
 import 'table_widgets.dart';

@@ -14,7 +14,6 @@ import 'kitchen/kitchen_setup_screen.dart';
 import 'kitchen/kitchen_widgets.dart';
 import 'purchasing/po_history_screen.dart';
 import 'purchasing/purchasing_api.dart';
-import 'orders/cart_screen.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_home.dart';
 import 'sell/sell_env.dart';
