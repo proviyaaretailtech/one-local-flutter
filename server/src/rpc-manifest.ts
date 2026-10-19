@@ -18,12 +18,15 @@ import { secureHandlers, withImageLinks, type SecureHandler } from './modules/se
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
+import * as kit from './schemas/kitchen.ts';
 import * as cat from './schemas/catalogue.ts';
 import * as grn from './schemas/grn.ts';
 import * as tbl from './schemas/tables.ts';
 import * as bo from './schemas/backoffice.ts';
 import * as svc from './schemas/service.ts';
 import * as rst from './schemas/restaurant.ts';
+import * as sell from './schemas/sell.ts';
+import * as pur from './schemas/purchasing.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -90,6 +93,19 @@ export const MANIFEST: Entry[] = [
   db('pos_set_order_status', { args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
   db('pos_fulfilment_act', { args: 'passthrough', map: P, rate: 'write', idem: true, roles: 'staff with order.update_status' }),
   db('pos_refund', { args: 'passthrough', map: P, rate: 'money', idem: true, roles: 'manager roles only' }),
+  // ---- the till on top of the counter bill, section F (0380-0383). Body = the function's `p` object; the database checks organisation,
+  //      store, role and every amount. Money calls carry the Idempotency-Key header; manager-only rules answer 403 for anyone else.
+  db('pos_sell_catalog', { args: sell.Catalog, map: P, rate: 'read', roles: STAFF }),
+  db('pos_receipt_list', { args: sell.Receipts, map: P, rate: 'read', roles: STAFF }),
+  db('pos_split_pay', { args: sell.SplitPay, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_payment_attempt_record', { args: sell.Attempt, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
+  db('pos_online_checkout', { args: sell.OnlineCheckout, map: P, rate: 'money', roles: 'staff allowed to take payment' }),
+  db('pos_return_list', { args: sell.ReturnList, map: P, rate: 'read', roles: STAFF }),
+  db('pos_return_create', { args: sell.ReturnCreate, map: P, rate: 'write', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_return_decide', { args: sell.ReturnDecide, map: P, rate: 'write', roles: 'manager roles only' }),
+  db('pos_return_issue_refund', { args: sell.ReturnRefund, map: P, rate: 'money', idem: true, roles: 'manager roles only' }),
+  db('pos_coupon_list', { args: sell.CouponList, map: P, rate: 'read', roles: STAFF }),
+  db('pos_coupon_save', { args: sell.CouponSave, map: P, rate: 'write', roles: 'manager roles only' }),
   db('pos_home_online', { args: 'passthrough', map: P, rate: 'read', roles: STAFF }),
   db('pos_home_channel', { args: 'passthrough', map: () => ({}), rate: 'read', roles: STAFF }),
   // ---- store inventory, section H (0400-0403). Body = the function's `p` object (location_id, ids, filters); the database validates it and
@@ -106,6 +122,13 @@ export const MANIFEST: Entry[] = [
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  // ---- kitchen stations and the kitchen display, section H (0480, 0481). Body = the function's `p` object; the database checks organisation,
+  //      location and role (kitchen:view / kitchen:configure; order.update_status to act on a ticket). Writes carry the Idempotency-Key header.
+  db('kitchen_config', { args: kit.Config, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
+  db('kitchen_station_view', { args: kit.StationView, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
+  db('kitchen_station_save', { args: kit.StationSave, map: P, rate: 'write', idem: true, roles: 'staff with kitchen:configure' }),
+  db('kds_queue', { args: kit.Queue, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
+  db('kds_ticket_act', { args: kit.TicketAct, map: P, rate: 'write', idem: true, roles: 'staff with order.update_status' }),
   // ---- store catalogue and goods-received (GRN) matching, section G (0390, 0391, 0409). Body = the function's `p` object; the database
   //      checks organisation, location and role (menu:create / menu:update, inventory:record / inventory:approve). The sell screen's search
   //      is cat_item_list with status 'active'. Helpers (cat_stock_map, cat_location, cat_item_json, grn_rows, grn_totals, grn_signature,
@@ -167,6 +190,15 @@ export const MANIFEST: Entry[] = [
   db('svc_provider_save', { args: svc.ProviderSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('svc_schedule_save', { args: svc.ScheduleSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('svc_plan_save', { args: svc.PlanSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
+  db('pur_options', { args: pur.Options, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
+  db('pur_po_list', { args: pur.PoList, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
+  db('pur_po_view', { args: pur.PoView, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
+  db('pur_price_view', { args: pur.PriceView, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
+  db('pur_po_create', { args: pur.PoCreate, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
+  db('pur_po_act', { args: pur.PoAct, map: P, rate: 'write', roles: 'purchasing:record (submit, cancel a draft or pending order); purchasing:approve_po (approve, reject, cancel an approved order)' }),
+  db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
+  db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),
+  db('pur_audit_record', { args: pur.AuditRecord, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 

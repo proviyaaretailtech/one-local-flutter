@@ -65,6 +65,7 @@ node scripts/gateway-e2e.mjs                  # 54 checks: the door, two busines
 python3 ../tool/onboarding_e2e.py             # 35 checks, section B  (through /rpc)
 python3 ../tool/setup_e2e.py                  # 36 checks, section C  (through /rpc)
 node scripts/orders-e2e.mjs                   # 44 checks, section E (two businesses, tenancy, idempotency, version conflicts)
+node scripts/sell-e2e.mjs                     # 74 checks, section F, through /rpc (search, coupons, split pay, receipts, returns, refunds, tenancy)
 node scripts/catalogue-e2e.mjs                # section G through /rpc (catalogue + GRN as real staff of two businesses; needs section H installed)
 BASE_URL=http://localhost:8090 node --env-file=.env scripts/home-checks.ts   # 36 checks, section D (reads run as the signed-in person)
 ```
