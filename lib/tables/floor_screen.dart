@@ -4,8 +4,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
-import 'actions_screen.dart';
 import 'reserve_screen.dart';
+import 'table_order_screen.dart';
 import 'table_widgets.dart';
 
 /// Figma "Tables" (screen-1-tables-grid) and its bottom sheet (screen-2-bottom-sheet): every table of the store with its state, filter chips,
@@ -58,7 +58,9 @@ class _FloorScreenState extends State<FloorScreen> {
       return;
     }
     if (t.s('status') == 'occupied') {
-      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ActionsScreen(env: env, tableId: t.s('id'))));
+      // A table with a running order opens that order straight away (founder, 2026-10-20): items, kitchen status,
+      // Add Items, Send KOT, Change/Merge Table, Generate Bill. A free table opens the sheet with Start New Order.
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TableOrderScreen(env: env, tableId: t.s('id'))));
     } else {
       await showTableSheet(context, env, t, storeNow: _storeNow());
     }

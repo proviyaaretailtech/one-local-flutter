@@ -25,7 +25,6 @@ import 'sell/sell_env.dart';
 import 'sell/sell_screen.dart';
 import 'service/calendar_screen.dart';
 import 'service/service_widgets.dart' show ServiceRoutes;
-import 'settings/settings_api.dart';
 import 'settings/settings_screen.dart';
 import 'settings/support_screens.dart';
 import 'setup/setup_api.dart';
@@ -56,6 +55,8 @@ void installRoutes() {
   KitchenEnv kitchenEnv(BuildContext c) => KitchenEnv(onNavigate: (id) => _kitchenTab(c, id));
   HomeNav.kitchenSetup = (c) => Navigator.of(c).push(KitchenSetupScreen.route(kitchenEnv(c)));
   HomeNav.kitchenDisplay = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => KdsScreen(env: kitchenEnv(c))));
+  // The restaurant dashboard's "Open kitchen display" and the More page's Kitchen display tile open the same KDS.
+  HomeNav.kitchen = HomeNav.kitchenDisplay;
   HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id == 'menu' ? 'item' : id)))));
   HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
@@ -73,7 +74,6 @@ void installRoutes() {
   // Section P: the Settings page and Support & Help. The Team hook (users, roles, invites) belongs to section L.
   HomeNav.settings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SettingsScreen()));
   HomeNav.support = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SupportScreen()));
-  HomeNav.shareFeedback = (c) => openFeedbackSheet(c, SettingsEnv());
   HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
 }
 

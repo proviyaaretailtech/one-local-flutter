@@ -352,10 +352,17 @@ void main() {
   });
 
   group('Actions, order detail, transfer', () {
-    testWidgets('an occupied table opens its actions: bill, waiter, Open Existing Order, Transfer Table', (t) async {
+    testWidgets('an occupied table opens its running order straight away (founder, 2026-10-20)', (t) async {
       final s = Fake();
       await show(t, FloorScreen(env: TablesEnv(api: s.api)));
       await tapKey(t, 'table-T2');
+      expect(find.text('Table T12 Order'), findsOneWidget);
+      expect(find.text('Table T12 Actions'), findsNothing);
+    });
+
+    testWidgets('the actions screen: bill, waiter, Open Existing Order, Transfer Table', (t) async {
+      final s = Fake();
+      await show(t, ActionsScreen(env: TablesEnv(api: s.api), tableId: 't2'));
       expect(find.text('Table T12 Actions'), findsOneWidget);
       expect(find.text('Dine-In • Occupied • Bill Amount ₹1,302 • Waiter: SS'), findsOneWidget);
       expect(find.text('Open Existing Order'), findsOneWidget);

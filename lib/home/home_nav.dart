@@ -44,8 +44,6 @@ class HomeNav {
   static void Function(BuildContext context, String screen)? moneyScreen;
   // Section M: the storefront's delivery settings (radius, delivery window, pickup).
   static HomeRoute? deliverySettings;
-  // Section P: the "share feedback" sheet (feedback to One Local, same record as a support request).
-  static HomeRoute? shareFeedback;
   static HomeRoute? notifications;
   static HomeRoute? complaints;
   static HomeRoute? reviews;
@@ -72,7 +70,7 @@ class HomeNav {
   static void reset() {
     stockItem = null;
     moneyScreen = null;
-    kitchenSetup = kitchenDisplay = deliverySettings = shareFeedback = null;
+    kitchenSetup = kitchenDisplay = deliverySettings = null;
     home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = null;
   }
 }

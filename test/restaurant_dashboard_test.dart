@@ -134,8 +134,9 @@ void main() {
       expect(find.byKey(const ValueKey('tab-Money')), findsNothing);
     });
     testWidgets('menu opens the restaurant More page (Figma 45:7539); unbuilt links say Soon', (t) async {
-      var history = 0;
+      var history = 0, kitchen = 0;
       HomeNav.orderHistory = (_) => history++;
+      HomeNav.kitchen = (_) => kitchen++;
       await showRst(t);
       await t.tap(find.byKey(const ValueKey('home-menu')));
       await t.pumpAndSettle();
@@ -144,10 +145,24 @@ void main() {
         expect(find.text(l), findsWidgets, reason: l);
       }
       expect(find.text('Soon'), findsWidgets);
+      expect(find.text('Share feedback'), findsNothing);
+      await t.tap(find.text('Kitchen display').last);
+      await t.pumpAndSettle();
+      expect(kitchen, 1);
       await t.tap(find.text('Order history'));
       await t.pumpAndSettle();
       expect(history, 1);
       expect(find.byKey(const ValueKey('restaurant-logout')), findsOneWidget);
+    });
+    testWidgets('Bill on a restaurant opens the tables floor, not the store cart', (t) async {
+      var tables = 0, cart = 0;
+      HomeNav.tables = (_) => tables++;
+      HomeNav.bill = (_) => cart++;
+      await showRst(t);
+      await t.tap(find.byKey(const ValueKey('tab-Bill')));
+      await t.pumpAndSettle();
+      expect(tables, 1);
+      expect(cart, 0);
     });
   });
 }

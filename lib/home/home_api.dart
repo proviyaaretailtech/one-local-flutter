@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/partner_api.dart';
+import '../api/app_env.dart';
 
 Map<String, dynamic> _map(Object? v) => (v as Map?)?.cast<String, dynamic>() ?? const {};
 List<Map<String, dynamic>> _list(Object? v) => ((v as List?) ?? const []).map((e) => (e as Map).cast<String, dynamic>()).toList();
@@ -143,7 +144,7 @@ class HomeApi {
   HomeApi({http.Client? client, String? baseUrl, String? Function()? accessToken})
       : _http = client ?? http.Client(),
         _token = accessToken ?? (() => Supabase.instance.client.auth.currentSession?.accessToken),
-        _base = (baseUrl ?? const String.fromEnvironment('PARTNER_API_BASE_URL')).replaceAll(RegExp(r'/+$'), '');
+        _base = (baseUrl ?? AppEnv.apiBaseUrl).replaceAll(RegExp(r'/+$'), '');
 
   final http.Client _http;
   final String? Function() _token;

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/partner_api.dart';
+import 'app_env.dart';
 
 /// The one door to the POS server: `POST {PARTNER_API_BASE_URL}/rpc/<name>` with the JSON arguments as the body and the Supabase
 /// session token as the bearer. The server runs the named database function as the signed-in person, so the database decides
@@ -13,7 +14,7 @@ class RpcClient {
   RpcClient({http.Client? client, String? baseUrl, String? Function()? accessToken})
       : _http = client ?? http.Client(),
         _token = accessToken ?? (() => Supabase.instance.client.auth.currentSession?.accessToken),
-        _base = (baseUrl ?? const String.fromEnvironment('PARTNER_API_BASE_URL')).replaceAll(RegExp(r'/+$'), '');
+        _base = (baseUrl ?? AppEnv.apiBaseUrl).replaceAll(RegExp(r'/+$'), '');
 
   final http.Client _http;
   final String? Function() _token;

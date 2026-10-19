@@ -21,12 +21,13 @@ void main() {
     installRoutes();
     for (final (name, hook) in [
       ('money', HomeNav.money), ('team', HomeNav.team), ('storefront', HomeNav.storefront), ('deliverySettings', HomeNav.deliverySettings),
-      ('shareFeedback', HomeNav.shareFeedback), ('settings', HomeNav.settings), ('support', HomeNav.support), ('notifications', HomeNav.notifications),
+      ('kitchen', HomeNav.kitchen), ('settings', HomeNav.settings), ('support', HomeNav.support), ('notifications', HomeNav.notifications),
       ('reviews', HomeNav.reviews), ('items', HomeNav.items), ('orderHistory', HomeNav.orderHistory), ('setup', HomeNav.setup),
     ]) {
       expect(hook, isNotNull, reason: name);
     }
     expect(HomeNav.moneyScreen, isNotNull);
+    expect(identical(HomeNav.kitchen, HomeNav.kitchenDisplay), isTrue, reason: 'dashboard button and More tile open the same KDS');
   });
 
   /// Plugs a recording hook into every slot; [opened] collects what was opened.
@@ -38,7 +39,7 @@ void main() {
     HomeNav.team = rec('team');
     HomeNav.storefront = rec('storefront');
     HomeNav.deliverySettings = rec('delivery');
-    HomeNav.shareFeedback = rec('shareFeedback');
+    HomeNav.kitchen = rec('kitchen');
     HomeNav.settings = rec('settings');
     HomeNav.setup = rec('setup');
     HomeNav.support = rec('support');
@@ -118,7 +119,7 @@ void main() {
         'Manage staff': 'team',
         'OneLocal manager': 'storefront',
         'Delivery settings': 'delivery',
-        'Share feedback': 'shareFeedback',
+        'Kitchen display': 'kitchen',
         'Payout': 'money:payouts',
         'Invoices': 'money:invoices',
         'Fees & charges': 'money:settlements',
