@@ -382,7 +382,7 @@ void main() {
       expect(find.text('₹48,920'), findsOneWidget);
       expect(find.text('127 orders received'), findsOneWidget);
       expect(find.text('Open'), findsOneWidget);
-      for (final l in ['Order history', 'Complaints', 'Reviews', 'Settings', 'Outlet info', 'Show all']) {
+      for (final l in ['Order history', 'Complaints', 'Reviews', 'Settings', 'Storefront', 'Show all']) {
         expect(find.text(l), findsOneWidget);
       }
       expect(find.text('₹3,42,800'), findsOneWidget);

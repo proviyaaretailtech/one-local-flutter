@@ -18,21 +18,32 @@ class HomeNav {
   static HomeRoute? orders;
   static HomeRoute? orderHistory;
 
-  // Section C: setup and settings.
+  // Section C: setup. Section P: the Settings page and Support & Help. Section L (Team) plugs in `team`: users, invitations, roles, tasks, activity.
   static HomeRoute? setup;
+  static HomeRoute? settings;
+  static HomeRoute? team;
 
   // Later phases (G catalogue, H inventory, F sell, J–Q back office).
   static HomeRoute? items;
   static HomeRoute? stock;
   // Section H: one item's stock detail (section J's low-stock "view item" uses it).
   static ItemRoute? stockItem;
+  // Section H kitchen: stations setup and the Kitchen Display System.
+  static HomeRoute? kitchenSetup;
+  static HomeRoute? kitchenDisplay;
   // Section H: tables and floor (the POS tab).
   static HomeRoute? tables;
   static HomeRoute? bill;
   // Section I: the Service POS calendar, used instead of `bill` by service partners (partner_type 'service').
   static HomeRoute? service;
   static String? partnerType;
+  // Section M: the storefront page builder and its settings.
+  static HomeRoute? storefront;
   static HomeRoute? money;
+  // Section K: one Money screen by its key ('payouts', 'invoices', 'settlements', ...), for links that name a screen.
+  static void Function(BuildContext context, String screen)? moneyScreen;
+  // Section M: the storefront's delivery settings (radius, delivery window, pickup).
+  static HomeRoute? deliverySettings;
   static HomeRoute? notifications;
   static HomeRoute? complaints;
   static HomeRoute? reviews;
@@ -57,8 +68,9 @@ class HomeNav {
 
   /// Clears every hook (tests).
   static void reset() {
-    home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = lowStock = null;
     stockItem = null;
-    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = null;
+    moneyScreen = null;
+    kitchenSetup = kitchenDisplay = deliverySettings = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = null;
   }
 }

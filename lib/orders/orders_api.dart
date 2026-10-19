@@ -161,16 +161,25 @@ class OrdersApi {
   Future<Quote> quote(List<CartLine> lines, {String? coupon}) async =>
       Quote(await _send('POST', '/quote', body: {'lines': lines.map((l) => l.toJson()).toList(), 'coupon_code': ?coupon}));
 
-  Future<OrderView> checkout({required List<CartLine> lines, required String method, num? tendered, String? reference, required String key}) async =>
+  // customerName / customerPhone / couponCode (section F): who the bill is for and the coupon; the server prices the coupon.
+  Future<OrderView> checkout({required List<CartLine> lines, required String method, num? tendered, String? reference, required String key, String? customerName, String? customerPhone, String? couponCode}) async =>
       OrderView(await _send('POST', '/checkout', key: key, body: {
         'lines': lines.map((l) => l.toJson()).toList(),
         'method': method,
         'tendered': ?tendered,
         if (reference != null && reference.isNotEmpty) 'reference': reference,
+        if (customerName != null && customerName.isNotEmpty) 'customer_name': customerName,
+        if (customerPhone != null && customerPhone.isNotEmpty) 'customer_phone': customerPhone,
+        if (couponCode != null && couponCode.isNotEmpty) 'coupon_code': couponCode,
       }));
 
-  Future<OrderView> hold({required List<CartLine> lines, required String key}) async =>
-      OrderView(await _send('POST', '/hold', key: key, body: {'lines': lines.map((l) => l.toJson()).toList()}));
+  Future<OrderView> hold({required List<CartLine> lines, required String key, String? customerName, String? customerPhone, String? couponCode}) async =>
+      OrderView(await _send('POST', '/hold', key: key, body: {
+        'lines': lines.map((l) => l.toJson()).toList(),
+        if (customerName != null && customerName.isNotEmpty) 'customer_name': customerName,
+        if (customerPhone != null && customerPhone.isNotEmpty) 'customer_phone': customerPhone,
+        if (couponCode != null && couponCode.isNotEmpty) 'coupon_code': couponCode,
+      }));
 
   Future<OrderView> get(String id) async => OrderView(await _send('GET', '/$id'));
 

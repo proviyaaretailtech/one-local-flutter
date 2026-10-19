@@ -21,23 +21,28 @@ class RestaurantMoreScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // (icon, label, hook). The hooks are the same ones the rest of the app plugs in app_routes.dart.
+    // A Money link opens that Money screen; no hook plugged = "Soon".
+    HomeRoute? moneyAt(String screen) => HomeNav.moneyScreen == null ? null : (c) => HomeNav.moneyScreen!(c, screen);
+    final settings = HomeNav.settings ?? HomeNav.setup;
     final links = <(IconData, String, HomeRoute?)>[
-      (LucideIcons.clock, 'Outlet timings', HomeNav.setup),
+      (LucideIcons.clock, 'Outlet timings', settings),
       (LucideIcons.info, 'Outlet info', HomeNav.setup),
-      (LucideIcons.phone, 'Phone numbers', HomeNav.setup),
-      (LucideIcons.users, 'Manage staff', null),
+      (LucideIcons.phone, 'Phone numbers', settings),
+      (LucideIcons.users, 'Manage staff', HomeNav.team),
       (LucideIcons.star, 'Feedback', HomeNav.reviews),
-      (LucideIcons.user, 'OneLocal manager', null),
-      (LucideIcons.house, 'Delivery settings', null),
+      (LucideIcons.user, 'OneLocal manager', HomeNav.storefront),
+      (LucideIcons.house, 'Delivery settings', HomeNav.deliverySettings),
       (LucideIcons.fileText, 'Order history', HomeNav.orderHistory ?? HomeNav.orders),
       (LucideIcons.chefHat, 'Kitchen display', HomeNav.kitchen), // KDS; replaces "Share feedback" (founder, 2026-10-20)
-      (LucideIcons.creditCard, 'Payout', HomeNav.money),
+      (LucideIcons.creditCard, 'Payout', moneyAt('payouts')),
       (LucideIcons.circleQuestionMark, 'Customer support', HomeNav.support),
       (LucideIcons.bell, 'Notifications', HomeNav.notifications),
-      (LucideIcons.file, 'Invoices', HomeNav.money),
-      (LucideIcons.chartPie, 'Taxes', HomeNav.money),
+      (LucideIcons.file, 'Invoices', moneyAt('invoices')),
+      // No tax screen exists yet (Money has no GST view): stays "Soon".
+      (LucideIcons.chartPie, 'Taxes', null),
       (LucideIcons.coffee, 'Menu', HomeNav.items),
-      (LucideIcons.list, 'Fees & charges', HomeNav.money),
+      // Fees and charges are the commission lines of each settlement.
+      (LucideIcons.list, 'Fees & charges', moneyAt('settlements')),
     ];
     final initial = outletName.trim().isEmpty ? 'O' : outletName.trim()[0].toUpperCase();
     return Scaffold(

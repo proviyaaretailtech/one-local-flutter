@@ -29,3 +29,19 @@ export const ReserveCancel = obj({ id, outcome: z.enum(['cancelled', 'no_show'],
 export const Transfer = obj({ from_table_id: id, to_table_id: id });
 export const Merge = obj({ table_ids: z.array(id, { message: 'Choose the tables to join.' }).min(2, 'Choose at least two tables.').max(8, 'You can join up to eight tables.') });
 export const Split = obj({ merge_id: id.optional(), table_id: id.optional() }).refine(v => !!(v.merge_id || v.table_id), { message: 'Choose the joined tables to split.' });
+
+// Take an order at a table (database: migration 0485). Dishes, quantities and notes; the database checks the dishes, the table's open order and the bill.
+const line = z.object({
+  menu_item_id: id,
+  qty: z.number({ message: 'Choose a quantity.' }).int('Choose a quantity.').min(1, 'Quantities are 1 to 99.').max(99, 'Quantities are 1 to 99.'),
+  notes: z.string().max(200, 'A note can be up to 200 characters.').nullish(),
+}).loose();
+export const OrderAdd = obj({
+  table_id: id,
+  lines: z.array(line, { message: 'Choose the dishes.' }).min(1, 'Choose at least one dish.').max(50, 'Up to 50 dishes at a time.'),
+  send: z.boolean({ message: 'send is true or false.' }).optional(),
+  guest_count: z.number().int().min(1).max(50).optional(),
+});
+export const KotSend = obj({ order_id: id.optional(), table_id: id.optional() }).refine(v => !!(v.order_id || v.table_id), { message: 'Choose the order or the table.' });
+export const ReadyList = obj({});
+export const MarkServed = obj({ item_ids: z.array(id, { message: 'Choose the dishes.' }).min(1, 'Choose at least one dish.').max(100, 'Up to 100 dishes at a time.') });

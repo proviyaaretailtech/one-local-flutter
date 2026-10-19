@@ -34,11 +34,16 @@ Future<void> showStoreSideNav(
     SideNavEntry(LucideIcons.package, 'GRN', hook(HomeNav.grn)),
     SideNavEntry(LucideIcons.clipboardList, 'Stock management', hook(HomeNav.stock)),
     SideNavEntry(LucideIcons.qrCode, 'All Orders', hook(HomeNav.orderHistory ?? HomeNav.orders)),
+    // No wallet or customer screen on this line yet (built in their own sections): they stay "Soon".
     const SideNavEntry(LucideIcons.wallet, 'One Local Wallet', null),
     SideNavEntry(LucideIcons.indianRupee, 'Money', hook(HomeNav.money)),
     const SideNavEntry(LucideIcons.circleUser, 'Customer', null),
+    // Founder flow (19 Oct 2026): Team, the OneLocal page, Reports, Settings and Help live in this menu.
+    SideNavEntry(LucideIcons.users, 'Team', hook(HomeNav.team)),
+    SideNavEntry(LucideIcons.globe, 'OneLocal page', hook(HomeNav.storefront)),
     SideNavEntry(LucideIcons.fileText, 'Reports', onReports),
-    SideNavEntry(LucideIcons.settings, 'Settings', hook(HomeNav.setup)),
+    SideNavEntry(LucideIcons.settings, 'Settings', hook(HomeNav.settings ?? HomeNav.setup)),
+    SideNavEntry(LucideIcons.circleQuestionMark, 'Help & support', hook(HomeNav.support)),
   ];
   return showGeneralDialog<void>(
     context: context,

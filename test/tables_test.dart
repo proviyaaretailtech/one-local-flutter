@@ -232,7 +232,7 @@ void main() {
       expect(find.text('Table T4'), findsNothing);
     });
 
-    testWidgets('Start New Order hands the table to the host; without a host it says so', (t) async {
+    testWidgets('Start New Order hands the table to the host; without a host it opens Add dishes (0485)', (t) async {
       final s = Fake();
       Facts? got;
       await show(t, FloorScreen(env: TablesEnv(api: s.api, onStartOrder: (c, table) => got = table)));
@@ -242,7 +242,8 @@ void main() {
       await show(t, FloorScreen(env: TablesEnv(api: s.api)));
       await tapKey(t, 'table-T4');
       await tapText(t, 'Start New Order');
-      expect(find.text('Starting an order from a table opens in a later release.'), findsOneWidget);
+      expect(find.text('Table T4'), findsOneWidget);
+      expect(find.text('Dine-in'), findsOneWidget);   // the Add dishes page of that table
     });
 
     testWidgets('View History lists orders and reservations of the table', (t) async {

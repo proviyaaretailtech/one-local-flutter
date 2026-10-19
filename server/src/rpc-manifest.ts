@@ -14,16 +14,25 @@
 // is copied into args.idempotency_key when the body has none).
 // scripts/manifest-audit.mjs reads this file and fails on any function that is unsafe for the `authenticated` role.
 import type { z } from 'zod';
-import { secureHandlers, withImageLinks, type SecureHandler } from './modules/secure/index.ts';
+import { dropRemovedFile, secureHandlers, withImageLinks, withStorefrontLinks, type SecureHandler } from './modules/secure/index.ts';
 import * as ob from './schemas/onboarding.ts';
 import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
+import * as kit from './schemas/kitchen.ts';
 import * as cat from './schemas/catalogue.ts';
 import * as grn from './schemas/grn.ts';
 import * as tbl from './schemas/tables.ts';
 import * as bo from './schemas/backoffice.ts';
 import * as svc from './schemas/service.ts';
 import * as rst from './schemas/restaurant.ts';
+import * as sell from './schemas/sell.ts';
+import * as pur from './schemas/purchasing.ts';
+import * as mo from './schemas/money.ts';
+import * as team from './schemas/team.ts';
+import * as sf from './schemas/storefront.ts';
+import * as nt from './schemas/notices.ts';
+import * as st from './schemas/settings.ts';
+import { helpContent } from './modules/help.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -43,6 +52,8 @@ const db = (alias: string, e: Omit<DbEntry, 'kind' | 'alias' | 'fn'> & { fn?: st
 const sec = (alias: string, e: Omit<SecureEntry, 'kind' | 'alias' | 'handler'>): SecureEntry => ({ kind: 'secure', alias, handler: (secureHandlers as Record<string, SecureHandler>)[alias], ...e });
 const P = (a: unknown) => ({ p: a });
 const links = (r: unknown) => withImageLinks(r);
+const links2 = (r: unknown) => withStorefrontLinks(r);
+const STOREFRONT = 'owner, admin, manager, business manager, location manager, operations or marketing manager (the function checks)';
 
 const empty = { rate: 'read' as Rate, args: 'passthrough' as const };
 
@@ -90,6 +101,19 @@ export const MANIFEST: Entry[] = [
   db('pos_set_order_status', { args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
   db('pos_fulfilment_act', { args: 'passthrough', map: P, rate: 'write', idem: true, roles: 'staff with order.update_status' }),
   db('pos_refund', { args: 'passthrough', map: P, rate: 'money', idem: true, roles: 'manager roles only' }),
+  // ---- the till on top of the counter bill, section F (0380-0383). Body = the function's `p` object; the database checks organisation,
+  //      store, role and every amount. Money calls carry the Idempotency-Key header; manager-only rules answer 403 for anyone else.
+  db('pos_sell_catalog', { args: sell.Catalog, map: P, rate: 'read', roles: STAFF }),
+  db('pos_receipt_list', { args: sell.Receipts, map: P, rate: 'read', roles: STAFF }),
+  db('pos_split_pay', { args: sell.SplitPay, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_payment_attempt_record', { args: sell.Attempt, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
+  db('pos_online_checkout', { args: sell.OnlineCheckout, map: P, rate: 'money', roles: 'staff allowed to take payment' }),
+  db('pos_return_list', { args: sell.ReturnList, map: P, rate: 'read', roles: STAFF }),
+  db('pos_return_create', { args: sell.ReturnCreate, map: P, rate: 'write', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_return_decide', { args: sell.ReturnDecide, map: P, rate: 'write', roles: 'manager roles only' }),
+  db('pos_return_issue_refund', { args: sell.ReturnRefund, map: P, rate: 'money', idem: true, roles: 'manager roles only' }),
+  db('pos_coupon_list', { args: sell.CouponList, map: P, rate: 'read', roles: STAFF }),
+  db('pos_coupon_save', { args: sell.CouponSave, map: P, rate: 'write', roles: 'manager roles only' }),
   db('pos_home_online', { args: 'passthrough', map: P, rate: 'read', roles: STAFF }),
   db('pos_home_channel', { args: 'passthrough', map: () => ({}), rate: 'read', roles: STAFF }),
   // ---- store inventory, section H (0400-0403). Body = the function's `p` object (location_id, ids, filters); the database validates it and
@@ -106,6 +130,13 @@ export const MANIFEST: Entry[] = [
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  // ---- kitchen stations and the kitchen display, section H (0480, 0481). Body = the function's `p` object; the database checks organisation,
+  //      location and role (kitchen:view / kitchen:configure; order.update_status to act on a ticket). Writes carry the Idempotency-Key header.
+  db('kitchen_config', { args: kit.Config, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
+  db('kitchen_station_view', { args: kit.StationView, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
+  db('kitchen_station_save', { args: kit.StationSave, map: P, rate: 'write', idem: true, roles: 'staff with kitchen:configure' }),
+  db('kds_queue', { args: kit.Queue, map: P, rate: 'read', roles: 'staff with kitchen:view' }),
+  db('kds_ticket_act', { args: kit.TicketAct, map: P, rate: 'write', idem: true, roles: 'staff with order.update_status' }),
   // ---- store catalogue and goods-received (GRN) matching, section G (0390, 0391, 0409). Body = the function's `p` object; the database
   //      checks organisation, location and role (menu:create / menu:update, inventory:record / inventory:approve). The sell screen's search
   //      is cat_item_list with status 'active'. Helpers (cat_stock_map, cat_location, cat_item_json, grn_rows, grn_totals, grn_signature,
@@ -134,6 +165,12 @@ export const MANIFEST: Entry[] = [
   db('tbl_transfer', { args: tbl.Transfer, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('tbl_merge', { args: tbl.Merge, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('tbl_split', { args: tbl.Split, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
+  // ---- take an order at a table (0485): add dishes (send or hold), send held dishes, Ready to serve, Mark as served. Writes carry the Idempotency-Key
+  //      header (the database refuses a reused key with another body); Mark as served is safe to repeat (dishes already served are counted, not refused).
+  db('tbl_order_add', { args: tbl.OrderAdd, map: P, rate: 'write', idem: true, roles: 'staff with order:place' }),
+  db('tbl_kot_send', { args: tbl.KotSend, map: P, rate: 'write', idem: true, roles: 'staff with order:place or order:update_status' }),
+  db('tbl_ready_list', { args: tbl.ReadyList, map: P, rate: 'read', roles: 'floor staff' }),
+  db('tbl_mark_served', { args: tbl.MarkServed, map: P, rate: 'write', roles: 'staff with order:update_status' }),
   // ---- back office, section J (0420): Low Stock and Purchase Suggestions, read from section H's stock numbers. Body = the function's `p`
   //      object; no location_id = the whole business, which the database allows only for a business-wide person.
   db('backoffice_low_stock', { args: bo.LowStock, map: P, rate: 'read', roles: 'staff with inventory:read' }),
@@ -167,6 +204,113 @@ export const MANIFEST: Entry[] = [
   db('svc_provider_save', { args: svc.ProviderSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('svc_schedule_save', { args: svc.ScheduleSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('svc_plan_save', { args: svc.PlanSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
+  db('pur_options', { args: pur.Options, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
+  db('pur_po_list', { args: pur.PoList, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
+  db('pur_po_view', { args: pur.PoView, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
+  db('pur_price_view', { args: pur.PriceView, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
+  db('pur_po_create', { args: pur.PoCreate, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
+  db('pur_po_act', { args: pur.PoAct, map: P, rate: 'write', roles: 'purchasing:record (submit, cancel a draft or pending order); purchasing:approve_po (approve, reject, cancel an approved order)' }),
+  db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
+  db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),
+  db('pur_audit_record', { args: pur.AuditRecord, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
+  // ---- money, section K (0435). Body = the function's `p` object; the database checks organisation, location and permission (money:read / record /
+  //      approve; settlements, payouts and reports need the organisation-level settlements:read / payouts:read). Writes carry the Idempotency-Key header.
+  db('money_options', { args: mo.Options, map: P, rate: 'read', roles: ANY }),
+  db('money_overview', { args: mo.Window, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_payments_list', { args: mo.Payments, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_transactions_list', { args: mo.Transactions, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_invoices_list', { args: mo.Invoices, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_cashbook', { args: mo.Day, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_expenses_list', { args: mo.Expenses, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_refunds_list', { args: mo.Refunds, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('money_settlements_list', { args: mo.Settlements, map: P, rate: 'read', roles: 'whole-business roles with settlements:read' }),
+  db('money_settlement_detail', { args: mo.IdOnly, map: P, rate: 'read', roles: 'whole-business roles with settlements:read' }),
+  db('money_payouts_list', { args: mo.Payouts, map: P, rate: 'read', roles: 'whole-business roles with payouts:read' }),
+  db('money_reports', { args: mo.Window, map: P, rate: 'read', roles: 'whole-business roles with settlements:read and payment_ledger:read' }),
+  db('money_report_rows', { args: mo.ReportRows, map: P, rate: 'read', roles: 'staff with the permission of that report' }),
+  db('money_expense_record', { args: mo.ExpenseRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('money_expense_void', { args: mo.Void, map: P, rate: 'money', idem: true, roles: 'staff with money:approve' }),
+  db('money_cash_record', { args: mo.CashRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('money_cash_void', { args: mo.Void, map: P, rate: 'money', idem: true, roles: 'staff with money:approve' }),
+  db('money_party_record', { args: mo.PartyRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('money_adjustment_request', { args: mo.AdjustmentRequest, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('money_adjustment_decide', { args: mo.AdjustmentDecide, map: P, rate: 'money', idem: true, roles: 'staff with money:approve (not the requester)' }),
+  db('money_invoice_pay', { args: mo.InvoicePay, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('money_invoice_set_due', { args: mo.InvoiceDue, map: P, rate: 'write', roles: 'staff with money:record' }),
+  // ---- team, section L (0440). Body = the function's `p` object; the database checks organisation, place and role (owner/admin invite and change people;
+  //      managers read and run tasks; the assigned person starts and submits their own). Roles are read-only here. No pay or bank data is ever returned.
+  db('team_options', { args: team.Options, map: P, rate: 'read', roles: 'staff who may open the team (pos_staff:read or org_invitations:manage)' }),
+  db('team_dashboard', { args: team.Dashboard, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_user_list', { args: team.UserList, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_user_view', { args: team.UserView, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_role_view', { args: team.RoleView, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_activity', { args: team.Activity, map: P, rate: 'read', roles: 'audit_logs:read or pos_audit_log:read or org_invitations:manage' }),
+  db('team_task_list', { args: team.TaskList, map: P, rate: 'read', roles: 'task managers (all tasks); the assigned person (own tasks)' }),
+  db('team_task_view', { args: team.TaskView, map: P, rate: 'read', roles: 'task managers; the assigned person' }),
+  db('team_invite', { args: team.Invite, map: P, rate: 'write', roles: 'owner or admin (org_invitations:manage); only an owner invites an owner or admin' }),
+  db('team_invite_act', { args: team.InviteAct, map: P, rate: 'write', roles: 'owner or admin (org_invitations:manage)' }),
+  db('team_user_act', { args: team.UserAct, map: P, rate: 'write', roles: 'owner or admin (org_invitations:manage); never on yourself' }),
+  db('team_task_save', { args: team.TaskSave, map: P, rate: 'write', idem: true, roles: 'task managers (owner, admin, manager, business / operations / location manager)' }),
+  db('team_task_act', { args: team.TaskAct, map: P, rate: 'write', roles: 'task managers; the assigned person may start and submit' }),
+  // ---- storefront, section M (0450-0451). Body = the function's `p` object; the database validates it and checks organisation and role
+  //      (owner / admin / manager / marketing roles edit; storefront:publish publishes). Results carry storage paths: post turns them into short links.
+  //      Pictures go through the two secure handlers below (signed slot, then confirm); the app never holds a storage key.
+  db('sf_options', { args: sf.None, map: P, rate: 'read', roles: STOREFRONT }),
+  db('sf_builder_get', { args: sf.None, map: P, rate: 'read', roles: STOREFRONT }),
+  db('sf_settings_get', { args: sf.None, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  db('sf_products', { args: sf.Products, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  db('sf_preview', { args: sf.Preview, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  db('sf_image_library', { args: sf.ImageLibrary, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  db('sf_offer_list', { args: sf.None, map: P, rate: 'read', roles: STOREFRONT }),
+  db('sf_ad_list', { args: sf.None, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  db('sf_draft_save', { args: sf.DraftSave, map: P, rate: 'write', roles: STOREFRONT }),
+  db('sf_draft_discard', { args: sf.DraftDiscard, map: P, rate: 'write', roles: STOREFRONT }),
+  db('sf_publish', { args: sf.Publish, map: P, rate: 'write', roles: 'staff with storefront:publish' }),
+  db('sf_product_save', { args: sf.ProductSave, map: P, rate: 'write', post: links2, roles: 'storefront roles; catalogue facts need menu:update' }),
+  db('sf_profile_save', { args: 'passthrough', map: P, rate: 'write', post: links2, roles: STOREFRONT }),
+  db('sf_hours_save', { args: 'passthrough', map: P, rate: 'write', post: links2, roles: STOREFRONT }),
+  db('sf_delivery_save', { args: 'passthrough', map: P, rate: 'write', post: links2, roles: STOREFRONT }),
+  db('sf_offer_save', { args: 'passthrough', map: P, rate: 'write', roles: STOREFRONT }),
+  db('sf_offer_act', { args: sf.OfferAct, map: P, rate: 'write', roles: STOREFRONT }),
+  db('sf_ad_save', { args: 'passthrough', map: P, rate: 'write', post: links2, roles: STOREFRONT }),
+  db('sf_ad_act', { args: sf.AdAct, map: P, rate: 'write', post: links2, roles: STOREFRONT }),
+  sec('storefront_image_slot', { args: sf.ImageAsk, rate: 'secure', roles: STOREFRONT }),
+  sec('storefront_image_attach', { args: sf.ImageAttach, rate: 'secure', roles: STOREFRONT }),
+  // ---- customer communication, section N (0460). Notices and announcements are for any signed-in staff (the database filters by role and place);
+  //      customer messages are RECORDED AND QUEUED only (nothing is sent); the database checks pos_campaigns:read / send and pos_customer_feedback:read / respond.
+  db('notice_list', { args: nt.NoticeList, map: P, rate: 'read', roles: STAFF }),
+  db('notice_mark_read', { args: nt.NoticeMarkRead, map: P, rate: 'write', roles: STAFF }),
+  db('announce_list', { args: nt.AnnounceList, map: P, rate: 'read', roles: STAFF }),
+  db('announce_mark_read', { args: nt.AnnounceMarkRead, map: P, rate: 'write', roles: STAFF }),
+  db('comm_options', { args: nt.CommOptions, map: P, rate: 'read', roles: 'staff with pos_campaigns:read' }),
+  db('comm_audience', { args: nt.CommAudience, map: P, rate: 'read', roles: 'staff with pos_campaigns:read' }),
+  db('comm_queue', { args: nt.CommQueue, map: P, rate: 'write', idem: true, roles: 'staff with pos_campaigns:send' }),
+  db('comm_list', { args: nt.CommList, map: P, rate: 'read', roles: 'staff with pos_campaigns:read' }),
+  db('comm_cancel', { args: nt.CommCancel, map: P, rate: 'write', roles: 'staff with pos_campaigns:send' }),
+  db('comm_feedback_list', { args: nt.FeedbackList, map: P, rate: 'read', roles: 'staff with pos_customer_feedback:read' }),
+  db('comm_feedback_respond', { args: nt.FeedbackRespond, map: P, rate: 'write', roles: 'staff with pos_customer_feedback:respond' }),
+  // ---- settings and store profile, section P (0470). Body = the function's `p` object; the database checks the caller's business and role
+  //      (read: any active person; save: owner, admin, business manager, manager; bank only owner and admin). Bank numbers are saved by the
+  //      existing secure handler partner_setup_save_payment and are never returned.
+  db('pos_settings_get', { args: st.Empty, map: P, rate: 'read', roles: STAFF }),
+  db('pos_settings_save_hours', { args: st.Hours, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_readiness', { args: st.Readiness, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_help', { args: st.Help, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_owner', { args: st.Owner, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_staff_phone', { args: st.StaffPhone, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_set_pickup', { args: st.Switch, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_set_qr_checkout', { args: st.Switch, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_location', { args: st.Location, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_save_language', { args: st.Language, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_documents', { args: st.Empty, map: P, rate: 'read', roles: 'owner, admin, managers, finance' }),
+  db('pos_settings_document_remove', { args: st.DocumentRemove, map: P, post: dropRemovedFile, rate: 'write', roles: 'owner or manager' }),
+  db('pos_settings_remove_qr', { args: st.Empty, map: P, post: dropRemovedFile, rate: 'write', roles: 'owner or manager' }),
+  db('pos_support_list', { args: st.Empty, map: P, rate: 'read', roles: STAFF }),
+  db('pos_support_create', { args: st.SupportCreate, map: P, rate: 'write', idem: true, roles: STAFF }),
+  { kind: 'local', alias: 'pos_help_content', args: 'passthrough', rate: 'read', roles: ANY, run: () => helpContent() },   // static FAQ, no database
+  sec('pos_settings_file_slot', { args: st.FileAsk, rate: 'secure', roles: STAFF }),
+  sec('pos_settings_file_attach', { args: st.FileAttach, rate: 'secure', roles: STAFF }),
+  sec('pos_settings_file_link', { args: st.FileLink, rate: 'secure', roles: STAFF }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 

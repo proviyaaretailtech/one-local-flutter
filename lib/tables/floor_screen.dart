@@ -4,10 +4,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
-import 'actions_screen.dart';
 import 'reserve_screen.dart';
 import 'table_order_screen.dart';
 import 'table_widgets.dart';
+import 'take_order_screens.dart';
 
 /// Figma "Tables" (screen-1-tables-grid) and its bottom sheet (screen-2-bottom-sheet): every table of the store with its state, filter chips,
 /// a 2-column grid. Tap a free, reserved or cleaning table for the sheet; tap an occupied one for its actions.
@@ -115,6 +115,14 @@ class _FloorScreenState extends State<FloorScreen> {
               ),
           ]),
         ),
+        if (widget.pickFor == null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: OutlineButtonT('Ready to serve', key: const ValueKey('open-ready-to-serve'), icon: LucideIcons.chefHat, height: 48, onPressed: () async {
+              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReadyToServeScreen(env: env)));
+              if (mounted) _load();
+            }),
+          ),
         if (_d == null && _error == null) tablesLoading(),
         if (_d == null && _error != null) TablesError(_error!, onRetry: _load),
         if (d != null && tables.isEmpty)
@@ -219,10 +227,12 @@ class _TableSheetState extends State<_TableSheet> {
             LimeButton('Start New Order', icon: LucideIcons.shoppingCart, height: 56, onPressed: () {
               nav.pop();
               final start = widget.env.onStartOrder;
+              final t = v!.m('table');
               if (start == null) {
-                showToast(context, 'Starting an order from a table opens in a later release.');
+                // founder-approved flow (2026-10-20): Start New Order opens Add dishes for this table
+                nav.push(MaterialPageRoute(builder: (_) => AddDishesScreen(env: widget.env, tableId: t.s('id'), tableLabel: 'Table ${t.s('label')}')));
               } else {
-                start(context, v!.m('table'));
+                start(context, t);
               }
             }),
             const SizedBox(height: 12),

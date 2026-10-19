@@ -81,6 +81,24 @@ test('inventory (section H): every function is listed, reads are "read", writes 
   assert.ok(keep.success && keep.data.title === 'x' && keep.data.lines.length === 1);   // fields the schema does not name still reach the database
 });
 
+test('kitchen (section H): five functions listed, writes carry the Idempotency-Key, shapes are checked', async () => {
+  for (const a of ['kitchen_config', 'kitchen_station_view', 'kds_queue']) assert.equal(lookup(a)?.rate, 'read', a);
+  for (const a of ['kitchen_station_save', 'kds_ticket_act']) { const e = lookup(a); assert.ok(e && e.kind === 'db' && e.idem && e.rate === 'write', a); }
+  for (const a of ['kitchen_station_json', 'kds_card_json', 'kds_cards', 'kitchen_queue_key', 'kitchen_can']) assert.equal(lookup(a), undefined, a);   // helpers are not reachable
+  assert.equal((await post('/rpc/kds_queue')).status, 401);
+  const parse = (alias: string, body: unknown) => (lookup(alias) as { args: { safeParse(v: unknown): { success: boolean; data?: any } } }).args.safeParse(body);
+  assert.equal(parse('kitchen_station_save', { name: '   ' }).success, false);
+  assert.equal(parse('kitchen_station_save', { id: '40000000-0000-0000-0000-0000000000a1', version: 2, printer_id: null }).success, true);   // a partial update: name not sent
+  assert.equal(parse('kds_ticket_act', { ticket_id: '40000000-0000-0000-0000-0000000000a1', action: 'ready', station: 'Main Kitchen' }).success, false);
+  assert.equal(parse('kitchen_station_save', { name: 'x'.repeat(61) }).success, false);
+  assert.equal(parse('kitchen_station_save', { name: 'Tandoor', printer_id: 'nope' }).success, false);
+  assert.equal(parse('kds_ticket_act', { ticket_id: '40000000-0000-0000-0000-0000000000a1', action: 'delete' }).success, false);
+  assert.equal(parse('kds_queue', { status: 'late' }).success, false);
+  assert.equal(parse('kds_queue', { station: 'Main Kitchen' }).success, false);
+  const keep = parse('kitchen_station_save', { name: 'Tandoor', extra: 1 });
+  assert.ok(keep.success && keep.data.extra === 1);
+});
+
 test('back office (section J): four functions listed, writes are "write", close carries the Idempotency-Key, shapes are checked', async () => {
   assert.equal(lookup('backoffice_low_stock')?.rate, 'read');
   assert.equal(lookup('purchase_suggestions_list')?.rate, 'read');
@@ -98,4 +116,71 @@ test('back office (section J): four functions listed, writes are "write", close 
   assert.equal(parse('purchase_suggestions_close', { ids: [id], outcome: 'deleted' }).success, false);
   assert.equal(parse('purchase_suggestions_close', { ids: [id], outcome: 'ordered', purchase_order_ref: 'PO-1', quantities: { [id]: -2 } }).success, false);
   assert.ok(parse('purchase_suggestions_close', { ids: [id], outcome: 'ordered', purchase_order_ref: 'PO-1', quantities: { [id]: 6 } }).success);
+});
+
+test('purchasing (section H): nine functions listed, reads are "read", writes carry the Idempotency-Key where they create, shapes are checked', async () => {
+  const reads = ['pur_options', 'pur_po_list', 'pur_po_view', 'pur_price_view'];
+  const writes = ['pur_po_create', 'pur_po_act', 'pur_po_receive', 'pur_sourcing_select', 'pur_audit_record'];
+  for (const a of reads) assert.equal(lookup(a)?.rate, 'read', a);
+  for (const a of writes) { const e = lookup(a); assert.ok(e && e.kind === 'db' && e.rate === 'write', a); }
+  for (const a of ['pur_po_create', 'pur_po_receive', 'pur_sourcing_select', 'pur_audit_record']) assert.ok((lookup(a) as { idem?: boolean }).idem, a);
+  assert.equal(lookup('pur_po_json'), undefined);               // service-only helpers are not reachable
+  assert.equal(lookup('purchasing_receipt_posted'), undefined);
+  assert.equal((await post('/rpc/pur_po_list')).status, 401);
+  const parse = (alias: string, body: unknown) => (lookup(alias) as { args: { safeParse(v: unknown): { success: boolean; data?: any } } }).args.safeParse(body);
+  const line = { inventory_item_id: '40000000-0000-0000-0000-0000000000a1', qty: 10, unit_cost_minor: 36000, gst_pct: 5 };
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [line] }).success, true);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [] }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: '', lines: [line] }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [{ ...line, qty: 0 }] }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [{ ...line, unit_cost_minor: 1.5 }] }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', lines: [{ ...line, gst_pct: 101 }] }).success, false);
+  assert.equal(parse('pur_po_view', {}).success, false);
+  assert.equal(parse('pur_po_act', { id: '40000000-0000-0000-0000-0000000000a1', action: 'approve' }).success, true);
+  assert.equal(parse('pur_po_act', { id: '40000000-0000-0000-0000-0000000000a1', action: 'delete' }).success, false);
+  assert.equal(parse('pur_po_create', { supplier_id: 'abc', submit: true, lines: [line] }).success, true);
+  assert.equal(parse('pur_po_list', { status: 'weird' }).success, false);
+  assert.equal(parse('pur_audit_record', { price_id: '40000000-0000-0000-0000-0000000000a1', checks: [{ name: 'x', result: 'maybe' }] }).success, false);
+  assert.equal(parse('pur_audit_record', { price_id: '40000000-0000-0000-0000-0000000000a1', checks: [{ name: 'Temp', result: 'fail', detail: '8.1C' }] }).success, true);
+  const keep = parse('pur_po_create', { supplier_id: 'abc', notes: 'n', lines: [{ ...line, extra: 1 }] });
+  assert.ok(keep.success && keep.data.lines[0].extra === 1);
+});
+
+test('section P: every settings function is listed, bank saves stay on the secure handler, file handlers exist, static help is served', () => {
+  for (const a of ['pos_settings_get', 'pos_settings_save_hours', 'pos_settings_save_readiness', 'pos_settings_save_help', 'pos_settings_save_owner', 'pos_settings_save_staff_phone',
+    'pos_settings_set_pickup', 'pos_settings_set_qr_checkout', 'pos_settings_save_location', 'pos_settings_save_language', 'pos_settings_documents',
+    'pos_settings_document_remove', 'pos_settings_remove_qr', 'pos_support_list', 'pos_support_create']) assert.equal(lookup(a)?.kind, 'db', a);
+  for (const a of ['pos_settings_file_slot', 'pos_settings_file_attach', 'pos_settings_file_link', 'partner_setup_save_payment']) assert.equal(lookup(a)?.kind, 'secure', a);
+  assert.equal(lookup('pos_settings_save_bank'), undefined);
+  assert.equal(lookup('pos_settings__org'), undefined);
+  const help = (lookup('pos_help_content') as { run: () => { faq: unknown[]; categories: unknown[] } }).run();
+  assert.ok(help.faq.length >= 3 && help.categories.length === 4);
+});
+
+test('section P: the server checks the shape of the request, the database checks the rules', async () => {
+  const { Hours, SupportCreate, FileAsk } = await import('../../src/schemas/settings.ts');
+  assert.equal(Hours.safeParse({ opens_at: '09:00', closes_at: '21:30' }).success, true);
+  assert.equal(Hours.safeParse({ opens_at: '9am', closes_at: '21:30' }).success, false);
+  assert.equal(SupportCreate.safeParse({ message: 'no' }).success, false);
+  assert.equal(FileAsk.safeParse({ kind: 'document', content_type: 'text/plain', size: 10 }).success, false);
+  assert.equal(FileAsk.safeParse({ kind: 'store_qr', content_type: 'application/pdf', size: 10 }).success, true);
+  assert.equal(FileAsk.safeParse({ kind: 'store_qr', content_type: 'image/png', size: 6 * 1024 * 1024 }).success, false);
+});
+
+test('take an order at a table (0485): four functions listed, adds and sends carry the Idempotency-Key, shapes are checked', async () => {
+  for (const a of ['tbl_order_add', 'tbl_kot_send']) { const e = lookup(a); assert.ok(e && e.kind === 'db' && e.idem && e.rate === 'write', a); }
+  assert.equal(lookup('tbl_ready_list')?.rate, 'read');
+  assert.equal(lookup('tbl_mark_served')?.rate, 'write');
+  for (const a of ['tbl_kot_fire', 'tbl_order_reprice', 'tbl_req_replay', 'tbl_station_label']) assert.equal(lookup(a), undefined, a);   // helpers are not reachable
+  assert.equal((await post('/rpc/tbl_order_add')).status, 401);
+  const parse = (alias: string, body: unknown) => (lookup(alias) as { args: { safeParse(v: unknown): { success: boolean } } }).args.safeParse(body);
+  const id = '40000000-0000-0000-0000-0000000000a1';
+  assert.equal(parse('tbl_order_add', { table_id: id, lines: [{ menu_item_id: id, qty: 2, notes: 'less butter' }] }).success, true);
+  assert.equal(parse('tbl_order_add', { table_id: id, lines: [] }).success, false);
+  assert.equal(parse('tbl_order_add', { table_id: id, lines: [{ menu_item_id: id, qty: 0 }] }).success, false);
+  assert.equal(parse('tbl_order_add', { table_id: id, send: 'yes', lines: [{ menu_item_id: id, qty: 1 }] }).success, false);
+  assert.equal(parse('tbl_kot_send', {}).success, false);
+  assert.equal(parse('tbl_kot_send', { table_id: id }).success, true);
+  assert.equal(parse('tbl_mark_served', { item_ids: [] }).success, false);
+  assert.equal(parse('tbl_mark_served', { item_ids: ['nope'] }).success, false);
 });
