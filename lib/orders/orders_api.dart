@@ -79,6 +79,84 @@ class OrderCard {
   String get refundDamages => _s('refund_damages');
 }
 
+int _int(Object? v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
+num _num(Object? v) => v is num ? v : num.tryParse('$v') ?? 0;
+
+/// One card of the Live orders board (`pos_orders_board`). Status, minutes and "delayed" are the database's; the app only prints them.
+class LiveOrder {
+  LiveOrder(this.raw);
+  final Map<String, dynamic> raw;
+  String _s(String k) => (raw[k] ?? '').toString();
+  String get id => _s('order_id');
+  String get displayNo => _s('display_no');
+  DateTime? get placedAt => DateTime.tryParse(_s('placed_at'))?.toLocal();
+  String get customer => _s('customer');
+  String get items => _s('items');
+  String? get note => (raw['note'] as String?)?.trim().isEmpty ?? true ? null : raw['note'] as String;
+  String get channel => _s('channel');
+  String? get channelTag => raw['channel_tag'] as String?;
+  String? get externalId => raw['external_id'] as String?;
+  String? get table => raw['table'] as String?;
+  String get status => _s('status');
+  int get minutes => _int(raw['minutes']);
+  bool get delayed => raw['delayed'] == true;
+  num get total => _num(raw['total']);
+}
+
+/// One aggregator channel's state as the database reports it (never invented: no connection = offline).
+class ChannelState {
+  ChannelState(this.raw);
+  final Map<String, dynamic> raw;
+  String get channel => '${raw['channel'] ?? ''}';
+  String get name => '${raw['name'] ?? ''}';
+  bool get online => raw['state'] == 'online';
+  String? get reason => raw['reason'] as String?;
+}
+
+class OrdersBoard {
+  OrdersBoard(this.raw);
+  final Map<String, dynamic> raw;
+  Map<String, dynamic> get _header => (raw['header'] as Map?)?.cast<String, dynamic>() ?? const {};
+  String get business => '${_header['business'] ?? ''}';
+  String? get outlet => _header['outlet'] as String?;
+  /// One Local switch: true online, false offline, null when the business is not on One Local.
+  bool? get accepting => _header['accepting'] as bool?;
+  int count(String status) => _int(((raw['counts'] as Map?) ?? const {})[status]);
+  int live(String channel) => _int(((raw['channels'] as List?) ?? const []).cast<Map>().where((c) => c['key'] == channel).firstOrNull?['live']);
+  List<LiveOrder> get orders => ((raw['orders'] as List?) ?? const []).map((e) => LiveOrder((e as Map).cast<String, dynamic>())).toList();
+  ChannelState? integration(String channel) =>
+      ((raw['integrations'] as List?) ?? const []).map((e) => ChannelState((e as Map).cast<String, dynamic>())).where((c) => c.channel == channel).firstOrNull;
+}
+
+/// One open held bill (`pos_hold_list`).
+class HeldBill {
+  HeldBill(this.raw);
+  final Map<String, dynamic> raw;
+  String _s(String k) => (raw[k] ?? '').toString();
+  String get id => _s('order_id');
+  String get displayNo => _s('display_no');
+  String get channel => _s('channel');
+  String get source => _s('source');
+  String get customer => _s('customer');
+  String? get reason => (raw['reason'] as String?)?.trim().isEmpty ?? true ? null : raw['reason'] as String;
+  String get items => _s('items');
+  String? get note => (raw['note'] as String?)?.trim().isEmpty ?? true ? null : raw['note'] as String;
+  num get total => _num(raw['total']);
+  int get minutes => _int(raw['minutes']);
+  bool get delayed => raw['delayed'] == true;
+  bool get hasCoupon => raw['has_coupon'] == true;
+  /// The bill's version (its updated_at), sent back on resume and cancel.
+  Object? get version => raw['version'];
+}
+
+class HoldList {
+  HoldList(this.raw);
+  final Map<String, dynamic> raw;
+  int get delayedAfter => _int(raw['delayed_after_minutes']);
+  List<HeldBill> get holds => ((raw['holds'] as List?) ?? const []).map((e) => HeldBill((e as Map).cast<String, dynamic>())).toList();
+  Map<String, dynamic>? get oldest => (raw['oldest'] as Map?)?.cast<String, dynamic>();
+}
+
 /// Server totals for a cart that is not placed yet (`POST /quote`).
 class Quote {
   Quote(this.raw);
@@ -168,10 +246,56 @@ class OrdersApi {
         if (reference != null && reference.isNotEmpty) 'reference': reference,
       }));
 
-  Future<OrderView> hold({required List<CartLine> lines, required String key}) async =>
-      OrderView(await _send('POST', '/hold', key: key, body: {'lines': lines.map((l) => l.toJson()).toList()}));
+  Future<OrderView> hold({required List<CartLine> lines, required String key, String? reason}) async => OrderView(await _send('POST', '/hold', key: key, body: {
+        'lines': lines.map((l) => l.toJson()).toList(),
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      }));
 
   Future<OrderView> get(String id) async => OrderView(await _send('GET', '/$id'));
+
+  /// The generic gateway door (`POST /rpc/<fn>`, allowlist in server/src/rpc-manifest.ts), used by the Orders tab (migrations 0530-0531).
+  Future<Map<String, dynamic>> _rpc(String fn, Map<String, dynamic> args, {String? key}) async {
+    final token = _token();
+    if (token == null) throw const PartnerApiException(401, 'Sign in to continue.');
+    final res = await _http
+        .post(Uri.parse('$_base/rpc/$fn'),
+            headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json', 'Idempotency-Key': ?key}, body: jsonEncode(args))
+        .timeout(const Duration(seconds: 30));
+    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
+    final map = decoded is Map ? decoded.cast<String, dynamic>() : <String, dynamic>{};
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw OrdersApiException(res.statusCode, (map['detail'] as String?) ?? 'Something went wrong. Please try again.', map['code'] as String?);
+    }
+    return map;
+  }
+
+  /// Live orders: counts per status, channel totals, Zomato / Swiggy state and the cards of one channel and status (`pos_orders_board`).
+  Future<OrdersBoard> board({String channel = 'all', String status = 'new', String q = '', String? locationId}) async => OrdersBoard(await _rpc('pos_orders_board', {
+        'channel': channel,
+        'status': status,
+        if (q.trim().isNotEmpty) 'q': q.trim(),
+        'location_id': ?locationId,
+      }));
+
+  /// Hold orders: open held bills with their age and reason, and the oldest one (`pos_hold_list`).
+  Future<HoldList> holds({String channel = 'all', String q = '', String? locationId}) async => HoldList(await _rpc('pos_hold_list', {
+        'channel': channel,
+        if (q.trim().isNotEmpty) 'q': q.trim(),
+        'location_id': ?locationId,
+      }));
+
+  /// Resume POS: rewrites the held bill's lines (and/or reason) ON THE SAME ORDER; answers the bill's new version (`pos_hold_update`).
+  /// The same [key] again is a replay. Pay afterwards with [pay] and that version.
+  Future<String> updateHold(String orderId, {List<CartLine>? lines, String? reason, required Object? version, required String key}) async {
+    final r = await _rpc('pos_hold_update', {
+      'order_id': orderId,
+      'expected_updated_at': '$version',
+      'lines': ?lines?.map((l) => l.toJson()).toList(),
+      'reason': ?reason,
+      'idempotency_key': key,
+    }, key: key);
+    return '${r['updated_at'] ?? version}';
+  }
 
   Future<OrderView> pay(String id, {required String method, num? tendered, String? reference, Object? version, required String key}) async =>
       OrderView(await _send('POST', '/$id/pay', key: key, body: {

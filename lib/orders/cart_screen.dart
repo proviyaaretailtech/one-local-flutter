@@ -9,13 +9,25 @@ import 'order_screen.dart';
 import 'order_widgets.dart';
 import 'orders_api.dart';
 
+/// A held bill reopened from the Hold orders tab (Resume POS). The cart edits THAT order: changed lines are written to it with
+/// `pos_hold_update`, and payment goes through `pay` on the same order id — a held bill is never placed again as a new order.
+class ResumeHold {
+  const ResumeHold({required this.orderId, required this.displayNo, required this.version, this.reason, this.hasCoupon = false});
+  final String orderId, displayNo;
+  final Object? version;
+  final String? reason;
+  final bool hasCoupon;
+}
+
 /// Figma "Cart" and "Checkout" for a new counter bill. Nothing is placed until Complete Payment (or Save & Hold).
 /// Every total on screen is the server's quote; the phone only keeps which items and how many.
+/// With [resume] it is the cart of a held bill instead (see [ResumeHold]).
 class CartScreen extends StatefulWidget {
-  const CartScreen({super.key, this.api, this.initialLines = const [], this.onNavigate});
+  const CartScreen({super.key, this.api, this.initialLines = const [], this.onNavigate, this.resume});
   final OrdersApi? api;
   final List<CartLine> initialLines;
   final ValueChanged<String>? onNavigate;
+  final ResumeHold? resume;
   @override
   State<CartScreen> createState() => _CartScreenState();
 }
@@ -33,12 +45,29 @@ class _CartScreenState extends State<CartScreen> {
   String? _key; // one key per payment intent: kept for a retry, dropped when the cart, method or amount changes
   Timer? _debounce;
   int _seq = 0;
+  // resume: the lines the held order has on the server, and its version; both move forward after a successful pos_hold_update
+  late Map<String, int> _savedLines;
+  late Object? _resumeVersion = widget.resume?.version;
+
+  Map<String, int> _snapshot() {
+    final m = <String, int>{};
+    for (final l in _lines) {
+      m[l.menuItemId] = (m[l.menuItemId] ?? 0) + l.qty;
+    }
+    return m;
+  }
+
+  bool get _linesChanged {
+    final now = _snapshot();
+    return now.length != _savedLines.length || now.entries.any((e) => _savedLines[e.key] != e.value);
+  }
 
   static const _methods = [('cash', 'Cash'), ('card', 'Card'), ('upi', 'UPI / QR'), ('split', 'Split Pay')];
 
   @override
   void initState() {
     super.initState();
+    _savedLines = _snapshot();
     _requote();
   }
 
@@ -112,6 +141,16 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  /// Resume: write changed lines to the held order (same order id), then answer its current version.
+  Future<Object?> _syncHeld(String key, {String? reason}) async {
+    final r = widget.resume!;
+    if (!_linesChanged && reason == null) return _resumeVersion;
+    final v = await _api.updateHold(r.orderId, lines: _linesChanged ? _lines : null, reason: reason, version: _resumeVersion, key: key);
+    _resumeVersion = v;
+    _savedLines = _snapshot();
+    return v;
+  }
+
   Future<void> _complete() async {
     final q = _quote;
     if (q == null || _busy) return;
@@ -122,7 +161,14 @@ class _CartScreenState extends State<CartScreen> {
     setState(() => _busy = true);
     _key ??= OrdersApi.newKey();
     try {
-      final view = await _api.checkout(lines: _lines, method: _method, tendered: _method == 'cash' ? _tendered : null, key: _key!);
+      final r = widget.resume;
+      final OrderView view;
+      if (r != null) {
+        final version = await _syncHeld('${_key!}:lines');
+        view = await _api.pay(r.orderId, method: _method, tendered: _method == 'cash' ? _tendered : null, version: version, key: _key!);
+      } else {
+        view = await _api.checkout(lines: _lines, method: _method, tendered: _method == 'cash' ? _tendered : null, key: _key!);
+      }
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => OrderScreen(api: _api, orderId: view.id, initial: view, onNavigate: widget.onNavigate)));
     } catch (e) {
@@ -134,10 +180,20 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _hold() async {
     if (_lines.isEmpty || _busy) return;
+    final reason = await _askReason();
+    if (reason == null || !mounted) return;
     setState(() => _busy = true);
     final key = OrdersApi.newKey();
     try {
-      final view = await _api.hold(lines: _lines, key: key);
+      final r = widget.resume;
+      if (r != null) {
+        await _syncHeld(key, reason: reason);
+        if (!mounted) return;
+        showToast(context, '#${r.displayNo} is still on hold.');
+        Navigator.of(context).pop();
+        return;
+      }
+      final view = await _api.hold(lines: _lines, key: key, reason: reason);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => OrderScreen(api: _api, orderId: view.id, initial: view, onNavigate: widget.onNavigate)));
     } catch (e) {
@@ -145,6 +201,20 @@ class _CartScreenState extends State<CartScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Why the bill is held (shown on the Hold orders card). Empty is allowed; null = the person closed the sheet.
+  Future<String?> _askReason() {
+    final c = TextEditingController(text: widget.resume?.reason ?? '');
+    return showOrderSheet<String>(
+      context,
+      title: 'Save & Hold',
+      body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        TextField(key: const ValueKey('hold-reason'), controller: c, maxLength: 200, decoration: const InputDecoration(hintText: 'Why is it on hold? (optional)')),
+        const SizedBox(height: 8),
+        DarkCta(label: 'Hold bill', onPressed: () => Navigator.pop(ctx, c.text.trim())),
+      ]),
+    );
   }
 
   @override
@@ -156,10 +226,15 @@ class _CartScreenState extends State<CartScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: _checkout ? 'Checkout · new bill' : 'Cart · new bill', onBack: () => _checkout ? setState(() => _checkout = false) : Navigator.maybePop(context)),
+        OrdersTopBar(
+            title: '${_checkout ? 'Checkout' : 'Cart'} · ${widget.resume != null ? 'held bill #${widget.resume!.displayNo}' : 'new bill'}',
+            onBack: () => _checkout ? setState(() => _checkout = false) : Navigator.maybePop(context)),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(12, 14, 12, 16), children: [
-            OrderHeaderCard(number: 'New bill', channel: 'Store Checkout', subtitle: 'Customer: Guest · ${_placedAt.format(context)}'),
+            OrderHeaderCard(
+                number: widget.resume != null ? '#${widget.resume!.displayNo}' : 'New bill',
+                channel: 'Store Checkout',
+                subtitle: widget.resume != null ? 'Held bill · resumed ${_placedAt.format(context)}' : 'Customer: Guest · ${_placedAt.format(context)}'),
             const SizedBox(height: 14),
             StateHeader(
               title: title,

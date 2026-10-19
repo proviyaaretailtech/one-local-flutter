@@ -11,6 +11,7 @@ import 'inventory/inventory_dashboard.dart';
 import 'inventory/stock_detail_screen.dart';
 import 'orders/cart_screen.dart';
 import 'orders/order_screen.dart';
+import 'orders/orders_board_screen.dart';
 import 'orders/orders_home.dart';
 import 'service/calendar_screen.dart';
 import 'service/service_widgets.dart' show ServiceRoutes;
@@ -23,7 +24,9 @@ import 'tables/table_widgets.dart';
 /// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G) and low stock (J) into the [HomeNav] hooks.
 void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
-  HomeNav.orders = HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
+  // The Orders tab is Live orders | Hold orders (specs/orders-live-hold); the full history stays one tap away in the side menu.
+  HomeNav.orders = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))));
+  HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
   HomeNav.bill = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CartScreen(onNavigate: (id) => _tab(c, id))));
   HomeNav.items = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CatalogueScreen(onNavigate: (id) => _tab(c, id))));
   HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const GrnQueueScreen()));
