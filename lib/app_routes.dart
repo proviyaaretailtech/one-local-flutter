@@ -18,6 +18,8 @@ import 'money/money_home.dart';
 import 'notices/feedback_screen.dart';
 import 'notices/notices_api.dart';
 import 'notices/notices_home.dart';
+import 'menu/menu_screen.dart';
+import 'orders/cart_screen.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_board_screen.dart';
 import 'orders/orders_home.dart';
@@ -41,6 +43,7 @@ import 'team/team_widgets.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
 /// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K), the team (L), the storefront (M), notices (N) and settings and support (P) into the [HomeNav] hooks.
+/// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J) and the restaurant menu into the [HomeNav] hooks.
 void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
   // The Orders tab is Live orders | Hold orders (specs/orders-live-hold); the full history stays one tap away in the side menu.
@@ -49,6 +52,7 @@ void installRoutes() {
   // Section F: the till (sell, search, carts, payment, history, returns, receipts). Section E's cart screen stays reachable from the orders list.
   HomeNav.bill = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'sell'), builder: (_) => SellScreen(env: SellEnv(onTab: (id) => _tab(c, id)))));
   HomeNav.items = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CatalogueScreen(onNavigate: (id) => _tab(c, id))));
+  HomeNav.menu = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuScreen()));
   HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const GrnQueueScreen()));
   InvEnv inventoryEnv(BuildContext c) => InvEnv(
       onNavigate: (id) => _tab(c, id),
@@ -62,6 +66,7 @@ void installRoutes() {
   // The restaurant dashboard's "Open kitchen display" and the More page's Kitchen display tile open the same KDS.
   HomeNav.kitchen = HomeNav.kitchenDisplay;
   HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id == 'menu' ? 'item' : id)))));
+  HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id)))));
   HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
   HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
@@ -86,6 +91,7 @@ void installRoutes() {
 void _tab(BuildContext context, String id) => switch (id) {
       'home' => HomeNav.go(context, HomeNav.home, 'Home'),
       'item' => HomeNav.go(context, HomeNav.items, 'Items'),
+      'menu' => HomeNav.go(context, HomeNav.menu ?? HomeNav.items, 'The menu'),
       'bill' => HomeNav.go(context, HomeNav.bill, 'Bill'),
       'stock' => HomeNav.go(context, HomeNav.stock, 'Stock'),
       _ => HomeNav.go(context, null, 'Online orders'),

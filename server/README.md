@@ -26,6 +26,7 @@ Local Supabase only: the server refuses a non-local `SUPABASE_URL` unless `ALLOW
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | ONLY the secret-bearing handlers (`src/modules/secure/`: storage slots, PII save for an already-verified user id, `me`) and the test scripts. The `/rpc` gateway and the order/home routes never use it |
 | `SUPABASE_ANON_KEY` (or `SUPABASE_PUBLISHABLE_KEY`) | yes | verifies tokens and runs every call as the caller (their token on this key) so row-level security applies |
 | `PARTNER_PII_KEY` | production | 16+ characters; encrypts PAN and bank numbers in the database. Local dev uses a fixed dev-only key; production without it answers 503 on tax/bank saves |
+| `ANTHROPIC_API_KEY` | optional | Claude API key for "Write with AI" (dish descriptions). Unset: `menu_ai_describe` answers 503 `ai_not_configured`. Never print or commit it |
 | `PORT` | no | default 8090 |
 | `ALLOW_REMOTE` | no | `1` only on the host meant to use a hosted project |
 | `TRUSTED_PROXY_HOPS` | no | proxies in front of the server (for per-address limits) |

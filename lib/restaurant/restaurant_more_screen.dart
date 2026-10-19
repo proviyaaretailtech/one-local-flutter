@@ -40,7 +40,7 @@ class RestaurantMoreScreen extends StatelessWidget {
       (LucideIcons.file, 'Invoices', moneyAt('invoices')),
       // No tax screen exists yet (Money has no GST view): stays "Soon".
       (LucideIcons.chartPie, 'Taxes', null),
-      (LucideIcons.coffee, 'Menu', HomeNav.items),
+      (LucideIcons.coffee, 'Menu', HomeNav.menu ?? HomeNav.items),
       // Fees and charges are the commission lines of each settlement.
       (LucideIcons.list, 'Fees & charges', moneyAt('settlements')),
     ];

@@ -18,6 +18,7 @@
     "vercel-build": "npm run build:vercel"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.135.0",
     "@supabase/supabase-js": "2.116.0",
     "zod": "4.6.1"
   },

@@ -165,8 +165,9 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
           service ? 'Appointments' : restaurant ? 'Tables' : 'Billing',
         );
       case 'Item':
+        HomeNav.go(context, HomeNav.items, 'Items');
       case 'Menu':
-        HomeNav.go(context, HomeNav.items, label == 'Menu' ? 'The menu' : 'Items');
+        HomeNav.go(context, HomeNav.menu ?? HomeNav.items, 'The menu'); // restaurant: menu and dish detail
       case 'Stock':
         HomeNav.go(context, HomeNav.stock, 'Stock');
       case 'Home':

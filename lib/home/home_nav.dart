@@ -54,6 +54,8 @@ class HomeNav {
   static void Function(BuildContext context, String receiptDocumentId)? receipt;
   // Section J: low stock and purchase suggestions ("view item" uses section H's [stockItem]).
   static HomeRoute? lowStock;
+  // Restaurant: the Menu tab (menu and dish detail). A store keeps [items] (the catalogue).
+  static HomeRoute? menu;
   // Restaurant: the kitchen display (KOT queue). Plugged in by the kitchen section; until then the button says so.
   static HomeRoute? kitchen;
   // Side nav: customers, the One Local Wallet and Manage account (plugged by lib/account/routes.dart).
@@ -75,6 +77,6 @@ class HomeNav {
     stockItem = null;
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
-    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = customers = wallet = account = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = customers = wallet = account = menu = null;
   }
 }

@@ -18,6 +18,7 @@ One codebase: `npm run dev` (node:http, local) and the Vercel function (`api/ind
 | `SUPABASE_ANON_KEY` (or `SUPABASE_PUBLISHABLE_KEY`) | no (public key) | verifies tokens and runs every `/rpc` call as the signed-in person |
 | `SUPABASE_SERVICE_ROLE_KEY` | **yes** | only the secret-bearing handlers (storage slots and previews, PAN/bank saves, `me`). The `/rpc` pass-through never uses it |
 | `PARTNER_PII_KEY` | **yes** | 16+ characters; encrypts PAN and bank numbers inside the database. **Without it, production answers 503 on tax and bank saves.** Keep the same value forever: changing it makes saved numbers unreadable |
+| `ANTHROPIC_API_KEY` | no | Claude API key for "Write with AI" on the restaurant dish screen. Without it the screen says "AI writing is not set up yet" and manual writing still works |
 | `ALLOW_REMOTE` | no | must be `1`, otherwise the server refuses a non-local Supabase URL |
 | `TRUSTED_PROXY_HOPS` | no | `1` (Vercel is one proxy in front) |
 | `NODE_ENV` | no | Vercel sets `production` itself |

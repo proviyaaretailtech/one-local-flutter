@@ -95,7 +95,7 @@ class _HubScreenState extends State<HubScreen> {
         // The hub carries the restaurant bar: Bill opens the floor first (founder, 2026-10-20).
         HomeNav.go(context, HomeNav.tables ?? HomeNav.bill, 'Tables');
       case 'Menu':
-        HomeNav.go(context, HomeNav.items, 'The menu');
+        HomeNav.go(context, HomeNav.menu ?? HomeNav.items, 'The menu');
       case 'Stock':
         HomeNav.go(context, HomeNav.stock, 'Stock');
       case 'Home':

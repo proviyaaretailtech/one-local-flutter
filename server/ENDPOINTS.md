@@ -34,6 +34,7 @@ Only where a secret, storage or a third party is needed. They get the user id fr
 |---|---|---|
 | `me` | reads the membership with the service role | `{person, restaurant}`; 403 when not staff |
 | `partner_app_save_tax`, `partner_app_save_bank`, `partner_setup_save_payment` | `PARTNER_PII_KEY` encrypts PAN and bank numbers inside the database; the key lives only on the server | 503 `not_configured` in production without the key |
+| `menu_ai_describe` | `ANTHROPIC_API_KEY` calls the Claude API (`claude-opus-5-5`) to draft a dish description; the database (`rst_menu_ai_begin`) checks menu.update, the dish and the per-business limit; nothing is saved | 503 `ai_not_configured` without the key; 429 `rate_limited` over 20/hour or 100/day per business |
 | `partner_app_document_slot`, `partner_app_document_attach`, `partner_app_document_preview` | signed upload slots / previews in private bucket `partner-documents` | the path must be inside the caller's own application folder |
 | `partner_setup_image_slot`, `partner_setup_image_attach` | same, bucket `partner-listing-media` | path inside the caller's business folder |
 | `POST /webhooks/razorpay`, `POST /webhooks/cashfree` | payment provider webhooks (real HTTP endpoints, no user token) | **not connected**: answer 501 until `RAZORPAY_WEBHOOK_SECRET` / `CASHFREE_WEBHOOK_SECRET` and the hand-off to a database function exist |

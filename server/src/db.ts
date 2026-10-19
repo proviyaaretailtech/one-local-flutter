@@ -50,6 +50,7 @@ const STATUS: Record<string, number> = {
   NO_AUDIENCE: 422,                                         // notices (section N)
   NOT_VERIFIED: 409, NOT_LISTED: 409, INCOMPLETE: 422,                                                                          // outlets (0520-0522)
   SHIFT_OPEN: 409, NO_SHIFT: 409, PAYMENT_PENDING: 409, NOT_ENOUGH_CASH: 422, REASON_REQUIRED: 422, RETURN_WINDOW: 422,       // store shift, payment pending, refunds (0500-0502)
+  RATE_LIMITED: 429,                                                                                             // Write with AI per business (0541)
 };
 const CODE: Record<string, string> = {
   NOT_DELIVERABLE: 'order_not_deliverable', PICKED_UP: 'already_picked_up', EXPIRED: 'offer_expired', TAKEN: 'already_taken',
