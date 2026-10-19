@@ -395,6 +395,45 @@ try {
   ok('money: B cannot use A location (reads and writes)', refused(await rpc(B, 'money_expenses_list', { location_id: locA })) && refused(await rpc(B, 'money_payments_list', { location_id: locA }))
     && refused(await rpc(B, 'money_cashbook', { location_id: locA })) && refused(await rpc(B, 'money_cash_record', { location_id: locA, direction: 'in', title: 'x', amount_minor: 100 }, `gw-mo-${randomUUID()}`)));
   ok('money: B cannot pay or set the due date of A invoices', refused(await rpc(B, 'money_invoice_pay', { invoice_id: randomUUID(), amount_minor: 100 }, `gw-mo-${randomUUID()}`)) && refused(await rpc(B, 'money_invoice_set_due', { invoice_id: randomUUID(), due_date: '2026-10-20' })));
+  // ---- team (section L): the same gateway, A's people and tasks against B's token
+  const staffA = sql(`insert into pos_staff(organization_id,location_id,staff_code,full_name,mobile,designation,bank_name,account_number,monthly_salary) values ('${orgA}','${locA}','ZZ-S1','ZZ Staff A','9000011111','Cashier','HDFC','998877665544',25000) returning id`).split('\n')[0];
+  ok('team: no token is 401, service-only helpers are not on the allowlist', (await rpc(null, 'team_dashboard')).s === 401 && (await rpc(A, 'team_member_json')).s === 404 && (await rpc(A, 'team_task_event')).s === 404);
+  const tDash = await rpc(A, 'team_dashboard');
+  ok('team: A manager reads its dashboard (3 people: manager, owner, viewer)', tDash.s === 200 && Number(tDash.j.members) === 3 && tDash.j.can_invite === false, tDash);
+  ok('team: A viewer has no team access', refused(await rpc(V, 'team_dashboard')) && refused(await rpc(V, 'team_user_list')));
+  ok('team: A manager cannot invite (403)', (await rpc(A, 'team_invite', { full_name: 'Zed Zed', mobile: '9876500001', email: `zz-inv-${run}@example.com`, role_slug: 'biller', location_id: locA })).s === 403);
+  const inv = await rpc(OA, 'team_invite', { full_name: 'ZZ Pooja', mobile: '9876500002', email: `zz-pooja-${run}@example.com`, role_slug: 'biller', location_id: locA });
+  ok('team: A owner invites; answer has no token; delivery pending', inv.s === 200 && inv.j.status === 'invited' && inv.j.delivery === 'pending' && !JSON.stringify(inv.j).includes('token'), inv);
+  const dup = await rpc(OA, 'team_invite', { full_name: 'ZZ Pooja', mobile: '98765 00002', email: `zz-pooja2-${run}@example.com`, role_slug: 'biller', location_id: locA });
+  ok('team: same number again is 409 duplicate_mobile (the frame error)', dup.s === 409 && dup.j.code === 'duplicate_mobile' && /already has an invitation/.test(dup.j.detail ?? dup.j.error ?? dup.j.message ?? ''), dup);
+  const rs = await rpc(OA, 'team_invite', { full_name: 'ZZ Pooja', mobile: '9876500002', email: `zz-pooja2-${run}@example.com`, role_slug: 'biller', location_id: locA, resend: true });
+  ok('team: Resend invitation resends the same one', rs.s === 200 && rs.j.id === inv.j.id && rs.j.send_count === 2, rs);
+  const ceil = await rpc(OA, 'team_invite', { full_name: 'ZZ Own', mobile: '9876500003', email: `zz-own-${run}@example.com`, role_slug: 'org_owner' });
+  ok('team: an owner may invite an admin (the admin and owner ceiling is covered in the DB test)', ceil.s === 200);
+  ok('team: bad shape is a 400 with a sentence', await (async () => { const r = await rpc(OA, 'team_user_view', { id: 'nope' }); return r.s === 400 && r.j.code === 'validation'; })());
+  const tk = await rpc(OA, 'team_task_save', { title: 'ZZ Restock', assignee_staff_id: staffA }, `gw-team-${randomUUID()}`);
+  ok('team: A owner creates a task for A staff', tk.s === 200 && tk.j.status === 'assigned' && tk.j.assignee_name === 'ZZ Staff A', tk);
+  const tkey = `gw-team-${randomUUID()}`;
+  const tk1 = await rpc(OA, 'team_task_save', { title: 'ZZ Replay' }, tkey), tk2 = await rpc(OA, 'team_task_save', { title: 'ZZ Replay' }, tkey);
+  ok('team: same Idempotency-Key replays the same task', tk1.s === 200 && tk2.j.id === tk1.j.id && tk2.j.replayed === true, tk2);
+  ok('team: stale version is 409 version_conflict', await (async () => { const r = await rpc(OA, 'team_task_act', { id: tk.j.id, action: 'start', version: 99 }); return r.s === 409 && r.j.code === 'version_conflict'; })());
+  const aList = await rpc(OA, 'team_user_list'), uids = JSON.stringify(aList.j);
+  const memberA = sql(`select id from org_users where organization_id='${orgA}' and role_id=(select id from roles where slug='manager') limit 1`);
+  // B (another business, real owner) against A's people and tasks
+  const bDash2 = await rpc(B, 'team_dashboard');
+  ok('team: B dashboard counts only B (1 person, no invitations, no tasks)', bDash2.s === 200 && Number(bDash2.j.members) === 1 && Number(bDash2.j.invitations) === 0 && Number(bDash2.j.tasks_due) === 0, bDash2);
+  const bList2 = await rpc(B, 'team_user_list');
+  ok('team: B user list has none of A', bList2.s === 200 && bList2.j.items.length === 1 && !JSON.stringify(bList2.j).includes('ZZ Pooja') && !JSON.stringify(bList2.j).includes(memberA), bList2);
+  ok('team: B cannot open an A person or invitation', (await rpc(B, 'team_user_view', { id: memberA })).s === 404 && (await rpc(B, 'team_user_view', { id: inv.j.id })).s === 404);
+  ok('team: B cannot revoke, suspend or re-role an A person', (await rpc(B, 'team_invite_act', { id: inv.j.id, action: 'revoke' })).s === 404
+    && (await rpc(B, 'team_user_act', { id: memberA, action: 'suspend' })).s === 404 && (await rpc(B, 'team_user_act', { id: memberA, action: 'set_role', role_slug: 'org_owner' })).s === 404);
+  ok('team: B cannot invite into A place', refused(await rpc(B, 'team_invite', { full_name: 'Spy Spy', mobile: '9876500009', email: `zz-spy-${run}@example.com`, role_slug: 'biller', location_id: locA })));
+  ok('team: B cannot see, change or act on an A task, nor give B work to A staff', (await rpc(B, 'team_task_view', { id: tk.j.id })).s === 404 && (await rpc(B, 'team_task_act', { id: tk.j.id, action: 'cancel', version: 1 })).s === 404
+    && (await rpc(B, 'team_task_save', { id: tk.j.id, version: 1, title: 'Hijack' })).s === 404 && refused(await rpc(B, 'team_task_save', { title: 'Spy task', assignee_staff_id: staffA })));
+  ok('team: B task list, options and activity hold nothing of A', (await rpc(B, 'team_task_list')).j.items.length === 0 && !JSON.stringify((await rpc(B, 'team_options')).j).includes(staffA)
+    && !JSON.stringify((await rpc(B, 'team_activity', { range: '7d' })).j).includes('ZZ Pooja'));
+  ok('team: A pay and bank data never leave the database', !uids.includes('998877665544') && !JSON.stringify(tk.j).includes('25000') && !JSON.stringify((await rpc(OA, 'team_options')).j).includes('998877665544'));
+  ok('team: applicant with no business gets nothing', refused(await rpc(P1, 'team_dashboard')) && refused(await rpc(P1, 'team_user_view', { id: memberA })));
   ok('payment webhook hook answers 501 (not connected)', (await fetch(`${API}/webhooks/razorpay`, { method: 'POST' })).status === 501);
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.stack?.slice(0, 600));
@@ -416,6 +455,7 @@ try {
   sql(`delete from org_counters where organization_id in ('${orgA}','${orgB}')`);
   try { sql(`delete from table_merge_members where organization_id in ('${orgA}','${orgB}')`); sql(`delete from pos_reservations where organization_id in ('${orgA}','${orgB}')`); sql(`delete from dining_tables where organization_id in ('${orgA}','${orgB}')`); } catch {}
   try { sql(`delete from inventory_bins where organization_id in ('${orgA}','${orgB}')`); } catch {}
+  try { sql(`delete from pos_task_events where organization_id in ('${orgA}','${orgB}')`); } catch {}
   try { console.log(execSync('../../database/purge_test_orders.sh', { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { console.log('purge:', e.message.slice(0, 120)); }
   console.log('leftover test businesses: ' + sql(`select count(*) from organizations where id in ('${orgA}','${orgB}')`));
 }

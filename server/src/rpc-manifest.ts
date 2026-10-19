@@ -28,6 +28,7 @@ import * as rst from './schemas/restaurant.ts';
 import * as sell from './schemas/sell.ts';
 import * as pur from './schemas/purchasing.ts';
 import * as mo from './schemas/money.ts';
+import * as team from './schemas/team.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -200,7 +201,7 @@ export const MANIFEST: Entry[] = [
   db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
   db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),
   db('pur_audit_record', { args: pur.AuditRecord, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
-  // ---- money, section K (0430). Body = the function's `p` object; the database checks organisation, location and permission (money:read / record /
+  // ---- money, section K (0435). Body = the function's `p` object; the database checks organisation, location and permission (money:read / record /
   //      approve; settlements, payouts and reports need the organisation-level settlements:read / payouts:read). Writes carry the Idempotency-Key header.
   db('money_options', { args: mo.Options, map: P, rate: 'read', roles: ANY }),
   db('money_overview', { args: mo.Window, map: P, rate: 'read', roles: 'staff with money:read' }),
@@ -224,6 +225,21 @@ export const MANIFEST: Entry[] = [
   db('money_adjustment_decide', { args: mo.AdjustmentDecide, map: P, rate: 'money', idem: true, roles: 'staff with money:approve (not the requester)' }),
   db('money_invoice_pay', { args: mo.InvoicePay, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
   db('money_invoice_set_due', { args: mo.InvoiceDue, map: P, rate: 'write', roles: 'staff with money:record' }),
+  // ---- team, section L (0440). Body = the function's `p` object; the database checks organisation, place and role (owner/admin invite and change people;
+  //      managers read and run tasks; the assigned person starts and submits their own). Roles are read-only here. No pay or bank data is ever returned.
+  db('team_options', { args: team.Options, map: P, rate: 'read', roles: 'staff who may open the team (pos_staff:read or org_invitations:manage)' }),
+  db('team_dashboard', { args: team.Dashboard, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_user_list', { args: team.UserList, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_user_view', { args: team.UserView, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_role_view', { args: team.RoleView, map: P, rate: 'read', roles: 'staff who may open the team' }),
+  db('team_activity', { args: team.Activity, map: P, rate: 'read', roles: 'audit_logs:read or pos_audit_log:read or org_invitations:manage' }),
+  db('team_task_list', { args: team.TaskList, map: P, rate: 'read', roles: 'task managers (all tasks); the assigned person (own tasks)' }),
+  db('team_task_view', { args: team.TaskView, map: P, rate: 'read', roles: 'task managers; the assigned person' }),
+  db('team_invite', { args: team.Invite, map: P, rate: 'write', roles: 'owner or admin (org_invitations:manage); only an owner invites an owner or admin' }),
+  db('team_invite_act', { args: team.InviteAct, map: P, rate: 'write', roles: 'owner or admin (org_invitations:manage)' }),
+  db('team_user_act', { args: team.UserAct, map: P, rate: 'write', roles: 'owner or admin (org_invitations:manage); never on yourself' }),
+  db('team_task_save', { args: team.TaskSave, map: P, rate: 'write', idem: true, roles: 'task managers (owner, admin, manager, business / operations / location manager)' }),
+  db('team_task_act', { args: team.TaskAct, map: P, rate: 'write', roles: 'task managers; the assigned person may start and submit' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
 ];
 

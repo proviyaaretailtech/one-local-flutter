@@ -24,6 +24,8 @@ class HomeNav {
   // Later phases (G catalogue, H inventory, F sell, J–Q back office).
   static HomeRoute? items;
   static HomeRoute? stock;
+  // Section L: the team (users, invitations, roles, tasks, activity).
+  static HomeRoute? team;
   // Section H: one item's stock detail (section J's low-stock "view item" uses it).
   static ItemRoute? stockItem;
   // Section H kitchen: stations setup and the Kitchen Display System.
@@ -62,6 +64,6 @@ class HomeNav {
   static void reset() {
     home = orders = orderHistory = setup = items = stock = bill = money = notifications = complaints = reviews = support = lowStock = null;
     stockItem = null;
-    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = null;
   }
 }
