@@ -170,6 +170,15 @@ export const MANIFEST: Entry[] = [
   db('svc_dashboard', { args: svc.Dashboard, map: P, rate: 'read', roles: 'staff who may book' }),
   // ---- Restaurant dashboard (0491): the home screen of a restaurant; each block is read as the caller, a block the role may not read is null.
   db('rst_dashboard', { args: rst.Dashboard, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  // ---- Restaurant bill and pay (0550): the bill of a table, split it per guest, pay a part or the whole bill (money, idempotent: a part is never
+  //      paid twice), discount code on a placed bill, kitchen note, receipt view and send log. Roles and amounts are the database's.
+  db('rst_bill_view', { args: rst.BillView, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  db('rst_bill_split', { args: rst.BillSplit, map: P, rate: 'write', idem: true, roles: 'staff allowed to take payment' }),
+  db('rst_bill_pay', { args: rst.BillPay, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('rst_bill_coupon', { args: rst.BillCoupon, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
+  db('rst_bill_note', { args: rst.BillNote, map: P, rate: 'write', roles: 'staff with order:place or order:update_status' }),
+  db('rst_receipt_view', { args: rst.BillOrder, map: P, rate: 'read', roles: 'floor staff or staff allowed to take payment' }),
+  db('rst_receipt_log', { args: rst.ReceiptLog, map: P, rate: 'write', roles: 'floor staff or staff allowed to take payment' }),
   db('svc_calendar', { args: svc.Calendar, map: P, rate: 'read', roles: STAFF }),
   db('svc_quote', { args: svc.Quote, map: P, rate: 'read', roles: 'staff who may book' }),
   db('svc_slots', { args: svc.Slots, map: P, rate: 'read', roles: 'staff who may book' }),
