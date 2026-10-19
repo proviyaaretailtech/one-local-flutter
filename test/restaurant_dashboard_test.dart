@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/home/control_centre_screen.dart';
 import 'package:vinii_pos/home/home_nav.dart';
+import 'package:vinii_pos/outlets/outlet_scope.dart';
 import 'package:vinii_pos/restaurant/restaurant_api.dart';
 
 import 'home_test.dart' show FakeHome, summaryJson, showTall;
@@ -56,13 +57,17 @@ Future<FakeRst> showRst(WidgetTester t, {FakeRst? rpc}) async {
 }
 
 void main() {
-  setUp(HomeNav.reset);
+  setUp(() {
+    HomeNav.reset();
+    OutletScope.reset(); // the header's outlet switcher is app-wide
+  });
 
   group('Restaurant dashboard (home of a restaurant)', () {
     testWidgets('draws the server figures, not the store cards', (t) async {
       final r = await showRst(t);
-      expect(r.calls.where((c) => c.$1 == 'rst_dashboard'), hasLength(1));
-      expect(r.calls.first.$2.containsKey('location_id'), isFalse);
+      // the header's default is "All outlets": the server sums the outlets (0524)
+      expect(r.calls.where((c) => c.$1 == 'rst_dashboard_scope'), hasLength(1));
+      expect(r.calls.first.$2['location_id'], 'all');
       for (final text in ['ORDERS LIVE', '4', '19 today', 'KOT PENDING', '5', '1 delayed', 'SALES TODAY', '₹7,402', '18 bills paid', 'Banjara Hills', 'Kitchen status', 'New', 'Cooking', 'Ready',
         'Open kitchen display', 'Tables', 'Available', 'Occupied', 'Reserved', 'Cleaning', '10 tables', 'Ingredients low', '17 critical · 3 low', 'ONELOCAL ORDERS', '2 open · 5 today',
         'Last 7 days', 'Sales analytics', 'Quick links', 'Order history', 'Complaints', 'Reviews', 'Settings', 'Outlet info', 'Show all']) {

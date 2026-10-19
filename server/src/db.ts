@@ -34,7 +34,7 @@ export function userClient(request: Request): SupabaseClient {
 
 // Database functions raise errors like "OL_STALE: this order was already changed on another phone": a family prefix (OL, POS, INV,
 // GRN, SVC, PS, TBL, PUR, MONEY, TEAM, SF), a reason, then the sentence the app shows. The reason decides the HTTP status; an unknown reason is a plain 400.
-const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC', 'PS', 'TBL', 'PUR', 'MONEY', 'TEAM', 'SF'];
+const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC', 'PS', 'TBL', 'PUR', 'MONEY', 'TEAM', 'SF', 'OUTLET'];
 const STATUS: Record<string, number> = {
   BAD_REQUEST: 400, BAD_QTY: 400, EMPTY: 400, BAD_TABLE: 400, FORBIDDEN: 403, NOT_FOUND: 404, NOT_ONE_LOCAL: 404,
   NOT_ACCEPTING: 409, ITEM_UNAVAILABLE: 409, STALE: 409, WRONG_STATE: 409, EXPIRED: 409, NOT_DELIVERABLE: 409, PICKED_UP: 409, TAKEN: 409,
@@ -48,6 +48,7 @@ const STATUS: Record<string, number> = {
   CEILING: 403, SELF: 403, DUPLICATE_MOBILE: 409, DUPLICATE_EMAIL: 409, ALREADY_MEMBER: 409,  // team (section L)
   NOT_READY: 409, NOTHING_TO_PUBLISH: 409, BAD_STATE: 409,  // storefront (section M)
   NO_AUDIENCE: 422,                                         // notices (section N)
+  NOT_VERIFIED: 409, NOT_LISTED: 409, INCOMPLETE: 422,                                                                          // outlets (0520-0522)
 };
 const CODE: Record<string, string> = {
   NOT_DELIVERABLE: 'order_not_deliverable', PICKED_UP: 'already_picked_up', EXPIRED: 'offer_expired', TAKEN: 'already_taken',

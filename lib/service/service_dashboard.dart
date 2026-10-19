@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../home/home_nav.dart';
 import '../home/home_widgets.dart';
+import '../outlets/outlet_header.dart';
+import '../outlets/outlet_scope.dart';
 import '../ui/theme.dart';
 import 'service_api.dart';
 import 'service_widgets.dart' show svcRupees, svcStatus;
@@ -21,10 +22,28 @@ class ServiceHomeBody extends StatefulWidget {
 }
 
 class _ServiceHomeBodyState extends State<ServiceHomeBody> {
-  late Future<ServiceDashboardData> _f = widget.api.dashboard();
+  // the outlet chosen in the header's switcher (a service home shows one outlet; "all" is not summed yet)
+  late Future<ServiceDashboardData> _f = widget.api.dashboard(locationId: OutletScope.selected.value);
+
+  @override
+  void initState() {
+    super.initState();
+    OutletScope.selected.addListener(_followScope);
+  }
+
+  @override
+  void dispose() {
+    OutletScope.selected.removeListener(_followScope);
+    super.dispose();
+  }
+
+  void _followScope() {
+    if (!mounted) return;
+    _reload();
+  }
 
   Future<void> _reload() async {
-    final next = widget.api.dashboard();
+    final next = widget.api.dashboard(locationId: OutletScope.selected.value);
     setState(() {
       _f = next;
     });
@@ -33,12 +52,6 @@ class _ServiceHomeBodyState extends State<ServiceHomeBody> {
     } catch (_) {
       // drawn by the builder
     }
-  }
-
-  String _initials() {
-    final parts = widget.personName.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
-    if (parts.isEmpty) return '·';
-    return (parts.first[0] + (parts.length > 1 ? parts.last[0] : '')).toUpperCase();
   }
 
   @override
@@ -85,29 +98,8 @@ class _ServiceHomeBodyState extends State<ServiceHomeBody> {
     return ListView(
       padding: const EdgeInsets.only(bottom: 132),
       children: [
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(children: [
-            Semantics(
-              button: true,
-              label: 'Menu',
-              child: InkWell(
-                key: const ValueKey('home-menu'),
-                customBorder: const CircleBorder(),
-                onTap: widget.onMenu,
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(color: kBg, shape: BoxShape.circle, border: Border.all(color: kLine)),
-                  child: const Icon(LucideIcons.menu, size: 18, color: kMuted),
-                ),
-              ),
-            ),
-            const Spacer(),
-            Container(width: 32, height: 32, alignment: Alignment.center, decoration: BoxDecoration(color: kLime, borderRadius: BorderRadius.circular(8)), child: Text(_initials(), style: inter(10, 700, color: kNavy))),
-          ]),
-        ),
+        // the outlet header (specs/outlets-multi)
+        OutletHeader(title: d.locationName, onMenu: widget.onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), dashboard: true, allowAll: false),
         Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), child: Text('OneLocal', style: inter(24, 800, height: 1.1))),
         Container(
           color: kNavy,

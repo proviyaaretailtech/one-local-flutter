@@ -61,10 +61,11 @@ class RestaurantApi {
            );
   final RpcClient _rpc;
 
+  /// One outlet, or (no [locationId]) all outlets the person may see, summed by the server (0524 `rst_dashboard_scope`).
   Future<RestaurantDashboardData> dashboard({String? locationId}) async {
     try {
       return RestaurantDashboardData(
-        await _rpc.callMap('rst_dashboard', {'location_id': ?locationId}),
+        await _rpc.callMap('rst_dashboard_scope', {'location_id': locationId ?? 'all'}),
       );
     } on RpcException catch (e) {
       throw RestaurantApiException(e.status, e.message);

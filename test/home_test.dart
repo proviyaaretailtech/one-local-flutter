@@ -8,6 +8,7 @@ import 'package:vinii_pos/auth/partner_api.dart';
 import 'package:vinii_pos/home/control_centre_screen.dart';
 import 'package:vinii_pos/home/home_api.dart';
 import 'package:vinii_pos/home/home_nav.dart';
+import 'package:vinii_pos/outlets/outlet_scope.dart';
 import 'package:vinii_pos/home/home_widgets.dart';
 import 'package:vinii_pos/home/hub_screen.dart';
 
@@ -115,7 +116,10 @@ Future<void> tapText(WidgetTester t, String text) async {
 }
 
 void main() {
-  setUp(HomeNav.reset);
+  setUp(() {
+    HomeNav.reset();
+    OutletScope.reset(); // the header's outlet switcher is app-wide
+  });
 
   group('formatting', () {
     test('rupees use Indian grouping and keep paise only when present', () {
@@ -205,7 +209,7 @@ void main() {
     testWidgets('header band shows the server figures', (t) async {
       await showHome(t);
       expect(find.text('OneLocal'), findsOneWidget);
-      expect(find.text('RS'), findsOneWidget);
+      expect(find.text('SHOWING DATA FOR'), findsOneWidget, reason: 'the outlet switcher header (founder, 20 Oct)');
       expect(find.text('Store Open'), findsOneWidget);
       expect(find.text('Latur Main Branch · Synced 2 min ago'), findsWidgets);
       expect(find.text('SALES · 5 OCT'), findsOneWidget);

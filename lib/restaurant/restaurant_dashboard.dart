@@ -3,6 +3,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../home/home_nav.dart';
 import '../home/home_widgets.dart';
+import '../outlets/outlet_header.dart';
+import '../outlets/outlet_scope.dart';
 import '../service/service_widgets.dart' show svcRupees;
 import '../ui/theme.dart';
 import 'restaurant_api.dart';
@@ -28,8 +30,27 @@ class RestaurantHomeBody extends StatefulWidget {
 }
 
 class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
-  String? _location;
-  late Future<RestaurantDashboardData> _f = widget.api.dashboard();
+  // the outlet chosen in the header's switcher; null = all outlets (summed by rst_dashboard_scope)
+  String? _location = OutletScope.selected.value;
+  late Future<RestaurantDashboardData> _f = widget.api.dashboard(locationId: _location);
+
+  @override
+  void initState() {
+    super.initState();
+    OutletScope.selected.addListener(_followScope);
+  }
+
+  @override
+  void dispose() {
+    OutletScope.selected.removeListener(_followScope);
+    super.dispose();
+  }
+
+  void _followScope() {
+    if (!mounted || OutletScope.selected.value == _location) return;
+    _location = OutletScope.selected.value;
+    _reload();
+  }
 
   Future<void> _reload() async {
     final next = widget.api.dashboard(locationId: _location);
@@ -41,17 +62,6 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
     } catch (_) {
       // drawn by the builder
     }
-  }
-
-  String _initials() {
-    final parts = widget.personName
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((e) => e.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) return '·';
-    return (parts.first[0] + (parts.length > 1 ? parts.last[0] : ''))
-        .toUpperCase();
   }
 
   Future<void> _pickOutlet(RestaurantDashboardData d) async {
@@ -71,12 +81,19 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
             children: [
               Text('Show data for', style: inter(15, 600)),
               const SizedBox(height: 8),
+              ListTile(
+                key: const ValueKey('outlet-all'),
+                contentPadding: EdgeInsets.zero,
+                title: Text('All outlets (${d.outlets.length})', style: inter(14, 500)),
+                trailing: _location == null ? const Icon(LucideIcons.check, size: 18, color: kLink) : null,
+                onTap: () => Navigator.pop(ctx, ''),
+              ),
               for (final o in d.outlets)
                 ListTile(
                   key: ValueKey('outlet-${o['id']}'),
                   contentPadding: EdgeInsets.zero,
                   title: Text('${o['name']}', style: inter(14, 500)),
-                  trailing: o['id'] == d.locationId
+                  trailing: _location != null && o['id'] == d.locationId
                       ? const Icon(LucideIcons.check, size: 18, color: kLink)
                       : null,
                   onTap: () => Navigator.pop(ctx, '${o['id']}'),
@@ -87,8 +104,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
       ),
     );
     if (picked == null || !mounted) return;
-    _location = picked;
-    _reload();
+    OutletScope.selected.value = picked.isEmpty ? null : picked;   // the header and every outlet-aware screen follow
   }
 
   @override
@@ -251,48 +267,8 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
     return ListView(
       padding: const EdgeInsets.only(bottom: 132),
       children: [
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(
-            children: [
-              Semantics(
-                button: true,
-                label: 'Menu',
-                child: InkWell(
-                  key: const ValueKey('home-menu'),
-                  customBorder: const CircleBorder(),
-                  onTap: widget.onMenu,
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: kBg,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: kLine),
-                    ),
-                    child: const Icon(
-                      LucideIcons.menu,
-                      size: 18,
-                      color: kMuted,
-                    ),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                width: 32,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: kLime,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(_initials(), style: inter(10, 700, color: kNavy)),
-              ),
-            ],
-          ),
-        ),
+        // the outlet header (specs/outlets-multi): follows this screen's outlet picker
+        OutletHeader(title: d.locationName, onMenu: widget.onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), dashboard: true),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
           child: Text('OneLocal', style: inter(24, 800, height: 1.1)),

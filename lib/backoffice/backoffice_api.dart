@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 
 import '../api/rpc_client.dart';
+import '../outlets/outlet_scope.dart';
 import '../auth/partner_api.dart';
 
 num? _num(Object? v) => v == null ? null : (v is num ? v : num.tryParse('$v'));
@@ -107,13 +108,14 @@ class BackofficeApi {
 
   Future<Map<String, dynamic>> _call(String fn, Map<String, Object?> args, {String? key}) async {
     Map<String, dynamic> body() => <String, dynamic>{
-          if (locationId != null && locationId!.isNotEmpty) 'location_id': locationId,
+          // the outlet chosen in the header's switcher when the screen names none; none = the whole business (specs/outlets-multi)
+          if (OutletScope.pick(locationId) != null) 'location_id': OutletScope.pick(locationId),
           ...args,
         }..removeWhere((_, v) => v == null);
     try {
       return await _rpc.callMap(fn, body(), key);
     } on RpcException catch (e) {
-      if (e.code != 'store_scope' || (locationId != null && locationId!.isNotEmpty)) throw _wrap(e);
+      if (e.code != 'store_scope' || OutletScope.pick(locationId) != null) throw _wrap(e);
       final own = await _ownStore();
       if (own == null) throw _wrap(e);
       locationId = own;

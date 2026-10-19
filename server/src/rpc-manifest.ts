@@ -33,6 +33,7 @@ import * as sf from './schemas/storefront.ts';
 import * as nt from './schemas/notices.ts';
 import * as st from './schemas/settings.ts';
 import { helpContent } from './modules/help.ts';
+import * as out from './schemas/outlets.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -312,6 +313,18 @@ export const MANIFEST: Entry[] = [
   sec('pos_settings_file_attach', { args: st.FileAttach, rate: 'secure', roles: STAFF }),
   sec('pos_settings_file_link', { args: st.FileLink, rate: 'secure', roles: STAFF }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
+  // ---- Outlets (0520-0522): the outlet header, Restaurant status (Delivery status, Rush mode per outlet) and adding an outlet, which stays
+  //      pending until Master Admin approves it. The database checks organisation, outlet, role and verification. outlet_json is internal.
+  db('outlet_list', { args: out.List, map: P, rate: 'read', roles: STAFF }),
+  db('outlet_set_channel', { args: out.SetChannel, map: P, rate: 'write', roles: 'channel_integrations:update at that outlet (owner, admin, managers)' }),
+  db('outlet_add', { args: out.Add, map: P, rate: 'write', idem: true, roles: 'locations:manage (owner, admin, business manager) of an approved business' }),
+  // ---- Outlet drafts (0523): save and continue later; where the outlet is (same state reuses the business GSTIN, another state needs its own
+  //      GSTIN and a contact who becomes the outlet admin). Submit makes the pending outlet. The "all outlets" restaurant home (0524).
+  db('outlet_draft_get', { args: out.DraftGet, map: P, rate: 'read', roles: 'locations:manage of an approved business' }),
+  db('outlet_draft_save', { args: out.DraftSave, map: P, rate: 'write', idem: true, roles: 'locations:manage of an approved business' }),
+  db('outlet_draft_submit', { args: out.DraftRef, map: P, rate: 'write', roles: 'locations:manage of an approved business' }),
+  db('outlet_draft_discard', { args: out.DraftRef, map: P, rate: 'write', roles: 'locations:manage of an approved business' }),
+  db('rst_dashboard_scope', { args: rst.DashboardScope, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
 ];
 
 const byAlias = new Map<string, Entry>(MANIFEST.map(e => [e.alias, e]));

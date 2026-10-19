@@ -156,7 +156,8 @@ class _CartScreenState extends State<CartScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: _checkout ? 'Checkout · new bill' : 'Cart · new bill', onBack: () => _checkout ? setState(() => _checkout = false) : Navigator.maybePop(context)),
+        // Bill is a main tab: the cart shows the outlet header (specs/outlets-multi), checkout keeps the back arrow to the cart
+        OrdersTopBar(title: _checkout ? 'Checkout · new bill' : 'Cart · new bill', onBack: _checkout ? () => setState(() => _checkout = false) : null),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(12, 14, 12, 16), children: [
             OrderHeaderCard(number: 'New bill', channel: 'Store Checkout', subtitle: 'Customer: Guest · ${_placedAt.format(context)}'),

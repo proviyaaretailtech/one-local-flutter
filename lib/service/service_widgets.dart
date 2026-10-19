@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
+import '../outlets/outlet_header.dart';
 import '../ui/theme.dart';
 
 /// Top of every Service POS screen (Figma section I): menu button, OneLocal wordmark, initials avatar, then "Service" and "Business · City".
@@ -15,7 +16,8 @@ class ServiceTopBar extends StatelessWidget {
         decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: kLine))),
         padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
         child: Column(children: [
-          Padding(
+          // first-level screens show the outlet header (specs/outlets-multi); inner screens keep the back arrow
+          if (onBack == null) OutletHeader(title: 'Service POS', onMenu: onMenu, safeTop: false, initials: initials) else Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
             child: Row(children: [
               Semantics(
