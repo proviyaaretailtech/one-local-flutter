@@ -33,6 +33,8 @@ class HomeNav {
   static HomeRoute? kitchenDisplay;
   // Section H: tables and floor (the POS tab).
   static HomeRoute? tables;
+  // Table QR codes (0560): print, share, switch, replace the codes guests scan to order.
+  static HomeRoute? tableQr;
   static HomeRoute? bill;
   // Section I: the Service POS calendar, used instead of `bill` by service partners (partner_type 'service').
   static HomeRoute? service;
@@ -78,5 +80,6 @@ class HomeNav {
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
     home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = customers = wallet = account = menu = null;
+    tableQr = null;
   }
 }

@@ -34,6 +34,7 @@ class RestaurantMoreScreen extends StatelessWidget {
       (LucideIcons.house, 'Delivery settings', HomeNav.deliverySettings),
       (LucideIcons.fileText, 'Order history', HomeNav.orderHistory ?? HomeNav.orders),
       (LucideIcons.chefHat, 'Kitchen display', HomeNav.kitchen), // KDS; replaces "Share feedback" (founder, 2026-10-20)
+      (LucideIcons.qrCode, 'Table QR codes', HomeNav.tableQr), // codes guests scan to order (0560)
       (LucideIcons.creditCard, 'Payout', moneyAt('payouts')),
       (LucideIcons.circleQuestionMark, 'Customer support', HomeNav.support),
       (LucideIcons.bell, 'Notifications', HomeNav.notifications),

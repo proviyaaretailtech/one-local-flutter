@@ -4,3 +4,5 @@ node_modules/
 !.env.example
 api/index.js
 .vercel
+# the guest menu web build (../tool/build_guest_web.sh)
+public/t/

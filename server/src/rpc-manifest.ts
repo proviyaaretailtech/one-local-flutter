@@ -37,6 +37,7 @@ import * as out from './schemas/outlets.ts';
 import * as cu from './schemas/customers.ts';
 import * as sh from './schemas/shift.ts';
 import * as ord from './schemas/orders.ts';
+import * as gst from './schemas/guest.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -364,6 +365,16 @@ export const MANIFEST: Entry[] = [
   db('pos_payment_fail', { args: sh.PayFail, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
   db('pos_payment_status', { args: sh.PayStatus, map: P, rate: 'read', roles: STAFF }),
   db('pos_refund_check', { args: sh.RefundCheck, map: P, rate: 'read', roles: STAFF }),
+  // ---- table QR codes and guest orders (0560, 0561; spec specs/table-qr-guest-menu). Body = the function's `p` object; the database checks
+  //      organisation, store and role (floor staff read; table managers issue / replace / switch codes; order:place accepts guest orders).
+  //      The guest's own calls do not come through here: they use the guest door (src/guest-door.ts, POST /guest/<name>).
+  db('tbl_qr_list', { args: gst.QrList, map: P, rate: 'read', roles: 'floor staff (the code itself: table managers only)' }),
+  db('tbl_qr_issue', { args: gst.QrIssue, map: P, rate: 'write', roles: 'table managers; replacing names the table' }),
+  db('tbl_qr_set_enabled', { args: gst.QrEnabled, map: P, rate: 'write', roles: 'table managers' }),
+  db('guest_requests_list', { args: gst.Requests, map: P, rate: 'read', roles: 'floor staff' }),
+  db('guest_request_decide', { args: gst.Decide, map: P, rate: 'write', roles: 'staff with order:place (accepting places the order as them)' }),
+  db('guest_staff_menu', { args: gst.StaffMenu, map: P, rate: 'read', roles: 'staff with order:place' }),
+  db('guest_staff_place', { args: gst.StaffPlace, map: P, rate: 'write', idem: true, roles: 'staff with order:place (Hand to guest)' }),
   db('online_order_act', { fn: 'gw_online_order_act', args: 'passthrough', map: P, rate: 'write', roles: 'staff with order.update_status' }),
   // ---- Outlets (0520-0522): the outlet header, Restaurant status (Delivery status, Rush mode per outlet) and adding an outlet, which stays
   //      pending until Master Admin approves it. The database checks organisation, outlet, role and verification. outlet_json is internal.

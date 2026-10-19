@@ -33,8 +33,9 @@ export function userClient(request: Request): SupabaseClient {
 }
 
 // Database functions raise errors like "OL_STALE: this order was already changed on another phone": a family prefix (OL, POS, INV,
-// GRN, SVC, PS, TBL, PUR, MONEY, TEAM, SF, OUTLET, CUST, WALLET, ACCT), a reason, then the sentence the app shows. The reason decides the HTTP status; an unknown reason is a plain 400.
-const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC', 'PS', 'TBL', 'PUR', 'MONEY', 'TEAM', 'SF', 'OUTLET', 'CUST', 'WALLET', 'ACCT'];
+// GRN, SVC, PS, TBL, PUR, MONEY, TEAM, SF, OUTLET, CUST, WALLET, ACCT, GUEST), a reason, then the sentence the app shows. The reason decides the HTTP status; an unknown reason is a plain 400.
+const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC', 'PS', 'TBL', 'PUR', 'MONEY', 'TEAM', 'SF', 'OUTLET', 'CUST', 'WALLET', 'ACCT', 'GUEST'];
+// GRN, SVC, PS, TBL, PUR), a reason, then the sentence the app shows. The reason decides the HTTP status; an unknown reason is a plain 400.
 const STATUS: Record<string, number> = {
   BAD_REQUEST: 400, BAD_QTY: 400, EMPTY: 400, BAD_TABLE: 400, FORBIDDEN: 403, NOT_FOUND: 404, NOT_ONE_LOCAL: 404,
   NOT_ACCEPTING: 409, ITEM_UNAVAILABLE: 409, STALE: 409, WRONG_STATE: 409, EXPIRED: 409, NOT_DELIVERABLE: 409, PICKED_UP: 409, TAKEN: 409,
@@ -44,13 +45,13 @@ const STATUS: Record<string, number> = {
   SHORT: 409, ALLOCATION: 409, CAPACITY: 422, STORAGE: 422, TENANT: 403,                                   // inventory (section H)
   CONFLICT: 409, SCOPE: 403,                                                                                     // purchase suggestions (section J), tables (H), money (K)
   MERGED: 409, NOT_OCCUPIED: 409, BUSY: 409, CLOSED: 422,                                                                   // tables and floor (section H)
+  RATE_LIMITED: 429, NOT_PUBLISHED: 409, CONFIRM: 422,                                                                   // QR guest orders (0560, 0561) and Write with AI (0541)
   COUPON_UNKNOWN: 422, COUPON_MIN: 422, COUPON_LIMIT: 422, COUPON_CUSTOMER: 422, COUPON_ZERO: 422, OVER_REFUND: 422, OVER_RETURN: 422, PROVIDER_OFF: 503, TAX_REQUIRED: 422, UNRESOLVED: 422, UNAVAILABLE: 503,
   CEILING: 403, SELF: 403, DUPLICATE_MOBILE: 409, DUPLICATE_EMAIL: 409, ALREADY_MEMBER: 409,  // team (section L)
   NOT_READY: 409, NOTHING_TO_PUBLISH: 409, BAD_STATE: 409,  // storefront (section M)
   NO_AUDIENCE: 422,                                         // notices (section N)
   NOT_VERIFIED: 409, NOT_LISTED: 409, INCOMPLETE: 422,                                                                          // outlets (0520-0522)
   SHIFT_OPEN: 409, NO_SHIFT: 409, PAYMENT_PENDING: 409, NOT_ENOUGH_CASH: 422, REASON_REQUIRED: 422, RETURN_WINDOW: 422,       // store shift, payment pending, refunds (0500-0502)
-  RATE_LIMITED: 429,                                                                                             // Write with AI per business (0541)
 };
 const CODE: Record<string, string> = {
   NOT_DELIVERABLE: 'order_not_deliverable', PICKED_UP: 'already_picked_up', EXPIRED: 'offer_expired', TAKEN: 'already_taken',

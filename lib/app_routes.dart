@@ -39,6 +39,7 @@ import 'storefront/builder_screen.dart';
 import 'storefront/settings_screens.dart';
 import 'storefront/storefront_api.dart';
 import 'tables/floor_screen.dart';
+import 'tables/table_qr_screen.dart';
 import 'tables/table_widgets.dart';
 import 'team/team_screens.dart';
 import 'team/team_widgets.dart';
@@ -69,6 +70,7 @@ void installRoutes() {
   HomeNav.kitchen = HomeNav.kitchenDisplay;
   HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id == 'menu' ? 'item' : id)))));
   HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id)))));
+  HomeNav.tableQr = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => TableQrScreen(env: TablesEnv())));
   HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
   HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));

@@ -6,12 +6,18 @@ import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../outlets/outlet_header.dart';
 import '../ui/theme.dart';
+import 'table_qr_api.dart';
 import 'tables_api.dart';
 
 /// What the tables screens need from the rest of the app. Screens owned by other sections plug in through these hooks.
 class TablesEnv {
-  TablesEnv({TablesApi? api, this.onNavigate, this.onStartOrder, this.initials = '', this.onMenu}) : api = api ?? TablesApi();
+  TablesEnv({TablesApi? api, this.onNavigate, this.onStartOrder, this.initials = '', this.onMenu, TableQrApi? qrApi})
+      : api = api ?? TablesApi(),
+        qrApi = qrApi ?? TableQrApi();
   final TablesApi api;
+
+  /// Table QR codes and guest orders (0560, 0561).
+  final TableQrApi qrApi;
 
   /// Bottom-bar tabs this section does not own: 'home', 'menu', 'orders', 'stock'.
   final ValueChanged<String>? onNavigate;

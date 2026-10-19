@@ -158,3 +158,32 @@ is optional everywhere: without it the business's main store allowed to the call
 A shift holds no copy of money: `totals` are read from `payments` and `pos_refunds` at that store in the shift window (frozen on the row at close).
 New error codes: `shift_open`, `no_shift`, `payment_pending` (409); `reason_required`, `not_enough_cash`, `return_window` (422).
 E2E + cross-tenant: `node scripts/shift-e2e.mjs` (39 checks).
+## Table QR codes and the guest menu — `lib/tables/table_qr_screen.dart`, `lib/guest/*`, `src/schemas/guest.ts`, migrations 0560, 0561
+
+Spec: `specs/table-qr-guest-menu/spec.md`.
+
+### Staff (`POST /rpc/<name>`, as the caller)
+
+| Name | Who (the database decides) | Logic |
+|---|---|---|
+| `tbl_qr_list` | floor staff; the code itself only for table managers | every table of the store with has_code / enabled / issued_at |
+| `tbl_qr_issue` | table managers | first code, or `replace: true` with `confirm_label` = the table's name (422 `confirm` otherwise); replacing ends the table's guest sessions |
+| `tbl_qr_set_enabled` | table managers | on / off; off ends the guest sessions |
+| `guest_requests_list` | floor staff | waiting guest orders of the store (or one table), `can_decide` |
+| `guest_request_decide` | staff with order:place | `accept` places the order with `pos_place_order` as the caller (placed_by guest, KOT); `decline` needs a reason the guest sees |
+| `guest_staff_menu`, `guest_staff_place` (idem) | staff with order:place | Hand to guest on the staff phone: the same published menu; places the order straight away |
+
+### The guest door (`POST /guest/<name>`, no sign-in) — `src/guest-door.ts`
+
+Separate allowlist: `open` (`guest_qr_open`), `menu` (`guest_menu`), `send` (`guest_order_send`), `status` (`guest_order_status`). The guest
+functions are executable by **service_role only**, so the gateway is the only way in. Limits per network address (240/min overall; open 30,
+menu 60, send 12, status 120 per minute) and per code / session; strict bodies (no extra keys, 16 KB). The database adds its own limits
+(per table and per address hash per hour, three waiting orders per table, eight per session per hour). A guest never sends a price, a
+table, an outlet or a business: the session names them. Errors: `GUEST_<REASON>`; an ended session answers 409 `session_expired`.
+
+### The guest page (`GET /t/<code>`) — `src/guest-web.ts`
+
+Static files of the Flutter web build `lib/guest_web_main.dart` (`../tool/build_guest_web.sh` writes `public/t/`, not committed). Any path
+under `/t/` that is not a built file gets the page; the page reads the code from its own address. `Referrer-Policy: no-referrer` so the
+code never leaks to other sites. On Vercel the build is served from `public/t/` and `vercel.json` rewrites `/t/<code>` to the page.
+E2E: `node scripts/guest-e2e.mjs` (two businesses, cross-tenant, abuse limits, replaced code, accept into an order, Hand to guest).

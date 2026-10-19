@@ -4,7 +4,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
+import 'actions_screen.dart';
+import 'guest_orders.dart';
 import 'reserve_screen.dart';
+import 'table_qr_screen.dart';
 import 'table_order_screen.dart';
 import 'table_widgets.dart';
 import 'take_order_screens.dart';
@@ -29,6 +32,7 @@ class _FloorScreenState extends State<FloorScreen> {
   Facts? _d;
   String? _error;
   int _seq = 0;
+  final _guests = GlobalKey<GuestOrdersPanelState>();
 
   @override
   void initState() {
@@ -38,6 +42,7 @@ class _FloorScreenState extends State<FloorScreen> {
 
   Future<void> _load() async {
     final mine = ++_seq;
+    _guests.currentState?.reload();
     try {
       final d = await env.api.floor(status: _status);
       if (!mounted || mine != _seq) return;
@@ -115,7 +120,7 @@ class _FloorScreenState extends State<FloorScreen> {
               ),
           ]),
         ),
-        if (widget.pickFor == null)
+        if (widget.pickFor == null) ...[
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
             child: OutlineButtonT('Ready to serve', key: const ValueKey('open-ready-to-serve'), icon: LucideIcons.chefHat, height: 48, onPressed: () async {
@@ -123,6 +128,19 @@ class _FloorScreenState extends State<FloorScreen> {
               if (mounted) _load();
             }),
           ),
+          // guest orders from the table QR codes, and the codes themselves (0560, 0561)
+          GuestOrdersPanel(key: _guests, env: env, onChanged: _load),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: OutlineButtonT('Table QR codes', key: const ValueKey('open-qr'), icon: LucideIcons.qrCode, dark: true, height: 46, onPressed: () async {
+                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TableQrScreen(env: env)));
+                if (mounted) _load();
+              }),
+            ),
+          ),
+        ],
         if (_d == null && _error == null) tablesLoading(),
         if (_d == null && _error != null) TablesError(_error!, onRetry: _load),
         if (d != null && tables.isEmpty)
@@ -234,6 +252,13 @@ class _TableSheetState extends State<_TableSheet> {
               } else {
                 start(context, t);
               }
+            }),
+            const SizedBox(height: 12),
+          ],
+          if (allowed.contains('start_order')) ...[
+            OutlineButtonT('Hand to guest', key: const ValueKey('sheet-hand-to-guest'), icon: LucideIcons.smartphone, dark: true, height: 56, onPressed: () {
+              nav.pop();
+              nav.push(GuestHostScreen.route(widget.env, widget.table.s('id')));
             }),
             const SizedBox(height: 12),
           ],
