@@ -19,6 +19,7 @@ import 'notices/feedback_screen.dart';
 import 'notices/notices_api.dart';
 import 'notices/notices_home.dart';
 import 'orders/order_screen.dart';
+import 'orders/orders_board_screen.dart';
 import 'orders/orders_home.dart';
 import 'purchasing/po_history_screen.dart';
 import 'purchasing/purchasing_api.dart';
@@ -42,7 +43,9 @@ import 'team/team_widgets.dart';
 /// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K), the team (L), the storefront (M), notices (N) and settings and support (P) into the [HomeNav] hooks.
 void installRoutes() {
   HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
-  HomeNav.orders = HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
+  // The Orders tab is Live orders | Hold orders (specs/orders-live-hold); the full history stays one tap away in the side menu.
+  HomeNav.orders = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))));
+  HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
   // Section F: the till (sell, search, carts, payment, history, returns, receipts). Section E's cart screen stays reachable from the orders list.
   HomeNav.bill = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'sell'), builder: (_) => SellScreen(env: SellEnv(onTab: (id) => _tab(c, id)))));
   HomeNav.items = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CatalogueScreen(onNavigate: (id) => _tab(c, id))));

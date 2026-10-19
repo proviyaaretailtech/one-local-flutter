@@ -5,7 +5,7 @@
 //   GET  /api/partner/pos-orders/catalog?q=                                   sellable items   menu_items (RLS)
 //   POST /api/partner/pos-orders/quote                                        cart totals      pos_quote_order (writes nothing)
 //   POST /api/partner/pos-orders/checkout   (Idempotency-Key)                 place + pay      pos_checkout
-//   POST /api/partner/pos-orders/hold       (Idempotency-Key)                 place unpaid     pos_checkout {hold}
+//   POST /api/partner/pos-orders/hold       (Idempotency-Key)                 place unpaid     pos_hold_place (pos_checkout {hold} + reason, 0530)
 //   GET  /api/partner/pos-orders/:id                                          one order        pos_order_view
 //   POST /api/partner/pos-orders/:id/pay    (Idempotency-Key)                 pay a held bill  pos_checkout_pay
 //   POST /api/partner/pos-orders/:id/cancel                                   cancel unpaid    pos_set_order_status
@@ -340,8 +340,10 @@ export async function checkout(request: Request, hold: boolean) {
   const key = requiredKey(request);
   const client = asCaller(request);
   const coupon = text(body.coupon_code, 40);
-  const out = await call<Row>(client, 'pos_checkout', {
+  const reason = hold ? text(body.reason, 200) : '';
+  const out = await call<Row>(client, hold ? 'pos_hold_place' : 'pos_checkout', {
     idempotency_key: key, hold, lines: lines(body.lines), method: text(body.method, 10), tendered: hold ? null : money(body.tendered),
+    ...(reason ? { reason } : {}),
     reference: text(body.reference, 80) || null, customer_name: text(body.customer_name, 80) || null, customer_phone: text(body.customer_phone, 20) || null, notes: text(body.notes, 200) || null,
     ...(coupon ? { coupon_code: coupon } : {}),
   });
