@@ -53,3 +53,6 @@ app.*.map.json
 # local test password (phase A)
 .phasea_test_pw
 .ol-ui-dev.log
+
+# local env folders (keys)
+/env/
