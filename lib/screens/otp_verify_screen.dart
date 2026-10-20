@@ -107,7 +107,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
     final target = _isPhone ? maskPhone(widget.phone!) : maskEmail(widget.email!);
     return ScreenShell(
       children: [
-        const BrandNav(),
+        const BrandNav(back: true),
         FormContent(children: [
           const Kicker('Sign in · Verify'),
           PageIntro(

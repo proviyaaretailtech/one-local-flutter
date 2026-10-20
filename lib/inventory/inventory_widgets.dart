@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../ui/app_tab_bar.dart';
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
 import '../outlets/outlet_header.dart';
 import 'inventory_api.dart';
@@ -97,64 +99,21 @@ String stamp(DateTime d) => '${dayMonth(d, year: true)}, ${hm(d)}';
 
 /// Top bar of every section H screen: menu, OneLocal wordmark, dark "Items" pill with a camera, bell. White, rounded at the bottom.
 class InvTopBar extends StatelessWidget {
-  const InvTopBar({super.key, this.onMenu, this.onItems, this.onBell});
+  const InvTopBar({super.key, this.title = 'Money', this.onMenu, this.onItems, this.onBell});
+  final String title;
   final VoidCallback? onMenu, onItems, onBell;
+  // The shared banner: back, store name over the page's name, the Items scan button, bell, ☰ (used by the Money section).
   @override
-  Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.fromLTRB(14, MediaQuery.paddingOf(context).top + 10, 14, 10),
-        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),
-        child: Row(children: [
-          Semantics(
-            button: true,
-            label: 'Menu',
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onMenu,
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(color: const Color(0xFFF3F4F1), shape: BoxShape.circle, border: Border.all(color: kLine)),
-                child: const Icon(LucideIcons.menu, size: 15, color: kInk),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          const SizedBox(width: 80, height: 14, child: FittedBox(alignment: Alignment.centerLeft, child: BrandLogo())),
-          const Spacer(),
-          Semantics(
-            button: true,
-            label: 'Items',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: onItems,
-              child: Container(
-                height: 30,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(10)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(LucideIcons.camera, size: 14, color: kLimeH),
-                  const SizedBox(width: 8),
-                  ExcludeSemantics(child: Text('Items', style: inter(13, 500, color: kLimeH))),
-                ]),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Semantics(
-            button: true,
-            label: 'Notifications',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: onBell,
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(color: const Color(0xFFF3F4F1), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(LucideIcons.bell, size: 16, color: kInk),
-              ),
-            ),
-          ),
-        ]),
+  Widget build(BuildContext context) => AppHeader(
+        title: title,
+        onMenu: onMenu,
+        onBell: onBell,
+        trailing: Semantics(
+          button: true,
+          label: 'Items',
+          excludeSemantics: true,
+          child: IconButton(onPressed: onItems, icon: const Icon(LucideIcons.camera, size: 22, color: kInk)),
+        ),
       );
 }
 
@@ -170,41 +129,13 @@ class InvBottomNav extends StatelessWidget {
     ('online', 'Online order', LucideIcons.shoppingBag),
     ('stock', 'Stock', LucideIcons.boxes),
   ];
+  // The app's one bottom bar ([AppTabBar]); tabs keep their 'inv-tab-…' keys.
   @override
-  Widget build(BuildContext context) => SafeArea(
-        top: false,
-        minimum: const EdgeInsets.fromLTRB(14, 12, 14, 14), // 12 above: the last button of a page never touches the bar
-        child: Container(
-          height: 78,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-          decoration: BoxDecoration(color: kNavyH, borderRadius: BorderRadius.circular(34)),
-          child: Row(children: [
-            for (final (id, label, icon) in tabs)
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  selected: id == active,
-                  label: label,
-                  child: InkWell(
-                    key: ValueKey('inv-tab-$id'),
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () => onTap(id),
-                    child: Container(
-                      decoration: id == active ? BoxDecoration(color: kLimeH, borderRadius: BorderRadius.circular(12)) : null,
-                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(icon, size: 20, color: id == active ? kNavyH : Colors.white),
-                        SizedBox(height: id == 'bill' ? 10 : 5),
-                        ExcludeSemantics(
-                          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: inter(10.5, id == active ? 700 : 500, color: id == active ? kNavyH : Colors.white)),
-                        ),
-                      ]),
-                    ),
-                  ),
-                ),
-              ),
-          ]),
-        ),
+  Widget build(BuildContext context) => AppTabBar(
+        tabs: [for (final (id, label, icon) in tabs) AppTab(id, label, icon, primary: id == 'bill')],
+        active: active,
+        onTap: onTap,
+        keyPrefix: 'inv-tab-',
       );
 }
 
@@ -226,7 +157,7 @@ class InvPage extends StatelessWidget {
       backgroundColor: kBg,
       body: Column(children: [
         // the outlet header (specs/outlets-multi) replaces InvTopBar on every section H screen
-        OutletHeader(title: 'Stock', onMenu: onMenu ?? () => Navigator.of(context).maybePop(), rounded: true),
+        OutletHeader(title: 'Stock', onMenu: onMenu),   // ☰: the screen's menu, else the side menu (AppHeader)
         Expanded(child: list),
       ]),
       bottomNavigationBar: InvBottomNav(onTap: onTab),

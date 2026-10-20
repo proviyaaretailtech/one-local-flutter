@@ -6,6 +6,7 @@ import 'auth/partner_api.dart';
 import 'backoffice/low_stock_screen.dart';
 import 'catalogue/catalogue_screen.dart';
 import 'catalogue/grn_screens.dart';
+import 'home/app_shell.dart';
 import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
 import 'inventory/inventory_dashboard.dart';
@@ -48,32 +49,53 @@ import 'team/team_widgets.dart';
 /// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K), the team (L), the storefront (M), notices (N) and settings and support (P) into the [HomeNav] hooks.
 /// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J) and the restaurant menu into the [HomeNav] hooks.
 void installRoutes() {
-  HomeNav.home = (c) => Navigator.of(c).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const ControlCentreScreen()), (r) => r.isFirst);
+  // Home: inside the app shell, its Home tab; otherwise (after setup, first entry) the shell replaces everything.
+  HomeNav.home = (c) {
+    if (_inShell('Home')) return;
+    Navigator.of(c, rootNavigator: true).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => appShell()), (r) => r.isFirst);
+  };
   // The Orders tab is Live orders | Hold orders (specs/orders-live-hold); the full history stays one tap away in the side menu.
-  HomeNav.orders = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))));
+  HomeNav.orders = (c) {
+    if (_inShell('Online order') || _inShell('Orders')) return;
+    Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))));
+  };
   HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
   // Section F: the till (sell, search, carts, payment, history, returns, receipts). Section E's cart screen stays reachable from the orders list.
-  HomeNav.bill = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'sell'), builder: (_) => SellScreen(env: SellEnv(onTab: (id) => _tab(c, id)))));
-  HomeNav.items = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => CatalogueScreen(onNavigate: (id) => _tab(c, id))));
-  HomeNav.menu = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuScreen()));
+  HomeNav.bill = (c) {
+    if (HomeNav.shell?.kind == 'store' && _inShell('Bill')) return;
+    Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'sell'), builder: (_) => SellScreen(env: SellEnv(onTab: (id) => _tab(c, id)))));
+  };
+  HomeNav.items = (c) {
+    if (_inShell('Item')) return;
+    Navigator.of(c).push(MaterialPageRoute(builder: (_) => CatalogueScreen(onNavigate: (id) => _tab(c, id))));
+  };
+  HomeNav.menu = (c) {
+    if (_inShell('Menu')) return;
+    Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuScreen()));
+  };
   HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const GrnQueueScreen()));
-  InvEnv inventoryEnv(BuildContext c) => InvEnv(
-      onNavigate: (id) => _tab(c, id),
-      onOpenPurchasing: (ctx) => Navigator.of(ctx).push(PoHistoryScreen.pageRoute(PurEnv(inv: inventoryEnv(ctx)))),
-      onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
-  HomeNav.stock = (c) => Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
+  const inventoryEnv = _inventoryEnv;
+  HomeNav.stock = (c) {
+    if (_inShell('Stock')) return;
+    Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
+  };
   HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
   KitchenEnv kitchenEnv(BuildContext c) => KitchenEnv(onNavigate: (id) => _kitchenTab(c, id));
   HomeNav.kitchenSetup = (c) => Navigator.of(c).push(KitchenSetupScreen.route(kitchenEnv(c)));
   HomeNav.kitchenDisplay = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => KdsScreen(env: kitchenEnv(c))));
   // The restaurant dashboard's "Open kitchen display" and the More page's Kitchen display tile open the same KDS.
   HomeNav.kitchen = HomeNav.kitchenDisplay;
-  HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id == 'menu' ? 'item' : id)))));
-  HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id)))));
+  HomeNav.tables = (c) {
+    if (HomeNav.shell?.kind == 'restaurant' && _inShell('Bill')) return;   // a restaurant's Bill tab is the floor
+    Navigator.of(c).push(MaterialPageRoute(builder: (_) => _floor(c)));
+  };
   HomeNav.tableQr = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => TableQrScreen(env: TablesEnv())));
   HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
-  HomeNav.service = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
+  HomeNav.service = (c) {
+    if (HomeNav.shell?.kind == 'service' && _inShell('Bill')) return;   // a service partner's Bill tab is the calendar
+    Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
+  };
   // Section K: money. The server says which screens this person may open; the bottom bar's other tabs go back through _tab.
   HomeNav.money = (c) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
   HomeNav.moneyScreen = (c, screen) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id)), start: screen));
@@ -87,9 +109,40 @@ void installRoutes() {
   // Section P: the Settings page and Support & Help. The Team hook (users, roles, invites) belongs to section L.
   HomeNav.settings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SettingsScreen()));
   HomeNav.support = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SupportScreen()));
-  HomeNav.setup = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
+  // Setup covers the whole screen, bar included.
+  HomeNav.setup = (c) => Navigator.of(c, rootNavigator: true).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
   installAccountRoutes(); // side nav: Customer, One Local Wallet, Manage account
 }
+
+InvEnv _inventoryEnv(BuildContext c) => InvEnv(
+    onNavigate: (id) => _tab(c, id),
+    onOpenPurchasing: (ctx) => Navigator.of(ctx).push(PoHistoryScreen.pageRoute(PurEnv(inv: _inventoryEnv(ctx)))),
+    onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
+
+/// Switches the app shell to the tab with this bar label, when the shell is up and has that tab.
+bool _inShell(String label) => HomeNav.shell?.show(label) ?? false;
+
+Widget _floor(BuildContext c) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id)));
+
+/// The signed-in app: one bottom bar over a back stack per tab. Each tab's first screen depends on the kind of
+/// business: Bill is the till for a store, the tables floor for a restaurant, the calendar for a service partner.
+Widget appShell({AuthRepository? auth}) => AppShell(
+      rootFor: (kind, label) => switch (label) {
+        'Home' => ControlCentreScreen(auth: auth),
+        'Item' => Builder(builder: (c) => CatalogueScreen(onNavigate: (id) => _tab(c, id))),
+        'Menu' => const MenuScreen(),
+        'Bill' => Builder(
+            builder: (c) => switch (kind) {
+              'restaurant' => _floor(c),
+              'service' => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id)),
+              _ => SellScreen(env: SellEnv(onTab: (id) => _tab(c, id))),
+            },
+          ),
+        'Online order' || 'Orders' => Builder(builder: (c) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))),
+        'Stock' => Builder(builder: (c) => InventoryDashboard(env: _inventoryEnv(c))),
+        _ => null,
+      },
+    );
 
 /// Bottom-bar tabs of the order screens that belong to other sections.
 void _tab(BuildContext context, String id) => switch (id) {
@@ -126,6 +179,6 @@ Future<void> openWorkspace(BuildContext context, {AuthRepository? auth, SetupApi
   }
   if (!context.mounted) return;
   Navigator.of(context).push(MaterialPageRoute(
-    builder: (_) => needsSetup ? SetupEntry(api: setupApi, onFinished: (ctx) => HomeNav.home!(ctx)) : ControlCentreScreen(auth: auth),
+    builder: (_) => needsSetup ? SetupEntry(api: setupApi, onFinished: (ctx) => HomeNav.home!(ctx)) : appShell(auth: auth),
   ));
 }

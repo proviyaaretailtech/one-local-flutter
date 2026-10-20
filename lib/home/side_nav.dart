@@ -21,27 +21,23 @@ Future<void> showStoreSideNav(
   BuildContext context, {
   required String name,
   String? email,
-  required VoidCallback onDashboard,
   required VoidCallback onReports,
   required VoidCallback onSignOut,
 }) {
   // Each entry opens through its HomeNav hook; an unplugged hook makes the row "Soon".
   VoidCallback? hook(HomeRoute? r) => r == null ? null : () => r(context);
+  // Ordered by how often a shop needs them, daily tools first and the set-up-once pages last. Dashboard, Store POS,
+  // Catalogue and Stock management are not here: they are the bottom bar's Home, Bill, Item and Stock (founder, 20 Oct 2026).
   final entries = [
-    SideNavEntry(LucideIcons.layoutDashboard, 'Dashboard', onDashboard),
-    SideNavEntry(LucideIcons.store, 'Store POS', hook(HomeNav.bill)),
-    SideNavEntry(LucideIcons.bookOpen, 'Catalogue', hook(HomeNav.items)),
     SideNavEntry(LucideIcons.package, 'GRN', hook(HomeNav.grn)),
-    SideNavEntry(LucideIcons.clipboardList, 'Stock management', hook(HomeNav.stock)),
     SideNavEntry(LucideIcons.qrCode, 'All Orders', hook(HomeNav.orderHistory ?? HomeNav.orders)),
-    SideNavEntry(LucideIcons.wallet, 'One Local Wallet', hook(HomeNav.wallet)),
     SideNavEntry(LucideIcons.indianRupee, 'Money', hook(HomeNav.money)),
     SideNavEntry(LucideIcons.circleUser, 'Customer', hook(HomeNav.customers)),
-    // Founder flow (19 Oct 2026): Team, the OneLocal page, Reports, Settings and Help live in this menu.
-    SideNavEntry(LucideIcons.users, 'Team', hook(HomeNav.team)),
-    SideNavEntry(LucideIcons.globe, 'OneLocal page', hook(HomeNav.storefront)),
     SideNavEntry(LucideIcons.fileText, 'Reports', onReports),
+    SideNavEntry(LucideIcons.users, 'Team', hook(HomeNav.team)),
     SideNavEntry(LucideIcons.settings, 'Settings', hook(HomeNav.settings ?? HomeNav.setup)),
+    SideNavEntry(LucideIcons.globe, 'OneLocal page', hook(HomeNav.storefront)),
+    SideNavEntry(LucideIcons.wallet, 'One Local Wallet', hook(HomeNav.wallet)),
     SideNavEntry(LucideIcons.circleQuestionMark, 'Help & support', hook(HomeNav.support)),
   ];
   return showGeneralDialog<void>(
@@ -97,23 +93,38 @@ class _StoreSideNav extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              // Profile: initials stand in for the photo the Figma frame shows.
-              Row(children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(color: kLime, shape: BoxShape.circle),
-                  child: Text(initials(name), style: inter(16, 700, color: kNavy)),
+              // Profile: initials stand in for the photo the Figma frame shows. It is also the way to Manage account
+              // (founder, 20 Oct 2026: one place for the account, not a separate row at the foot).
+              Semantics(
+                button: onAccount != null,
+                label: 'Manage account',
+                excludeSemantics: true,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: onAccount == null ? null : () => _go(context, onAccount!),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Row(children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(color: kLime, shape: BoxShape.circle),
+                        child: Text(_mark(name, email), style: inter(16, 700, color: kNavy)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          name.trim().isEmpty
+                              ? Text('Add your name', style: inter(15, 700, color: kLink))   // no name on the account yet: Manage account sets it
+                              : Text(name, style: inter(15, 700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if (email != null && email!.isNotEmpty) Text(email!, style: inter(12, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ]),
+                      ),
+                    ]),
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(name, style: inter(15, 700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    if (email != null && email!.isNotEmpty) Text(email!, style: inter(12, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ]),
-                ),
-              ]),
+              ),
               const SizedBox(height: 14),
               const Divider(height: 1, color: kLine),
               const SizedBox(height: 10),
@@ -134,8 +145,6 @@ class _StoreSideNav extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              _NavRow(icon: LucideIcons.user, label: 'Manage account', soon: onAccount == null, onTap: onAccount == null ? null : () => _go(context, onAccount!), light: true),
-              const SizedBox(height: 8),
               _NavRow(icon: LucideIcons.logOut, label: 'Sign out', danger: true, onTap: () => _go(context, onSignOut)),
             ]),
           ),
@@ -146,16 +155,16 @@ class _StoreSideNav extends StatelessWidget {
 }
 
 class _NavRow extends StatelessWidget {
-  const _NavRow({required this.icon, required this.label, required this.onTap, this.soon = false, this.danger = false, this.light = false});
+  const _NavRow({required this.icon, required this.label, required this.onTap, this.soon = false, this.danger = false});
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
-  final bool soon, danger, light;
+  final bool soon, danger;
 
   @override
   Widget build(BuildContext context) {
     final fg = danger ? kRed : soon ? kMuted : kInk;
-    final bg = danger ? const Color(0xFFFEF2F2) : light ? const Color(0xFFF9FAFB) : const Color(0xFFF3F4EE);
+    final bg = danger ? const Color(0xFFFEF2F2) : const Color(0xFFF3F4EE);
     return Semantics(
       button: true,
       enabled: onTap != null,
@@ -184,4 +193,11 @@ class _NavRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The profile circle: the name's initials, else the email's first letter (an account without a name), else "?".
+String _mark(String name, String? email) {
+  if (name.trim().isNotEmpty && initials(name) != '?') return initials(name);
+  final e = (email ?? '').trim();
+  return e.isEmpty ? '?' : e[0].toUpperCase();
 }

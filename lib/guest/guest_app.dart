@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../inventory/inventory_api.dart' show Facts;
+import '../ui/theme.dart' show typeSize;
 import 'guest_api.dart';
 
 /// The guest's own screens (ported in spirit from the VINII partner app's guest runtime, `lib/presentation/guest/*`): welcome, the menu as a
@@ -195,7 +196,7 @@ const _line = Color(0xFFE5E7EB);
 const _veg = Color(0xFF16A34A);
 const _nonVeg = Color(0xFFB91C1C);
 
-TextStyle _t(double size, FontWeight w, {Color color = _ink, double? height}) => TextStyle(fontFamily: 'Inter', fontSize: size, fontWeight: w, color: color, height: height);
+TextStyle _t(double size, FontWeight w, {Color color = _ink, double? height}) => TextStyle(fontFamily: 'Inter', fontSize: typeSize(size), fontWeight: w, color: color, height: height);
 
 /// "₹120" or "₹120.50".
 String guestMoney(num v) {

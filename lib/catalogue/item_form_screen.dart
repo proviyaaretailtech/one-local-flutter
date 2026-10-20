@@ -7,16 +7,20 @@ import '../ui/theme.dart';
 import 'catalogue_api.dart';
 import 'catalogue_format.dart';
 import 'catalogue_widgets.dart';
+import 'item_photo.dart';
 import 'item_sheets.dart' show parsePriceMinor;
 
 /// Figma "Item Creation" (Store Standard / Screens): identity, units and storage, tax and pricing, then a save checklist.
 /// Also used to change an existing item (Quick edit, Edit catalogue details): [item] pre-fills the form and carries its version.
 /// The screen only collects and sends; the database decides what is valid (tax needed to save, price not above MRP, unique SKU and barcode).
 class ItemFormScreen extends StatefulWidget {
-  const ItemFormScreen({super.key, this.api, this.item, this.onNavigate});
+  const ItemFormScreen({super.key, this.api, this.item, this.onNavigate, this.photos = const DeviceItemPhotos()});
   final CatalogueApi? api;
   final CatItem? item;
   final ValueChanged<String>? onNavigate;
+
+  /// Choosing the product photo, removing its background, attaching it to the saved item.
+  final ItemPhotoService photos;
   @override
   State<ItemFormScreen> createState() => _ItemFormScreenState();
 }
@@ -26,7 +30,9 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   final _name = TextEditingController(), _sku = TextEditingController(), _category = TextEditingController(), _brand = TextEditingController(), _barcode = TextEditingController();
   final _netQty = TextEditingController(), _packUnits = TextEditingController(text: '1'), _hsn = TextEditingController();
   final _cost = TextEditingController(), _price = TextEditingController(), _mrp = TextEditingController();
-  final _keyIdentity = GlobalKey(), _keyPricing = GlobalKey(), _keyReview = GlobalKey();
+  final _keyIdentity = GlobalKey(), _keyUnits = GlobalKey(), _keyPricing = GlobalKey(), _keyReview = GlobalKey();
+  ItemPhoto? _photo;
+  bool _photoBusy = false;
   late final String _saveKey = CatalogueApi.newKey();
   String _unit = 'pc', _netUnit = 'g';
   num? _gst;
@@ -64,6 +70,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     for (final c in [_name, _sku, _category, _barcode, _netQty, _hsn, _cost, _price, _mrp]) {
       c.addListener(() => setState(() {}));
     }
+    _scroll.addListener(_followScroll);
   }
 
   @override
@@ -71,7 +78,40 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     for (final c in [_name, _sku, _category, _brand, _barcode, _netQty, _packUnits, _hsn, _cost, _price, _mrp]) {
       c.dispose();
     }
+    _scroll.dispose();
     super.dispose();
+  }
+
+  // ---------------------------------------------------------------- steps that follow the scroll
+  final _scroll = ScrollController();
+  final _formKey = GlobalKey();
+  final _chipKeys = List.generate(4, (_) => GlobalKey());
+  int _active = 0;
+  bool _jumping = false;
+  List<GlobalKey> get _sections => [_keyIdentity, _keyUnits, _keyPricing, _keyReview];
+
+  /// The current step is the last section whose top has reached the top of the form (the end of the form counts as the last).
+  void _followScroll() {
+    if (_jumping) return;
+    final form = _formKey.currentContext?.findRenderObject() as RenderBox?;
+    if (form == null || !form.attached) return;
+    final top = form.localToGlobal(Offset.zero).dy;
+    var at = 0;
+    for (var i = 0; i < _sections.length; i++) {
+      final box = _sections[i].currentContext?.findRenderObject() as RenderBox?;
+      if (box != null && box.attached && box.localToGlobal(Offset.zero).dy - top <= 72) at = i;
+    }
+    final p = _scroll.position;
+    if (p.pixels >= p.maxScrollExtent - 4 && p.maxScrollExtent > 0) at = _sections.length - 1;
+    _setActive(at);
+  }
+
+  void _setActive(int i) {
+    if (i == _active) return;
+    setState(() => _active = i);
+    // keep the current step's chip in view in the row
+    final chip = _chipKeys[i].currentContext;
+    if (chip != null) Scrollable.ensureVisible(chip, duration: const Duration(milliseconds: 200), alignment: 0.5);
   }
 
   void _tab(String id) {
@@ -84,9 +124,14 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     }
   }
 
-  void _goto(GlobalKey k) {
+  /// A tap on a step: highlight it now, then scroll its section to the top (the scroll does not move the highlight meanwhile).
+  Future<void> _goto(GlobalKey k) async {
+    _setActive(_sections.indexOf(k));
     final c = k.currentContext;
-    if (c != null) Scrollable.ensureVisible(c, duration: const Duration(milliseconds: 250), alignment: 0.02);
+    if (c == null) return;
+    _jumping = true;
+    await Scrollable.ensureVisible(c, duration: const Duration(milliseconds: 250), alignment: 0.02);
+    _jumping = false;
   }
 
   String? _nullIfBlank(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
@@ -130,8 +175,18 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     });
     try {
       final saved = await _api.save(fields, id: widget.item?.id, key: _saveKey);
+      // The photo goes on once the item exists; when photo storage is not set up the item is still saved, and the toast says so.
+      String? photoNote;
+      if (_photo != null) {
+        try {
+          await widget.photos.attach(saved.id, _photo!);
+        } catch (e) {
+          photoNote = e is ItemPhotoUnavailable ? e.message : 'The photo could not be saved.';
+        }
+      }
       if (!mounted) return;
-      showToast(context, draft ? '${saved.name} saved as a draft.' : '${saved.name} saved.');
+      final done = draft ? '${saved.name} saved as a draft.' : '${saved.name} saved.';
+      showToast(context, photoNote == null ? done : '$done $photoNote');
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -149,65 +204,171 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     }
   }
 
-  // ---------------------------------------------------------------- pieces
-  Widget _card(Key? key, String title, {Widget? chip, required List<Widget> children}) => Container(
+  // ---------------------------------------------------------------- photo
+  Future<void> _pickPhoto() async {
+    try {
+      final p = await widget.photos.pick();
+      if (p != null && mounted) setState(() => _photo = p);
+    } catch (e) {
+      if (mounted) showToast(context, e is ItemPhotoUnavailable ? e.message : 'That photo could not be opened.');
+    }
+  }
+
+  Future<void> _removeBackground() async {
+    final p = _photo;
+    if (p == null) return;
+    setState(() => _photoBusy = true);
+    try {
+      final clean = await widget.photos.removeBackground(p);
+      if (mounted) setState(() => _photo = clean);
+    } catch (e) {
+      if (mounted) showToast(context, e is ItemPhotoUnavailable ? e.message : 'The background could not be removed.');
+    } finally {
+      if (mounted) setState(() => _photoBusy = false);
+    }
+  }
+
+  Widget _photoBox() {
+    final p = _photo;
+    if (p == null) {
+      return InkWell(
+        key: const ValueKey('item-photo-add'),
+        borderRadius: BorderRadius.circular(14),
+        onTap: _pickPhoto,
+        child: Container(
+          height: 104,
+          decoration: BoxDecoration(color: kSoftField, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFDADCD5))),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(LucideIcons.imagePlus, size: 26, color: kMuted),
+            const SizedBox(height: 6),
+            Text('Add product photo', style: inter(14, 600)),
+            Text('JPG, PNG or WebP · up to 5 MB', style: inter(12, 400, color: kMuted)),
+          ]),
+        ),
+      );
+    }
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+        width: 96,
+        height: 96,
+        decoration: BoxDecoration(color: kSoftField, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFDADCD5))),
+        clipBehavior: Clip.antiAlias,
+        child: Image.memory(p.bytes, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(LucideIcons.imageOff, color: kMuted)),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (p.backgroundRemoved) const Padding(padding: EdgeInsets.only(bottom: 6), child: DotChip('Background removed', bg: kSoftField, fg: kMuted)),
+          _smallAction(LucideIcons.sparkles, _photoBusy ? 'Removing background…' : 'Remove background (AI)', _photoBusy || p.backgroundRemoved ? null : _removeBackground, const ValueKey('item-photo-bg')),
+          _smallAction(LucideIcons.refreshCw, 'Replace photo', _photoBusy ? null : _pickPhoto, const ValueKey('item-photo-replace')),
+          _smallAction(LucideIcons.trash2, 'Remove photo', _photoBusy ? null : () => setState(() => _photo = null), const ValueKey('item-photo-remove'), danger: true),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _smallAction(IconData icon, String label, VoidCallback? onTap, Key key, {bool danger = false}) => InkWell(
         key: key,
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0xFFE3E5DF))),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(children: [
+            Icon(icon, size: 16, color: onTap == null ? kMuted : danger ? kError : kLink),
+            const SizedBox(width: 8),
+            Text(label, style: inter(13, 600, color: onTap == null ? kMuted : danger ? kError : kLink)),
+          ]),
+        ),
+      );
+
+  // ---------------------------------------------------------------- pieces
+  /// One numbered section: a number badge (a tick once its required fields are filled), the title, a line on what it is for.
+  Widget _section(Key? key, int n, String title, String hint, bool done, List<Widget> children) => Container(
+        key: key,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE3E5DF))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [Expanded(child: Text(title, style: inter(18, 700))), ?chip]),
-          const SizedBox(height: 8),
+          Row(children: [
+            _badge(n, done),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: inter(16, 700)),
+                Text(hint, style: inter(12, 400, color: kMuted)),
+              ]),
+            ),
+          ]),
+          const SizedBox(height: 6),
           ...children,
         ]),
       );
 
-  Widget _label(String t) => Padding(padding: const EdgeInsets.only(top: 10, bottom: 8), child: Text(t, style: inter(14, 600, color: kMuted)));
+  Widget _badge(int n, bool done, {double size = 26}) => Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: done ? kLime : kSoftField, shape: BoxShape.circle),
+        child: done ? Icon(LucideIcons.check, size: size * 0.55, color: kDark) : Text('$n', style: inter(12, 700, color: kMuted)),
+      );
+
+  Widget _label(String t) => Padding(padding: const EdgeInsets.only(top: 12, bottom: 6), child: Text(t, style: inter(13, 600, color: kMuted)));
+
+  /// A label over its field, so two can sit side by side.
+  Widget _field(String label, Widget field) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_label(label), field]);
+
+  Widget _pair(Widget a, Widget b) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: a), const SizedBox(width: 10), Expanded(child: b)]);
+
+  BoxDecoration _box(bool bad) =>
+      BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: bad ? kError : const Color(0xFFDADCD5), width: bad ? 1.5 : 1));
 
   Widget _input(TextEditingController c, String hint, {TextInputType? type, List<TextInputFormatter>? formatters, bool bad = false}) => Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         alignment: Alignment.centerLeft,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: bad ? kError : const Color(0xFFDADCD5), width: bad ? 1.5 : 1)),
+        decoration: _box(bad),
         child: TextField(
           controller: c,
           keyboardType: type,
           inputFormatters: formatters,
-          style: inter(16, 400),
-          decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(16, 400, color: bad ? kError : kMuted)),
+          style: inter(14, 400),
+          decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(14, 400, color: bad ? kError : kMuted)),
         ),
       );
 
   Widget _dropdown<T>({required T? value, required List<(T, String)> items, required ValueChanged<T?> onChanged, String hint = 'Select', bool bad = false}) => Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: bad ? kError : const Color(0xFFDADCD5), width: bad ? 1.5 : 1)),
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: _box(bad),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<T>(
             value: value,
             isExpanded: true,
-            icon: const Icon(LucideIcons.chevronDown, size: 18, color: kMuted),
-            hint: Text(hint, style: inter(16, 400, color: bad ? kError : kMuted)),
-            style: inter(16, 400),
-            items: [for (final (v, l) in items) DropdownMenuItem<T>(value: v, child: Text(l))],
+            icon: const Icon(LucideIcons.chevronDown, size: 16, color: kMuted),
+            hint: Text(hint, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(14, 400, color: bad ? kError : kMuted)),
+            style: inter(14, 400),
+            items: [for (final (v, l) in items) DropdownMenuItem<T>(value: v, child: Text(l, maxLines: 1, overflow: TextOverflow.ellipsis))],
             onChanged: onChanged,
           ),
         ),
       );
 
   Widget _kv(String k, String v, {Color vc = kInk}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(children: [Expanded(child: Text(k, style: inter(15, 400, color: kMuted))), Text(v, style: inter(16, 700, color: vc))]),
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(children: [Expanded(child: Text(k, style: inter(13, 400, color: kMuted))), Text(v, style: inter(14, 700, color: vc))]),
       );
 
   Widget _check(bool done, String text) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 24, child: Icon(done ? LucideIcons.check : LucideIcons.circle, size: done ? 18 : 14, color: kInk)),
-          const SizedBox(width: 6),
-          Expanded(child: Text(text, style: inter(16, 400))),
+          Icon(done ? LucideIcons.circleCheck : LucideIcons.circle, size: 18, color: done ? kLink : kMuted),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: inter(13, done ? 600 : 400, color: done ? kInk : kMuted))),
         ]),
       );
+
+  static final _money = [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))];
+  static const _decimal = TextInputType.numberWithOptions(decimal: true);
 
   @override
   Widget build(BuildContext context) {
@@ -225,109 +386,132 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
       final net = price / (1 + _gst! / 100);
       margin = '${money((net - cost).round())} · ${((net - cost) / net * 100).toStringAsFixed(1)}%';
     }
+    // Which sections have their required fields filled (the steps tick off as the person goes).
+    final identityDone = _name.text.trim().isNotEmpty && _sku.text.trim().isNotEmpty && _category.text.trim().isNotEmpty && _barcode.text.trim().isNotEmpty;
+    final unitsDone = netQty != null && num.tryParse(_packUnits.text.trim()) != null;
+    final pricingDone = !taxOpen && price != null;
     final title = _editing ? 'Edit Item' : 'Item Creation';
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: 'VINII Store POS', onBack: () => Navigator.of(context).maybePop()),
+        OrdersTopBar(title: 'Item', onBack: () => Navigator.of(context).maybePop()),
+        // The steps stay in view: where you are, what is done, a tap jumps to it.
+        Container(
+          color: kBg,
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              for (final (i, label, done) in [
+                (0, 'Product', identityDone),
+                (1, 'Units', unitsDone),
+                (2, 'Tax & price', pricingDone),
+                (3, 'Review', identityDone && unitsDone && pricingDone),
+              ])
+                _StepChip(i + 1, label, done, _active == i, () => _goto(_sections[i]), _badge, key: _chipKeys[i]),
+            ]),
+          ),
+        ),
+        // One scrolling column (every section is built, so a step can always jump to it and the scroll can tell where you are).
         Expanded(
-          child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
-            Text(title, style: inter(26, 800)),
-            const SizedBox(height: 6),
-            Text(_editing ? 'Change this catalogue item. Stock is not changed here.' : 'Prepare a new catalogue item without changing live stock.', style: inter(15, 400, color: kMuted)),
+          child: SingleChildScrollView(
+            key: _formKey,
+            controller: _scroll,
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(title, style: inter(22, 800)),
             const SizedBox(height: 4),
-            Text(_editing ? '${widget.item!.sku} · ${statusLabel(widget.item!)} · Tax ${widget.item!.taxVerified ? 'verified' : 'not verified'}' : 'New item · Unsaved draft · Tax validation required', style: inter(14, 600, color: kMuted)),
+            Text(_editing ? 'Change this catalogue item. Stock is not changed here.' : 'Prepare a new catalogue item without changing live stock.', style: inter(13, 400, color: kMuted)),
+            const SizedBox(height: 2),
+            Text(_editing ? '${widget.item!.sku} · ${statusLabel(widget.item!)} · Tax ${widget.item!.taxVerified ? 'verified' : 'not verified'}' : 'New item · Unsaved draft · Tax validation required', style: inter(12, 600, color: kMuted)),
             const SizedBox(height: 14),
-            Row(children: [
-              _TabChip('Identity', true, () => _goto(_keyIdentity)),
-              const SizedBox(width: 10),
-              _TabChip('Pricing', false, () => _goto(_keyPricing)),
-              const SizedBox(width: 10),
-              _TabChip('Review', false, () => _goto(_keyReview)),
+            _section(_keyIdentity, 1, 'Item identity', 'Photo, name and the codes that find this product', identityDone, [
+              const SizedBox(height: 6),
+              _photoBox(),
+              _field('Product name *', _input(_name, 'Product name')),
+              _field('SKU *', _input(_sku, 'Unique SKU, for example OC-200-PK')),
+              _pair(_field('Category *', _input(_category, 'Snacks')), _field('Brand', _input(_brand, 'Add brand'))),
+              _field('Barcode *', _input(_barcode, 'Scan or type the barcode')),
+              const SizedBox(height: 6),
+              Text(_barcode.text.trim().isEmpty ? 'Without a barcode this item cannot be found by scan.' : 'Identifier has no saved catalogue link. Confirm uniqueness again when saving.',
+                  style: inter(12, 400, color: kMuted, height: 1.35)),
             ]),
-            const SizedBox(height: 14),
-            _card(_keyIdentity, 'Item identity', chip: const DotChip('Draft', bg: kSoftField, fg: kMuted), children: [
-              _label('Product name *'),
-              _input(_name, 'Product name'),
-              _label('SKU *'),
-              _input(_sku, 'Unique SKU, for example OC-200-PK'),
-              _label('Category *'),
-              _input(_category, 'Snacks'),
-              _label('Brand'),
-              _input(_brand, 'Not provided · Add brand'),
-              _label('Barcode *'),
-              _input(_barcode, 'Scan or type the barcode'),
-              const SizedBox(height: 8),
-              Text(_barcode.text.trim().isEmpty ? 'Without a barcode this item cannot be found by scan.' : 'Identifier has no saved catalogue link. Confirm uniqueness again when saving.', style: inter(14, 400, color: kMuted, height: 1.35)),
-            ]),
-            _card(null, 'Units & storage', children: [
-              _label('Selling unit *'),
-              _dropdown<String>(value: _unit, items: sellingUnits, onChanged: (v) => setState(() => _unit = v ?? 'pc')),
+            _section(_keyUnits, 2, 'Units & storage', 'How it is sold, packed and kept', unitsDone, [
+              _pair(
+                _field('Selling unit *', _dropdown<String>(value: _unit, items: sellingUnits, onChanged: (v) => setState(() => _unit = v ?? 'pc'))),
+                _field('Storage', _dropdown<String>(value: _storage.isEmpty ? null : _storage, items: [for (final s in _storages) (s, s)], hint: 'Dry shelf', onChanged: (v) => setState(() => _storage = v ?? ''))),
+              ),
               _label('Net quantity *'),
               Row(children: [
-                Expanded(flex: 3, child: _input(_netQty, '200', type: const TextInputType.numberWithOptions(decimal: true), formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))])),
+                Expanded(flex: 3, child: _input(_netQty, '200', type: _decimal, formatters: _money)),
                 const SizedBox(width: 10),
                 Expanded(flex: 2, child: _dropdown<String>(value: _netUnit, items: [for (final u in netUnits) (u, u)], onChanged: (v) => setState(() => _netUnit = v ?? 'g'))),
               ]),
               _label('Purchase-to-sale conversion *'),
               Row(children: [
-                Text('1 pack =', style: inter(16, 400)),
+                Text('1 pack =', style: inter(14, 400)),
                 const SizedBox(width: 10),
-                SizedBox(width: 90, child: _input(_packUnits, '1', type: const TextInputType.numberWithOptions(decimal: true), formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))])),
+                SizedBox(width: 84, child: _input(_packUnits, '1', type: _decimal, formatters: _money)),
                 const SizedBox(width: 10),
-                Text('selling unit', style: inter(16, 400)),
+                Text('selling unit', style: inter(14, 400)),
               ]),
-              _label('Storage'),
-              _dropdown<String>(value: _storage.isEmpty ? null : _storage, items: [for (final s in _storages) (s, s)], hint: 'Ambient · Dry shelf', onChanged: (v) => setState(() => _storage = v ?? '')),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _kv('Opening stock', 'Not added · 0 units'),
             ]),
-            _card(_keyPricing, 'Tax & pricing', children: [
-              Text(taxOpen ? 'Draft pricing · Not effective' : 'Tax details entered', style: inter(14, 400, color: kMuted)),
-              _label('HSN / tax category *'),
-              _input(_hsn, 'Required · Select verified tax category', bad: taxOpen && _hsn.text.trim().isEmpty && _error != null, type: TextInputType.number, formatters: [FilteringTextInputFormatter.digitsOnly]),
-              _label('GST rate *'),
-              _dropdown<num>(value: _gst, items: [for (final g in gstSlabs) (g, '${qty(g)}%')], hint: 'Not verified · Required before saving', bad: _gst == null && _error != null, onChanged: (v) => setState(() => _gst = v)),
-              _label('Purchase cost · ex tax (₹)'),
-              _input(_cost, '₹24.00', type: const TextInputType.numberWithOptions(decimal: true), formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
-              _label('Selling price · tax inclusive (₹) *'),
-              _input(_price, '₹40.00', type: const TextInputType.numberWithOptions(decimal: true), formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
-              _label('MRP (₹)'),
-              _input(_mrp, '₹45.00', type: const TextInputType.numberWithOptions(decimal: true), formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
-              const SizedBox(height: 6),
-              _kv('Unit selling price', unitPrice ?? '—'),
-              _kv('Margin', margin),
+            _section(_keyPricing, 3, 'Tax & pricing', taxOpen ? 'Draft pricing · Not effective until tax is set' : 'Tax details entered', pricingDone, [
+              _pair(
+                _field('HSN / tax category *',
+                    _input(_hsn, 'Tax category', bad: taxOpen && _hsn.text.trim().isEmpty && _error != null, type: TextInputType.number, formatters: [FilteringTextInputFormatter.digitsOnly])),
+                _field('GST rate *',
+                    _dropdown<num>(value: _gst, items: [for (final g in gstSlabs) (g, '${qty(g)}%')], hint: 'Required', bad: _gst == null && _error != null, onChanged: (v) => setState(() => _gst = v))),
+              ),
+              _pair(_field('Purchase cost · ex tax (₹)', _input(_cost, '₹24.00', type: _decimal, formatters: _money)), _field('MRP (₹)', _input(_mrp, '₹45.00', type: _decimal, formatters: _money))),
+              _field('Selling price · tax inclusive (₹) *', _input(_price, '₹40.00', type: _decimal, formatters: _money)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(color: kSoftField, borderRadius: BorderRadius.circular(12)),
+                child: Column(children: [_kv('Unit selling price', unitPrice ?? '—'), _kv('Margin', margin)]),
+              ),
             ]),
             if (_error != null && _bannerOpen)
               Container(
-                margin: const EdgeInsets.only(bottom: 14),
-                padding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
-                decoration: BoxDecoration(color: kBadBg, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE9908A))),
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+                decoration: BoxDecoration(color: kBadBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE9908A))),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Padding(padding: EdgeInsets.only(top: 2), child: Icon(LucideIcons.circleX, size: 24, color: kBadText)),
-                  const SizedBox(width: 12),
+                  const Padding(padding: EdgeInsets.only(top: 1), child: Icon(LucideIcons.circleX, size: 20, color: kBadText)),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_errorTitle ?? 'Could not save the item', style: inter(17, 700)),
-                      const SizedBox(height: 4),
-                      Text(_error!, style: inter(15, 400, color: const Color(0xFF9A6B68), height: 1.35)),
+                      Text(_errorTitle ?? 'Could not save the item', style: inter(14, 700)),
+                      const SizedBox(height: 2),
+                      Text(_error!, style: inter(13, 400, color: const Color(0xFF9A6B68), height: 1.35)),
                     ]),
                   ),
-                  IconButton(tooltip: 'Dismiss', onPressed: () => setState(() => _bannerOpen = false), icon: const Icon(LucideIcons.x, size: 18, color: kMuted)),
+                  IconButton(tooltip: 'Dismiss', onPressed: () => setState(() => _bannerOpen = false), icon: const Icon(LucideIcons.x, size: 16, color: kMuted)),
                 ]),
               ),
-            _card(_keyReview, 'Save checklist', children: [
+            _section(_keyReview, 4, 'Save checklist', 'What is still needed before this item can be sold', identityDone && unitsDone && pricingDone, [
               const SizedBox(height: 4),
               _check(_name.text.trim().isNotEmpty && _category.text.trim().isNotEmpty && _sku.text.trim().isNotEmpty, 'Name, category and SKU completed'),
               _check(_barcode.text.trim().isNotEmpty, 'Barcode entered'),
               _check(mrp != null && cost != null && !taxOpen, 'Verify pack MRP, cost and tax'),
+              _check(_photo != null, 'Product photo added (optional)'),
               _check(_editing, 'Save item before receiving or printing labels'),
             ]),
-            DarkButton('Complete tax validation', busy: _busy, onPressed: () => _save(draft: false)),
-            const SizedBox(height: 12),
-            OutlineButton('Save draft only', onPressed: _busy ? null : () => _save(draft: true), height: 56),
-            const SizedBox(height: 12),
-            Text('A draft is not sold and does not change stock. Stock is received in Stock.', style: inter(14, 400, color: kMuted, height: 1.35)),
+            Text('A draft is not sold and does not change stock. Stock is received in Stock.', style: inter(12, 400, color: kMuted, height: 1.35)),
+          ]),
+          ),
+        ),
+        // Save stays in reach wherever the person is on the form.
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFE3E5DF)))),
+          child: Row(children: [
+            Expanded(child: OutlineButton('Save draft only', onPressed: _busy ? null : () => _save(draft: true), height: 48)),
+            const SizedBox(width: 10),
+            Expanded(child: DarkButton('Save item', busy: _busy, onPressed: () => _save(draft: false))),
           ]),
         ),
         PosBottomNav(active: 'item', onTap: _tab),
@@ -336,19 +520,48 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   }
 }
 
-class _TabChip extends StatelessWidget {
-  const _TabChip(this.label, this.on, this.onTap);
+/// A step of the form at the top: its number (a tick when done), its name; a tap scrolls to it.
+/// A step of the form at the top. [current] (the section on screen) is the dark chip; [done] shows a tick in its badge.
+class _StepChip extends StatelessWidget {
+  const _StepChip(this.n, this.label, this.done, this.current, this.onTap, this.badge, {super.key});
+  final int n;
   final String label;
-  final bool on;
+  final bool done, current;
   final VoidCallback onTap;
+  final Widget Function(int n, bool done, {double size}) badge;
   @override
-  Widget build(BuildContext context) => InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-          decoration: BoxDecoration(color: on ? kLime : Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: on ? kLime : const Color(0xFFE3E5DF))),
-          child: Text(label, style: inter(15, on ? 700 : 500, color: on ? kDark : kInk)),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Semantics(
+          button: true,
+          selected: current,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
+              decoration: BoxDecoration(
+                color: current ? kDark : Colors.white,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: current ? kDark : done ? kLime : const Color(0xFFE3E5DF)),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (current && !done)
+                  Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(color: kLime, shape: BoxShape.circle),
+                    child: Text('$n', style: inter(12, 700, color: kDark)),
+                  )
+                else
+                  badge(n, done, size: 22),
+                const SizedBox(width: 6),
+                Text(label, style: inter(13, current ? 700 : 600, color: current ? Colors.white : kInk)),
+              ]),
+            ),
+          ),
         ),
       );
 }

@@ -42,15 +42,20 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
   String? _location = OutletScope.selected.value;
   late Future<HomeSummary> _summary = _api.summary(location: _location);
 
+  // Every screen's ☰ opens this dashboard's side menu, over that screen.
+  late final HomeRoute _menuHook = (c) => _openMenu(c);
+
   @override
   void initState() {
     super.initState();
     OutletScope.selected.addListener(_followScope);
+    HomeNav.openMenu = _menuHook;
   }
 
   @override
   void dispose() {
     OutletScope.selected.removeListener(_followScope);
+    if (HomeNav.openMenu == _menuHook) HomeNav.openMenu = null;
     super.dispose();
   }
 
@@ -103,26 +108,27 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
     Navigator.of(context).popUntil((r) => r.isFirst);
   }
 
-  void _openMenu() {
+  /// Opens the side menu over [from] (any screen's ☰, through [HomeNav.openMenu]), or over the dashboard.
+  void _openMenu([BuildContext? from]) {
+    final c = from ?? context;
     // A store gets the Figma side nav (section D 39:7416); restaurant and service keep the short sheet for now.
     if (_kind != 'restaurant' && _kind != 'service') {
       showStoreSideNav(
-        context,
+        c,
         name: _personName ?? 'Partner',
         email: (widget.auth ?? AuthRepository()).currentEmail,
-        onDashboard: () {},
-        onReports: _openHub,
+        onReports: () => _openHub(c),
         onSignOut: _signOut,
       );
       return;
     }
     // A restaurant gets the Figma More page (section D 45:7539).
     if (_kind == 'restaurant') {
-      Navigator.of(context).push(RestaurantMoreScreen.route(outletName: _outletName ?? 'My outlet', outletLine: 'Restaurant', onLogout: _signOut));
+      Navigator.of(c).push(RestaurantMoreScreen.route(outletName: _outletName ?? 'My outlet', outletLine: 'Restaurant', onLogout: _signOut));
       return;
     }
     showModalBottomSheet<void>(
-      context: context,
+      context: c,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => SafeArea(
@@ -131,11 +137,11 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             _MenuRow(icon: LucideIcons.chartColumn, label: 'Sales feed', onTap: () {
               Navigator.pop(ctx);
-              _openHub();
+              _openHub(c);
             }),
             _MenuRow(icon: LucideIcons.settings, label: 'Settings', onTap: () {
               Navigator.pop(ctx);
-              HomeNav.go(context, HomeNav.settings ?? HomeNav.setup, 'Settings');
+              HomeNav.go(c, HomeNav.settings ?? HomeNav.setup, 'Settings');
             }),
             _MenuRow(icon: LucideIcons.logOut, label: 'Sign out', onTap: () {
               Navigator.pop(ctx);
@@ -147,7 +153,7 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
     );
   }
 
-  void _openHub() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => HubScreen(api: _api, location: _location)));
+  void _openHub([BuildContext? from]) => Navigator.of(from ?? context).push(MaterialPageRoute(builder: (_) => HubScreen(api: _api, location: _location)));
 
   void _tab(String label) {
     switch (label) {
@@ -185,13 +191,17 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
           _kind = s.outletKind;
           _personName = s.personName;
           _outletName = s.outletName;
+          HomeNav.storeName = s.outletName;   // the top line of every screen's header
+          // Inside the app shell: its bar shows this kind's tabs (store / restaurant / service).
+          final shell = HomeNav.shell;
+          if (shell != null && shell.kind != s.outletKind) WidgetsBinding.instance.addPostFrameCallback((_) => shell.setKind(s.outletKind));
         }
         final loading = snap.connectionState != ConnectionState.done;
         final tabs = s?.outletKind == 'restaurant' ? kHubTabs : kStoreTabs;
         return Scaffold(
           backgroundColor: kBg,
           extendBody: true,
-          bottomNavigationBar: SafeArea(top: false, child: FloatingTabBar(tabs: tabs, onTap: _tab)),
+          bottomNavigationBar: SafeArea(top: false, child: FloatingTabBar(tabs: tabs, onTap: _tab, current: 'Home')),
           body: SafeArea(
             bottom: false,
             child: loading && s == null
@@ -241,99 +251,79 @@ class _Body extends StatelessWidget {
     final day = dayLabel(s.day);
     final restaurant = s.outletKind == 'restaurant';
     final syncedAt = s.lastSync;
-    final syncLine = '${s.outletName} · ${syncedAt == null ? 'Updated ${ago(s.asOf, now)}' : 'Synced ${ago(syncedAt, now)}'}';
+    final synced = syncedAt == null ? 'Updated ${ago(s.asOf, now)}' : 'Synced ${ago(syncedAt, now)}';
+    final syncLine = '${s.outletName} · $synced';
     final gaps = <(String, int)>[
-      if ((s.missingDescriptions ?? 0) > 0) ('Missing descriptions', s.missingDescriptions!),
-      if ((s.missingPhotos ?? 0) > 0) ('Missing photos', s.missingPhotos!),
-      if (restaurant && (s.missingRecipes ?? 0) > 0) ('Missing recipes', s.missingRecipes!),
+      if ((s.missingDescriptions ?? 0) > 0) ('description', s.missingDescriptions!),
+      if ((s.missingPhotos ?? 0) > 0) ('photo', s.missingPhotos!),
+      if (restaurant && (s.missingRecipes ?? 0) > 0) ('recipe', s.missingRecipes!),
     ];
+    final open = s.isOpen;
     return ListView(
       padding: const EdgeInsets.only(bottom: 132),
       children: [
         // Top bar: the outlet header (outlet name, live status, all-outlets chip, initials) — specs/outlets-multi.
         OutletHeader(title: s.outletName, onMenu: onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), dashboard: true),
         Padding(
-          padding: const EdgeInsets.fromLTRB(0, 4, 16, 0),
-          child: Text('OneLocal', style: inter(24, 800, height: 1.1)),
-        ),
-        // Navy header band.
-        Container(
-          color: kNavy,
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              Dot(s.isOpen == true ? kLime : s.isOpen == false ? kRed : kMuted),
-              const SizedBox(width: 8),
-              Text(
-                s.isOpen == true ? 'Store Open' : s.isOpen == false ? 'Store Closed' : 'Status not set',
-                style: inter(12, 700, color: s.isOpen == true ? kLime : Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: InkWell(
-                  onTap: onOutlet,
-                  child: Text(syncLine, textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10, 400, color: const Color(0xFFD1D5DB))),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 12),
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(
-                child: _StatTile(
-                  label: 'SALES · $day',
-                  value: s.salesTotal == null ? '—' : rupees(s.salesTotal!.round()),
-                  chip: '${dayLabel(s.day, caps: false)} report',
-                  good: true,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _StatTile(
-                  label: 'ORDERS · $day',
-                  value: s.ordersCount == null ? '—' : count(s.ordersCount!),
-                  chip: '${s.activeCount ?? 0} active now',
-                  good: true,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: (s.ordersCount ?? 0) == 0 || s.unitsSold == null
-                    ? _StatTile(label: 'ITEMS · $day', value: '—', chip: 'Not reported', good: false)
-                    : _StatTile(label: 'ITEMS · $day', value: count(s.unitsSold!), chip: 'units sold', good: true),
-              ),
-            ]),
-            const SizedBox(height: 10),
-            Material(
-              color: const Color(0xFF0E1F12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Color(0xFF2F4F1F))),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: () => HomeNav.go(context, HomeNav.orders, 'Orders'),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  child: Row(children: [
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('OPERATIONS · $day', style: inter(10, 700, color: kLime)),
-                        const SizedBox(height: 2),
-                        Text(
+            // One light status card: open or closed, the day once, three plain numbers, today's operations.
+            HomeCard(
+              padding: const EdgeInsets.all(14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  Dot(open == true ? kLink : open == false ? kRed : kMuted),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(open == true ? 'Store open' : open == false ? 'Store closed' : 'Status not set', style: inter(14, 700)),
+                      Text('Today · ${dayLabel(s.day, caps: false)}', style: inter(11, 400, color: kMuted)),
+                    ]),
+                  ),
+                  // The outlet's sync time; tapping it switches outlet (as the old header line did).
+                  InkWell(
+                    onTap: onOutlet,
+                    child: Padding(padding: const EdgeInsets.all(4), child: Text(synced, style: inter(11, 400, color: kMuted))),
+                  ),
+                ]),
+                const SizedBox(height: 12),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: _StatTile(label: 'Sales', value: s.salesTotal == null ? '—' : rupees(s.salesTotal!.round()))),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _StatTile(label: 'Orders', value: s.ordersCount == null ? '—' : count(s.ordersCount!), note: '${s.activeCount ?? 0} active now'),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: (s.ordersCount ?? 0) == 0 || s.unitsSold == null
+                        ? const _StatTile(label: 'Items sold', value: '—', note: 'Not reported')
+                        : _StatTile(label: 'Items sold', value: count(s.unitsSold!)),
+                  ),
+                ]),
+                const SizedBox(height: 10),
+                // Today's figures open today's report (the insights feed: today so far, daily takings), not the
+                // orders board: in a store that board read as kitchen orders (founder, 20 Oct 2026).
+                InkWell(
+                  onTap: onInsights,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(children: [
+                      Expanded(
+                        child: Text(
                           '${s.settledCount ?? 0} bills settled · ${s.pax ?? 0} pax · ${s.activeCount ?? 0} open',
-                          style: inter(10.5, 400, color: const Color(0xFFD1D5DB)),
+                          style: inter(11.5, 400, color: kMuted),
                         ),
-                      ]),
-                    ),
-                    Text('View', style: inter(10, 500, color: kMuted)),
-                  ]),
+                      ),
+                      Text('Today’s report', style: inter(11.5, 600, color: kLink)),
+                      const Icon(LucideIcons.chevronRight, size: 14, color: kLink),
+                    ]),
+                  ),
                 ),
-              ),
+              ]),
             ),
-          ]),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const SizedBox(height: 20),
             if (gaps.isNotEmpty) ...[
-              _AttentionCard(day: dayLabel(s.day, caps: false), total: s.itemsTotal ?? 0, gaps: gaps, restaurant: restaurant),
+              _AttentionCard(total: s.itemsTotal ?? 0, gaps: gaps, restaurant: restaurant),
               const SizedBox(height: 20),
             ],
             SectionHeader(
@@ -394,75 +384,61 @@ String initials(String name) {
   return (parts.first[0] + parts.last[0]).toUpperCase();
 }
 
+/// A plain number on the status card: small label, the value, and an optional muted note (no badges).
 class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value, required this.chip, required this.good});
-  final String label, value, chip;
-  final bool good;
+  const _StatTile({required this.label, required this.value, this.note});
+  final String label, value;
+  final String? note;
   @override
   Widget build(BuildContext context) => Container(
         height: 82,
-        padding: const EdgeInsets.fromLTRB(10, 10, 6, 8),
-        decoration: BoxDecoration(color: kNavyTile, borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.fromLTRB(10, 9, 6, 8),
+        decoration: BoxDecoration(color: kBg, borderRadius: BorderRadius.circular(10)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(8, 500, color: const Color(0xFF9CA3AF))),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 500, color: kMuted)),
           const SizedBox(height: 2),
-          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, style: inter(18, 700, color: Colors.white))),
+          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, style: inter(20, 700))),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: good ? const Color(0xFF173D12) : const Color(0xFF2D1F08), borderRadius: BorderRadius.circular(12)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Dot(good ? kLime : kAmber, size: 6),
-              const SizedBox(width: 5),
-              Flexible(child: Text(chip, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10.5, 500, color: good ? kLime : kAmber))),
-            ]),
-          ),
+          if (note != null) Text(note!, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10.5, 500, color: kMuted)),
         ]),
       );
 }
 
+/// "Needs attention": one line per gap in the item data, each with a Fix link to item editing.
 class _AttentionCard extends StatelessWidget {
-  const _AttentionCard({required this.day, required this.total, required this.gaps, required this.restaurant});
-  final String day;
+  const _AttentionCard({required this.total, required this.gaps, required this.restaurant});
   final int total;
   final List<(String, int)> gaps;
   final bool restaurant;
+  static const _icons = {'description': LucideIcons.fileText, 'photo': LucideIcons.image, 'recipe': LucideIcons.chefHat};
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: kAmberBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: kAmber)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              width: 20,
-              height: 20,
-              margin: const EdgeInsets.only(top: 2),
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(color: kAmber, shape: BoxShape.circle),
-              child: Text('!', style: inter(10, 800, color: Colors.white)),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Item data needs attention', style: inter(12, 700)),
-                const SizedBox(height: 2),
-                Text('$day · $total ${restaurant ? 'menu' : 'catalogue'} items', style: inter(10, 400, color: kAmberInk)),
-              ]),
-            ),
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SectionHeader('Needs attention', badge: GreyTag('$total ${restaurant ? 'menu' : 'catalogue'} items')),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: kAmber)),
+          child: Column(children: [
+            for (var i = 0; i < gaps.length; i++) ...[
+              if (i > 0) const Divider(height: 1, color: kLine),
+              InkWell(
+                onTap: () => HomeNav.go(context, HomeNav.items, 'Item editing'),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  child: Row(children: [
+                    Icon(_icons[gaps[i].$1] ?? LucideIcons.circleAlert, size: 16, color: kAmberInk),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('${gaps[i].$2} ${gaps[i].$2 == 1 ? 'item' : 'items'} missing ${gaps[i].$2 == 1 ? 'a ${gaps[i].$1}' : '${gaps[i].$1}s'}',
+                          style: inter(12.5, 500)),
+                    ),
+                    Text('Fix', style: inter(12.5, 700, color: kLink)),
+                  ]),
+                ),
+              ),
+            ],
           ]),
-          const SizedBox(height: 10),
-          for (final (label, n) in gaps)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(children: [
-                Expanded(child: Text(label, style: inter(10.5, 400, color: kMuted))),
-                Text('$n ${n == 1 ? 'item' : 'items'}', style: inter(10.5, 700, color: kAmberInk)),
-              ]),
-            ),
-          const SizedBox(height: 10),
-          LimeOnDarkButton(label: 'Review item data', height: 34, onPressed: () => HomeNav.go(context, HomeNav.items, 'Item editing')),
-        ]),
-      );
+        ),
+      ]);
 }
 
 class _OrderCard extends StatelessWidget {
@@ -539,7 +515,7 @@ class _StockCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!s.stockTracked) {
-      return const HomeCard(child: EmptyNote('Stock is not tracked for this outlet yet. Once stock items have reorder levels, the ones running low show here.'));
+      return const HomeCard(child: EmptyNote('Set reorder levels on stock items to see what’s running low.'));
     }
     if (s.stock.isEmpty) return const HomeCard(child: EmptyNote('Everything is above its reorder level.'));
     return HomeCard(

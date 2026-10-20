@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
 
 /// Figma header of the Orders tab: menu button, outlet name, One Local status (Online / Offline), initials.
@@ -21,44 +21,18 @@ class OrdersOutletHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final on = accepting == true;
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 10, 16, 12),
-      child: Row(children: [
-        Semantics(
-          button: true,
-          label: 'Menu',
-          child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: onMenu,
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(color: const Color(0xFFF3F4F1), borderRadius: BorderRadius.circular(10)),
-              child: const Icon(LucideIcons.menu, size: 22, color: kInk),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(name.isEmpty ? 'Orders' : name, style: inter(17, 700), maxLines: 1, overflow: TextOverflow.ellipsis),
-            if (accepting != null)
-              Row(children: [
-                Container(width: 8, height: 8, decoration: BoxDecoration(color: on ? const Color(0xFF16B364) : kMuted, shape: BoxShape.circle)),
-                const SizedBox(width: 6),
-                Text(on ? 'Online' : 'Offline', style: inter(13, 500, color: on ? const Color(0xFF16B364) : kMuted)),
-              ]),
-          ]),
-        ),
-        Container(
-          width: 36,
-          height: 36,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(color: Color(0xFFF3F4F1), shape: BoxShape.circle),
-          child: Text(initials(name), style: inter(12.5, 700)),
-        ),
-      ]),
+    // The shared banner: back, the outlet's name over "Orders", its One Local status, bell, ☰.
+    return AppHeader(
+      title: 'Orders',
+      kicker: name.isEmpty ? null : name,
+      onMenu: onMenu,
+      subtitle: accepting == null
+          ? null
+          : Row(children: [
+              Container(width: 8, height: 8, decoration: BoxDecoration(color: on ? const Color(0xFF16B364) : kMuted, shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              Text(on ? 'Online' : 'Offline', style: inter(13, 500, color: on ? const Color(0xFF16B364) : kMuted)),
+            ]),
     );
   }
 }

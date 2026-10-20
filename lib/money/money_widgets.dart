@@ -91,7 +91,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        InvTopBar(onMenu: () => Navigator.of(context).maybePop(), onItems: env.onItems ?? () => env.tab(context, 'item'), onBell: env.onBell ?? () => env.later(context, 'Notifications')),
+        InvTopBar(onItems: env.onItems ?? () => env.tab(context, 'item'), onBell: env.onBell ?? () => env.later(context, 'Notifications')),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,

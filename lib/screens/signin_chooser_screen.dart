@@ -18,7 +18,7 @@ class _SigninChooserScreenState extends State<SigninChooserScreen> {
   Widget build(BuildContext context) {
     return ScreenShell(
       children: [
-        const BrandNav(),
+        const BrandNav(back: true),
         FormContent(children: [
           const Kicker('Sign in · Delivery'),
           const PageIntro(

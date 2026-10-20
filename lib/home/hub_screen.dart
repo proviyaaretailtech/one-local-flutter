@@ -108,7 +108,7 @@ class _HubScreenState extends State<HubScreen> {
     return Scaffold(
       backgroundColor: kHubBg,
       extendBody: true,
-      bottomNavigationBar: SafeArea(top: false, child: FloatingTabBar(tabs: kHubTabs, onTap: _tab)),
+      bottomNavigationBar: SafeArea(top: false, child: FloatingTabBar(tabs: kHubTabs, onTap: _tab, current: 'Home')),
       body: SafeArea(
         bottom: false,
         child: FutureBuilder<HubFeed>(

@@ -203,7 +203,7 @@ void main() {
       await showTall(t, ServiceCalendarScreen(api: s.api));
       expect(find.text('Appointment Calendar'), findsOneWidget);
       expect(find.text('Thursday, 8 October 2026 · Indiranagar Studio'), findsOneWidget);
-      expect(find.text('Sharma Services · Bengaluru'), findsOneWidget);
+      expect(find.text('Sharma Services · Bengaluru'), findsNothing, reason: 'first-level screens carry only the shared banner');
       for (final w in ['Day', 'Week', 'All providers', 'Mon', 'Thu', 'Sun']) {
         expect(find.text(w), findsWidgets, reason: w);
       }

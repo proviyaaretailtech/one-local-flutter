@@ -215,6 +215,16 @@ void main() {
       expect(find.text('Opening & closing timings'), findsOneWidget);
     });
 
+    testWidgets('the server fails (500): the page still shows, every row empty, under a warning with Try again', (t) async {
+      final f = Fake((r) => fnOf(r) == 'pos_settings_get' ? err(500, 'Something went wrong. Please try again.') : null);
+      await openSettings(t, f);
+      expect(find.text('Could not open Settings'), findsNothing);
+      expect(find.textContaining('Your saved settings could not be loaded'), findsOneWidget);
+      expect(find.text('Opening & closing timings'), findsOneWidget);
+      expect(find.text('Owner'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+    });
+
     testWidgets('the server refuses the page (403): its own sentence is shown, not "offline"', (t) async {
       final f = Fake((r) => err(403, 'Sign in to a business to continue.', 'forbidden'));
       await openSettings(t, f);

@@ -63,7 +63,7 @@ void main() {
       await t.pumpWidget(MaterialApp(
         theme: posTheme(),
         home: Builder(builder: (c) => Scaffold(body: Center(child: TextButton(
-          onPressed: () => showStoreSideNav(c, name: 'Asha Stores', onDashboard: () {}, onReports: () {}, onSignOut: () {}),
+          onPressed: () => showStoreSideNav(c, name: 'Asha Stores', onReports: () {}, onSignOut: () {}),
           child: const Text('open'),
         )))),
       ));
@@ -88,7 +88,8 @@ void main() {
       await openSideNav(t);
       expect(soonOn('One Local Wallet'), findsOneWidget);
       expect(soonOn('Customer'), findsOneWidget);
-      expect(find.text('Soon'), findsNWidgets(3)); // wallet, customer, Manage account
+      expect(find.text('Soon'), findsNWidgets(2)); // wallet, customer
+      expect(find.bySemanticsLabel('Manage account'), findsOneWidget); // the profile block now
       await t.tap(find.text('One Local Wallet'));
       await t.pumpAndSettle();
       expect(opened, isEmpty);

@@ -1,5 +1,6 @@
 <svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="20.7679" height="20.7679" viewBox="0 0 20.7679 20.7679" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g id="circle-dot">
 <path id="Vector" d="M10.3802 19.0331C15.1597 19.0331 19.0342 15.1586 19.0342 10.3791C19.0342 5.59966 15.1597 1.72513 10.3802 1.72513C5.60073 1.72513 1.7262 5.59966 1.7262 10.3791C1.7262 15.1586 5.60073 19.0331 10.3802 19.0331Z" stroke="#3DB800" stroke-width="1.76527" stroke-linecap="round"/>
+<circle id="Dot" cx="10.3802" cy="10.3791" r="4.6" fill="#3DB800"/>
 </g>
 </svg>

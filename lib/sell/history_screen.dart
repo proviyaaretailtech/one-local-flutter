@@ -122,7 +122,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(onMenu: () => env.menu(context), initials: env.initials),
+        SellTopBar(title: 'Transaction history', initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
             SellTitle('Transaction History', sub: env.storeLine),

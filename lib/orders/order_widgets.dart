@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../ui/app_header.dart';
+import '../ui/app_tab_bar.dart';
 import '../ui/theme.dart';
 import '../outlets/outlet_header.dart';
 import 'orders_api.dart';
@@ -30,37 +32,9 @@ class OrdersTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // first-level screens show the outlet header (specs/outlets-multi); inner screens keep the back arrow and title
-    if (onBack == null) return OutletHeader(title: title, onMenu: onMenu, rounded: true);
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 10, 16, 12),
-      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),
-      child: Row(children: [
-        Semantics(
-          button: true,
-          label: onBack != null ? 'Back' : 'Menu',
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onBack ?? onMenu,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(color: const Color(0xFFF3F4F1), shape: BoxShape.circle, border: Border.all(color: kLine)),
-              child: Icon(onBack != null ? LucideIcons.chevronLeft : LucideIcons.menu, size: 18, color: kInk),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Container(
-          width: 30,
-          height: 30,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(color: kChipGreen, shape: BoxShape.circle),
-          child: Text('V', style: inter(15, 800, color: kGreenText)),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Text(title, style: inter(17, 700), overflow: TextOverflow.ellipsis)),
-      ]),
-    );
+    if (onBack == null) return OutletHeader(title: title, onMenu: onMenu);
+    // Inner screens: the shared banner (back, store name over the page's name, bell, ☰).
+    return AppHeader(title: title, onBack: onBack, onMenu: onMenu);
   }
 }
 
@@ -436,38 +410,13 @@ class PosBottomNav extends StatelessWidget {
     ('online', 'Online order', LucideIcons.shoppingBag),
     ('stock', 'Stock', LucideIcons.boxes),
   ];
+  // The app's one bottom bar ([AppTabBar]); tabs are keyed 'pos-tab-…'.
   @override
-  Widget build(BuildContext context) => SafeArea(
-        top: false,
-        minimum: const EdgeInsets.fromLTRB(16, 12, 16, 12), // 12 above: the last button of a page never touches the bar
-        child: Container(
-          height: 72,
-          decoration: BoxDecoration(color: kDark, borderRadius: BorderRadius.circular(30)),
-          child: Row(children: [
-            for (final (id, label, icon) in tabs)
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  selected: id == active,
-                  label: label,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: () => onTap(id),
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Container(
-                        width: id == active ? 40 : 28,
-                        height: id == active ? 36 : 26,
-                        decoration: id == active ? BoxDecoration(color: kLime, borderRadius: BorderRadius.circular(10)) : null,
-                        child: Icon(icon, size: 20, color: id == active ? kDark : Colors.white),
-                      ),
-                      const SizedBox(height: 4),
-                      ExcludeSemantics(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, id == active ? 700 : 500, color: Colors.white))),
-                    ]),
-                  ),
-                ),
-              ),
-          ]),
-        ),
+  Widget build(BuildContext context) => AppTabBar(
+        tabs: [for (final (id, label, icon) in tabs) AppTab(id, label, icon, primary: id == 'bill')],
+        active: active,
+        onTap: onTap,
+        keyPrefix: 'pos-tab-',
       );
 }
 

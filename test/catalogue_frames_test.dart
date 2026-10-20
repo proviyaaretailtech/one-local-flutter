@@ -82,7 +82,7 @@ void main() {
       await t.pumpAndSettle();
     });
     await frame(t, 'scan_qr', CatalogueScreen(api: _api()), height: 900, then: () async {
-      await t.tap(find.byTooltip('Scan a code'));
+      await t.tap(find.byTooltip('Scan a barcode'));
       await t.pumpAndSettle();
     });
     await frame(t, 'item_creation', ItemFormScreen(api: _api()), height: 2700);

@@ -25,7 +25,7 @@ class SuccessScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(onMenu: () => env.menu(context), initials: env.initials),
+        SellTopBar(title: 'Payment', initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(24, 24, 24, 16), children: [
             TransactionSuccessCard(
@@ -138,7 +138,7 @@ class _FailedScreenState extends State<FailedScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(onMenu: () => env.menu(context), initials: env.initials),
+        SellTopBar(title: 'Payment', initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(24, 20, 24, 16), children: [
             Text('Transaction Failed', style: inter(28, 800)),

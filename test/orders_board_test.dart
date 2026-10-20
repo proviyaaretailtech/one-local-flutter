@@ -133,9 +133,9 @@ void main() {
             live('o2', 'P-01085', 'new', 28, delayed: true, customer: 'Walk-in Guest', total: 820),
           ]));
       await openTab(t, s);
-      expect(find.text('Niks Browni And Burger'), findsOneWidget);
+      expect(find.text('NIKS BROWNI AND BURGER'), findsOneWidget);   // the banner's top line
       expect(find.text('Online'), findsOneWidget);
-      expect(find.text('NB'), findsOneWidget);
+      expect(find.text('NB'), findsNothing, reason: 'the shared banner has the bell and ☰ instead of initials');
       expect(find.text('Live orders'), findsOneWidget);
       expect(find.text('Hold orders'), findsOneWidget);
       for (final c in ['All', 'Dine In', 'Takeaway', 'Delivery', 'Zomato', 'Swiggy']) {

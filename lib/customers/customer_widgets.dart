@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../home/home_widgets.dart' show kLime;
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
 
 /// Small building blocks shared by the Customer, One Local Wallet and Manage account screens, in the app's look
@@ -12,30 +12,9 @@ class CwaTopBar extends StatelessWidget {
   final String title;
   final VoidCallback? onBack;
   final Widget? trailing;
+  // The shared banner (back, store name over the page's name, bell, ☰).
   @override
-  Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 10, 16, 12),
-        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),
-        child: Row(children: [
-          Semantics(
-            button: true,
-            label: 'Back',
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onBack ?? () => Navigator.maybePop(context),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(color: const Color(0xFFF3F4F1), shape: BoxShape.circle, border: Border.all(color: kLine)),
-                child: const Icon(LucideIcons.chevronLeft, size: 18, color: kInk),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Text(title, style: inter(17, 700), overflow: TextOverflow.ellipsis)),
-          ?trailing,
-        ]),
-      );
+  Widget build(BuildContext context) => AppHeader(title: title, onBack: onBack, back: true, trailing: trailing);
 }
 
 class CwaCard extends StatelessWidget {

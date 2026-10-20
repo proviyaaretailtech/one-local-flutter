@@ -181,7 +181,7 @@ void main() {
       final s = Fake();
       await show(t, FloorScreen(env: TablesEnv(api: s.api, initials: 'RS')));
       expect(find.text('Tables'), findsOneWidget);
-      expect(find.text('RS'), findsOneWidget);
+      expect(find.text('RS'), findsNothing, reason: 'the shared banner has the bell and ☰ instead of initials');
       for (final l in ['T1', 'T2', 'T3', 'T4', 'T5', 'T12', 'T13']) {
         expect(find.byKey(ValueKey('table-$l')), findsOneWidget, reason: l);
       }

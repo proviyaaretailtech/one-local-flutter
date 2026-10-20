@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
 
 /// Header of the till screens (Figma): menu or back button, the "O" mark, title and the staff initials.
@@ -10,40 +11,10 @@ class SellTopBar extends StatelessWidget {
   final String title, initials;
   final VoidCallback? onMenu, onBack;
   final Widget? action;
+  // The shared banner (back, store name over the page's name, bell, ☰); the till's own name is its tab's, "Bill".
   @override
-  Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + 10, 16, 12),
-        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))),
-        child: Row(children: [
-          Semantics(
-            button: true,
-            label: onBack != null ? 'Back' : 'Menu',
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onBack ?? onMenu,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(color: const Color(0xFFF3F4F1), shape: BoxShape.circle, border: Border.all(color: kLine)),
-                child: Icon(onBack != null ? LucideIcons.chevronLeft : LucideIcons.menu, size: 18, color: kInk),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(width: 30, height: 30, alignment: Alignment.center, decoration: const BoxDecoration(color: kChipGreen, shape: BoxShape.circle), child: Text('O', style: inter(15, 800, color: kInk))),
-          const SizedBox(width: 12),
-          Expanded(child: Text(title, style: inter(18, 700), overflow: TextOverflow.ellipsis)),
-          ?action,
-          const SizedBox(width: 8),
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: const Color(0xFFF3F4F1), borderRadius: BorderRadius.circular(10)),
-            child: Text(initials, style: inter(13, 700)),
-          ),
-        ]),
-      );
+  Widget build(BuildContext context) =>
+      AppHeader(title: title == 'OneLocal POS' || title == 'OneLocal' ? 'Bill' : title, onBack: onBack, onMenu: onMenu, trailing: action);
 }
 
 /// Page title and the line under it ("Transaction History" / "OneLocal · Latur Main Branch").

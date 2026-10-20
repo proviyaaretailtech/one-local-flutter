@@ -27,3 +27,10 @@ export const Save = z.object({
   net_qty: opt(z.number().positive().max(1_000_000)), net_qty_unit: opt(z.enum(['g', 'kg', 'ml', 'l', 'pc'])),
   unit_description: opt(z.string().max(40)), purchase_pack_units: opt(z.number().positive().max(1_000_000)), storage: opt(z.string().max(40)),
 }).strict().refine(b => !b.id || b.version, { message: 'Refresh the item and try again.', path: ['version'] });
+
+// "Remove background (AI)" on the item form: the photo as base64 (JPG, PNG or WebP, up to 5 MB before encoding). Nothing is saved.
+export const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const RemoveBg = z.object({
+  image_b64: z.string().min(16, 'That photo is empty.').max(Math.ceil(IMAGE_MAX_BYTES / 3) * 4 + 8, 'Each photo can be up to 5 MB.').regex(/^[A-Za-z0-9+/]+=*$/, 'That photo could not be read.'),
+  content_type: z.enum(['image/jpeg', 'image/png', 'image/webp'], { message: 'Use a JPG, PNG or WebP photo.' }),
+}).strict();

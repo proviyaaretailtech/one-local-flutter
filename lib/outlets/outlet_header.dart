@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../ui/theme.dart';
 import '../home/home_nav.dart';
+import '../ui/app_header.dart';
+import '../ui/theme.dart';
 import 'outlet_scope.dart';
 import 'outlet_status_screen.dart';
 import 'outlets_api.dart';
@@ -178,84 +179,42 @@ class _OutletHeaderState extends State<OutletHeader> {
     OutletScope.selected.value = picked.isEmpty ? null : picked;
   }
 
-  Widget _menuButton(BuildContext context) => Semantics(
-        button: true,
-        label: 'Menu',
-        child: InkWell(
-          key: widget.menuKey,
-          borderRadius: BorderRadius.circular(12),
-          onTap: widget.onMenu ?? () => HomeNav.go(context, HomeNav.home, 'Menu'),
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: kOutletSquare, borderRadius: BorderRadius.circular(12)),
-            child: const Icon(LucideIcons.menu, size: 20, color: kInk),
-          ),
-        ),
-      );
-
-  BoxDecoration get _box => BoxDecoration(
-        color: Colors.white,
-        borderRadius: widget.rounded ? const BorderRadius.vertical(bottom: Radius.circular(28)) : null,
-        border: widget.rounded ? null : const Border(bottom: BorderSide(color: kLine)),
-      );
-
-  EdgeInsets _pad(BuildContext context) => EdgeInsets.fromLTRB(16, (widget.safeTop ? MediaQuery.paddingOf(context).top : 0) + 10, 16, 10);
-
-  Widget _dashboard(BuildContext context, OutletOverview? o) {
-    final all = widget.allowAll && OutletScope.selected.value == null && widget.locationId == null;
+  // The dashboard's banner, on every screen (founder, 20 Oct 2026): back when there is a page below, "SHOWING DATA FOR"
+  // over the outlet ▾ (the switcher) and its status (Restaurant status), bell and ☰ — drawn by the shared [AppHeader].
+  Widget _banner(BuildContext context, OutletOverview? o) {
+    final all = widget.dashboard && widget.allowAll && OutletScope.selected.value == null && widget.locationId == null;
     final cur = o?.current;
-    final label = o == null || cur == null ? widget.title : all ? 'All outlets (${o.verified.length})' : cur.name;
-    return Container(
-      padding: _pad(context),
-      decoration: _box,
-      child: Row(children: [
-        Expanded(
-          child: Semantics(
-            button: o != null,
-            label: o == null ? null : 'Showing data for $label. Change outlet',
-            excludeSemantics: o != null,
-            child: InkWell(
-              key: const ValueKey('outlet-header-name'),
-              onTap: o == null || cur == null ? null : () => _pick(o),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text('SHOWING DATA FOR', style: inter(10.5, 700, color: kMuted).copyWith(letterSpacing: 0.8)),
-                const SizedBox(height: 2),
-                Row(children: [
-                  Flexible(child: Text(label, key: const ValueKey('outlet-header-label'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(18, 700))),
-                  if (o != null && cur != null) const Icon(LucideIcons.chevronDown, size: 18, color: kInk),
-                ]),
-                if (o != null && cur != null)
-                  InkWell(
-                    key: const ValueKey('outlet-header-chip'),
-                    onTap: () => OutletHeader.openStatus(context),
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Container(width: 8, height: 8, decoration: BoxDecoration(color: outletStatusColor(all ? (o.chip == 'All online' ? 'online' : 'paused') : cur.status), shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Text(all ? o.chip : cur.statusLabel, key: const ValueKey('outlet-header-status'), style: inter(12.5, 600, color: kMuted)),
-                        const Icon(LucideIcons.chevronRight, size: 12, color: kMuted),
-                      ]),
-                    ),
+    // Until the outlet is known (or when the server cannot say), the store's name from the dashboard, else the screen's title.
+    final label = o == null || cur == null ? (HomeNav.storeName ?? widget.title) : all ? 'All outlets (${o.verified.length})' : cur.name;
+    return Semantics(
+      label: o == null ? null : 'Showing data for $label',
+      child: AppHeader(
+        kicker: 'Showing data for',
+        title: label,
+        titleKey: const ValueKey('outlet-header-name'),
+        bellKey: const ValueKey('outlet-header-bell'),
+        onTitle: o == null || cur == null ? null : () => _pick(o),
+        back: widget.dashboard ? false : null,
+        safeTop: widget.safeTop,
+        onMenu: widget.onMenu,
+        menuKey: widget.menuKey,
+        onBell: widget.onBell,
+        subtitle: o == null || cur == null
+            ? null
+            : InkWell(
+                key: const ValueKey('outlet-header-chip'),
+                onTap: () => OutletHeader.openStatus(context),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 8, height: 8, decoration: BoxDecoration(color: outletStatusColor(all ? (o.chip == 'All online' ? 'online' : 'paused') : cur.status), shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(all ? o.chip : cur.statusLabel,
+                        key: const ValueKey('outlet-header-status'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12.5, 600, color: kMuted)),
                   ),
-              ]),
-            ),
-          ),
-        ),
-        Semantics(
-          button: true,
-          label: 'Notifications',
-          excludeSemantics: true,
-          child: IconButton(
-            key: const ValueKey('outlet-header-bell'),
-            onPressed: widget.onBell ?? () => HomeNav.go(context, HomeNav.notifications, 'Notifications'),
-            icon: const Icon(LucideIcons.bell, size: 22, color: kInk),
-          ),
-        ),
-        const SizedBox(width: 4),
-        _menuButton(context),
-      ]),
+                  const Icon(LucideIcons.chevronRight, size: 12, color: kMuted),
+                ]),
+              ),
+      ),
     );
   }
 
@@ -265,78 +224,7 @@ class _OutletHeaderState extends State<OutletHeader> {
       future: _f,
       builder: (context, snap) {
         final o = snap.hasError ? null : snap.data;
-        if (widget.dashboard) return _dashboard(context, o);
-        final cur = o?.current;
-        final name = cur?.name.isNotEmpty == true ? cur!.name : widget.title;
-        return Container(
-          padding: _pad(context),
-          decoration: _box,
-          child: Row(children: [
-            _menuButton(context),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Semantics(
-                button: cur != null,
-                label: cur == null ? null : 'Outlet ${cur.name}, ${cur.statusLabel}. Change outlet',
-                excludeSemantics: cur != null,
-                child: InkWell(
-                  key: const ValueKey('outlet-header-name'),
-                  onTap: cur == null ? null : () => _pick(o!),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                    Row(children: [
-                      Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(17, 700))),
-                      if (cur != null && (o?.verified.length ?? 0) > 1) const Icon(LucideIcons.chevronDown, size: 16, color: kInk),
-                    ]),
-                    if (cur != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Row(children: [
-                          Container(width: 8, height: 8, decoration: BoxDecoration(color: outletStatusColor(cur.status), shape: BoxShape.circle)),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(cur.statusLabel,
-                                key: const ValueKey('outlet-header-status'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: inter(13, 600, color: outletStatusColor(cur.status))),
-                          ),
-                        ]),
-                      ),
-                  ]),
-                ),
-              ),
-            ),
-            if (o != null && o.chip.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              Semantics(
-                button: true,
-                label: '${o.chip}. Open restaurant status',
-                excludeSemantics: true,
-                child: InkWell(
-                  key: const ValueKey('outlet-header-chip'),
-                  borderRadius: BorderRadius.circular(999),
-                  onTap: () => OutletHeader.openStatus(context),
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(10, 5, 6, 5),
-                    decoration: BoxDecoration(color: kOutletChipBg, borderRadius: BorderRadius.circular(999)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(o.chip, style: inter(11, 600, color: kOutletChipText)),
-                      const Icon(LucideIcons.chevronRight, size: 12, color: kOutletChipText),
-                    ]),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(width: 10),
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(color: kOutletSquare, shape: BoxShape.circle),
-              child: Text(o == null || o.personName.isEmpty ? (widget.initials ?? '') : outletInitials(o.personName), style: inter(13, 700)),
-            ),
-          ]),
-        );
+        return _banner(context, o);
       },
     );
   }

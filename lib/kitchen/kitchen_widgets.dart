@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../inventory/inventory_widgets.dart' show kNavyH, kLimeH, kGreyBg, kAmberText, kAmberBgH, kBlueIconBg, kGreenIconBg, kPostedText;
+import '../inventory/inventory_widgets.dart' show kNavyH, kGreyBg, kAmberText, kAmberBgH, kBlueIconBg, kGreenIconBg, kPostedText;
+import '../ui/app_tab_bar.dart';
 import '../ui/theme.dart';
 import 'kitchen_api.dart';
 
@@ -94,38 +95,13 @@ class KitchenBottomNav extends StatelessWidget {
     ('orders', 'Orders', LucideIcons.shoppingBag),
     ('stock', 'Stock', LucideIcons.boxes),
   ];
+  // The app's one bottom bar ([AppTabBar]); the kitchen sits under POS, and tabs keep their 'kit-tab-…' keys.
   @override
-  Widget build(BuildContext context) => SafeArea(
-        top: false,
-        minimum: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        child: Container(
-          height: 84,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-          decoration: BoxDecoration(color: kNavyH, borderRadius: BorderRadius.circular(34)),
-          child: Row(children: [
-            for (final (id, label, icon) in tabs)
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  selected: id == 'pos',
-                  label: label,
-                  child: InkWell(
-                    key: ValueKey('kit-tab-$id'),
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () => onTap(id),
-                    child: Container(
-                      decoration: id == 'pos' ? BoxDecoration(color: kLimeH, borderRadius: BorderRadius.circular(14)) : null,
-                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(icon, size: 22, color: id == 'pos' ? kNavyH : Colors.white),
-                        const SizedBox(height: 5),
-                        ExcludeSemantics(child: Text(label, maxLines: 1, style: inter(11, id == 'pos' ? 700 : 500, color: id == 'pos' ? kNavyH : Colors.white))),
-                      ]),
-                    ),
-                  ),
-                ),
-              ),
-          ]),
-        ),
+  Widget build(BuildContext context) => AppTabBar(
+        tabs: [for (final (id, label, icon) in tabs) AppTab(id, label, icon, primary: id == 'pos')],
+        active: 'pos',
+        onTap: onTap,
+        keyPrefix: 'kit-tab-',
       );
 }
 

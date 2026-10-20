@@ -83,10 +83,10 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   }
 
   Future<void> _add() async {
-    final what = await showCatSheet<String>(context, title: 'Add Item', subtitle: 'Add products the easy way', body: (ctx) => Row(children: [
-          Expanded(child: _AddChoice(icon: LucideIcons.zap, label: 'Quick Add', fill: kLime, onTap: () => Navigator.of(ctx).pop('quick'))),
-          const SizedBox(width: 12),
-          Expanded(child: _AddChoice(icon: LucideIcons.shoppingCart, label: 'Item creation', fill: Colors.white, onTap: () => Navigator.of(ctx).pop('full'))),
+    final what = await showCatSheet<String>(context, title: 'Add Item', subtitle: 'Choose how much you want to fill in now', body: (ctx) => Column(children: [
+          _AddChoice(icon: LucideIcons.zap, label: 'Quick Add', detail: 'Name, SKU and price — ready in seconds', primary: true, onTap: () => Navigator.of(ctx).pop('quick')),
+          const SizedBox(height: 10),
+          _AddChoice(icon: LucideIcons.shoppingCart, label: 'Item creation', detail: 'Photo, codes, units, tax and pricing', onTap: () => Navigator.of(ctx).pop('full')),
         ]));
     if (!mounted || what == null) return;
     if (what == 'quick') {
@@ -142,15 +142,15 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
       backgroundColor: kBg,
       body: Column(children: [
         // Item is a main tab: the outlet header (specs/outlets-multi); ☰ falls back to Home when the screen has no menu of its own
-        OrdersTopBar(title: 'VINII Store POS', onMenu: widget.onMenu),
+        OrdersTopBar(title: 'Catalogue', onMenu: widget.onMenu),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
             child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 16), children: [
-              BigTitle('Catalogue', trailing: d == null ? null : _CountPill('${d.count('total')} items')),
+              BigTitle('Catalogue', trailing: d == null ? null : _CountPill('${d.count('total')} ${d.count('total') == 1 ? 'item' : 'items'}')),
               const SizedBox(height: 16),
               Row(children: [
-                SizedBox(width: 132, child: LimeButton('+ Add Items', onPressed: _add)),
+                SizedBox(width: 124, child: LimeButton('+ Add Items', onPressed: _add)),
                 const SizedBox(width: 12),
                 Expanded(child: _searchField()),
               ]),
@@ -162,7 +162,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
               ]),
               const SizedBox(height: 18),
               Row(children: [
-                Expanded(child: Text('Food products', style: inter(19, 600))),
+                Expanded(child: Text('Food products', style: inter(16, 600))),
                 _ViewToggle(grid: _grid, onChanged: (g) => setState(() => _grid = g)),
               ]),
               const SizedBox(height: 14),
@@ -185,8 +185,8 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   }
 
   Widget _searchField() => Container(
-        height: 56,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), border: Border.all(color: const Color(0xFFD9DCD6))),
+        height: 46,
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(23), border: Border.all(color: const Color(0xFFD9DCD6))),
         child: Row(children: [
           const SizedBox(width: 14),
           const Icon(LucideIcons.search, size: 20, color: kMuted),
@@ -195,15 +195,15 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
             child: TextField(
               controller: _search,
               textInputAction: TextInputAction.search,
-              style: inter(16, 400),
-              decoration: plainInput.copyWith(hintText: 'Search name, SKU...', hintStyle: inter(16, 400, color: kMuted)),
+              style: inter(14, 400),
+              decoration: plainInput.copyWith(hintText: 'Search name, SKU...', hintStyle: inter(14, 400, color: kMuted)),
               onChanged: (_) {
                 _debounce?.cancel();
                 _debounce = Timer(const Duration(milliseconds: 300), () => _reload(toFirst: true));
               },
             ),
           ),
-          IconButton(tooltip: 'Scan a code', visualDensity: VisualDensity.compact, onPressed: _scan, icon: const Icon(LucideIcons.scanLine, size: 18, color: kMuted)),
+          IconButton(tooltip: 'Scan a barcode', visualDensity: VisualDensity.compact, onPressed: _scan, icon: const Icon(LucideIcons.scanLine, size: 18, color: kMuted)),
         ]),
       );
 
@@ -244,13 +244,13 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
         padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE3E5DF))),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Padding(padding: EdgeInsets.only(top: 2), child: Icon(LucideIcons.info, size: 24, color: kMuted)),
+          const Padding(padding: EdgeInsets.only(top: 1), child: Icon(LucideIcons.info, size: 18, color: kMuted)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('A simpler receipt preview', style: inter(19, 600)),
+              Text('A simpler receipt preview', style: inter(14, 600)),
               const SizedBox(height: 4),
-              Text('Item quantities and tax are now easier to review before you print or share.', style: inter(16, 400, color: kMuted, height: 1.35)),
+              Text('Item quantities and tax are now easier to review before you print or share.', style: inter(13, 400, color: kMuted, height: 1.35)),
             ]),
           ),
           IconButton(tooltip: 'Dismiss', onPressed: () => setState(() => _noteOpen = false), icon: const Icon(LucideIcons.x, size: 20, color: kInk)),
@@ -333,9 +333,9 @@ class _CountPill extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFE3E5DF))),
-        child: Text(text, style: inter(16, 500, color: kMuted)),
+        child: Text(text, style: inter(13, 500, color: kMuted)),
       );
 }
 
@@ -350,7 +350,7 @@ class _TextAction extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 22, color: color), const SizedBox(width: 8), Text(label, style: inter(18, 600, color: color))]),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 18, color: color), const SizedBox(width: 6), Text(label, style: inter(14, 600, color: color))]),
         ),
       );
 }
@@ -369,9 +369,9 @@ class _ViewToggle extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             onTap: () => onChanged(value),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(color: on ? kPrimary : null, borderRadius: BorderRadius.circular(14)),
-              child: Row(children: [Icon(icon, size: 20, color: on ? kLime : kMuted), const SizedBox(width: 8), Text(label, style: inter(17, 600, color: on ? kLime : kMuted))]),
+              child: Row(children: [Icon(icon, size: 16, color: on ? kLime : kMuted), const SizedBox(width: 6), Text(label, style: inter(13, 600, color: on ? kLime : kMuted))]),
             ),
           ),
         );
@@ -396,37 +396,47 @@ class _Chip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(color: on ? kLime : Colors.white, borderRadius: BorderRadius.circular(999)),
-            child: Text(label, style: inter(17, on ? 700 : 500, color: on ? kDark : kMuted)),
+            child: Text(label, style: inter(13, on ? 700 : 500, color: on ? kDark : kMuted)),
           ),
         ),
       );
 }
 
+/// One way to add a product: round icon, name, what it is for, and a chevron (stacked, so both read the same size).
 class _AddChoice extends StatelessWidget {
-  const _AddChoice({required this.icon, required this.label, required this.fill, required this.onTap});
+  const _AddChoice({required this.icon, required this.label, required this.detail, required this.onTap, this.primary = false});
   final IconData icon;
-  final String label;
-  final Color fill;
+  final String label, detail;
   final VoidCallback onTap;
+  final bool primary;
   @override
   Widget build(BuildContext context) => Material(
-        color: fill,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: fill == Colors.white ? const Color(0xFFE3E5DF) : fill)),
+        color: primary ? const Color(0xFFF3FFE4) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: primary ? kLime : const Color(0xFFE3E5DF))),
         child: InkWell(
-          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           onTap: onTap,
-          // fixed height and one line: both choices are the same size whatever the label
-          child: SizedBox(
-            height: 64,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 22, color: kDark), const SizedBox(width: 10), Text(label, maxLines: 1, style: inter(17, 700, color: kDark))]),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+            child: Row(children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(color: primary ? kLime : kSoftField, shape: BoxShape.circle),
+                child: Icon(icon, size: 20, color: kDark),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(label, style: inter(15, 700, color: kDark)),
+                  const SizedBox(height: 2),
+                  Text(detail, style: inter(12, 400, color: kMuted)),
+                ]),
+              ),
+              const Icon(LucideIcons.chevronRight, size: 18, color: kMuted),
+            ]),
           ),
         ),
       );

@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
 import '../outlets/outlet_header.dart';
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
 
 /// Top of every Service POS screen (Figma section I): menu button, OneLocal wordmark, initials avatar, then "Service" and "Business · City".
@@ -11,51 +12,11 @@ class ServiceTopBar extends StatelessWidget {
   final String business;
   final VoidCallback? onMenu, onBack;
   final String? initials;
+  // First-level screens: the dashboard's banner (outlet, status); inner screens: the shared banner with back.
   @override
-  Widget build(BuildContext context) => Container(
-        decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: kLine))),
-        padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
-        child: Column(children: [
-          // first-level screens show the outlet header (specs/outlets-multi); inner screens keep the back arrow
-          if (onBack == null) OutletHeader(title: 'Service POS', onMenu: onMenu, safeTop: false, initials: initials) else Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-            child: Row(children: [
-              Semantics(
-                button: true,
-                label: onBack != null ? 'Back' : 'Menu',
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: onBack ?? onMenu,
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(color: kBg, shape: BoxShape.circle, border: Border.all(color: kLine)),
-                    child: Icon(onBack != null ? LucideIcons.chevronLeft : LucideIcons.menu, size: 20, color: kInk),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const BrandLogo(),
-              const Spacer(),
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: kCheck, borderRadius: BorderRadius.circular(12)),
-                child: initials == null || initials!.isEmpty ? const Icon(LucideIcons.user, size: 18, color: kInk) : Text(initials!, style: inter(15, 700)),
-              ),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 6, 24, 10),
-            child: Row(children: [
-              Text('Service', style: inter(15, 600, color: kLink)),
-              const SizedBox(width: 12),
-              Expanded(child: Text(business, textAlign: TextAlign.right, overflow: TextOverflow.ellipsis, style: inter(13, 400, color: kMuted))),
-            ]),
-          ),
-        ]),
-      );
+  Widget build(BuildContext context) => onBack == null
+      ? OutletHeader(title: 'Service POS', onMenu: onMenu, initials: initials)
+      : AppHeader(title: 'Service', kicker: business.isEmpty ? null : business, onBack: onBack, onMenu: onMenu);
 }
 
 /// Status pill of an appointment: green Confirmed / Completed, amber Deposit pending, red Cancelled / No-show, grey otherwise.

@@ -19,15 +19,52 @@ int? parsePriceMinor(String text) {
 
 // ---------------------------------------------------------------- About this product (tap an item)
 Future<void> showAbout(BuildContext context, CatItem item, {required VoidCallback onOpen}) {
+  // The product first (name, SKU when it has one), then its facts as label / value rows in one card, then the action.
+  Widget fact(String k, String v, {bool strong = false}) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(children: [
+          Text(k, style: inter(13, 400, color: kMuted)),
+          const SizedBox(width: 12),
+          Expanded(child: Text(v, textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(strong ? 16 : 14, strong ? 700 : 600))),
+        ]),
+      );
   return showCatSheet<void>(
     context,
     title: 'About this product',
-    subtitle: '${item.name} · ${item.sku}\nCheck the pack and SKU before selecting.',
-    body: (ctx) => Column(children: [
-      SheetOption('Selling price', subtitle: money(item.priceMinor), fill: kSoftField),
-      SheetOption('Category', subtitle: item.category.isEmpty ? '—' : item.category),
-      SheetOption('Pack size', subtitle: packSize(item)),
-      const SizedBox(height: 4),
+    body: (ctx) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: kSoftField, borderRadius: BorderRadius.circular(12)),
+          child: const Icon(LucideIcons.package, size: 22, color: kMuted),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(item.name, style: inter(16, 700), maxLines: 2, overflow: TextOverflow.ellipsis),
+            if (item.sku.isNotEmpty) Text('SKU ${item.sku}', style: inter(12, 400, color: kMuted)),
+          ]),
+        ),
+      ]),
+      const SizedBox(height: 14),
+      Container(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE3E5DF))),
+        child: Column(children: [
+          fact('Selling price', money(item.priceMinor), strong: true),
+          const Divider(height: 1, color: Color(0xFFF1F2EE)),
+          fact('Category', item.category.isEmpty ? 'Not set' : item.category),
+          const Divider(height: 1, color: Color(0xFFF1F2EE)),
+          fact('Pack size', packSize(item) == '—' ? 'Not set' : packSize(item)),
+        ]),
+      ),
+      const SizedBox(height: 10),
+      Row(children: [
+        const Icon(LucideIcons.info, size: 14, color: kMuted),
+        const SizedBox(width: 6),
+        Expanded(child: Text('Check the pack and SKU before selecting.', style: inter(12, 400, color: kMuted))),
+      ]),
+      const SizedBox(height: 16),
       DarkButton('View product details', onPressed: () {
         Navigator.of(ctx).pop();
         onOpen();
@@ -93,7 +130,7 @@ class _DetailDrawerState extends State<_DetailDrawer> {
               padding: const EdgeInsets.fromLTRB(20, 18, 16, 22),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(i.name, style: inter(26, 800)),
@@ -231,20 +268,20 @@ class _QuickAddState extends State<_QuickAdd> {
   }
 
   Widget _field(String label, TextEditingController c, String hint, {TextInputType? type, List<TextInputFormatter>? formatters}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: inter(16, 700)),
-        const SizedBox(height: 8),
+        Text(label, style: inter(13, 600)),
+        const SizedBox(height: 6),
         Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFDADCD5))),
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFDADCD5))),
           alignment: Alignment.centerLeft,
           child: TextField(
             controller: c,
             keyboardType: type,
             inputFormatters: formatters,
             onChanged: (_) => setState(() {}),
-            style: inter(16, 400),
-            decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(16, 400, color: kMuted)),
+            style: inter(14, 400),
+            decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(14, 400, color: kMuted)),
           ),
         ),
       ]);
@@ -253,17 +290,17 @@ class _QuickAddState extends State<_QuickAdd> {
   Widget build(BuildContext context) => Dialog(
         backgroundColor: Colors.white,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: Text('Quick add product', style: inter(24, 800))),
-              IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(LucideIcons.x, size: 22, color: kMuted)),
+            Row(children: [
+              Expanded(child: Text('Quick add product', style: inter(20, 700))),
+              IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(LucideIcons.x, size: 20, color: kMuted)),
             ]),
-            Text('Create a catalogue record. Fill in all required fields to continue.', style: inter(16, 400, color: kMuted, height: 1.35)),
+            Text('Create a catalogue record. Fill in all required fields to continue.', style: inter(13, 400, color: kMuted, height: 1.35)),
             const SizedBox(height: 14),
-            Row(children: [Text('Record', style: inter(15, 400, color: kMuted)), const Spacer(), Text('New product', style: inter(16, 700))]),
+            Row(children: [Text('Record', style: inter(13, 400, color: kMuted)), const Spacer(), Text('New product', style: inter(13, 700))]),
             const SizedBox(height: 14),
             _field('Product name *', _name, 'Enter product name'),
             const SizedBox(height: 14),
@@ -272,33 +309,38 @@ class _QuickAddState extends State<_QuickAdd> {
             _field('Selling price (₹) *', _price, 'Enter price', type: const TextInputType.numberWithOptions(decimal: true), formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
             const SizedBox(height: 14),
             if (_error != null)
-              Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_error!, style: inter(14, 500, color: kError)))
+              Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_error!, style: inter(12, 500, color: kError)))
             else if (!_ready)
-              Padding(padding: const EdgeInsets.only(bottom: 10), child: Text('Required fields are blank · Not ready to add', style: inter(15, 400, color: kMuted))),
-            Material(
-              color: _ready ? kPrimary : const Color(0xFFE5E7EB),
-              borderRadius: BorderRadius.circular(28),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(28),
-                onTap: _ready && !_busy ? _add : null,
-                child: SizedBox(
-                  height: 56,
-                  child: Center(
-                    child: _busy
-                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: kLime))
-                        : Text('Add product', style: inter(18, 700, color: _ready ? kLime : kMuted)),
+              Padding(padding: const EdgeInsets.only(bottom: 10), child: Text('Required fields are blank · Not ready to add', style: inter(12, 400, color: kMuted))),
+            // Cancel and Add side by side, the app's usual button height.
+            Row(children: [
+              Expanded(child: OutlineButton('Cancel', onPressed: _busy ? null : () => Navigator.of(context).pop(), height: 48)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Material(
+                  color: _ready ? kPrimary : const Color(0xFFE5E7EB),
+                  borderRadius: BorderRadius.circular(24),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: _ready && !_busy ? _add : null,
+                    child: SizedBox(
+                      height: 48,
+                      child: Center(
+                        child: _busy
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: kLime))
+                            : Text('Add product', style: inter(14, 700, color: _ready ? kLime : kMuted)),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            OutlineButton('Cancel', onPressed: _busy ? null : () => Navigator.of(context).pop(), height: 56),
+            ]),
           ]),
         ),
       );
 }
 
-// ---------------------------------------------------------------- Scan QR code
+// ---------------------------------------------------------------- Scan barcode
 Future<CatItem?> showScanSheet(BuildContext context, CatalogueApi api) =>
     showDialog<CatItem>(context: context, barrierColor: Colors.black54, builder: (_) => _ScanSheet(api: api));
 
@@ -338,86 +380,119 @@ class _ScanSheetState extends State<_ScanSheet> {
     }
   }
 
+  // Products carry barcodes (EAN / UPC), so this is a barcode lookup: a wide viewfinder, then the number typed in. The camera is not
+  // connected yet (no scanner library in the app), so the viewfinder says so instead of pretending; typing the code works today.
   @override
   Widget build(BuildContext context) {
-    const ink = Color(0xFF111815), panel = Color(0xFF2A352F), row = Color(0xFF202923);
     final ready = _code.text.trim().isNotEmpty;
     return Dialog(
-      backgroundColor: ink,
+      backgroundColor: Colors.white,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            Expanded(child: Text('Scan QR code', style: inter(26, 700, color: Colors.white))),
-            IconButton(tooltip: 'Close', style: IconButton.styleFrom(backgroundColor: row), onPressed: () => Navigator.of(context).pop(), icon: const Icon(LucideIcons.x, size: 24, color: Colors.white)),
+            Expanded(child: Text('Scan barcode', style: inter(20, 700))),
+            IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(LucideIcons.x, size: 20, color: kMuted)),
           ]),
-          const SizedBox(height: 10),
-          Text('Place the entire QR code inside the square guide.', style: inter(16, 400, color: const Color(0xFFC9CFCB))),
+          Text('Point the camera at the product\'s barcode, or type the number below.', style: inter(13, 400, color: kMuted, height: 1.35)),
+          const SizedBox(height: 14),
+          const _BarcodeViewfinder(),
           const SizedBox(height: 16),
+          Text('Barcode or SKU', style: inter(13, 600, color: kMuted)),
+          const SizedBox(height: 6),
           Container(
-            height: 330,
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-            decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(26)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('CAMERA PREVIEW · STATIC PLACEHOLDER', style: inter(12.5, 500, color: const Color(0xFFC9CFCB)).copyWith(letterSpacing: 0.3)),
-              Expanded(child: Center(child: Container(width: 150, height: 150, decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), border: Border.all(color: kLime, width: 2.5))))),
-              Center(child: Text('Keep all four corners visible', style: inter(15, 400, color: const Color(0xFFC9CFCB)))),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            decoration: BoxDecoration(color: row, borderRadius: BorderRadius.circular(20)),
+            height: 46,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: _error != null ? kError : const Color(0xFFDADCD5))),
             child: Row(children: [
-              const Icon(LucideIcons.flashlight, size: 22, color: kLime),
-              const SizedBox(width: 14),
-              Expanded(child: Text('Flashlight', style: inter(18, 500, color: Colors.white))),
-              Text('Off', style: inter(16, 400, color: const Color(0xFFC9CFCB))),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(color: const Color(0xFFFEF6E7), borderRadius: BorderRadius.circular(24)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text('ENTER CODE MANUALLY', style: inter(15, 800, color: const Color(0xFF9A4A00))),
-              const SizedBox(height: 10),
-              Text('QR text or identifier', style: inter(17, 700)),
-              const SizedBox(height: 8),
-              Container(
-                height: 52,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.centerLeft,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE3E5DF))),
+              const Icon(LucideIcons.scanBarcode, size: 18, color: kMuted),
+              const SizedBox(width: 8),
+              Expanded(
                 child: TextField(
                   controller: _code,
+                  autofocus: true,
                   onChanged: (_) => setState(() => _error = null),
                   onSubmitted: (_) => ready && !_busy ? _find() : null,
-                  style: inter(16, 400),
-                  decoration: plainInput.copyWith(hintText: 'Enter the code text', hintStyle: inter(16, 400, color: kMuted)),
-                ),
-              ),
-              if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: inter(14, 500, color: kError))),
-              const SizedBox(height: 12),
-              Material(
-                color: ready ? kPrimary : const Color(0xFFE5E7EB),
-                borderRadius: BorderRadius.circular(28),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(28),
-                  onTap: ready && !_busy ? _find : null,
-                  child: SizedBox(
-                    height: 56,
-                    child: Center(child: _busy ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: kLime)) : Text('Find code', style: inter(18, 700, color: ready ? kLime : kMuted))),
-                  ),
+                  style: inter(14, 400),
+                  decoration: plainInput.copyWith(hintText: 'e.g. 8901058851298', hintStyle: inter(14, 400, color: kMuted)),
                 ),
               ),
             ]),
           ),
+          if (_error != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_error!, style: inter(12, 500, color: kError))),
           const SizedBox(height: 14),
-          Text('The camera is not connected in this release: type the code to look it up.', style: inter(14, 400, color: const Color(0xFFC9CFCB))),
+          Material(
+            color: ready ? kPrimary : const Color(0xFFE5E7EB),
+            borderRadius: BorderRadius.circular(24),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: ready && !_busy ? _find : null,
+              child: SizedBox(
+                height: 48,
+                child: Center(
+                  child: _busy
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: kLime))
+                      : Text('Find product', style: inter(14, 700, color: ready ? kLime : kMuted)),
+                ),
+              ),
+            ),
+          ),
         ]),
+      ),
+    );
+  }
+}
+
+/// A barcode's viewfinder: a dark panel with a wide, short guide (lime corners) and a scan line across it.
+class _BarcodeViewfinder extends StatelessWidget {
+  const _BarcodeViewfinder();
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 168,
+        decoration: BoxDecoration(color: const Color(0xFF1B2420), borderRadius: BorderRadius.circular(16)),
+        child: Stack(alignment: Alignment.center, children: [
+          SizedBox(
+            width: 240,
+            height: 96,
+            child: Stack(children: [
+              for (final a in const [Alignment.topLeft, Alignment.topRight, Alignment.bottomLeft, Alignment.bottomRight])
+                Align(alignment: a, child: _Corner(a)),
+              Center(child: Icon(LucideIcons.barcode, size: 52, color: Colors.white.withValues(alpha: 0.28))),
+              Center(child: Container(height: 2, margin: const EdgeInsets.symmetric(horizontal: 10), color: kLime.withValues(alpha: 0.85))),
+            ]),
+          ),
+          Positioned(
+            bottom: 10,
+            child: Row(children: [
+              Icon(LucideIcons.camera, size: 14, color: Colors.white.withValues(alpha: 0.6)),
+              const SizedBox(width: 6),
+              Text('Camera scanning is coming soon', style: inter(12, 500, color: Colors.white.withValues(alpha: 0.7))),
+            ]),
+          ),
+        ]),
+      );
+}
+
+class _Corner extends StatelessWidget {
+  const _Corner(this.a);
+  final Alignment a;
+  @override
+  Widget build(BuildContext context) {
+    const side = BorderSide(color: kLime, width: 3);
+    return SizedBox(
+      width: 22,
+      height: 22,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: a.y < 0 ? side : BorderSide.none,
+            bottom: a.y > 0 ? side : BorderSide.none,
+            left: a.x < 0 ? side : BorderSide.none,
+            right: a.x > 0 ? side : BorderSide.none,
+          ),
+        ),
       ),
     );
   }

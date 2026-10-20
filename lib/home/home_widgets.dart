@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../ui/app_tab_bar.dart';
 import '../ui/theme.dart';
 
 // Section D tokens, read from the exported Figma frames (assets/figma_ref_d, 2x PNG, colours sampled).
@@ -189,51 +190,18 @@ const kHubTabs = [
 ];
 
 /// Floating navy bar, radius 40, five tabs, the centre one a lime tile (Figma bottom nav in both frames).
+/// With [current], that tab is the filled lime tile (as on the Stock bar) and the centre action, when it is not
+/// the current tab, keeps only a lime outline, so it stands out without looking selected.
 class FloatingTabBar extends StatelessWidget {
-  const FloatingTabBar({super.key, required this.tabs, required this.onTap});
+  const FloatingTabBar({super.key, required this.tabs, required this.onTap, this.current});
   final List<BarTab> tabs;
   final ValueChanged<String> onTap;
+  final String? current;
+  // The app's one bottom bar ([AppTabBar]); tabs are keyed by label ('tab-Home').
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 88,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: kNavy,
-        borderRadius: BorderRadius.circular(40),
-        boxShadow: const [BoxShadow(color: Color(0x33000000), offset: Offset(0, 8), blurRadius: 24)],
-      ),
-      child: Row(children: [
-        for (final t in tabs)
-          Expanded(
-            child: Semantics(
-              button: true,
-              label: t.label,
-              child: InkWell(
-                key: ValueKey('tab-${t.label}'),
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => onTap(t.label),
-                child: t.hero
-                    ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(color: kLime, borderRadius: BorderRadius.circular(8)),
-                          child: Icon(t.icon, size: 22, color: kNavy),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(t.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10, 700, color: Colors.white)),
-                      ])
-                    : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(t.icon, size: 22, color: Colors.white),
-                        const SizedBox(height: 6),
-                        Text(t.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10, 500, color: Colors.white)),
-                      ]),
-              ),
-            ),
-          ),
-      ]),
-    );
-  }
+  Widget build(BuildContext context) => AppTabBar(
+        tabs: [for (final t in tabs) AppTab(t.label, t.label, t.icon, primary: t.hero)],
+        active: current,
+        onTap: onTap,
+      );
 }

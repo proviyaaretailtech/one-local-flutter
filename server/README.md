@@ -27,6 +27,7 @@ Local Supabase only: the server refuses a non-local `SUPABASE_URL` unless `ALLOW
 | `SUPABASE_ANON_KEY` (or `SUPABASE_PUBLISHABLE_KEY`) | yes | verifies tokens and runs every call as the caller (their token on this key) so row-level security applies |
 | `PARTNER_PII_KEY` | production | 16+ characters; encrypts PAN and bank numbers in the database. Local dev uses a fixed dev-only key; production without it answers 503 on tax/bank saves |
 | `ANTHROPIC_API_KEY` | optional | Claude API key for "Write with AI" (dish descriptions). Unset: `menu_ai_describe` answers 503 `ai_not_configured`. Never print or commit it |
+| `REMOVE_BG_API_KEY` | optional | remove.bg key for "Remove background (AI)" on the item form (`cat_image_remove_bg`). Unset: 503 `bg_not_configured`. `REMOVE_BG_SIZE` picks the output size (default `auto`). Never print or commit it |
 | `PORT` | no | default 8090 |
 | `ALLOW_REMOTE` | no | `1` only on the host meant to use a hosted project |
 | `TRUSTED_PROXY_HOPS` | no | proxies in front of the server (for per-address limits) |

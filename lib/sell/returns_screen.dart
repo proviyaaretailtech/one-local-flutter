@@ -121,7 +121,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(onMenu: () => env.menu(context), initials: env.initials),
+        SellTopBar(title: 'Returns & refunds', initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
             Row(children: [

@@ -91,6 +91,18 @@ void main() {
   });
 
   group('Sell screen', () {
+    testWidgets('the till pages are shortcuts on the screen (☰ is only the side menu); Open carts opens the carts', (t) async {
+      final env = Till().env();
+      await tall(t, SellScreen(env: env));
+      for (final s in ['Open carts', 'History', 'Returns', 'Invoices', 'Cash shift']) {
+        expect(find.text(s), findsOneWidget, reason: s);
+      }
+      expect(find.text('Bill'), findsWidgets);
+      await t.tap(find.text('Open carts'));
+      await t.pumpAndSettle();
+      expect(find.byType(CartsScreen), findsOneWidget);
+    });
+
     testWidgets('shows the catalogue; an unavailable item cannot be added; ADD fills the cart and PAY shows the server total', (t) async {
       final till = Till();
       final env = till.env();

@@ -22,11 +22,23 @@ const double kFieldH = 54;
 const double kRadius = 12;
 const double kBorderW = 1;
 
-/// Inter at a named weight. Inter.ttf is a variable font, so the weight axis is set too.
+/// The app's type scale. Every [inter] size snaps to the nearest step (a tie goes to the smaller one), so text that was
+/// drawn at 12.5 or 13.5 lines up with 13, and nothing is smaller than 11.
+const kTypeScale = <double>[11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
+
+double typeSize(double size) {
+  var best = kTypeScale.first;
+  for (final s in kTypeScale) {
+    if ((s - size).abs() < (best - size).abs()) best = s;
+  }
+  return best;
+}
+
+/// Inter at a named weight, on the type scale ([typeSize]). Inter.ttf is a variable font, so the weight axis is set too.
 TextStyle inter(double size, int weight, {Color color = kInk, double? height, List<Shadow>? shadows}) {
   return TextStyle(
     fontFamily: 'Inter',
-    fontSize: size,
+    fontSize: typeSize(size),
     fontWeight: FontWeight.values[(weight ~/ 100) - 1],
     fontVariations: [FontVariation('wght', weight.toDouble())],
     color: color,
@@ -142,17 +154,39 @@ class BrandLogo extends StatelessWidget {
   }
 }
 
-/// Logo left, "Help" right. 24 / 16 padding.
+/// Logo left, "Help" right. 24 / 16 padding. With [back] (the sign-in screens, whose Figma frames have no way back)
+/// and a screen to go back to, a back circle (the [StepNav] style, 36) sits before the logo. Off by default: screens
+/// with a [StepNav] already have their own back.
 class BrandNav extends StatelessWidget {
-  const BrandNav({super.key});
+  const BrandNav({super.key, this.back = false});
+  final bool back;
   @override
   Widget build(BuildContext context) {
+    final canPop = back && (ModalRoute.of(context)?.canPop ?? false);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: kPadX, vertical: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          if (canPop) ...[
+            Semantics(
+              button: true,
+              label: 'Back',
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => Navigator.maybePop(context),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: kBg, shape: BoxShape.circle, border: Border.all(color: kLine, width: kBorderW)),
+                  child: SvgPicture.asset('assets/figma/arrow_left.svg', width: 14, height: 14),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           const BrandLogo(),
+          const Spacer(),
           Text('Help', style: inter(14, 600, color: kLink)),
         ],
       ),

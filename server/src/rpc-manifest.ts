@@ -155,6 +155,8 @@ export const MANIFEST: Entry[] = [
   db('cat_item_view', { args: cat.View, map: P, rate: 'read', roles: STAFF }),
   db('cat_item_lookup', { args: cat.Lookup, map: P, rate: 'read', roles: STAFF }),
   db('cat_item_save', { args: cat.Save, map: P, rate: 'write', idem: true, roles: 'staff with menu:create (new) or menu:update (change)' }),
+  // Item form "Remove background (AI)": remove.bg with REMOVE_BG_API_KEY (server only); a photo up to 5 MB, nothing saved.
+  sec('cat_image_remove_bg', { args: cat.RemoveBg, rate: 'secure', roles: 'active staff of a business (checked on the server)', maxBytes: 7 * 1024 * 1024 + 64 * 1024 }),
   db('grn_list', { args: grn.List, map: P, rate: 'read', roles: STAFF }),
   db('grn_view', { args: grn.Receipt, map: P, rate: 'read', roles: STAFF }),
   db('grn_matching_view', { args: grn.Receipt, map: P, rate: 'read', roles: STAFF }),

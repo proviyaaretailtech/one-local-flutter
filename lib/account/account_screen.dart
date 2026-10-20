@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../customers/customer_widgets.dart';
+import '../home/control_centre_screen.dart' show initials;
 import '../home/home_widgets.dart' show kLime;
+import '../settings/settings_widgets.dart' show GroupCard, GroupTitle, RowAction, SettingRow, StatusPill;
 import '../ui/theme.dart';
 import 'account_api.dart';
 
@@ -151,21 +153,31 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
     }
   }
 
-  Widget _line(IconData icon, String label, String value, {String? action, VoidCallback? onTap, Key? key, String? foot}) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+  // Laid out like the Settings page (Figma section P, there is no Manage account frame): a profile card, then grouped white
+  // cards of rows (round green icon, title, status line, green action on the right).
+  Widget _profile(AccountInfo a) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFECEDE8))),
         child: Row(children: [
-          Icon(icon, size: 18, color: kMuted),
+          Container(
+            width: 52,
+            height: 52,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(color: kLime, shape: BoxShape.circle),
+            child: Text(initials(a.name.isEmpty ? a.email : a.name), style: inter(16, 700, color: kPrimary)),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label, style: inter(11.5, 500, color: kMuted)),
-              Text(value, style: inter(14.5, 600)),
-              if (foot != null) Text(foot, style: inter(11.5, 400, color: const Color(0xFFB54708))),
+              Text(a.name.isEmpty ? 'Your account' : a.name, style: inter(16, 700), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text([if (a.email.isNotEmpty) a.email, if (a.phone != null) '+${a.phone}'].join(' · '),
+                  style: inter(12, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
             ]),
           ),
-          if (action != null) TextButton(key: key, onPressed: _busy ? null : onTap, child: Text(action, style: inter(13.5, 600, color: kLink))),
         ]),
       );
+
+  Widget _act(String label, VoidCallback onTap, Key key) => RowAction(label, key: key, onTap: _busy ? null : onTap);
 
   @override
   Widget build(BuildContext context) {
@@ -177,73 +189,61 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
         Expanded(
           child: a == null
               ? Center(child: _error != null ? CwaLoadError(message: _error!, onRetry: _load) : const CircularProgressIndicator())
-              : ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
-                  CwaCard(
-                    child: Column(children: [
-                      _line(LucideIcons.user, 'Name', a.name.isEmpty ? 'Not set' : a.name, action: 'Edit', onTap: _editName, key: const ValueKey('acct-edit-name')),
-                      const Divider(color: kLine, height: 1),
-                      _line(LucideIcons.mail, 'Email', a.email.isEmpty ? 'Not set' : a.email,
-                          action: 'Change', onTap: _editEmail, key: const ValueKey('acct-edit-email'),
-                          foot: a.pendingEmail != null ? 'Waiting for you to confirm ${a.pendingEmail}' : (!a.emailConfirmed && a.email.isNotEmpty ? 'Not confirmed yet' : null)),
-                      const Divider(color: kLine, height: 1),
-                      _line(LucideIcons.smartphone, 'Mobile', a.phone == null ? 'Not set' : '+${a.phone}',
-                          action: a.phone == null ? 'Add' : 'Change', onTap: _editPhone, key: const ValueKey('acct-edit-phone')),
-                    ]),
-                  ),
-                  const CwaSection('How you sign in'),
-                  CwaCard(
-                    child: Column(children: [
-                      for (final m in a.methods)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Row(children: [
-                            Icon(m.enabled ? LucideIcons.circleCheck : LucideIcons.circle, size: 18, color: m.enabled ? kLink : kMuted),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(m.label, style: inter(14, m.enabled ? 600 : 400, color: m.enabled ? kInk : kMuted))),
-                            Text(
-                              m.method == 'partner_code' && m.code != null
-                                  ? (m.enabled ? '${m.code} · until ${cwaDate(m.validUntil)}' : 'expired')
-                                  : (m.enabled ? 'On' : 'Off'),
-                              style: inter(12, 500, color: kMuted),
-                            ),
-                          ]),
-                        ),
-                    ]),
-                  ),
-                  const CwaSection('Where you are signed in'),
-                  CwaCard(
-                    child: Column(children: [
-                      if (a.devices.isEmpty) Text('No active sessions.', style: inter(13, 400, color: kMuted)),
-                      for (final d in a.devices)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Row(children: [
-                            const Icon(LucideIcons.monitorSmartphone, size: 18, color: kMuted),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(d.device, style: inter(13.5, 600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                Text('Last active ${cwaDateTime(d.lastActive)}', style: inter(11.5, 400, color: kMuted)),
-                              ]),
-                            ),
-                            if (d.thisDevice)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(color: kLime, borderRadius: BorderRadius.circular(10)),
-                                child: Text('This device', style: inter(10.5, 700, color: kPrimary)),
-                              ),
-                          ]),
-                        ),
-                    ]),
-                  ),
-                  if (a.memberships.isNotEmpty) ...[
-                    const CwaSection('Your businesses'),
-                    CwaCard(
-                      child: Column(children: [
-                        for (final m in a.memberships)
-                          CwaRow('${m['organization'] ?? ''}${m['location'] == null ? '' : ' · ${m['location']}'}', '${m['role_name'] ?? m['role'] ?? ''}', strong: m['current'] == true),
-                      ]),
+              : ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+                  _profile(a),
+                  const GroupTitle('Profile'),
+                  GroupCard(children: [
+                    SettingRow(icon: LucideIcons.user, title: 'Name', subtitle: a.name.isEmpty ? 'Not set' : a.name, actions: [_act('Edit', _editName, const ValueKey('acct-edit-name'))]),
+                    SettingRow(
+                      icon: LucideIcons.mail,
+                      title: 'Email',
+                      subtitle: [
+                        a.email.isEmpty ? 'Not set' : a.email,
+                        if (a.pendingEmail != null) 'Waiting for you to confirm ${a.pendingEmail}' else if (!a.emailConfirmed && a.email.isNotEmpty) 'Not confirmed yet',
+                      ].join(' · '),
+                      actions: [_act('Change', _editEmail, const ValueKey('acct-edit-email'))],
                     ),
+                    SettingRow(
+                      icon: LucideIcons.smartphone,
+                      title: 'Mobile number',
+                      subtitle: a.phone == null ? 'Not set' : '+${a.phone}',
+                      actions: [_act(a.phone == null ? 'Add' : 'Change', _editPhone, const ValueKey('acct-edit-phone'))],
+                    ),
+                  ]),
+                  const GroupTitle('How you sign in'),
+                  GroupCard(children: [
+                    for (final m in a.methods)
+                      SettingRow(
+                        icon: m.method == 'partner_code' ? LucideIcons.keyRound : m.method == 'google' ? LucideIcons.globe : m.method.contains('phone') || m.method.contains('sms') ? LucideIcons.smartphone : LucideIcons.mail,
+                        title: m.label,
+                        subtitle: m.method == 'partner_code' && m.code != null
+                            ? (m.enabled ? '${m.code} · until ${cwaDate(m.validUntil)}' : 'Expired')
+                            : (m.enabled ? 'You can sign in this way' : 'Not set up'),
+                        actions: [StatusPill(m.enabled ? 'On' : 'Off', good: m.enabled)],
+                      ),
+                  ]),
+                  const GroupTitle('Where you are signed in'),
+                  GroupCard(children: [
+                    if (a.devices.isEmpty) const SettingRow(icon: LucideIcons.monitorSmartphone, title: 'No active sessions', subtitle: 'Sign in on a phone or browser to see it here'),
+                    for (final d in a.devices)
+                      SettingRow(
+                        icon: LucideIcons.monitorSmartphone,
+                        title: d.device,
+                        subtitle: 'Last active ${cwaDateTime(d.lastActive)}',
+                        actions: [if (d.thisDevice) const StatusPill('This device', good: true)],
+                      ),
+                  ]),
+                  if (a.memberships.isNotEmpty) ...[
+                    const GroupTitle('Your businesses'),
+                    GroupCard(children: [
+                      for (final m in a.memberships)
+                        SettingRow(
+                          icon: LucideIcons.store,
+                          title: '${m['organization'] ?? ''}${m['location'] == null ? '' : ' · ${m['location']}'}',
+                          subtitle: '${m['role_name'] ?? m['role'] ?? ''}',
+                          actions: [if (m['current'] == true) const StatusPill('Current', good: true)],
+                        ),
+                    ]),
                   ],
                   const SizedBox(height: 22),
                   CwaButton(

@@ -148,29 +148,19 @@ class _SellScreenState extends State<SellScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
+        // ☰ is the side menu (as on every screen); the till's own pages are the shortcuts under the search.
         SellTopBar(
-          title: 'OneLocal',
+          title: 'Bill',
           initials: env.initials,
-          onMenu: () => env.menu(context),
-          action: Material(
-            color: kDark,
-            shape: const StadiumBorder(),
-            child: InkWell(
-              customBorder: const StadiumBorder(),
-              onTap: _openSearch,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(LucideIcons.camera, size: 16, color: kLime),
-                  const SizedBox(width: 8),
-                  Text('Items', style: inter(14, 600, color: Colors.white)),
-                ]),
-              ),
-            ),
+          action: Semantics(
+            button: true,
+            label: 'Items',
+            excludeSemantics: true,
+            child: IconButton(tooltip: 'Search or scan items', onPressed: _openSearch, icon: const Icon(LucideIcons.scanLine, size: 22, color: kInk)),
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
           child: SellSearchField(
             controller: _search,
             hint: 'Scan bar code or type EAN/SKU…',
@@ -181,6 +171,24 @@ class _SellScreenState extends State<SellScreen> {
             },
           ),
         ),
+        SizedBox(
+          height: 38,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(children: [
+              for (final (id, icon, label) in const [
+                ('carts', LucideIcons.layers, 'Open carts'),
+                ('history', LucideIcons.history, 'History'),
+                ('returns', LucideIcons.undo2, 'Returns'),
+                ('receipts', LucideIcons.receiptText, 'Invoices'),
+                ('shift', LucideIcons.wallet, 'Cash shift'),
+              ])
+                _Shortcut(icon: icon, label: label, onTap: () => env.open(context, id)),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 8),
         if (_shift != null && _shift!.shift == null) _shiftBanner(_shift!),
         Expanded(child: _body()),
         _cartBar(units),
@@ -220,7 +228,7 @@ class _SellScreenState extends State<SellScreen> {
     final cats = ['', ...catalog.categories];
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SizedBox(
-        width: 84,
+        width: 72,
         child: ListView(children: [
           for (final c in cats)
             Semantics(
@@ -230,17 +238,17 @@ class _SellScreenState extends State<SellScreen> {
               child: InkWell(
                 onTap: () => setState(() => _category = c),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(color: c == _category ? const Color(0xFFFFF4E0) : null, border: Border(left: BorderSide(width: 3, color: c == _category ? const Color(0xFFF59E0B) : Colors.transparent))),
                   child: Column(children: [
                     Container(
-                      width: 44,
-                      height: 44,
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: kLine)),
-                      child: Icon(c.isEmpty ? LucideIcons.layoutGrid : LucideIcons.tag, size: 20, color: c == _category ? const Color(0xFFD97706) : kMuted),
+                      child: Icon(c.isEmpty ? LucideIcons.layoutGrid : LucideIcons.tag, size: 16, color: c == _category ? const Color(0xFFD97706) : kMuted),
                     ),
                     const SizedBox(height: 6),
-                    ExcludeSemantics(child: Text(c.isEmpty ? 'All items' : c, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(11.5, c == _category ? 700 : 500, color: c == _category ? const Color(0xFFB45309) : kMuted))),
+                    ExcludeSemantics(child: Text(c.isEmpty ? 'All items' : c, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(11, c == _category ? 700 : 500, color: c == _category ? const Color(0xFFB45309) : kMuted))),
                   ]),
                 ),
               ),
@@ -252,7 +260,7 @@ class _SellScreenState extends State<SellScreen> {
             ? Padding(padding: const EdgeInsets.all(12), child: StateCard(icon: LucideIcons.search, title: 'No items found', body: 'Try another name or SKU, or pick another category.', primary: 'Open search', onPrimary: _openSearch))
             : GridView.builder(
                 padding: const EdgeInsets.fromLTRB(4, 0, 12, 12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: 196),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: 182),
                 itemCount: _items.length,
                 itemBuilder: (_, i) => ProductCard(item: _items[i], inCart: cart.lines.where((l) => l.menuItemId == _items[i].id).firstOrNull?.qty ?? 0, onAdd: () => _add(_items[i])),
               ),
@@ -261,13 +269,13 @@ class _SellScreenState extends State<SellScreen> {
   }
 
   Widget _cartBar(int units) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
         decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(26)), boxShadow: [BoxShadow(color: Color(0x12000000), blurRadius: 12, offset: Offset(0, -2))]),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           InkWell(
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CartsScreen(env: env))),
             child: Row(children: [
-              Text('Current Cart', style: inter(18, 700)),
+              Text('Current Cart', style: inter(15, 700)),
               if (env.carts.carts.length > 1) ...[const SizedBox(width: 8), TagChip('${env.carts.carts.length} open')],
               const Spacer(),
               Badge(
@@ -275,11 +283,11 @@ class _SellScreenState extends State<SellScreen> {
                 label: Text('$units'),
                 backgroundColor: kChipGreen,
                 textColor: kGreenText,
-                child: const Icon(LucideIcons.shoppingCart, size: 26, color: kGreenText),
+                child: const Icon(LucideIcons.shoppingCart, size: 22, color: kGreenText),
               ),
             ]),
           ),
-          const Divider(height: 22, color: kLine),
+          const Divider(height: 18, color: kLine),
           Row(children: [
             Expanded(
               flex: 3,
@@ -289,6 +297,34 @@ class _SellScreenState extends State<SellScreen> {
             Expanded(flex: 1, child: LightCta(label: 'Hold', onPressed: cart.isEmpty || _busy ? null : _hold)),
           ]),
         ]),
+      );
+}
+
+/// A till shortcut under the search (Open carts, History, Returns, Invoices, Cash shift): what the old ☰ "Sell" sheet held.
+class _Shortcut extends StatelessWidget {
+  const _Shortcut({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Material(
+          color: Colors.white,
+          shape: const StadiumBorder(side: BorderSide(color: Color(0xFFE3E5DF))),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(icon, size: 16, color: kInk),
+                const SizedBox(width: 6),
+                Text(label, style: inter(13, 600)),
+              ]),
+            ),
+          ),
+        ),
       );
 }
 
@@ -305,7 +341,7 @@ class ProductCard extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Stack(children: [
             Container(
-              height: 84,
+              height: 76,
               width: double.infinity,
               decoration: BoxDecoration(color: const Color(0xFFF3F4F1), borderRadius: BorderRadius.circular(14)),
               clipBehavior: Clip.antiAlias,
@@ -319,11 +355,11 @@ class ProductCard extends StatelessWidget {
               Positioned(right: 6, top: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: kDark, borderRadius: BorderRadius.circular(8)), child: Text('×$inCart', style: inter(10.5, 700, color: kLime)))),
           ]),
           const SizedBox(height: 6),
-          Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(13.5, 600, height: 1.2)),
+          Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(13, 600, height: 1.2)),
           const Spacer(),
           if (!item.available) Text('Out of stock', style: inter(11.5, 600, color: kBadText)),
           Row(children: [
-            Text(rupees(item.price), style: inter(17, 800)),
+            Text(rupees(item.price), style: inter(15, 800)),
             const Spacer(),
             Semantics(
               button: true,

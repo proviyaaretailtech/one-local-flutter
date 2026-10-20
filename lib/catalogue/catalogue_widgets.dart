@@ -142,7 +142,7 @@ class StatTile extends StatelessWidget {
 
 /// Dark pill button with lime text ("POS Items →", "Edit catalogue details", "Review Exceptions").
 class DarkButton extends StatelessWidget {
-  const DarkButton(this.label, {super.key, required this.onPressed, this.trailing, this.height = 56, this.busy = false});
+  const DarkButton(this.label, {super.key, required this.onPressed, this.trailing, this.height = 48, this.busy = false});
   final String label;
   final VoidCallback? onPressed;
   final IconData? trailing;
@@ -164,7 +164,7 @@ class DarkButton extends StatelessWidget {
                 child: busy
                     ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: kLime))
                     : Row(mainAxisSize: MainAxisSize.min, children: [
-                        Text(label, style: inter(17, 700, color: kLime)),
+                        Text(label, style: inter(15, 700, color: kLime)),
                         if (trailing != null) ...[const SizedBox(width: 8), Icon(trailing, size: 18, color: kLime)],
                       ]),
               ),
@@ -188,7 +188,7 @@ class OutlineButton extends StatelessWidget {
         child: InkWell(
           customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(height / 2)),
           onTap: onPressed,
-          child: SizedBox(height: height, width: double.infinity, child: Center(child: Text(label, style: inter(16, 600, color: color)))),
+          child: SizedBox(height: height, width: double.infinity, child: Center(child: Text(label, style: inter(14, 600, color: color)))),
         ),
       );
 }
@@ -212,15 +212,15 @@ class SheetOption extends StatelessWidget {
             customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
               child: Row(children: [
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(title, style: inter(17, 600, color: color)),
-                    if (subtitle != null) ...[const SizedBox(height: 3), Text(subtitle!, style: inter(14, 400, color: kMuted))],
+                    Text(title, style: inter(15, 600, color: color)),
+                    if (subtitle != null) ...[const SizedBox(height: 2), Text(subtitle!, style: inter(13, 400, color: kMuted))],
                   ]),
                 ),
-                if (trailing != null) Icon(trailing, size: 22, color: color == kInk ? kMuted : color),
+                if (trailing != null) Icon(trailing, size: 20, color: color == kInk ? kMuted : color),
               ]),
             ),
           ),
@@ -238,16 +238,16 @@ Future<T?> showCatSheet<T>(BuildContext context, {required String title, String?
     builder: (ctx) => SafeArea(
       top: false,
       child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(20, 10, 20, 24 + MediaQuery.viewInsetsOf(ctx).bottom),
+        padding: EdgeInsets.fromLTRB(20, 10, 20, 20 + MediaQuery.viewInsetsOf(ctx).bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFD9DCE2), borderRadius: BorderRadius.circular(4)))),
-          const SizedBox(height: 18),
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: Text(title, style: inter(24, 700))),
-            IconButton(tooltip: 'Close', onPressed: () => Navigator.of(ctx).pop(), icon: const Icon(LucideIcons.x, size: 24)),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: Text(title, style: inter(20, 700))),
+            IconButton(tooltip: 'Close', onPressed: () => Navigator.of(ctx).pop(), icon: const Icon(LucideIcons.x, size: 20)),
           ]),
-          if (subtitle != null) ...[const SizedBox(height: 4), Text(subtitle, style: inter(15, 400, color: kMuted))],
-          const SizedBox(height: 16),
+          if (subtitle != null) ...[const SizedBox(height: 2), Text(subtitle, style: inter(13, 400, color: kMuted))],
+          const SizedBox(height: 14),
           body(ctx),
         ]),
       ),
@@ -257,7 +257,7 @@ Future<T?> showCatSheet<T>(BuildContext context, {required String title, String?
 
 /// Green "+ Add Items" pill and the other lime-filled buttons.
 class LimeButton extends StatelessWidget {
-  const LimeButton(this.label, {super.key, required this.onPressed, this.height = 56});
+  const LimeButton(this.label, {super.key, required this.onPressed, this.height = 46});
   final String label;
   final VoidCallback? onPressed;
   final double height;
@@ -268,7 +268,7 @@ class LimeButton extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(height / 2),
           onTap: onPressed,
-          child: SizedBox(height: height, child: Center(child: Text(label, style: inter(17, 700, color: kDark)))),
+          child: SizedBox(height: height, child: Center(child: Text(label, style: inter(14, 700, color: kDark)))),
         ),
       );
 }
@@ -280,7 +280,7 @@ class BigTitle extends StatelessWidget {
   final Widget? trailing;
   @override
   Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        Expanded(child: Text(title, style: inter(34, 800).copyWith(letterSpacing: -0.5))),
+        Expanded(child: Text(title, style: inter(26, 800).copyWith(letterSpacing: -0.4))),
         ?trailing,
       ]);
 }

@@ -206,13 +206,15 @@ void main() {
   });
 
   group('Control centre', () {
-    testWidgets('header band shows the server figures', (t) async {
+    testWidgets('status card shows the server figures', (t) async {
       await showHome(t);
-      expect(find.text('OneLocal'), findsOneWidget);
+      expect(find.text('OneLocal'), findsNothing, reason: 'the stray wordmark under the header is gone');
       expect(find.text('SHOWING DATA FOR'), findsOneWidget, reason: 'the outlet switcher header (founder, 20 Oct)');
-      expect(find.text('Store Open'), findsOneWidget);
+      expect(find.text('Store open'), findsOneWidget);
+      expect(find.text('Today · 5 Oct'), findsOneWidget);   // the day once, not on every label
+      expect(find.text('Synced 2 min ago'), findsOneWidget);
       expect(find.text('Latur Main Branch · Synced 2 min ago'), findsWidgets);
-      expect(find.text('SALES · 5 OCT'), findsOneWidget);
+      expect(find.text('Sales'), findsOneWidget);
       expect(find.text('₹21,469'), findsWidgets);
       expect(find.text('53'), findsOneWidget);
       expect(find.text('8 active now'), findsOneWidget);
@@ -227,20 +229,21 @@ void main() {
       expect(find.text('Nothing sold yet today.'), findsOneWidget);
     });
 
-    testWidgets('closed store says Store Closed', (t) async {
+    testWidgets('closed store says Store closed', (t) async {
       await showHome(t, summary: summaryJson(open: false));
-      expect(find.text('Store Closed'), findsOneWidget);
+      expect(find.text('Store closed'), findsOneWidget);
     });
 
-    testWidgets('item data gaps: the store card hides recipes, none means no card (a restaurant has its own dashboard)', (t) async {
+    testWidgets('item data gaps: one line each with Fix; the store list hides recipes, none means no list (a restaurant has its own dashboard)', (t) async {
       await showHome(t);
-      expect(find.text('Item data needs attention'), findsOneWidget);
-      expect(find.text('77 items'), findsOneWidget);
-      expect(find.text('18 items'), findsOneWidget);
-      expect(find.text('Missing recipes'), findsNothing);
+      expect(find.text('Needs attention'), findsOneWidget);
+      expect(find.text('77 items missing descriptions'), findsOneWidget);
+      expect(find.text('18 items missing photos'), findsOneWidget);
+      expect(find.text('Fix'), findsNWidgets(2));
+      expect(find.textContaining('recipe'), findsNothing);
 
       await showHome(t, summary: summaryJson(catalogue: {'items': 10, 'missing_descriptions': 0, 'missing_photos': 0, 'missing_recipes': null}));
-      expect(find.text('Item data needs attention'), findsNothing);
+      expect(find.text('Needs attention'), findsNothing);
     });
 
     testWidgets('active orders: number, status, items, total, fulfilment, ETA', (t) async {
@@ -268,7 +271,7 @@ void main() {
       expect(find.text('Restock critical items'), findsOneWidget);
 
       await showHome(t, summary: summaryJson(stockTracked: false, stock: []));
-      expect(find.textContaining('Stock is not tracked for this outlet yet.'), findsOneWidget);
+      expect(find.text('Set reorder levels on stock items to see what’s running low.'), findsOneWidget);
       expect(find.text('Restock critical items'), findsNothing);
 
       await showHome(t, summary: summaryJson(stock: []));
@@ -322,9 +325,20 @@ void main() {
       await t.tap(find.byKey(const ValueKey('home-menu')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('side-nav')), findsOneWidget);
-      for (final l in ['Dashboard', 'Store POS', 'Catalogue', 'GRN', 'Stock management', 'All Orders', 'One Local Wallet', 'Money', 'Customer', 'Reports', 'Settings', 'Manage account', 'Sign out']) {
+      for (final l in ['GRN', 'All Orders', 'One Local Wallet', 'Money', 'Customer', 'Reports', 'Settings', 'OneLocal page', 'Sign out']) {
         expect(find.text(l), findsOneWidget, reason: l);
       }
+      // Ordered by priority, set-up-once pages lower; the bottom bar's Home, Bill, Item and Stock are not repeated here; Manage account is the profile header.
+      for (final gone in ['Dashboard', 'Store POS', 'Catalogue', 'Stock management']) {
+        expect(find.text(gone), findsNothing, reason: '$gone is on the bottom bar');
+      }
+      const order = ['GRN', 'All Orders', 'Money', 'Customer', 'Reports', 'Team', 'Settings', 'OneLocal page', 'One Local Wallet', 'Help & support'];
+      final ys = [for (final l in order) t.getTopLeft(find.text(l)).dy];
+      for (var i = 1; i < ys.length; i++) {
+        expect(ys[i], greaterThan(ys[i - 1]), reason: '${order[i]} comes after ${order[i - 1]}');
+      }
+      expect(find.bySemanticsLabel('Manage account'), findsOneWidget);
+      expect(t.getTopLeft(find.bySemanticsLabel('Manage account')).dy, lessThan(ys.first), reason: 'the profile block, above the list');
       // Screens that are not built say so instead of looking live.
       expect(find.text('Soon'), findsWidgets);
       await t.tap(find.text('Settings'));
@@ -343,7 +357,7 @@ void main() {
 
     testWidgets('several outlets: the outlet line picks one, and the server is asked for it', (t) async {
       final api = await showHome(t, summary: summaryJson(outlets: [{'id': 'l1', 'name': 'Latur Main Branch'}, {'id': 'l2', 'name': 'Udgir Road'}]));
-      await t.tap(find.text('Latur Main Branch · Synced 2 min ago').first);
+      await t.tap(find.text('Synced 2 min ago'));
       await t.pumpAndSettle();
       await t.tap(find.text('Udgir Road'));
       await t.pumpAndSettle();
@@ -357,7 +371,7 @@ void main() {
       expect(find.text('No outlet is assigned to you yet.'), findsOneWidget);
       api.failWith = null;
       await tapText(t, 'Try again');
-      expect(find.text('Store Open'), findsOneWidget);
+      expect(find.text('Store open'), findsOneWidget);
 
       await showTall(t, ControlCentreScreen(api: FakeHome(failWith: Exception('socket')), now: () => _clock));
       expect(find.text('We could not reach OneLocal.'), findsOneWidget);

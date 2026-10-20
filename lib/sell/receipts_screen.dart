@@ -90,7 +90,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(onMenu: () => env.menu(context), initials: env.initials),
+        SellTopBar(title: 'Invoices & receipts', initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), children: [
             SellTitle('Invoices & Receipts', sub: env.storeLine),

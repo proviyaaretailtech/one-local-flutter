@@ -11,6 +11,7 @@ import 'package:vinii_pos/setup/business_screens.dart';
 import 'package:vinii_pos/setup/operations_screens.dart';
 import 'package:vinii_pos/setup/setup_api.dart';
 import 'package:vinii_pos/setup/setup_flow.dart';
+import 'package:vinii_pos/setup/setup_widgets.dart' show PillPrimary;
 import 'package:vinii_pos/setup/storefront_screens.dart';
 
 import 'helpers.dart';
@@ -175,18 +176,18 @@ void main() {
       expect(find.text('When applicable'), findsOneWidget);
       expect(find.text('Continue Setup'), findsOneWidget);
     });
-    testWidgets('first visit shows coach mark 1 of 10; Next records it and hides it', (t) async {
+    testWidgets('first visit shows the checklist tip inline; Got it records it and hides it', (t) async {
       final api = FakeSetup(initial: sampleSetup(seen: const []));
       await dashboard(t, api);
       expect(find.text('Your setup checklist'), findsOneWidget);
-      expect(find.text('1 of 10'), findsOneWidget);
-      await tap(t, 'Next');
+      expect(find.text('1 of 10'), findsNothing);   // tips no longer carry their own count
+      await tap(t, 'Got it');
       expect(find.text('Your setup checklist'), findsNothing);
       expect(api.calls, contains('tour 1'));
     });
-    testWidgets('a coach mark already read is not shown again', (t) async {
+    testWidgets('a tip already read is not shown again', (t) async {
       await dashboard(t, FakeSetup(initial: sampleSetup(seen: const [1])));
-      expect(find.text('1 of 10'), findsNothing);
+      expect(find.text('Your setup checklist'), findsNothing);
     });
     testWidgets('Continue Setup opens the first required step not done (payment)', (t) async {
       await dashboard(t, FakeSetup());
@@ -210,6 +211,10 @@ void main() {
       var finished = false;
       await dashboard(t, api, onFinished: (_) => finished = true);
       await tap(t, 'Continue Setup');
+      // The review page comes first: every step with its state and Edit.
+      expect(find.text('Review your setup'), findsOneWidget);
+      expect(api.calls, isNot(contains('complete')));
+      await tap(t, 'Finish setup');
       expect(api.calls, contains('complete'));
       expect(find.text('Your business is ready!'), findsOneWidget);
       expect(find.text('8 of 8 required tasks complete'), findsOneWidget);
@@ -220,6 +225,7 @@ void main() {
       final api = FakeSetup(initial: sampleSetup(done: allDone))..failWith = const PartnerApiException(400, 'Finish "Catalogue" before you complete setup.');
       await dashboard(t, api);
       await tap(t, 'Continue Setup');
+      await tap(t, 'Finish setup');
       expect(toast('Finish "Catalogue" before you complete setup.'), findsOneWidget);
       expect(find.text('Your business is ready!'), findsNothing);
     });
@@ -254,11 +260,11 @@ void main() {
       await tap(t, 'Continue');
       expect(api.calls, ['plan null']);
     });
-    testWidgets('coach mark 2 of 10', (t) async {
+    testWidgets('tip 2 shows inline', (t) async {
       final api = FakeSetup(initial: sampleSetup(seen: const []));
       await show(t, PlanScreen(api: api, state: api.state));
       expect(find.text('Choose your plan'), findsOneWidget);
-      expect(find.text('2 of 10'), findsOneWidget);
+      expect(find.text('Got it'), findsOneWidget);
     });
   });
 
@@ -445,11 +451,58 @@ void main() {
       expect(api.bodies['fulfilment'], {'pickup': false, 'self_delivery': true, 'onelocal_delivery': false, 'radius_km': '3',
         'service_areas': ['Shivaji Nagar', 'Ausa Road'], 'min_order': '199', 'delivery_fee': '', 'delivery_hours': 'same_as_opening'});
     });
-    testWidgets('coach mark 9 of 10 is labelled optional', (t) async {
+    testWidgets('is labelled optional, with tip 9 inline', (t) async {
       final api = FakeSetup(initial: sampleSetup(seen: const []));
       await show(t, FulfilmentScreen(api: api, state: api.state));
       expect(find.text('BUSINESS SETUP · OPTIONAL'), findsOneWidget);
-      expect(find.text('9 of 10'), findsOneWidget);
+      expect(find.text('Choose how orders are fulfilled'), findsOneWidget);
+    });
+  });
+
+  group('Intro', () {
+    testWidgets('a fresh setup opens with the 3-card intro, then the first step', (t) async {
+      final api = FakeSetup(initial: sampleSetup(done: const {'business_profile', 'location', 'owner_details'}));
+      await show(t, SetupEntry(api: api, onFinished: (_) {}));
+      await t.pumpAndSettle();
+      expect(find.text('Let’s get your business ready'), findsOneWidget);
+      await tap(t, 'Next');
+      expect(find.text('About 5 minutes'), findsOneWidget);
+      await tap(t, 'Next');
+      await tap(t, 'Let’s start');
+      expect(find.text('Plan & Subscription'), findsOneWidget);
+      expect(find.text('Step 4 of 11'), findsOneWidget);
+    });
+    testWidgets('once a step is saved there is no intro', (t) async {
+      await show(t, SetupEntry(api: FakeSetup(), onFinished: (_) {}));   // sample: plan done
+      await t.pumpAndSettle();
+      expect(find.text('Let’s get your business ready'), findsNothing);
+      expect(find.text('Payment Setup'), findsOneWidget);
+    });
+  });
+
+  group('Review', () {
+    testWidgets('lists every step with Done / Skipped / To do; Edit opens that step and comes back', (t) async {
+      final api = FakeSetup();   // sample: plan done, the rest open
+      await show(t, Builder(builder: (c) => TextButton(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => SetupReviewScreen(state: api.state))), child: const Text('open'))));
+      await tap(t, 'open');
+      expect(find.text('Review your setup'), findsOneWidget);
+      expect(find.text('Done'), findsOneWidget);                  // plan
+      expect(find.text('Skipped · optional'), findsNWidgets(2));  // staff, delivery
+      expect(find.text('To do'), findsNWidgets(5));               // payment, tax, catalogue, pos, listing
+      expect(t.widget<PillPrimary>(find.byType(PillPrimary)).onPressed, isNull);   // required left: no Finish
+    });
+  });
+
+  group('Walk', () {
+    testWidgets('required steps first; optional ones last, with Skip for now', (t) async {
+      final api = FakeSetup();
+      expect(setupSequence(api.state), ['plan', 'payment', 'tax', 'catalogue', 'pos', 'listing', 'staff', 'delivery']);
+      await show(t, setupScreenFor('staff', api, api.state));
+      expect(find.text('Step 10 of 11'), findsOneWidget);
+      expect(find.text('Skip for now'), findsOneWidget);
+      await show(t, setupScreenFor('catalogue', api, api.state));
+      expect(find.text('Step 7 of 11'), findsOneWidget);
+      expect(find.text('Skip for now'), findsNothing);
     });
   });
 
@@ -461,6 +514,17 @@ void main() {
       expect(find.text('We could not load your setup.'), findsOneWidget);
       api.failWith = null;
       await tap(t, 'Try again');
+      // Setup runs as a wizard: it opens straight into the first unfinished step (plan is done in the sample, so payment:
+      // the 3 sign-up items + plan come first, step 5 of 11); ✕ shows the checklist.
+      expect(find.text('Payment Setup'), findsOneWidget);
+      expect(find.text('Step 5 of 11'), findsOneWidget);
+      // Back (beside the main button) opens the previous step; the first step of the walk has none.
+      await tap(t, '← Back');
+      expect(find.text('Plan & Subscription'), findsOneWidget);
+      expect(find.text('Step 4 of 11'), findsOneWidget);
+      expect(find.text('← Back'), findsNothing);
+      // In the walk the way out is "Finish later"; it shows the checklist.
+      await tap(t, 'Finish later');
       expect(find.text('Set up your business'), findsOneWidget);
     });
   });

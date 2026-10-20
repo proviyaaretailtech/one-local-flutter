@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'package:vinii_pos/catalogue/catalogue_format.dart';
 import 'package:vinii_pos/catalogue/catalogue_screen.dart';
 import 'package:vinii_pos/catalogue/grn_screens.dart';
 import 'package:vinii_pos/catalogue/item_form_screen.dart';
+import 'package:vinii_pos/catalogue/item_photo.dart';
 import 'package:vinii_pos/catalogue/item_sheets.dart';
 import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/ui/theme.dart';
@@ -147,7 +149,7 @@ void main() {
     testWidgets('the list view shows counts, chips, rows with price and stock, and the pager', (t) async {
       final s = server();
       await phone(t, CatalogueScreen(api: s.api));
-      expect(find.text('Catalogue'), findsOneWidget);
+      expect(find.text('Catalogue'), findsWidgets);   // the page title, and the banner's until the outlet is known
       expect(find.text('142 items'), findsOneWidget);
       for (final k in ['Active Items', 'Out of Stock', 'Inactive Items', 'Combos', 'Categories', 'Drafts']) {
         expect(find.text(k), findsOneWidget);
@@ -231,8 +233,9 @@ void main() {
       await t.tap(find.text('Coca-Cola 500ml'));
       await t.pumpAndSettle();
       expect(find.text('About this product'), findsOneWidget);
-      expect(find.text('Check the pack and SKU before selecting.', findRichText: true, skipOffstage: false), findsNothing); // subtitle is one multi-line text
-      expect(find.textContaining('Check the pack and SKU before selecting.'), findsOneWidget);
+      expect(find.text('Check the pack and SKU before selecting.'), findsOneWidget);   // its own hint line under the facts
+      expect(find.text('SKU CC500'), findsOneWidget);
+      expect(find.text('Selling price'), findsOneWidget);
       expect(find.text('500ml bottle'), findsOneWidget);
       await t.tap(find.text('View product details'));
       await t.pumpAndSettle();
@@ -250,7 +253,7 @@ void main() {
       await phone(t, CatalogueScreen(api: s.api), height: 3000);
       await t.tap(find.text('+ Add Items'));
       await t.pumpAndSettle();
-      expect(find.text('Add products the easy way'), findsOneWidget);
+      expect(find.text('Choose how much you want to fill in now'), findsOneWidget);
       expect(find.text('Quick Add'), findsOneWidget);
       expect(find.text('Item creation'), findsOneWidget);
       await t.tap(find.text('Quick Add'));
@@ -292,22 +295,23 @@ void main() {
       expect(find.text('Quick add product'), findsOneWidget);
     });
 
-    testWidgets('Scan QR code: type a code, Find code opens the item; an unknown code shows the message', (t) async {
+    testWidgets('Scan barcode: type a barcode, Find product opens the item; an unknown code shows the message', (t) async {
       final s = server();
       await phone(t, CatalogueScreen(api: s.api), height: 3000);
-      await t.tap(find.byTooltip('Scan a code'));
+      await t.tap(find.byTooltip('Scan a barcode'));
       await t.pumpAndSettle();
-      expect(find.text('Scan QR code'), findsOneWidget);
-      expect(find.text('CAMERA PREVIEW · STATIC PLACEHOLDER'), findsOneWidget);
-      expect(find.text('ENTER CODE MANUALLY'), findsOneWidget);
+      expect(find.text('Scan barcode'), findsOneWidget);
+      expect(find.descendant(of: find.byType(Dialog), matching: find.textContaining('QR')), findsNothing);
+      expect(find.text('Camera scanning is coming soon'), findsOneWidget);
+      expect(find.text('Barcode or SKU'), findsOneWidget);
       await t.enterText(find.descendant(of: find.byType(Dialog), matching: find.byType(TextField)), 'NOPE');
       await t.pump();
-      await t.tap(find.text('Find code'));
+      await t.tap(find.text('Find product'));
       await t.pumpAndSettle();
       expect(find.text('No item has that code.'), findsOneWidget);
       await t.enterText(find.descendant(of: find.byType(Dialog), matching: find.byType(TextField)), 'CC500');
       await t.pump();
-      await t.tap(find.text('Find code'));
+      await t.tap(find.text('Find product'));
       await t.pumpAndSettle();
       expect(find.text('About this product'), findsOneWidget);
     });
@@ -326,7 +330,7 @@ void main() {
       await phone(t, ItemFormScreen(api: s.api), height: 6400);
       expect(find.text('Item Creation'), findsOneWidget);
       expect(find.text('Prepare a new catalogue item without changing live stock.'), findsOneWidget);
-      for (final x in ['Item identity', 'Units & storage', 'Tax & pricing', 'Save checklist', 'Complete tax validation', 'Save draft only']) {
+      for (final x in ['Item identity', 'Units & storage', 'Tax & pricing', 'Save checklist', 'Save item', 'Save draft only']) {
         expect(find.text(x), findsOneWidget);
       }
       final fields = find.byType(TextField);
@@ -335,8 +339,8 @@ void main() {
       await t.enterText(find.widgetWithText(TextField, '').at(0), 'Oat Crunch Cookies 200g');
       // price field is the one with the ₹40.00 hint
       await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == '₹40.00'), '40');
-      await t.ensureVisible(find.text('Complete tax validation'));
-      await t.tap(find.text('Complete tax validation'));
+      await t.ensureVisible(find.text('Save item'));
+      await t.tap(find.text('Save item'));
       await t.pumpAndSettle();
       final sent = jsonDecode(s.requests.single.body) as Map<String, dynamic>;
       expect(sent['mode'], 'full');
@@ -376,14 +380,50 @@ void main() {
       expect(closed, true);
     });
 
+    testWidgets('a product photo can be added, have its background removed, and goes on the item once it is saved', (t) async {
+      final s = Fake((_) => ok(item('n1', 'Oat', 'OAT1', 4000)));
+      final photos = _FakePhotos();
+      await phone(t, ItemFormScreen(api: s.api, photos: photos), height: 6400);
+      expect(find.text('Add product photo'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('item-photo-add')));
+      await t.pumpAndSettle();
+      expect(find.text('Add product photo'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('item-photo-bg')));
+      await t.pumpAndSettle();
+      expect(find.text('Background removed'), findsOneWidget);
+      final fields = find.byType(TextField);
+      await t.enterText(fields.at(0), 'Oat');
+      await t.enterText(fields.at(1), 'OAT1');
+      await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == '₹40.00'), '40');
+      await t.tap(find.text('Save draft only'));
+      await t.pumpAndSettle();
+      expect(photos.attached, ['n1 bg']);
+    });
+
+    testWidgets('the step chips follow the scroll, and a tap jumps to its section', (t) async {
+      await phone(t, ItemFormScreen(api: Fake((_) => ok({})).api), height: 1704);   // an 852-point phone
+      bool current(String label) => (t.widget<Semantics>(find.ancestor(of: find.text(label), matching: find.byWidgetPredicate((w) => w is Semantics && w.properties.selected != null)).first)).properties.selected == true;
+      expect(current('Product'), isTrue);
+      // scroll until the Tax & pricing section reaches the top
+      await t.dragUntilVisible(find.text('Tax & pricing'), find.byType(SingleChildScrollView).last, const Offset(0, -200));
+      await t.drag(find.byType(SingleChildScrollView).last, const Offset(0, -250));
+      await t.pumpAndSettle();
+      expect(current('Product'), isFalse);
+      expect(current('Tax & price') || current('Review'), isTrue);
+      await t.tap(find.text('Units'));
+      await t.pumpAndSettle();
+      expect(current('Units'), isTrue);
+      expect(current('Tax & price'), isFalse);
+    });
+
     testWidgets('editing an item pre-fills it and sends its version; a stale save says so', (t) async {
       final it = CatItem(item('i1', 'Coca-Cola 500ml', 'CC500', 4000, version: 3));
       final s = Fake((_) => err(409, 'This item was changed on another device.', 'version_conflict'));
       await phone(t, ItemFormScreen(api: s.api, item: it), height: 6400);
       expect(find.text('Edit Item'), findsOneWidget);
       expect(find.text('Coca-Cola 500ml'), findsWidgets);
-      await t.ensureVisible(find.text('Complete tax validation'));
-      await t.tap(find.text('Complete tax validation'));
+      await t.ensureVisible(find.text('Save item'));
+      await t.tap(find.text('Save item'));
       await t.pumpAndSettle();
       final r = s.requests.single;
       expect(r.url.path, endsWith('/cat_item_save'));
@@ -442,7 +482,7 @@ void main() {
       expect(find.text('GRN Dashboard'), findsOneWidget);
       expect(find.text('Open receipt → Scan/Enter Products → Match Invoice'), findsOneWidget);
       for (final c in ['Receiving', 'GRN', 'Putaway', 'Shelf Labels']) {
-        expect(find.text(c), findsOneWidget);
+        expect(find.text(c), c == 'GRN' ? findsWidgets : findsOneWidget);   // 'GRN' is also the banner's title
       }
       expect(find.text('GRN-105'), findsOneWidget);
       expect(find.text('RCV-105 / PO-105 / INV-5512'), findsOneWidget);
@@ -586,4 +626,15 @@ void main() {
       expect(find.text('GRN Dashboard'), findsOneWidget);
     });
   });
+}
+
+/// Photo tools without a file dialog or an image service: a fixed picture, a background removal that marks it, attach records.
+class _FakePhotos extends ItemPhotoService {
+  final attached = <String>[];
+  @override
+  Future<ItemPhoto?> pick() async => ItemPhoto(bytes: Uint8List.fromList(const [0x89, 0x50, 0x4E, 0x47]), contentType: 'image/png');
+  @override
+  Future<ItemPhoto> removeBackground(ItemPhoto p) async => ItemPhoto(bytes: p.bytes, contentType: 'image/png', backgroundRemoved: true);
+  @override
+  Future<void> attach(String itemId, ItemPhoto p) async => attached.add('$itemId${p.backgroundRemoved ? ' bg' : ''}');
 }

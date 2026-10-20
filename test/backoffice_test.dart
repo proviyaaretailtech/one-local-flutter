@@ -180,7 +180,7 @@ void main() {
       await showTall(t, LowStockScreen(api: s.api));
       expect(find.text('Stock Management / Inventory'), findsOneWidget);
       expect(find.text('Low Stock'), findsWidgets);
-      expect(find.text('RS'), findsOneWidget);
+      expect(find.text('RS'), findsNothing, reason: 'the shared banner has the bell and ☰ instead of initials');
       expect(find.textContaining('Latur Main Branch'), findsOneWidget);
       expect(find.text('Items needing replenishment · 15 low stock · 8 critical'), findsOneWidget);
       expect(find.text('Showing recorded items only. Reorder levels and short quantities are not recorded.'), findsOneWidget);

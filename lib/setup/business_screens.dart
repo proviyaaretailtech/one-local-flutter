@@ -239,7 +239,8 @@ class _TaxScreenState extends State<TaxScreen> with TourHost {
   late final Map<String, dynamic> _t = widget.state.tax;
   late bool? _registered = _t['gst_registered'] as bool?;
   late final _gstin = TextEditingController(text: _t['gstin'] as String? ?? '');
-  late final _prefix = TextEditingController(text: _t['saved'] == true ? (_t['invoice_prefix'] as String? ?? '') : '');
+  // Smart default: "INV" until the partner saves their own. GST status stays an explicit answer (it is a tax declaration).
+  late final _prefix = TextEditingController(text: _t['saved'] == true ? (_t['invoice_prefix'] as String? ?? '') : 'INV');
   late bool _inclusive = _t['prices_include_tax'] != false;
   late bool _showAddress = _t['show_address_on_receipt'] != false;
   late bool _showGstin = _t['show_gstin_on_invoice'] != false;

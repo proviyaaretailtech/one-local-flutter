@@ -498,7 +498,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: 'VINII Store POS', onBack: () => Navigator.of(context).maybePop()),
+        OrdersTopBar(title: 'GRN', onBack: () => Navigator.of(context).maybePop()),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,

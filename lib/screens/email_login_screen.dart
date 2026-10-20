@@ -51,7 +51,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
   Widget build(BuildContext context) {
     return ScreenShell(
       children: [
-        const BrandNav(),
+        const BrandNav(back: true),
         FormContent(children: [
           const Kicker('Sign in · Email'),
           const PageIntro(title: 'Back to business.', subtitle: 'Enter the email address you use for OneLocal. We’ll send you a sign-in code.'),

@@ -57,7 +57,7 @@ class _PasswordLoginScreenState extends State<PasswordLoginScreen> {
   Widget build(BuildContext context) {
     return ScreenShell(
       children: [
-        const BrandNav(),
+        const BrandNav(back: true),
         FormContent(children: [
           const Kicker('Log in · Password'),
           const PageIntro(title: 'Good to see you again.', subtitle: 'Sign in to your OneLocal account with your password.'),

@@ -27,8 +27,24 @@ Future<T?> setupGuarded<T>(BuildContext context, Future<T> Function() call) asyn
   }
 }
 
+/// A setup step's place in the "Save & Continue" walk; [SetupDialog] shows it as "Step n of N" and a progress bar under
+/// the kicker, a Back button beside the main action, and "Skip for now" on optional steps.
+class SetupStepScope extends InheritedWidget {
+  const SetupStepScope({super.key, required this.number, required this.total, this.onBack, this.onSkip, required super.child});
+  final int number, total;
+
+  /// Opens the previous step of the walk; null on the first step.
+  final void Function(BuildContext context)? onBack;
+
+  /// Moves on without saving; only optional steps have it.
+  final void Function(BuildContext context)? onSkip;
+  static SetupStepScope? maybeOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<SetupStepScope>();
+  @override
+  bool updateShouldNotify(SetupStepScope old) => number != old.number || total != old.total;
+}
+
 /// The frame every setup screen shares: kicker, close button, title, subtitle, scrolling body, a rule, pinned actions.
-/// [tour] draws the "n of 10" coach mark over the dialogue the first time the screen is seen.
+/// [tour] shows the screen's tip the first time it is seen, as a hint under the title (it no longer covers the form).
 class SetupDialog extends StatefulWidget {
   const SetupDialog({
     super.key,
@@ -53,7 +69,6 @@ class SetupDialog extends StatefulWidget {
 
 class _SetupDialogState extends State<SetupDialog> {
   final _scroll = ScrollController();
-  final _stack = GlobalKey();
 
   @override
   void dispose() {
@@ -63,65 +78,130 @@ class _SetupDialogState extends State<SetupDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final card = Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(kDialogRadius), border: Border.all(color: kLine)),
-      clipBehavior: Clip.antiAlias,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-        Flexible(
-          child: SingleChildScrollView(
-            controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(kDialogPad, kDialogPad, kDialogPad, 12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Row(children: [
-                Expanded(child: Text(widget.kicker.toUpperCase(), style: inter(11.5, 700, color: kMuted).copyWith(letterSpacing: 0.2))),
-                Semantics(
-                  button: true,
-                  label: 'Close',
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: widget.onClose ?? () => Navigator.of(context).maybePop(),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: const BoxDecoration(color: kBg, shape: BoxShape.circle),
-                      alignment: Alignment.center,
-                      child: const Icon(LucideIcons.x, size: 18, color: kMuted),
-                    ),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 10),
-              Text(widget.title, style: inter(20, 700, height: 1.2)),
-              if (widget.subtitle != null) ...[
-                const SizedBox(height: 8),
-                Text(widget.subtitle!, style: inter(12, 400, color: kMuted, height: 1.42)),
-              ],
-              const SizedBox(height: 14),
-              ...widget.children,
-            ]),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(kDialogPad, 0, kDialogPad, kDialogPad),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-            const Divider(height: 1, thickness: 1, color: kLine),
-            const SizedBox(height: 12),
-            ...widget.actions,
+    final step = SetupStepScope.maybeOf(context);
+    final close = widget.onClose ?? () => Navigator.of(context).maybePop();
+    // Full screen (Pass 2): a fixed top bar (kicker, step and progress, a way out), the page scrolls, actions pinned below.
+    final topBar = Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 8, 10),
+      child: Row(children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(widget.kicker.toUpperCase(), style: inter(11.5, 700, color: kMuted).copyWith(letterSpacing: 0.2)),
+            if (step != null) ...[
+              const SizedBox(height: 3),
+              Text('Step ${step.number} of ${step.total}', style: inter(11.5, 600, color: kLink)),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(value: step.number / step.total, minHeight: 4, backgroundColor: kLine, color: kLime),
+              ),
+            ],
           ]),
         ),
+        const SizedBox(width: 12),
+        // In the walk the way out says what it does: finished steps are already saved, the rest waits on the checklist.
+        if (step != null)
+          Semantics(
+            button: true,
+            label: 'Finish later',
+            excludeSemantics: true,
+            child: TextButton(onPressed: close, child: Text('Finish later', style: inter(13, 600, color: kMuted))),
+          )
+        else
+          Semantics(
+            button: true,
+            label: 'Close',
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: close,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(color: kBg, shape: BoxShape.circle),
+                alignment: Alignment.center,
+                child: const Icon(LucideIcons.x, size: 18, color: kMuted),
+              ),
+            ),
+          ),
+      ]),
+    );
+    final page = SingleChildScrollView(
+      controller: _scroll,
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(widget.title, style: inter(22, 700, height: 1.2)),
+        if (widget.subtitle != null) ...[
+          const SizedBox(height: 8),
+          Text(widget.subtitle!, style: inter(13, 400, color: kMuted, height: 1.42)),
+        ],
+        if (widget.tour != null) ...[const SizedBox(height: 12), _TipHint(tour: widget.tour!)],
+        const SizedBox(height: 16),
+        ...widget.children,
+      ]),
+    );
+    final bottomBar = Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+        const Divider(height: 1, thickness: 1, color: kLine),
+        const SizedBox(height: 12),
+        // In the walk, Back sits beside the main (last) action.
+        if (step?.onBack != null && widget.actions.isNotEmpty) ...[
+          ...widget.actions.take(widget.actions.length - 1),
+          Row(children: [
+            SizedBox(width: 104, child: PillSecondary(label: '← Back', onPressed: () => step!.onBack!(context))),
+            const SizedBox(width: 10),
+            Expanded(child: widget.actions.last),
+          ]),
+        ] else
+          ...widget.actions,
+        if (step?.onSkip != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: TextButton(
+              onPressed: () => step!.onSkip!(context),
+              child: Text('Skip for now', style: inter(13, 600, color: kMuted)),
+            ),
+          ),
       ]),
     );
     return Scaffold(
-      backgroundColor: const Color(0xFFDDDEE0),
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Stack(key: _stack, children: [
-          // The dialogue hugs its content (Figma frames are 458 to 837 tall) and scrolls inside when the screen is shorter.
-          Center(child: Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 12), child: card)),
-          if (widget.tour != null) CoachMark(step: widget.tour!, stackKey: _stack, scroll: _scroll),
-        ]),
+        bottom: false,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [topBar, Expanded(child: page)]),
       ),
+      // As the Scaffold's bottom bar, so messages (toasts) appear above the buttons instead of covering them.
+      bottomNavigationBar: SafeArea(top: false, child: bottomBar),
     );
   }
+}
+
+/// The screen's tip, shown once under the title: it explains without blocking the form; "Got it" records it as seen.
+class _TipHint extends StatelessWidget {
+  const _TipHint({required this.tour});
+  final TourStep tour;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 4, 4),
+        decoration: BoxDecoration(color: kLime.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(12), border: Border.all(color: kLime.withValues(alpha: 0.6))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Padding(padding: EdgeInsets.only(top: 1), child: Icon(LucideIcons.lightbulb, size: 16, color: kDone)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(tour.title, style: inter(12.5, 700)),
+                const SizedBox(height: 2),
+                Text(tour.body, style: inter(12, 400, color: kMuted, height: 1.4)),
+              ]),
+            ),
+          ]),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(onPressed: tour.onNext, child: Text('Got it', style: inter(12.5, 700, color: kDone))),
+          ),
+        ]),
+      );
 }
 
 /// Small label above a field (11.5 / 600).

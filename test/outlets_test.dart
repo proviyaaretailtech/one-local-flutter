@@ -129,15 +129,14 @@ void main() {
   });
 
   group('Outlet header', () {
-    testWidgets('shows the outlet, its live status, the chip and the initials from the server', (t) async {
+    testWidgets('shows the outlet and its live status from the server', (t) async {
       await tall(t);
       await t.pumpWidget(const MaterialApp(home: Scaffold(body: OutletHeader(title: 'Orders'))));
       expect(find.text('Orders'), findsOneWidget, reason: 'the screen title until the server answers');
       await t.pumpAndSettle();
       expect(find.text('Niks Browni And Burger'), findsOneWidget);
       expect(find.text('Online'), findsOneWidget);
-      expect(find.text('1 of 2 online'), findsOneWidget);
-      expect(find.text('NB'), findsOneWidget);
+      expect(find.text('NB'), findsNothing, reason: 'the shared banner has the bell and ☰ instead of initials');
       expect(find.text('Orders'), findsNothing);
       expect(f.calls.single.$1, 'outlet_list');
     });
@@ -149,14 +148,14 @@ void main() {
       expect(f.calls.single.$2['location_id'], 'l2');
     });
 
-    testWidgets('when the server cannot answer it keeps the title and the initials the screen knows', (t) async {
+    testWidgets('when the server cannot answer it keeps the title', (t) async {
       await tall(t);
       OutletHeader.api = () => OutletsApi(baseUrl: 'http://pos.test', accessToken: () => 't', client: MockClient((_) async => http.Response('{"detail":"down"}', 503)));
       OutletHeader.refresh();
       await t.pumpWidget(const MaterialApp(home: Scaffold(body: OutletHeader(title: 'Stock', initials: 'RS'))));
       await t.pumpAndSettle();
       expect(find.text('Stock'), findsOneWidget);
-      expect(find.text('RS'), findsOneWidget);
+      expect(find.text('RS'), findsNothing, reason: 'the shared banner has the bell and ☰ instead of initials');
       expect(find.byKey(const ValueKey('outlet-header-chip')), findsNothing);
     });
 
@@ -204,7 +203,6 @@ void main() {
       expect(find.text('Not receiving orders'), findsNWidgets(2), reason: 'the branch that is off and the pending outlet');
       expect(find.text('Delivery status'), findsNWidgets(3));
       expect(find.text('Rush mode'), findsNWidgets(3));
-      expect(find.text('1 of 2 online'), findsOneWidget);
     });
 
     testWidgets('a pending outlet says so and its switches are disabled', (t) async {
@@ -422,7 +420,6 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('SHOWING DATA FOR'), findsOneWidget);
       expect(find.text('All outlets (2)'), findsOneWidget);
-      expect(find.text('1 of 2 online'), findsOneWidget);
       expect(find.byKey(const ValueKey('outlet-header-bell')), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('outlet-header-name')));
       await t.pumpAndSettle();

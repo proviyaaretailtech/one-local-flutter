@@ -269,7 +269,8 @@ class FulfilmentScreen extends StatefulWidget {
 class _FulfilmentScreenState extends State<FulfilmentScreen> with TourHost {
   final _optionsKey = GlobalKey();
   late final Map<String, dynamic> _f = widget.state.fulfilment;
-  late bool _pickup = _f['pickup'] == true;
+  // Smart default: customer pickup is on until the partner saves their own choice.
+  late bool _pickup = _f['saved'] == true ? _f['pickup'] == true : true;
   late bool _self = _f['self_delivery'] == true;
   late bool _onelocal = _f['onelocal_delivery'] == true;
   late final _radius = TextEditingController(text: _num(_f['radius_km']));

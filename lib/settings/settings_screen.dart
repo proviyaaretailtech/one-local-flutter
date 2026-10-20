@@ -3,7 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../auth/partner_api.dart';
 import '../home/home_nav.dart';
-import '../orders/order_widgets.dart' show OrdersTopBar;
+import '../orders/order_widgets.dart' show OrdersTopBar, kWarnBg, kWarnText;
 import '../states/state_kit.dart' show StateTone, StatusCard;
 import '../ui/theme.dart';
 import 'settings_api.dart';
@@ -33,6 +33,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _load();
   }
 
+  /// Set when the server answered but could not give the saved settings: the page still shows (every row empty) under a warning.
+  String? _unloaded;
+
   Future<void> _load() async {
     setState(() {
       _error = null;
@@ -40,12 +43,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     try {
       final s = await widget.env.api.get();
-      if (mounted) setState(() => _s = s);
+      if (mounted) {
+        setState(() {
+          _s = s;
+          _unloaded = null;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e is PartnerApiException ? e.message : 'Could not reach the server. Check your connection and try again.';
-        _offline = e is! PartnerApiException;
+        if (e is PartnerApiException && e.status < 500) {
+          // A refusal (not allowed, signed out): its own sentence, no page.
+          _error = e.message;
+        } else if (e is PartnerApiException) {
+          // The server failed (for example a database without this release's functions): show Settings anyway, empty, and
+          // say so (saving may fail too).
+          _unloaded = e.message;
+          _s ??= SettingsState({
+            'can_edit': true,
+            'bank_visible': true,
+            'bank': {'status': 'not_added'},
+            'organization': {'name': HomeNav.storeName ?? ''},
+          });
+        } else {
+          _error = 'Could not reach the server. Check your connection and try again.';
+          _offline = true;
+        }
       });
     }
   }
@@ -97,6 +120,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final bank = s.bankStatus;
     return [
       Padding(padding: const EdgeInsets.fromLTRB(4, 14, 4, 0), child: Row(children: [Expanded(child: Text(s.businessName.isEmpty ? 'Store preferences' : s.businessName, style: inter(13, 500, color: kMuted)))])),
+      if (_unloaded != null)
+        Container(
+          margin: const EdgeInsets.only(top: 10),
+          padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+          decoration: BoxDecoration(color: kWarnBg, borderRadius: BorderRadius.circular(14)),
+          child: Row(children: [
+            const Icon(LucideIcons.circleAlert, size: 18, color: kWarnText),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text('Your saved settings could not be loaded, so everything shows as not set. Saving may not work yet. ($_unloaded)',
+                  style: inter(12, 500, color: kWarnText, height: 1.35)),
+            ),
+            TextButton(onPressed: _load, child: Text('Try again', style: inter(12, 700, color: kWarnText))),
+          ]),
+        ),
       if (!edit) Padding(padding: const EdgeInsets.only(top: 10), child: _ReadOnlyNote()),
       const GroupTitle('Timings & readiness'),
       GroupCard(children: [

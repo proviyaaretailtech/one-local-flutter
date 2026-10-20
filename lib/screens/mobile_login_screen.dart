@@ -67,7 +67,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
     return ScreenShell(
       gradient: kRegistrationGradient,
       children: [
-        const BrandNav(),
+        const BrandNav(back: true),
         FormContent(children: [
           const Kicker('Sign in · Mobile'),
           const PageIntro(title: 'Your number. Your business.', subtitle: 'Use the mobile number registered with your OneLocal account.'),

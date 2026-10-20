@@ -5,6 +5,17 @@ import '../ui/theme.dart';
 typedef HomeRoute = void Function(BuildContext context);
 typedef ItemRoute = void Function(BuildContext context, String itemId);
 
+/// The app shell (lib/home/app_shell.dart) while it is on screen: one bottom bar, a back stack per tab.
+abstract class TabShell {
+  /// 'store', 'restaurant' or 'service': which tab set the bar shows and what Bill opens.
+  String get kind;
+  void setKind(String kind);
+
+  /// Switches to the tab with this bar label (tapping the current tab goes back to its first screen); false when the
+  /// bar has no such tab, so the caller opens the screen the old way.
+  bool show(String label);
+}
+
 /// Where the control centre's buttons lead. Screens owned by other phases plug themselves in here
 /// (for example section E sets `HomeNav.orders = (c) => Navigator.push(...)`). Until a screen is
 /// plugged in, the button says plainly that it is not in this release.
@@ -13,6 +24,13 @@ class HomeNav {
 
   // The control centre itself (set by app_routes.dart).
   static HomeRoute? home;
+
+  // The app shell, set while it is mounted; the tab hooks below switch its tabs instead of pushing a new page.
+  static TabShell? shell;
+
+  // Set by the dashboard: the side menu (☰ on every screen's header) and the store's name (the header's top line).
+  static HomeRoute? openMenu;
+  static String? storeName;
 
   // Section E: orders across channels.
   static HomeRoute? orders;
@@ -81,5 +99,8 @@ class HomeNav {
     kitchenSetup = kitchenDisplay = deliverySettings = null;
     home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = customers = wallet = account = menu = null;
     tableQr = null;
+    shell = null;
+    openMenu = null;
+    storeName = null;
   }
 }

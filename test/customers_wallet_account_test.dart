@@ -319,7 +319,7 @@ void main() {
           });
       await show(t, ManageAccountScreen(api: s.account, auth: auth));
       expect(s.calls.first.$1, 'acct_sync_contact');
-      expect(find.text('Priya Sharma'), findsOneWidget);
+      expect(find.text('Priya Sharma'), findsNWidgets(2));   // the profile card and the Name row
       expect(find.text('+919876500512'), findsOneWidget);
       expect(find.text('Email and password'), findsOneWidget);
       expect(find.textContaining('OLP-••••1234'), findsOneWidget);
@@ -371,7 +371,7 @@ void main() {
 
   group('Side nav', () {
     Future<int> soonCount(WidgetTester t) async {
-      await show(t, Builder(builder: (c) => TextButton(onPressed: () => showStoreSideNav(c, name: 'Priya', onDashboard: () {}, onReports: () {}, onSignOut: () {}), child: const Text('menu'))));
+      await show(t, Builder(builder: (c) => TextButton(onPressed: () => showStoreSideNav(c, name: 'Priya', onReports: () {}, onSignOut: () {}), child: const Text('menu'))));
       await t.tap(find.text('menu'));
       await t.pumpAndSettle();
       final n = find.text('Soon').evaluate().length;
@@ -386,11 +386,11 @@ void main() {
       HomeNav.customers = (_) => opened.add('customers');
       HomeNav.wallet = (_) => opened.add('wallet');
       HomeNav.account = (_) => opened.add('account');
-      expect(await soonCount(t), unplugged - 3);
+      expect(await soonCount(t), unplugged - 2);   // Manage account is the profile header now, not a "Soon" row
       for (final (label, hook) in [('Customer', 'customers'), ('One Local Wallet', 'wallet'), ('Manage account', 'account')]) {
         await t.tap(find.text('menu'));
         await t.pumpAndSettle();
-        await t.tap(find.text(label));
+        await t.tap(label == 'Manage account' ? find.bySemanticsLabel(label) : find.text(label));   // the account is the profile block
         await t.pumpAndSettle();
         expect(opened.last, hook);
         expect(find.byKey(const ValueKey('side-nav')), findsNothing);
