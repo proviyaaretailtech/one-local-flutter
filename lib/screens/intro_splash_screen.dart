@@ -42,47 +42,56 @@ class _IntroSplashScreenState extends State<IntroSplashScreen> {
       backgroundColor: Colors.white,
       body: GestureDetector(
         onTap: _next,
-        child: ClipRect(
-          child: FittedBox(
-            fit: BoxFit.cover,
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              width: SplashBackdrop.w,
-              height: SplashBackdrop.h,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const SplashBackdrop(),
-                  // Lime wash at the foot of the picture.
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: 150,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [const Color(0x00A1FE2F), const Color(0xFFA1FE2F).withValues(alpha: 0.95)],
+        // SizedBox.expand: the Scaffold body is loosely constrained; without it the FittedBox below shrinks to the
+        // design's aspect ratio and sits top-left instead of covering the screen.
+        child: SizedBox.expand(
+          child: ClipRect(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: SplashBackdrop.w,
+                height: SplashBackdrop.h,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const SplashBackdrop(),
+                    // Lime wash at the foot of the picture.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 150,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [const Color(0x00A1FE2F), const Color(0xFFA1FE2F).withValues(alpha: 0.95)],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const Positioned(left: 0, right: 0, top: 334, child: Align(alignment: Alignment.topCenter, child: PartnerWordmark())),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: 780,
-                    child: Column(
-                      children: [
-                        Text('Easy Selling starts here', style: inter(26, 700, color: kPrimary)),
-                        const SizedBox(height: 6),
-                        Text('Your Business, Simplified', style: inter(16, 400, color: kPrimary)),
-                      ],
+                    const Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 334,
+                      child: Align(alignment: Alignment.topCenter, child: PartnerWordmark()),
                     ),
-                  ),
-                ],
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 780,
+                      child: Column(
+                        children: [
+                          Text('Easy Selling starts here', style: inter(26, 700, color: kPrimary)),
+                          const SizedBox(height: 6),
+                          Text('Your Business, Simplified', style: inter(16, 400, color: kPrimary)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
