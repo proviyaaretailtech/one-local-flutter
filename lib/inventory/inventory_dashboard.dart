@@ -14,7 +14,7 @@ import 'transfer_screen.dart';
 
 /// What every section H screen shares: the API and the ways out of the section (other bottom-bar tabs, the linked order, Items, bell).
 class InvEnv {
-  InvEnv({InventoryApi? api, this.onNavigate, this.onOpenOrder, this.onOpenPurchasing, this.onItems, this.onBell}) : api = api ?? InventoryApi();
+  InvEnv({InventoryApi? api, this.onNavigate, this.onOpenOrder, this.onOpenPurchasing, this.onOpenLowStock, this.onItems, this.onBell}) : api = api ?? InventoryApi();
   final InventoryApi api;
 
   /// Bottom-bar tabs this section does not own: 'home', 'item', 'bill', 'online'.
@@ -25,6 +25,9 @@ class InvEnv {
 
   /// Opens the purchasing screens (Purchase History) from Planning > Replenishment; null keeps the "later release" notice.
   final void Function(BuildContext context)? onOpenPurchasing;
+
+  /// Opens Low Stock (section J, with Purchase Suggestions inside it) from Planning > Stock Risk; null shows the critical stock list.
+  final void Function(BuildContext context)? onOpenLowStock;
   final VoidCallback? onItems, onBell;
 
   static const dashboardRoute = '/inventory';
@@ -184,7 +187,7 @@ class _InventoryDashboardState extends State<InventoryDashboard> {
               fc == null ? 'No recent sales to project from' : '${_short(fc.s('name'))} ${qty(fc.n('end_stock'))}u end-stock${fc.b('shortfall_at_plus20') ? ' · +20% demand = shortfall' : ''}',
               () => _go(ForecastScreen(env: env, itemId: fc?.s('id')))),
           _plan(LucideIcons.circleAlert, kAmberBgH, kAmberText, 'Stock Risk', '${qty(c.n('critical'))} critical · ${qty(c.n('low'))} low · review expiry separately',
-              () => _go(StockListScreen(env: env, filter: 'critical'))),
+              () => env.onOpenLowStock != null ? env.onOpenLowStock!(context) : _go(StockListScreen(env: env, filter: 'critical'))),
           _plan(LucideIcons.chartNoAxesColumn, kGreyBg, kInk, 'Inventory Positioning',
               '${qty(pos.n('free'))} free · ${qty(pos.n('inbound'))} inbound · ${qty(pos.n('total'))} nominal total', () => env.later(context, 'Inventory positioning'),
               last: true),

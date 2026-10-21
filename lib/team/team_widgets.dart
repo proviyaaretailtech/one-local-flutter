@@ -2,14 +2,98 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../inventory/inventory_api.dart' show Facts;
 import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'team_api.dart';
 
+/// Roles that only make sense where food is cooked and served at tables: never offered to a store or a service business.
+const kRestaurantOnlyRoles = {'kitchen', 'captain'};
+
+/// The roles most businesses of each kind hand out, in the order they are offered. Everything else assignable goes under "More roles".
+const kCommonRoles = {
+  'restaurant': ['manager', 'biller', 'kitchen', 'captain', 'inventory_manager', 'accountant', 'org_admin'],
+  'store': ['manager', 'biller', 'inventory_manager', 'accountant', 'location_manager', 'org_admin'],
+};
+
+/// Picks a role to give someone. The server says which roles are assignable; this keeps out roles that do not fit the business
+/// (Kitchen in a store), puts the usual ones first and the rest under "More roles". [current] stays listed even if it would be
+/// hidden, so a person who already has it can keep it.
+/// The roles that fit this business, split into the usual ones (in [kCommonRoles] order) and the rest. Restaurant-only roles are left
+/// out unless the business is a restaurant or [current] is one of them. [onlyAssignable]: what may be given (Invite, Edit role), or
+/// every role (Roles & permissions, which only reviews).
+({List<Facts> common, List<Facts> more}) teamRolesFor(List<Facts> roles, {String? kind, String? current, bool onlyAssignable = true}) {
+  final restaurant = kind == 'restaurant';
+  final offered = [
+    for (final r in roles)
+      if ((!onlyAssignable || r.b('assignable')) && (restaurant || !kRestaurantOnlyRoles.contains(r.s('slug')) || r.s('slug') == current)) r,
+  ];
+  final order = kCommonRoles[restaurant ? 'restaurant' : 'store']!;
+  return (
+    common: [for (final s in order) ...offered.where((r) => r.s('slug') == s)],
+    more: [for (final r in offered) if (!order.contains(r.s('slug'))) r],
+  );
+}
+
+Future<String?> pickTeamRole(BuildContext context, {required String title, required List<Facts> roles, String? current, String? kind, bool onlyAssignable = true}) {
+  final (:common, :more) = teamRolesFor(roles, kind: kind, current: current, onlyAssignable: onlyAssignable);
+  final offered = [...common, ...more];
+  String sub(Facts r) => r.s('description').isNotEmpty ? r.s('description') : '${r.n('permission_count')} ${r.n('permission_count') == 1 ? 'permission' : 'permissions'}';
+  Widget row(BuildContext ctx, Facts r) {
+    final on = r.s('slug') == current;
+    return InkWell(
+      onTap: () => Navigator.pop(ctx, r.s('slug')),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 10, 12, 10), // room on the right for the scrollbar
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(r.s('name'), style: inter(15, on ? 700 : 600)),
+              const SizedBox(height: 2),
+              Text(sub(r), style: inter(12.5, 400, color: kMuted, height: 1.35)),
+            ]),
+          ),
+          const SizedBox(width: 12),
+          Icon(on ? LucideIcons.circleCheck : LucideIcons.circle, size: 20, color: on ? kGreenText : kTileLine),
+        ]),
+      ),
+    );
+  }
+
+  Widget heading(String t) => Padding(padding: const EdgeInsets.only(top: 14, bottom: 4), child: Text(t.toUpperCase(), style: inter(11.5, 700, color: kMuted)));
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (ctx) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.75),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 16, 8),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(title, style: inter(18, 700)),
+            Flexible(
+              child: ListView(shrinkWrap: true, children: [
+                if (common.isNotEmpty) ...[heading('Common roles'), for (final r in common) row(ctx, r)],
+                if (more.isNotEmpty) ...[heading('More roles'), for (final r in more) row(ctx, r)],
+                if (offered.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text('No roles can be given right now.', style: inter(14, 400, color: kMuted))),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    ),
+  );
+}
+
 /// What every Team screen shares: the API and the ways out of the section (other bottom-bar tabs).
 class TeamEnv {
-  TeamEnv({TeamApi? api, this.onNavigate}) : api = api ?? TeamApi();
+  TeamEnv({TeamApi? api, this.onNavigate, this.kind}) : api = api ?? TeamApi();
   final TeamApi api;
+
+  /// The business: 'restaurant', 'store' or 'service' (the app shell's kind). Decides which roles make sense to invite.
+  final String? kind;
 
   /// Bottom-bar tabs this section does not own: 'money', 'item', 'bill', 'online', 'stock'.
   final ValueChanged<String>? onNavigate;
@@ -452,17 +536,17 @@ class TeamChips extends StatelessWidget {
     required this.items,
     required this.active,
     required this.onTap,
+    this.scroll = false,
   });
   final List<(String id, String label, num? count)> items;
   final String active;
   final ValueChanged<String> onTap;
+
+  /// One row that scrolls sideways instead of wrapping (Roles: 19 roles would otherwise wrap into a wall of chips).
+  final bool scroll;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 14),
-    child: Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
+  Widget build(BuildContext context) {
+    final chips = [
         for (final (id, label, count) in items)
           Semantics(
             button: true,
@@ -496,9 +580,17 @@ class TeamChips extends StatelessWidget {
               ),
             ),
           ),
-      ],
-    ),
-  );
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: scroll
+          ? SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [for (var i = 0; i < chips.length; i++) ...[if (i > 0) const SizedBox(width: 8), chips[i]]]),
+            )
+          : Wrap(spacing: 8, runSpacing: 8, children: chips),
+    );
+  }
 }
 
 /// A tinted banner for an error or a note (Figma: "Invitation couldn't be sent").

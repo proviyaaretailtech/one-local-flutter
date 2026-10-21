@@ -101,7 +101,7 @@ class _TeamDashboardState extends State<TeamDashboardScreen>
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        childAspectRatio: 1.75,
+        childAspectRatio: 2.3, // Figma's tiles are short: number beside a two-line label, no empty space below
         children: [
           StatTile(
             value: '$members',
@@ -371,15 +371,8 @@ class _InviteState extends State<InviteScreen> {
   }
 
   Future<void> _pickRole() async {
-    final roles = _options!.l('roles').where((r) => r.b('assignable')).toList();
-    final v = await pickOne<String>(context, 'Role', [
-      for (final r in roles)
-        (
-          r.s('slug'),
-          r.s('name'),
-          r.s('description').isEmpty ? null : r.s('description'),
-        ),
-    ], current: _role);
+    final roles = _options!.l('roles');
+    final v = await pickTeamRole(context, title: 'Role', roles: roles, current: _role, kind: env.kind);
     if (v != null) {
       setState(() {
         _role = v;
@@ -427,7 +420,12 @@ class _InviteState extends State<InviteScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _bannerBody = e.message;
+        // Figma's banner also says what to do next when the number or email is already invited.
+        _bannerBody = e.duplicateMobile
+            ? '${e.message} Resend it or use another number.'
+            : e.duplicateEmail
+                ? '${e.message} Resend it or use another email.'
+                : e.message;
         _mobileError = e.duplicateMobile ? e.message : null;
         _emailError = e.duplicateEmail ? e.message : null;
         _canResend = e.duplicateMobile || e.duplicateEmail;
@@ -553,14 +551,7 @@ class _UserDetailState extends State<UserDetailScreen>
     final o = await env.api.options();
     if (!mounted) return;
     final roles = o.l('roles').where((r) => r.b('assignable')).toList();
-    final v = await pickOne<String>(context, 'Edit role', [
-      for (final r in roles)
-        (
-          r.s('slug'),
-          r.s('name'),
-          r.s('description').isEmpty ? null : r.s('description'),
-        ),
-    ], current: d.m('role').s('slug'));
+    final v = await pickTeamRole(context, title: 'Edit role', roles: roles, current: d.m('role').s('slug'), kind: env.kind);
     if (v == null || v == d.m('role').s('slug') || !mounted) return;
     final role = roles.firstWhere((r) => r.s('slug') == v);
     List<String>? places;

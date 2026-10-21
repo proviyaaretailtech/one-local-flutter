@@ -146,6 +146,7 @@ class GrnQueueRow {
   String get reviewStatus => _s('review_status');
   String get supplier => _s('supplier_name');
   String get invoiceNo => _s('invoice_no');
+  String get poRef => _s('po_ref');
   bool get hasInvoice => raw['has_invoice'] == true;
   int? get exceptions => (raw['exceptions'] as num?)?.toInt();
 }

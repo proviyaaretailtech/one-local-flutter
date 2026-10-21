@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../auth/partner_api.dart';
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
 import 'home_api.dart';
 import 'home_nav.dart';
@@ -114,34 +115,38 @@ class _HubScreenState extends State<HubScreen> {
         child: FutureBuilder<HubFeed>(
           future: _feed,
           builder: (context, snap) {
-            if (snap.connectionState != ConnectionState.done && snap.data == null) {
-              return const Center(child: CircularProgressIndicator(color: kLink));
-            }
-            if (snap.hasError) return _HubError(error: snap.error!, onRetry: _reload);
-            final f = snap.data!;
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 132),
-              children: [
-                Row(children: [
-                  Expanded(
-                    child: InkWell(
+            final loaded = snap.data;
+            // the shared banner (founder, 22 Oct 2026); the scope ("All outlets (5) ▾", the switcher) is the line under "Reports"
+            final header = AppHeader(
+              title: 'Reports',
+              safeTop: false,
+              subtitle: loaded == null
+                  ? null
+                  : InkWell(
                       key: const ValueKey('hub-outlet'),
-                      onTap: () => _pickOutlet(f),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('SHOWING DATA FOR', style: inter(9, 600, color: kMuted)),
-                        const SizedBox(height: 2),
-                        Row(children: [
-                          Flexible(child: Text(f.scopeLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(16.5, 700))),
-                          if (f.outlets.length > 1 || _location != null) ...[const SizedBox(width: 6), const Icon(LucideIcons.chevronDown, size: 18, color: kInk)],
-                        ]),
+                      onTap: () => _pickOutlet(loaded),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Flexible(child: Text(loaded.scopeLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(15, 500, color: kMuted))),
+                        if (loaded.outlets.length > 1 || _location != null) ...[const SizedBox(width: 2), const Icon(LucideIcons.chevronDown, size: 16, color: kMuted)],
                       ]),
                     ),
-                  ),
-                  _RoundButton(icon: LucideIcons.bell, label: 'Notifications', onTap: () => HomeNav.go(context, HomeNav.notifications, 'Notifications')),
-                  const SizedBox(width: 12),
-                  _RoundButton(icon: LucideIcons.menu, label: 'Back to control centre', onTap: () => Navigator.maybePop(context)),
-                ]),
-                const SizedBox(height: 16),
+            );
+            Widget body() {
+              if (snap.connectionState != ConnectionState.done && loaded == null) return const Center(child: CircularProgressIndicator(color: kLink));
+              if (snap.hasError) return _HubError(error: snap.error!, onRetry: _reload);
+              return _feedList(context, loaded!);
+            }
+
+            return Column(children: [header, Expanded(child: body())]);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _feedList(BuildContext context, HubFeed f) => ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 132),
+              children: [
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(children: [
@@ -207,33 +212,6 @@ class _HubScreenState extends State<HubScreen> {
                 ],
               ],
             );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, required this.label, required this.onTap});
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => Semantics(
-        button: true,
-        label: label,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: kLine)),
-            child: Icon(icon, size: 16, color: kInk),
-          ),
-        ),
-      );
 }
 
 class _Pill extends StatelessWidget {

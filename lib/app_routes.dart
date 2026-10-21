@@ -10,6 +10,7 @@ import 'home/app_shell.dart';
 import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
 import 'inventory/inventory_dashboard.dart';
+import 'inventory/receiving_screen.dart';
 import 'inventory/stock_detail_screen.dart';
 import 'kitchen/kds_screen.dart';
 import 'kitchen/kitchen_setup_screen.dart';
@@ -54,10 +55,12 @@ void installRoutes() {
     if (_inShell('Home')) return;
     Navigator.of(c, rootNavigator: true).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => appShell()), (r) => r.isFirst);
   };
-  // The Orders tab is Live orders | Hold orders (specs/orders-live-hold); the full history stays one tap away in the side menu.
+  // A restaurant's Orders tab is Live orders | Hold orders (specs/orders-live-hold); a store's Online order tab is Orders History (section E).
   HomeNav.orders = (c) {
     if (_inShell('Online order') || _inShell('Orders')) return;
-    Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))));
+    final restaurant = HomeNav.shell?.kind == 'restaurant';
+    Navigator.of(c).push(MaterialPageRoute(
+        builder: (_) => restaurant ? OrdersBoardScreen(onNavigate: (id) => _tab(c, id)) : OrdersHome(onNavigate: (id) => _tab(c, id))));
   };
   HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
   // Section F: the till (sell, search, carts, payment, history, returns, receipts). Section E's cart screen stays reachable from the orders list.
@@ -73,7 +76,8 @@ void installRoutes() {
     if (_inShell('Menu')) return;
     Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuScreen()));
   };
-  HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const GrnQueueScreen()));
+  HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(
+      builder: (_) => GrnQueueScreen(onReceive: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(ctx)))))));
   const inventoryEnv = _inventoryEnv;
   HomeNav.stock = (c) {
     if (_inShell('Stock')) return;
@@ -99,7 +103,7 @@ void installRoutes() {
   // Section K: money. The server says which screens this person may open; the bottom bar's other tabs go back through _tab.
   HomeNav.money = (c) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
   HomeNav.moneyScreen = (c, screen) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id)), start: screen));
-  HomeNav.team = (c) => Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id))));
+  HomeNav.team = (c) => Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id), kind: HomeNav.shell?.kind)));
   // Section M: the storefront page builder (profile, hours, delivery, offers, ads and publishing hang off it).
   HomeNav.storefront = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'storefront'), builder: (_) => StorePageBuilder(api: StorefrontApi())));
   HomeNav.deliverySettings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => DeliveryScreen(api: StorefrontApi())));
@@ -117,6 +121,7 @@ void installRoutes() {
 InvEnv _inventoryEnv(BuildContext c) => InvEnv(
     onNavigate: (id) => _tab(c, id),
     onOpenPurchasing: (ctx) => Navigator.of(ctx).push(PoHistoryScreen.pageRoute(PurEnv(inv: _inventoryEnv(ctx)))),
+    onOpenLowStock: (ctx) => HomeNav.lowStock?.call(ctx),
     onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
 
 /// Switches the app shell to the tab with this bar label, when the shell is up and has that tab.
@@ -126,8 +131,10 @@ Widget _floor(BuildContext c) => FloorScreen(env: TablesEnv(onNavigate: (id) => 
 
 /// The signed-in app: one bottom bar over a back stack per tab. Each tab's first screen depends on the kind of
 /// business: Bill is the till for a store, the tables floor for a restaurant, the calendar for a service partner.
-Widget appShell({AuthRepository? auth}) => AppShell(
-      rootFor: (kind, label) => switch (label) {
+Widget appShell({AuthRepository? auth}) => AppShell(rootFor: (kind, label) => shellTabRoot(kind, label, auth: auth));
+
+/// The first screen of the bar tab [label] for a business of [kind] ('store', 'restaurant', 'service'); null when the tab has none.
+Widget? shellTabRoot(String kind, String label, {AuthRepository? auth}) => switch (label) {
         'Home' => ControlCentreScreen(auth: auth),
         'Item' => Builder(builder: (c) => CatalogueScreen(onNavigate: (id) => _tab(c, id))),
         'Menu' => const MenuScreen(),
@@ -138,11 +145,13 @@ Widget appShell({AuthRepository? auth}) => AppShell(
               _ => SellScreen(env: SellEnv(onTab: (id) => _tab(c, id))),
             },
           ),
-        'Online order' || 'Orders' => Builder(builder: (c) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))),
+        // A store's Online order tab is section E (Orders History, each order opening its stage screen). The Live | Hold board with
+        // dine-in / takeaway / delivery is the restaurant's Orders tab (section H), so a store never sees it.
+        'Online order' => Builder(builder: (c) => OrdersHome(onNavigate: (id) => _tab(c, id))),
+        'Orders' => Builder(builder: (c) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))),
         'Stock' => Builder(builder: (c) => InventoryDashboard(env: _inventoryEnv(c))),
         _ => null,
-      },
-    );
+      };
 
 /// Bottom-bar tabs of the order screens that belong to other sections.
 void _tab(BuildContext context, String id) => switch (id) {

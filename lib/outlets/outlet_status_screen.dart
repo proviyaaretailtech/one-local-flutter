@@ -107,7 +107,7 @@ class _OutletStatusScreenState extends State<OutletStatusScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(child: Text('Restaurant status', style: inter(20, 700))),
+              Expanded(child: Text('${outletNounTitle()} status', style: inter(20, 700))),
               if (o != null && o.chip.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -125,7 +125,7 @@ class _OutletStatusScreenState extends State<OutletStatusScreen> {
                   controller: _search,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
-                    hintText: 'Search restaurant name or ID',
+                    hintText: 'Search ${outletNoun()} name or ID',
                     prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
                     filled: true,
                     fillColor: Colors.white,
@@ -180,7 +180,7 @@ class _OutletStatusScreenState extends State<OutletStatusScreen> {
                   if (o.canAdd)
                     Semantics(
                       button: true,
-                      label: 'Add another restaurant or store',
+                      label: 'Add another ${outletNoun()}',
                       excludeSemantics: true,
                       child: InkWell(
                         key: const ValueKey('outlets-add'),
@@ -193,7 +193,7 @@ class _OutletStatusScreenState extends State<OutletStatusScreen> {
                           child: Row(children: [
                             const Icon(LucideIcons.plus, size: 20, color: kOutletOnline),
                             const SizedBox(width: 10),
-                            Expanded(child: Text('Add another restaurant/store', style: inter(15, 600, color: kOutletOnline))),
+                            Expanded(child: Text('Add another ${outletNoun()}', style: inter(15, 600, color: kOutletOnline))),
                             const Icon(LucideIcons.chevronRight, size: 18, color: kOutletOnline),
                           ]),
                         ),
@@ -276,7 +276,9 @@ class _OutletCard extends StatelessWidget {
         _Toggle(
           key: ValueKey('outlet-rush-${o.id}'),
           title: 'Rush mode',
-          subtitle: o.rushMode ? '+${o.rushExtraMinutes} min added to preparation time' : 'Adds ${o.rushExtraMinutes} min when the kitchen is busy',
+          subtitle: outletIsRestaurant()
+              ? (o.rushMode ? '+${o.rushExtraMinutes} min added to preparation time' : 'Adds ${o.rushExtraMinutes} min when the kitchen is busy')
+              : (o.rushMode ? '+${o.rushExtraMinutes} min added to packing time' : 'Adds ${o.rushExtraMinutes} min to packing time when the store is busy'),
           value: o.rushMode,
           onChanged: enabled ? (v) => onSet(o, rushMode: v) : null,
         ),

@@ -191,7 +191,8 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
           _kind = s.outletKind;
           _personName = s.personName;
           _outletName = s.outletName;
-          HomeNav.storeName = s.outletName;   // the top line of every screen's header
+          HomeNav.storeName = s.outletName;   // the store's name on every screen's header
+          HomeNav.personName = s.personName; // the profile icon's initials
           // Inside the app shell: its bar shows this kind's tabs (store / restaurant / service).
           final shell = HomeNav.shell;
           if (shell != null && shell.kind != s.outletKind) WidgetsBinding.instance.addPostFrameCallback((_) => shell.setKind(s.outletKind));

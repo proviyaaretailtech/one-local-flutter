@@ -32,6 +32,9 @@ class HomeNav {
   static HomeRoute? openMenu;
   static String? storeName;
 
+  /// The signed-in person's name, for the profile icon on every header (their initials); null until the dashboard has read it.
+  static String? personName;
+
   // Section E: orders across channels.
   static HomeRoute? orders;
   static HomeRoute? orderHistory;
@@ -102,5 +105,6 @@ class HomeNav {
     shell = null;
     openMenu = null;
     storeName = null;
+    personName = null;
   }
 }

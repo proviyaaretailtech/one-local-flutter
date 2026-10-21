@@ -4,12 +4,15 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../home/home_nav.dart';
 import 'theme.dart';
 
-const _square = Color(0xFFF3F4F6);
+const _tintLeft = Color(0xFFE9F2E5);
+const _tintRight = Color(0xFFF6F9F4);
+const _ring = Color(0xFFE1E8DD);
 
-/// The one top banner every screen uses, in the dashboard's layout (founder, 20 Oct 2026): a back arrow when there is a
-/// page to go back to, a small grey line over the page's name in bold, then the bell and ☰ on the right.
-/// [kicker] defaults to the store's name ([HomeNav.storeName]); [subtitle] sits under the title (the outlet's status).
-/// ☰ opens the side menu from any screen ([HomeNav.openMenu]) unless the screen passes its own [onMenu].
+/// The one top banner every screen uses (founder, 22 Oct 2026): a soft green card with the side menu ☰ in the left corner (a back
+/// arrow instead on a page that can go back), a small caps line over a bold name, then the bell and the profile icon on the right.
+/// Main screens pass [kicker] "OneLocal Partner" and the store's name as [title], with the outlet and its status as [subtitle]; inner
+/// pages leave [kicker] to default to the store's name ([HomeNav.storeName]) over the page's own title.
+/// ☰ opens the side menu ([HomeNav.openMenu]) unless the screen passes its own [onMenu]; the profile icon opens Manage account.
 class AppHeader extends StatelessWidget {
   const AppHeader({
     super.key,
@@ -25,6 +28,7 @@ class AppHeader extends StatelessWidget {
     this.onBell,
     this.bellKey = const ValueKey('app-header-bell'),
     this.bell = true,
+    this.profile = true,
     this.trailing,
     this.safeTop = true,
   });
@@ -45,6 +49,9 @@ class AppHeader extends StatelessWidget {
   final VoidCallback? onBell;
   final Key bellKey;
   final bool bell;
+
+  /// The profile icon (the person's initials) on the right; it opens Manage account when that screen is plugged in.
+  final bool profile;
   final Widget? trailing;
 
   /// Adds the status-bar inset (for screens without a SafeArea above the header).
@@ -54,72 +61,117 @@ class AppHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final showBack = back ?? (onBack != null || (ModalRoute.of(context)?.canPop ?? false));
     final menu = onMenu ?? (HomeNav.openMenu == null ? null : () => HomeNav.openMenu!(context));
-    final top = Text((kicker ?? HomeNav.storeName ?? 'OneLocal').toUpperCase(),
-        maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 700, color: kMuted).copyWith(letterSpacing: 0.8));
+    final top = Text((kicker ?? HomeNav.storeName ?? 'OneLocal Partner').toUpperCase(),
+        maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 700, color: kMuted).copyWith(letterSpacing: 1));
     final name = Row(children: [
-      Flexible(child: Text(title, key: titleKey, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(18, 700))),
-      if (onTitle != null) const Icon(LucideIcons.chevronDown, size: 18, color: kInk),
+      // a long store name wraps onto a second line rather than being cut off
+      Flexible(child: Text(title, key: titleKey, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(19, 800, height: 1.15))),
+      if (onTitle != null) ...[const SizedBox(width: 2), const Icon(LucideIcons.chevronDown, size: 18, color: kInk)],
     ]);
+    final account = profile ? HomeNav.account : null;
     return Container(
-      padding: EdgeInsets.fromLTRB(12, (safeTop ? MediaQuery.paddingOf(context).top : 0) + 10, 12, 10),
-      decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: kLine))),
-      child: Row(children: [
-        if (showBack) ...[
-          _Square(
-            icon: LucideIcons.arrowLeft,
-            label: 'Back',
-            circle: true,
-            onTap: onBack ?? () => Navigator.of(context).maybePop(),
-          ),
-          const SizedBox(width: 10),
-        ] else
-          const SizedBox(width: 4),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            top,
-            const SizedBox(height: 2),
-            if (onTitle == null) name else InkWell(onTap: onTitle, child: name),
-            if (subtitle != null) Padding(padding: const EdgeInsets.only(top: 2), child: subtitle),
-          ]),
+      color: kBg,
+      padding: EdgeInsets.fromLTRB(12, (safeTop ? MediaQuery.paddingOf(context).top : 0) + 8, 12, 6),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _ring),
+          gradient: const LinearGradient(colors: [_tintLeft, _tintRight], begin: Alignment.centerLeft, end: Alignment.centerRight),
         ),
-        if (trailing != null) ...[const SizedBox(width: 6), trailing!],
-        if (bell)
-          Semantics(
-            button: true,
-            label: 'Notifications',
-            excludeSemantics: true,
-            child: IconButton(
-              key: bellKey,
-              onPressed: onBell ?? () => HomeNav.go(context, HomeNav.notifications, 'Notifications'),
-              icon: const Icon(LucideIcons.bell, size: 22, color: kInk),
-            ),
+        child: Stack(children: [
+          // the lighter sweep on the right of the card
+          Positioned(right: -70, top: -60, bottom: -60, width: 260, child: DecoratedBox(decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.55), shape: BoxShape.circle))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              if (showBack)
+                _Round(icon: LucideIcons.arrowLeft, label: 'Back', onTap: onBack ?? () => Navigator.of(context).maybePop())
+              else if (menu != null)
+                _Round(key: menuKey, icon: LucideIcons.menu, label: 'Menu', onTap: menu)
+              else
+                const SizedBox(width: 4),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                  top,
+                  const SizedBox(height: 2),
+                  if (onTitle == null) name else InkWell(onTap: onTitle, child: name),
+                  if (subtitle != null) Padding(padding: const EdgeInsets.only(top: 4), child: subtitle),
+                ]),
+              ),
+              if (trailing != null) ...[const SizedBox(width: 6), trailing!],
+              if (bell) ...[
+                const SizedBox(width: 6),
+                _Round(key: bellKey, icon: LucideIcons.bell, label: 'Notifications', onTap: onBell ?? () => HomeNav.go(context, HomeNav.notifications, 'Notifications')),
+              ],
+              if (account != null) ...[
+                const SizedBox(width: 8),
+                _Profile(onTap: () => account(context)),
+              ],
+            ]),
           ),
-        if (menu != null) ...[const SizedBox(width: 2), _Square(key: menuKey, icon: LucideIcons.menu, label: 'Menu', onTap: menu)],
-      ]),
+        ]),
+      ),
     );
   }
 }
 
-class _Square extends StatelessWidget {
-  const _Square({super.key, required this.icon, required this.label, required this.onTap, this.circle = false});
+/// A round white button on the banner (☰, back, bell).
+class _Round extends StatelessWidget {
+  const _Round({super.key, required this.icon, required this.label, required this.onTap});
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final bool circle;
   @override
   Widget build(BuildContext context) => Semantics(
         button: true,
         label: label,
         excludeSemantics: true,
-        child: InkWell(
-          customBorder: circle ? const CircleBorder() : RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          onTap: onTap,
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: _square, shape: circle ? BoxShape.circle : BoxShape.rectangle, borderRadius: circle ? null : BorderRadius.circular(12)),
-            child: Icon(icon, size: 20, color: kInk),
+        child: Material(
+          color: Colors.white,
+          shape: const CircleBorder(side: BorderSide(color: _ring)),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(width: 42, height: 42, child: Icon(icon, size: 20, color: kInk)),
           ),
         ),
       );
+}
+
+/// The person's initials in a green circle; opens Manage account.
+class _Profile extends StatelessWidget {
+  const _Profile({required this.onTap});
+  final VoidCallback onTap;
+
+  static String _initials(String? name) {
+    final parts = (name ?? '').trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty && RegExp(r'[A-Za-z]').hasMatch(p[0])).toList();
+    if (parts.isEmpty) return '';
+    return (parts.length == 1 ? parts.first[0] : parts.first[0] + parts.last[0]).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = _initials(HomeNav.personName);
+    return Semantics(
+      button: true,
+      label: 'Your profile',
+      excludeSemantics: true,
+      child: Material(
+        color: const Color(0xFF1B5E3A),
+        shape: const CircleBorder(),
+        child: InkWell(
+          key: const ValueKey('app-header-profile'),
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Center(child: text.isEmpty ? const Icon(LucideIcons.user, size: 20, color: Colors.white) : Text(text, style: inter(14, 800, color: Colors.white))),
+          ),
+        ),
+      ),
+    );
+  }
 }

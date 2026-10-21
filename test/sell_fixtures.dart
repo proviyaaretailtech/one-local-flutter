@@ -67,12 +67,18 @@ class Till {
   List<Map<String, dynamic>> receipts = [receipt('r1', 'P-00087', 'Rahul Patil', 630), receipt('r2', 'P-00086', 'Priya Shah', 920, label: 'Paid · Card')];
   List<Map<String, dynamic>> returns = [retRow('t1', 'RET-0001', 'requested')];
 
+  /// Figma "444 Discount": the catalogue list (MRP, stock count) and the stock list (status, daily sales) the till reads beside its
+  /// catalogue. Null answers 404, as for a person who may not see them: the till then shows the price alone.
+  List<Map<String, dynamic>>? catalogueFacts, stockFacts;
+
   late final client = MockClient((r) async {
     calls.add(r);
     final o = override?.call(r);
     if (o != null) return o;
     final p = r.url.path, m = r.method;
     Map<String, dynamic> body() => r.body.isEmpty ? {} : jsonDecode(r.body) as Map<String, dynamic>;
+    if (p.endsWith('/rpc/cat_item_list')) return catalogueFacts == null ? err(404, 'not found') : ok({'items': catalogueFacts, 'page': 1});
+    if (p.endsWith('/rpc/inv_stock_list')) return stockFacts == null ? err(403, 'Your role cannot see stock.', 'forbidden') : ok({'items': stockFacts, 'page': 1});
     if (p.endsWith('/rpc/pos_sell_catalog')) {
       final b = body();
       final q = '${b['q'] ?? ''}'.toLowerCase(), cat = '${b['category'] ?? ''}';

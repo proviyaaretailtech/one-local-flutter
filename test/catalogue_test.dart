@@ -593,6 +593,19 @@ void main() {
       expect(n, greaterThan(1)); // reloaded
     });
 
+    testWidgets('an invoiced line that never arrived adds no empty row to the posting preview', (t) async {
+      final view = grnView();
+      view['preview'] = [
+        ...(view['preview'] as List),
+        {'name': null, 'unit': null, 'item_id': null, 'stock_now': null, 'accepted_qty': 0, 'rejected_qty': null},
+      ];
+      final s = Fake((_) => ok(view));
+      await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
+      expect(find.text('Posting preview'), findsOneWidget);
+      expect(find.text('null'), findsNothing);
+      expect(find.text('+0 '), findsNothing);
+    });
+
     testWidgets('no invoice yet: no invented numbers, and no resolution form', (t) async {
       final s = Fake((_) => ok(grnView(hasInvoice: false, rows: [], blockers: const ['Enter the supplier invoice first.'])..['totals'] = {'invoice_amount_minor': 0, 'accepted_value_minor': 0, 'claim_minor': 0, 'exceptions': 0}));
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4000);
@@ -618,12 +631,32 @@ void main() {
             })
           : ok(grnView()));
       await phone(t, GrnQueueScreen(api: s.api));
-      expect(find.text('GRN-105 · RCV-105'), findsOneWidget);
+      expect(find.text('Goods receipts'), findsOneWidget);
+      expect(find.text('GRN-105'), findsOneWidget);
+      expect(find.text('RCV-105 / INV-5512'), findsOneWidget);
+      expect(find.text('Coca-Cola Bottling'), findsOneWidget);
       expect(find.text('1 to review'), findsOneWidget);
+      expect(find.text('RCV-106'), findsOneWidget);
       expect(find.text('Not opened'), findsOneWidget);
-      await t.tap(find.text('GRN-105 · RCV-105'));
+      expect(find.text('Needs review'), findsOneWidget);
+      expect(find.text('No receipts waiting for GRN'), findsNothing);
+      await t.tap(find.text('GRN-105'));
       await t.pumpAndSettle();
       expect(find.text('GRN Dashboard'), findsOneWidget);
+    });
+
+    testWidgets('no receipts: explains the flow and Receive stock opens Receiving', (t) async {
+      final s = Fake((r) => ok({'items': []}));
+      var received = 0;
+      await phone(t, GrnQueueScreen(api: s.api, onReceive: (_) => received++));
+      expect(find.text('No receipts waiting for GRN'), findsOneWidget);
+      expect(find.text('Count the delivery in Receiving'), findsOneWidget);
+      await t.tap(find.text('Receive stock'));
+      await t.pump();
+      expect(received, 1);
+      await t.tap(find.text('Receiving'));
+      await t.pump();
+      expect(received, 2);
     });
   });
 }

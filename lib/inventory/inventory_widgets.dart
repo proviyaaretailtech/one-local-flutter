@@ -429,9 +429,11 @@ class InvPrimary extends StatelessWidget {
 
 /// White outlined button ("View Lots", "Save Draft").
 class InvSecondary extends StatelessWidget {
-  const InvSecondary(this.label, {super.key, required this.onPressed});
+  const InvSecondary(this.label, {super.key, required this.onPressed, this.color = kInk, this.textSize = 15});
   final String label;
   final VoidCallback? onPressed;
+  final Color color;
+  final double textSize;
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -444,7 +446,7 @@ class InvSecondary extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: onPressed,
-              child: Container(height: 46, alignment: Alignment.center, child: Text(label, textAlign: TextAlign.center, style: inter(15, 600, color: onPressed == null ? kMuted : kInk))),
+              child: Container(height: 46, alignment: Alignment.center, child: Text(label, textAlign: TextAlign.center, maxLines: 1, style: inter(textSize, 600, color: onPressed == null ? kMuted : color))),
             ),
           ),
         ),

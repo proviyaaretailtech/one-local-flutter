@@ -2,11 +2,18 @@ import 'package:http/http.dart' as http;
 
 import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
+import '../home/home_nav.dart';
 
 Map<String, dynamic> _map(Object? v) => (v as Map?)?.cast<String, dynamic>() ?? const {};
 
 /// One outlet as the server describes it (`outlet_list`, migration 0522). Every word on the card (status, delivery label, why a
 /// toggle is off) comes from the server; the app only draws it.
+/// What a place is called, by the kind of business the app is running as (the shell's kind): a store's screens never say restaurant or
+/// kitchen. [kind] is for tests and for screens shown outside the shell.
+bool outletIsRestaurant([String? kind]) => (kind ?? HomeNav.shell?.kind) == 'restaurant';
+String outletNoun([String? kind]) => outletIsRestaurant(kind) ? 'restaurant' : 'store';
+String outletNounTitle([String? kind]) => outletIsRestaurant(kind) ? 'Restaurant' : 'Store';
+
 class Outlet {
   const Outlet(this.raw);
   final Map<String, dynamic> raw;

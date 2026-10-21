@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../ui/theme.dart';
 import 'email_login_screen.dart';
 import 'mobile_login_screen.dart';
+import 'password_login_screen.dart';
 
-/// Figma "OTP Request": where should we send your code.
+/// Figma "OTP Request": where should we send your code. A password sign-in sits underneath as the quieter second way in.
 class SigninChooserScreen extends StatefulWidget {
   const SigninChooserScreen({super.key});
   @override
@@ -14,6 +16,8 @@ class SigninChooserScreen extends StatefulWidget {
 class _SigninChooserScreenState extends State<SigninChooserScreen> {
   bool _sms = true;
 
+  void _open(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+
   @override
   Widget build(BuildContext context) {
     return ScreenShell(
@@ -22,8 +26,8 @@ class _SigninChooserScreenState extends State<SigninChooserScreen> {
         FormContent(children: [
           const Kicker('Sign in · Delivery'),
           const PageIntro(
-            title: 'Where should we send your code?',
-            subtitle: 'Choose a registered contact to receive your 6-digit sign-in code.',
+            title: 'How would you like to sign in?',
+            subtitle: 'We’ll send a 6-digit code to a registered contact.',
           ),
           Column(
             children: [
@@ -34,7 +38,7 @@ class _SigninChooserScreenState extends State<SigninChooserScreen> {
                 selected: _sms,
                 onTap: () => setState(() => _sms = true),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               OptionCard(
                 iconAsset: 'assets/figma/mail_green.svg',
                 title: 'Email',
@@ -42,7 +46,7 @@ class _SigninChooserScreenState extends State<SigninChooserScreen> {
                 selected: !_sms,
                 onTap: () => setState(() => _sms = false),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               const HelpfulNote(
                 iconAsset: 'assets/figma/message_circle.svg',
                 title: 'Choose a contact you can access',
@@ -53,15 +57,37 @@ class _SigninChooserScreenState extends State<SigninChooserScreen> {
         ]),
       ],
       actions: [
-        PrimaryAction(
-          label: 'Send code',
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _sms ? const MobileLoginScreen() : const EmailLoginScreen())),
-        ),
-        const SizedBox(height: 16),
-        LinkText('Change account', onTap: () => Navigator.pop(context)),
-        const SizedBox(height: 16),
+        PrimaryAction(label: 'Send code', onPressed: () => _open(_sms ? const MobileLoginScreen() : const EmailLoginScreen())),
+        const SizedBox(height: 12),
+        // Both secondary ways out share one line, so the screen stays as short as the code-only design.
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _SmallLink(icon: 'assets/figma/lock_green.svg', label: 'Use password', onTap: () => _open(const PasswordLoginScreen())),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text('·', style: inter(14, 600, color: kMuted))),
+          _SmallLink(label: 'Change account', onTap: () => Navigator.pop(context)),
+        ]),
+        const SizedBox(height: 12),
         const FooterNote('Never share your verification code with anyone.'),
       ],
     );
   }
+}
+
+/// A green text link, optionally with a small icon, sized for the action area.
+class _SmallLink extends StatelessWidget {
+  const _SmallLink({required this.label, required this.onTap, this.icon});
+  final String label;
+  final String? icon;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (icon != null) ...[SvgPicture.asset(icon!, width: 14, height: 14), const SizedBox(width: 6)],
+            Text(label, style: inter(14, 600, color: kLink, height: 1.5)),
+          ]),
+        ),
+      );
 }

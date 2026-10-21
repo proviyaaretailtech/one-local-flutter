@@ -166,7 +166,7 @@ class _OutletHeaderState extends State<OutletHeader> {
                 onTap: () => Navigator.pop(ctx, x.id),
               ),
             const Divider(height: 20, color: kLine),
-            _PickRow(key: const ValueKey('outlet-pick-manage'), title: 'Manage outlets', subtitle: 'Status, rush mode, add a restaurant/store', onTap: () => Navigator.pop(ctx, '#manage')),
+            _PickRow(key: const ValueKey('outlet-pick-manage'), title: 'Manage outlets', subtitle: 'Status, rush mode, add a ${outletNoun()}', onTap: () => Navigator.pop(ctx, '#manage')),
           ]),
         ),
       ),
@@ -186,14 +186,24 @@ class _OutletHeaderState extends State<OutletHeader> {
     final cur = o?.current;
     // Until the outlet is known (or when the server cannot say), the store's name from the dashboard, else the screen's title.
     final label = o == null || cur == null ? (HomeNav.storeName ?? widget.title) : all ? 'All outlets (${o.verified.length})' : cur.name;
+    // The banner (founder, 22 Oct 2026): ONELOCAL PARTNER over the store's name; under it the outlet ("Main ▾", the switcher) and its
+    // status in a pill. The outlet's own name repeats the store's ("Sharma General Store - Main"), so only the part after it shows.
+    final store = HomeNav.storeName ?? (cur == null ? widget.title : cur.name);
+    // An outlet named exactly like the store says where it is instead (its locality, else its code: "MAIN" -> "Main").
+    String short(Outlet x) {
+      final n = x.name.startsWith('$store - ') ? x.name.substring(store.length + 3) : x.name;
+      if (n != store) return n;
+      if (x.locality.isNotEmpty) return x.locality;
+      return x.code.isEmpty ? 'Main outlet' : x.code[0].toUpperCase() + x.code.substring(1).toLowerCase();
+    }
+
+    final outlet = o == null || cur == null ? null : all ? 'All outlets (${o.verified.length})' : short(cur);
     return Semantics(
       label: o == null ? null : 'Showing data for $label',
       child: AppHeader(
-        kicker: 'Showing data for',
-        title: label,
-        titleKey: const ValueKey('outlet-header-name'),
+        kicker: 'OneLocal Partner',
+        title: store,
         bellKey: const ValueKey('outlet-header-bell'),
-        onTitle: o == null || cur == null ? null : () => _pick(o),
         back: widget.dashboard ? false : null,
         safeTop: widget.safeTop,
         onMenu: widget.onMenu,
@@ -201,19 +211,37 @@ class _OutletHeaderState extends State<OutletHeader> {
         onBell: widget.onBell,
         subtitle: o == null || cur == null
             ? null
-            : InkWell(
-                key: const ValueKey('outlet-header-chip'),
-                onTap: () => OutletHeader.openStatus(context),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Container(width: 8, height: 8, decoration: BoxDecoration(color: outletStatusColor(all ? (o.chip == 'All online' ? 'online' : 'paused') : cur.status), shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(all ? o.chip : cur.statusLabel,
-                        key: const ValueKey('outlet-header-status'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12.5, 600, color: kMuted)),
+            : Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                InkWell(
+                  onTap: () => _pick(o),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Flexible(child: Text(outlet!, key: const ValueKey('outlet-header-name'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(15, 500, color: kMuted))),
+                    const SizedBox(width: 2),
+                    const Icon(LucideIcons.chevronDown, size: 16, color: kMuted),
+                  ]),
+                ),
+                const SizedBox(height: 6),
+                Material(
+                  color: const Color(0xFFEDEFEA),
+                  shape: const StadiumBorder(),
+                  child: InkWell(
+                    key: const ValueKey('outlet-header-chip'),
+                    customBorder: const StadiumBorder(),
+                    onTap: () => OutletHeader.openStatus(context),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Container(width: 8, height: 8, decoration: BoxDecoration(color: outletStatusColor(all ? (o.chip == 'All online' ? 'online' : 'paused') : cur.status), shape: BoxShape.circle)),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(all ? o.chip : cur.statusLabel,
+                              key: const ValueKey('outlet-header-status'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12.5, 600, color: kInk)),
+                        ),
+                      ]),
+                    ),
                   ),
-                  const Icon(LucideIcons.chevronRight, size: 12, color: kMuted),
-                ]),
-              ),
+                ),
+              ]),
       ),
     );
   }

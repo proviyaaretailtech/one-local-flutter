@@ -102,7 +102,14 @@ class _PasswordLoginScreenState extends State<PasswordLoginScreen> {
       actions: [
         PrimaryAction(label: _busy ? 'Signing in…' : 'Sign in', onPressed: _busy ? null : _signIn),
         const SizedBox(height: 16),
-        LinkText('Use a sign-in code instead', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SigninChooserScreen()))),
+        LinkText('Use a sign-in code instead', onTap: () {
+          // Opened from the chooser: go back to it rather than stacking a second one.
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const SigninChooserScreen()));
+          }
+        }),
         const SizedBox(height: 16),
         InkWell(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterPersonalScreen())),

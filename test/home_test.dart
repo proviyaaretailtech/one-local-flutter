@@ -209,7 +209,7 @@ void main() {
     testWidgets('status card shows the server figures', (t) async {
       await showHome(t);
       expect(find.text('OneLocal'), findsNothing, reason: 'the stray wordmark under the header is gone');
-      expect(find.text('SHOWING DATA FOR'), findsOneWidget, reason: 'the outlet switcher header (founder, 20 Oct)');
+      expect(find.text('ONELOCAL PARTNER'), findsOneWidget, reason: 'the banner (founder, 22 Oct)');
       expect(find.text('Store open'), findsOneWidget);
       expect(find.text('Today · 5 Oct'), findsOneWidget);   // the day once, not on every label
       expect(find.text('Synced 2 min ago'), findsOneWidget);
@@ -394,7 +394,7 @@ void main() {
 
     testWidgets('today, quick links and analytics from the server', (t) async {
       await showHub(t);
-      expect(find.text('SHOWING DATA FOR'), findsOneWidget);
+      expect(find.text('Reports'), findsOneWidget); // the shared banner
       expect(find.text('All outlets (5)'), findsOneWidget);
       expect(find.text('Today so far'), findsOneWidget);
       expect(find.text('₹48,920'), findsOneWidget);

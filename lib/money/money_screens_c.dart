@@ -54,7 +54,7 @@ class SettlementsScreen extends StatelessWidget {
               MoneyChip(month.isEmpty ? 'All time' : _monthLabel(month), active: month.isNotEmpty, onTap: () => chooseFor(c.context, 'Month', _months(), month, (v) => c.set({'month': v.isEmpty ? null : v}))),
               MoneyChip(statuses.firstWhere((s) => s.$1 == status).$2, active: status != 'all', onTap: () => chooseFor(c.context, 'Status', statuses, status, (v) => c.set({'status': v}))),
             ]),
-            MoneyHeading('Settlement history', pill: '${d.n('total')} cycles'),
+            MoneyHeading('Settlement history', pill: '${d.n('total')} ${d.n('total') == 1 ? 'cycle' : 'cycles'}'),
             if (rows.isEmpty) const MoneyEmpty('No settlements match these filters.'),
             for (final r in rows)
               MoneyRow(
@@ -238,7 +238,7 @@ class ReportsScreen extends StatelessWidget {
               MoneyRow(
                 title: r.s('title'),
                 amount: '↓ ${r.s('format').toUpperCase()}',
-                sub: '${r.n('records')} records',
+                sub: '${r.n('records')} ${r.n('records') == 1 ? 'record' : 'records'}',
                 status: r.b('ready') ? 'ready' : 'failed',
                 onTap: r.b('ready') ? () => exportCsv(c.context, c.api, r.s('key'), {'period': period}) : () => showToast(c.context, 'Your role cannot export this report.'),
               ),

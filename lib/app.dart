@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/email_verify_pending_screen.dart';
-import 'screens/intro_splash_screen.dart';
 import 'screens/login_success_screen.dart';
 import 'screens/splash_screen.dart';
 import 'ui/theme.dart';
@@ -51,9 +50,10 @@ class _AuthGateState extends State<AuthGate> {
         final user = auth.currentSession?.user;
         final Widget page;
         if (user == null) {
-          page = _introDone
-              ? const SplashScreen(key: ValueKey('splash'))
-              : IntroSplashScreen(key: const ValueKey('intro'), onDone: () => setState(() => _introDone = true));
+          // One screen for both splash frames: the first build plays the intro (logo, then the buttons glide in); coming back to it
+          // later (after signing out) opens straight on the buttons.
+          page = SplashScreen(key: const ValueKey('splash'), intro: !_introDone);
+          _introDone = true;
         } else if (user.email != null && user.email!.isNotEmpty && user.emailConfirmedAt == null && (user.phone ?? '').isEmpty) {
           page = EmailVerifyPendingScreen(key: const ValueKey('pending'), email: user.email!);
         } else {

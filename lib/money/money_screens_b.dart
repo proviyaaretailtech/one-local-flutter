@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_widgets.dart' show kCardLine, kPostedText, kRedText;
 import '../ui/theme.dart';
@@ -44,7 +45,7 @@ class CashbookScreen extends StatelessWidget {
 
           return [
             MoneyChips([
-              MoneyChip(dayMonth(day, year: true), active: true, onTap: () async {
+              MoneyChip(dayMonth(day, year: true), menu: true, icon: LucideIcons.calendar, onTap: () async {
                 final v = await _pickDay(c.context, day);
                 if (v != null) c.set({'day': v});
               }),
@@ -70,7 +71,10 @@ class CashbookScreen extends StatelessWidget {
                 Expanded(child: InvSecondary('Cash Out', onPressed: () => record('out'))),
               ]),
             if (!d.b('started')) const MoneyEmpty('The cashbook starts with its first entry. Add your opening cash with Cash In.'),
-            MoneyHeading('Cash entries', pill: '${entries.length + (bd.n('sales_cash_minor') > 0 ? 1 : 0) + (bd.n('cash_refunds_minor') > 0 ? 1 : 0)} entries'),
+            MoneyHeading('Cash entries', pill: () {
+              final n = entries.length + (bd.n('sales_cash_minor') > 0 ? 1 : 0) + (bd.n('cash_refunds_minor') > 0 ? 1 : 0);
+              return '$n ${n == 1 ? 'entry' : 'entries'}';
+            }()),
             if (bd.n('sales_cash_minor') > 0)
               MoneyRow(title: 'Counter sales received', amount: money(bd.no('sales_cash_minor'), sign: true), amountColor: kPostedText, sub: 'Sales • Cash In • from payments'),
             if (bd.n('cash_refunds_minor') > 0)
@@ -83,13 +87,11 @@ class CashbookScreen extends StatelessWidget {
                 amountColor: e.s('status') == 'voided' ? kMuted : (e.s('direction') == 'out' ? kRedText : kPostedText),
                 sub: '#${e.s('no')} • ${e.s('category')} • Cash ${e.s('direction') == 'in' ? 'In' : 'Out'}${e.so('expense_no') == null ? '' : ' • #${e.s('expense_no')}'}',
                 status: e.s('status') == 'voided' ? 'voided' : null,
-                extra: (d.b('can_void') && env.may('approve') && e.s('status') == 'posted' && e.s('source') == 'manual')
-                    ? Align(alignment: Alignment.centerRight, child: TextButton(
-                        onPressed: () async {
-                          final done = await askReason(c.context, title: 'Void ${e.s('no')}', action: 'Void entry', run: (n, k) => env.api.voidCash(e.s('id'), n, k));
-                          if (done) await c.reload();
-                        },
-                        child: Text('Void', style: inter(13, 600, color: kRedText))))
+                trailing: (d.b('can_void') && env.may('approve') && e.s('status') == 'posted' && e.s('source') == 'manual')
+                    ? MoneyAction('Void', color: kRedText, onTap: () async {
+                        final done = await askReason(c.context, title: 'Void ${e.s('no')}', action: 'Void entry', run: (n, k) => env.api.voidCash(e.s('id'), n, k));
+                        if (done) await c.reload();
+                      })
                     : null,
               ),
             const MoneyFootnote(['Sales cash and cash refunds come from payments and refunds. Cash expenses appear here as well, once.']),
@@ -124,11 +126,11 @@ class ExpensesScreen extends StatelessWidget {
           final cat = c.q['category'] as String?;
           return [
             MoneyChips([
-              MoneyChip(dayMonth(day, year: true), active: true, onTap: () async {
+              MoneyChip(dayMonth(day, year: true), menu: true, icon: LucideIcons.calendar, onTap: () async {
                 final v = await _pickDay(c.context, day);
                 if (v != null) c.set({'day': v});
               }),
-              MoneyChip(cat ?? 'All categories', active: cat != null, onTap: () => chooseFor(c.context, 'Category', [('', 'All categories'), for (final k in d.ls('categories')) (k, k)], cat ?? '', (v) => c.set({'category': v.isEmpty ? null : v}))),
+              MoneyChip(cat ?? 'All categories', active: cat != null, menu: true, onTap: () => chooseFor(c.context, 'Category', [('', 'All categories'), for (final k in d.ls('categories')) (k, k)], cat ?? '', (v) => c.set({'category': v.isEmpty ? null : v}))),
             ]),
             InvCard(
               child: Row(children: [
@@ -137,7 +139,7 @@ class ExpensesScreen extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(money(d.no('total_minor'), whole: true), style: inter(26, 700, color: kRedText)),
                 ])),
-                Text('${d.n('count')} expenses', style: inter(12.5, 400, color: kMuted)),
+                Text('${d.n('count')} ${d.n('count') == 1 ? 'expense' : 'expenses'}', style: inter(12.5, 400, color: kMuted)),
               ]),
             ),
             if (env.may('record') && d.b('can_record'))
@@ -162,14 +164,13 @@ class ExpensesScreen extends StatelessWidget {
                 amountColor: e.s('status') == 'voided' ? kMuted : kRedText,
                 sub: '#${e.s('no')} • ${e.s('category')} • ${methodLabel(e.so('method'))}',
                 status: e.s('status') == 'voided' ? 'voided' : null,
-                extra: (d.b('can_void') && env.may('approve') && e.s('status') == 'posted')
-                    ? Align(alignment: Alignment.centerRight, child: TextButton(
-                        onPressed: () async {
-                          final done = await askReason(c.context, title: 'Void ${e.s('no')}', action: 'Void expense', run: (n, k) => env.api.voidExpense(e.s('id'), n, k));
-                          if (done) await c.reload();
-                        },
-                        child: Text('Void', style: inter(13, 600, color: kRedText))))
-                    : (e.s('status') == 'voided' && e.so('void_reason') != null ? Text('Voided: ${e.s('void_reason')}', style: inter(12.5, 400, color: kMuted)) : null),
+                trailing: (d.b('can_void') && env.may('approve') && e.s('status') == 'posted')
+                    ? MoneyAction('Void', color: kRedText, onTap: () async {
+                        final done = await askReason(c.context, title: 'Void ${e.s('no')}', action: 'Void expense', run: (n, k) => env.api.voidExpense(e.s('id'), n, k));
+                        if (done) await c.reload();
+                      })
+                    : null,
+                extra: e.s('status') == 'voided' && e.so('void_reason') != null ? Text('Voided: ${e.s('void_reason')}', style: inter(12.5, 400, color: kMuted)) : null,
               ),
           ];
         },
@@ -209,7 +210,7 @@ class RefundsScreen extends StatelessWidget {
               MoneyChip(rangeLabel(w.so('from'), w.so('to')), onTap: () => chooseFor(c.context, 'Period', periods, period, (v) => c.set({'period': v}))),
               MoneyChip(kinds.firstWhere((k) => k.$1 == kind).$2, active: kind != 'all', onTap: () => chooseFor(c.context, 'Show', kinds, kind, (v) => c.set({'kind': v}))),
             ]),
-            MoneyHeading('Refund & adjustment list', pill: '${d.n('total')} records'),
+            MoneyHeading('Refund & adjustment list', pill: '${d.n('total')} ${d.n('total') == 1 ? 'record' : 'records'}'),
             if (rows.isEmpty) const MoneyEmpty('No refunds or adjustments in this period.'),
             for (final r in rows)
               MoneyRow(

@@ -108,7 +108,7 @@ void main() {
       final env = till.env();
       await tall(t, SellScreen(env: env));
       expect(find.text('Coca-Cola 500ml'), findsOneWidget);
-      expect(find.text('Out of stock'), findsOneWidget);
+      expect(find.text('Out of Stock'), findsOneWidget);
       expect(find.text('PAY'), findsOneWidget);
       await t.tap(find.text('ADD').first);
       await t.pumpAndSettle();
@@ -119,6 +119,75 @@ void main() {
       expect(find.text('PAY ₹84'), findsOneWidget); // 2 x ₹40 + 5% GST, as the server quoted it
       final q = jsonDecode(till.where('POST', '/quote').last.body);
       expect(q['lines'], [{'menu_item_id': 'm1', 'qty': 2}]);
+    });
+
+    group('444 Discount', () {
+      Till stocked() => Till()
+        ..catalogueFacts = [
+          {'id': 'm1', 'inventory_item_id': 'i1', 'mrp_minor': 5000, 'stock_qty': 84, 'stock_known': true}, // ₹50 MRP, sold at ₹40
+          {'id': 'm2', 'inventory_item_id': 'i2', 'mrp_minor': 28000, 'stock_qty': 0, 'stock_known': true}, // MRP equals the price; none left
+          {'id': 'm3', 'inventory_item_id': 'i3', 'mrp_minor': null, 'stock_qty': 3, 'stock_known': true},
+        ]
+        ..stockFacts = [
+          {'id': 'i1', 'status': 'healthy', 'available': 84, 'stock_days': 6},
+          {'id': 'i2', 'status': 'out', 'available': 0, 'stock_days': null},
+          {'id': 'i3', 'status': 'low', 'available': 3, 'stock_days': 1.5},
+        ];
+
+      testWidgets('MRP is struck through when the price is lower; stock says Available or Out of Stock and an empty item cannot be added', (t) async {
+        final env = stocked().env();
+        await tall(t, SellScreen(env: env));
+        final mrp = t.widget<Text>(find.text('₹50'));
+        expect(mrp.style?.decoration, TextDecoration.lineThrough);
+        expect(find.text('₹280'), findsOneWidget); // no MRP above the price: nothing struck through
+        expect(find.text('Available'), findsOneWidget); // Coca-Cola
+        expect(find.text('Out of Stock'), findsNWidgets(2)); // butter (stock 0) and the item not on sale
+        await t.tap(find.text('ADD').at(1)); // butter
+        await t.pumpAndSettle();
+        expect(env.carts.active.isEmpty, isTrue);
+      });
+
+      testWidgets('tabs: In Stock, Fast Moving (most sold per day first) and Low Inventory', (t) async {
+        final env = stocked().env();
+        await tall(t, SellScreen(env: env));
+        for (final l in ['All Items', 'In Stock', 'Fast Moving', 'Low Inventory']) {
+          expect(find.text(l), findsOneWidget, reason: l);
+        }
+        await t.tap(find.text('In Stock'));
+        await t.pumpAndSettle();
+        expect(find.text('Coca-Cola 500ml'), findsOneWidget);
+        expect(find.text('Amul Butter 500g'), findsNothing);
+        await t.tap(find.text('Fast Moving'));
+        await t.pumpAndSettle();
+        // Coca-Cola sells 14/day, the chocolate 2/day; butter has no recent sales
+        expect(t.getTopLeft(find.text('Coca-Cola 500ml')).dy, lessThanOrEqualTo(t.getTopLeft(find.text('Cadbury Dairy Milk')).dy));
+        expect(find.text('Amul Butter 500g'), findsNothing);
+        await t.ensureVisible(find.text('Low Inventory')); // the tab row scrolls sideways on a phone
+        await t.pumpAndSettle();
+        await t.tap(find.text('Low Inventory'));
+        await t.pumpAndSettle();
+        expect(find.text('Amul Butter 500g'), findsOneWidget);
+        expect(find.text('Cadbury Dairy Milk'), findsOneWidget);
+        expect(find.text('Coca-Cola 500ml'), findsNothing);
+      });
+
+      testWidgets('the cart shows what each line saves against MRP', (t) async {
+        final env = stocked().env();
+        await tall(t, SellScreen(env: env));
+        await t.tap(find.text('ADD').first); // Coca-Cola, ₹10 under MRP
+        await t.pumpAndSettle();
+        await t.tap(find.text('ADD').first);
+        await t.pumpAndSettle();
+        expect(find.text('Coca-Cola 500ml: ₹20 off MRP'), findsOneWidget);
+      });
+
+      testWidgets('a person who may not see the catalogue or stock gets the plain till: no tabs, no MRP', (t) async {
+        final env = Till().env();
+        await tall(t, SellScreen(env: env));
+        expect(find.text('In Stock'), findsNothing);
+        expect(find.text('Fast Moving'), findsNothing);
+        expect(find.textContaining('off MRP'), findsNothing);
+      });
     });
 
     testWidgets('a category narrows the grid', (t) async {

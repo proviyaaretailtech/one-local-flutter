@@ -22,12 +22,19 @@ Future<void> _font(String family, String asset) async {
   await loader.load();
 }
 
-CatalogueApi _api() => CatalogueApi(
+/// What the GRN home lists: three receipts at different stages.
+const _grnList = [
+  {'receipt_document_id': 'r1', 'doc_no': 'RCV-105', 'doc_status': 'review', 'grn_no': 'GRN-105', 'review_status': 'matching', 'supplier_name': 'Coca-Cola Bottling', 'invoice_no': 'INV-5512', 'po_ref': 'PO-105', 'has_invoice': true, 'exceptions': 1},
+  {'receipt_document_id': 'r2', 'doc_no': 'RCV-106', 'doc_status': 'review', 'grn_no': null, 'review_status': null, 'supplier_name': 'Metro Cash & Carry', 'invoice_no': null, 'has_invoice': false, 'exceptions': null},
+  {'receipt_document_id': 'r3', 'doc_no': 'RCV-101', 'doc_status': 'posted', 'grn_no': 'GRN-101', 'review_status': 'approved', 'supplier_name': 'Amul Dairy', 'invoice_no': 'INV-4410', 'has_invoice': true, 'exceptions': 0},
+];
+
+CatalogueApi _api({List<Map<String, Object?>> grnList = _grnList}) => CatalogueApi(
       baseUrl: 'http://frames.local',
       accessToken: () => 'frames',
       client: MockClient((r) async {
         final p = r.url.path;
-        final Object body = p.endsWith('/grn_matching_view') ? matchingView() : p.contains('/grn_') ? grnView() : p.endsWith('/cat_item_view') ? sixItems.first : catalogueList(sixItems);
+        final Object body = p.endsWith('/grn_list') ? {'items': grnList} : p.endsWith('/grn_matching_view') ? matchingView() : p.contains('/grn_') ? grnView() : p.endsWith('/cat_item_view') ? sixItems.first : catalogueList(sixItems);
         return http.Response(jsonEncode(body), 200, headers: {'content-type': 'application/json; charset=utf-8'});
       }),
     );
@@ -88,5 +95,7 @@ void main() {
     await frame(t, 'item_creation', ItemFormScreen(api: _api()), height: 2700);
     await frame(t, 'grn_dashboard', GrnDashboardScreen(receiptId: 'r1', api: _api()), height: 1900);
     await frame(t, 'grn_matching', GrnMatchingScreen(receiptId: 'r1', api: _api()), height: 1100);
+    await frame(t, 'grn_home', GrnQueueScreen(api: _api()), height: 1300);
+    await frame(t, 'grn_home_empty', GrnQueueScreen(api: _api(grnList: const [])), height: 844);
   }, skip: !on);
 }

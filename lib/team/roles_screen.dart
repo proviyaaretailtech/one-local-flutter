@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_api.dart' show Facts;
 import '../orders/order_widgets.dart';
-import '../states/state_kit.dart' show InfoBox;
 import '../ui/theme.dart';
 import 'team_screens.dart' show TeamLoader;
 import 'team_widgets.dart';
@@ -30,9 +30,16 @@ class _RolesState extends State<RolesScreen>
   void initState() {
     super.initState();
     load().then((_) {
-      final roles = data?.l('roles') ?? const <Facts>[];
-      if (roles.isNotEmpty) _pick(roles.first.s('slug'));
+      // start on the first usual role for this business (Manager), not on Owner or a role that does not fit
+      final (:common, :more) = teamRolesFor(data?.l('roles') ?? const <Facts>[], kind: env.kind, onlyAssignable: false);
+      final first = [...common, ...more];
+      if (first.isNotEmpty) _pick(first.first.s('slug'));
     });
+  }
+
+  Future<void> _choose(List<Facts> roles) async {
+    final v = await pickTeamRole(context, title: 'Choose a role', roles: roles, current: _slug, kind: env.kind, onlyAssignable: false);
+    if (v != null && v != _slug) _pick(v);
   }
 
   Future<void> _pick(String slug) async {
@@ -62,12 +69,38 @@ class _RolesState extends State<RolesScreen>
         onRetry: load,
         builder: (o) {
           final roles = o.l('roles');
+          final name = roles.firstWhere((r) => r.s('slug') == _slug, orElse: () => const Facts({})).s('name');
           return [
-            TeamChips(
-              items: [for (final r in roles) (r.s('slug'), r.s('name'), null)],
-              active: _slug ?? '',
-              onTap: _pick,
+            // One full-width field instead of a sideways-scrolling row of small chips: easy to tap and to find every role.
+            Semantics(
+              button: true,
+              label: 'Role: ${name.isEmpty ? 'none' : name}. Change role',
+              child: ExcludeSemantics(
+                child: Material(
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: kTileLine)),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => _choose(roles),
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 56),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 14, 8),
+                      child: Row(children: [
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                            Text('Role', style: inter(12, 500, color: kMuted)),
+                            const SizedBox(height: 2),
+                            Text(name.isEmpty ? 'Choose a role' : name, style: inter(16, 600)),
+                          ]),
+                        ),
+                        const Icon(LucideIcons.chevronDown, size: 20, color: kInk),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
             ),
+            const SizedBox(height: 14),
             if (_roleError != null)
               OrderCardBox(
                 child: Text(
@@ -104,12 +137,14 @@ class _RolesState extends State<RolesScreen>
           children: [
             Text(r.s('name'), style: inter(18, 600)),
             const SizedBox(height: 4),
-            Text(
-              r.s('description').isEmpty
-                  ? '${r.n('permission_count')} permissions in total'
-                  : '${r.s('description')} · ${r.n('permission_count')} permissions',
-              style: inter(13.5, 400, color: kMuted),
-            ),
+            if (r.s('description').isNotEmpty) Text(r.s('description'), style: inter(13.5, 400, color: kMuted)),
+            // Count what the switches below show (5 areas), not the raw permission keys behind them: "7 permissions" next to
+            // two switches that are on read as a contradiction.
+            Builder(builder: (_) {
+              final caps = r.l('capabilities');
+              final on = caps.where((c) => c.b('enabled')).length;
+              return Text('$on of ${caps.length} areas switched on', style: inter(13.5, 500, color: kInk));
+            }),
             if (summary.has('members')) ...[
               const SizedBox(height: 4),
               Text(
@@ -162,7 +197,5 @@ class _RolesState extends State<RolesScreen>
           ),
         ),
       ),
-    const SizedBox(height: 4),
-    InfoBox(lines: [r.s('note')]),
   ];
 }

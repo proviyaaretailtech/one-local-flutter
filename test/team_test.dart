@@ -196,6 +196,39 @@ void main() {
     });
   });
 
+  group('Role picker', () {
+    Future<void> open(WidgetTester t, String? kind) async {
+      final s = Fake();
+      await show(t, Navigator(onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => InviteScreen(env: TeamEnv(api: s.api, kind: kind)))));
+      await t.tap(find.text('Choose').first);
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('a store is not offered restaurant roles; the usual roles come first, the rest under More roles', (t) async {
+      await open(t, 'store');
+      expect(find.text('COMMON ROLES'), findsOneWidget);
+      expect(find.text('MORE ROLES'), findsOneWidget);
+      expect(find.text('Kitchen'), findsNothing);
+      expect(find.text('Captain'), findsNothing);
+      expect(find.text('Cashier'), findsOneWidget);
+      // the usual roles are above the heading for the rest
+      expect(t.getTopLeft(find.text('Inventory')).dy, lessThan(t.getTopLeft(find.text('MORE ROLES')).dy));
+      expect(t.getTopLeft(find.text('Viewer')).dy, greaterThan(t.getTopLeft(find.text('MORE ROLES')).dy));
+    });
+
+    testWidgets('a restaurant is offered Kitchen and Captain', (t) async {
+      await open(t, 'restaurant');
+      expect(find.text('Kitchen'), findsOneWidget);
+      expect(find.text('Captain'), findsOneWidget);
+    });
+
+    testWidgets('a role without a description shows how many permissions it has instead of a blank line', (t) async {
+      await open(t, 'store');
+      final inventory = ((fx['options'] as Map)['roles'] as List).cast<Map>().firstWhere((r) => r['slug'] == 'inventory_manager');
+      expect(find.text('${inventory['permission_count']} permissions'), findsWidgets);
+    });
+  });
+
   group('Invite user (Figma 120)', () {
     testWidgets('the form has name, mobile with +91, email and role; the server decides the rest', (t) async {
       final s = Fake((r) => fnOf(r) == 'team_invite' ? ok(fx['invite']) : null);
@@ -252,7 +285,8 @@ void main() {
       await t.tap(find.text('Send invitation'));
       await t.pumpAndSettle();
       expect(find.text('Invitation couldn\'t be sent'), findsOneWidget);
-      expect(find.text('This number already has an invitation.'), findsNWidgets(2)); // the banner and under the mobile field
+      expect(find.text('This number already has an invitation. Resend it or use another number.'), findsOneWidget); // the banner says what to do next
+      expect(find.text('This number already has an invitation.'), findsOneWidget); // under the mobile field
       expect(find.text('Fix the details and try again'), findsOneWidget);
       expect(find.text('Resend invitation'), findsOneWidget);
       expect(find.text('Send invitation'), findsNothing);
@@ -356,7 +390,10 @@ void main() {
       expect(switches, hasLength(5));
       expect(switches.every((w) => w.onChanged == null), true);
       expect(find.text('Save changes'), findsNothing);
-      expect(find.textContaining('set by Proviyaa'), findsOneWidget);
+      expect(find.textContaining('set by Proviyaa'), findsNothing); // the support note is not shown
+      // the count matches the switches (4 of the 5 areas are on), not the raw permission total
+      expect(find.text('4 of 5 areas switched on'), findsOneWidget);
+      expect(find.textContaining(RegExp(r'\d+ permissions')), findsNothing);
     });
 
     testWidgets('switches follow what the server says the role has', (t) async {
@@ -371,9 +408,23 @@ void main() {
     testWidgets('choosing another role asks the server for that role', (t) async {
       final s = Fake();
       await show(t, RolesScreen(env: TeamEnv(api: s.api)));
-      await t.tap(find.text('Cashier').first);
+      await t.tap(find.text('Role')); // the full-width role field
+      await t.pumpAndSettle();
+      await t.tap(find.text('Cashier').last);
       await t.pumpAndSettle();
       expect(argsOf(s.calls('team_role_view').last)['slug'], 'biller');
+    });
+
+    testWidgets('a store starts on Manager and its role list has no Kitchen or Captain', (t) async {
+      final s = Fake();
+      await show(t, RolesScreen(env: TeamEnv(api: s.api, kind: 'store')));
+      expect(argsOf(s.calls('team_role_view').first)['slug'], 'manager');
+      await t.tap(find.text('Role')); // the full-width role field
+      await t.pumpAndSettle();
+      expect(find.text('Choose a role'), findsOneWidget);
+      expect(find.text('Kitchen'), findsNothing);
+      expect(find.text('Captain'), findsNothing);
+      expect(find.text('Owner'), findsOneWidget); // every role can be reviewed, under More roles
     });
   });
 

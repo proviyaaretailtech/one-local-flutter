@@ -64,6 +64,19 @@ void main() {
   }
 
   testWidgets('Sell', (t) => frame(t, 'Sell', SellScreen(env: till.env(carts: carts()))), skip: !on);
+  // Figma "444 Discount": MRP struck through, stock on each card, the stock tabs, and the cart's savings against MRP
+  final stocked = Till()
+    ..catalogueFacts = [
+      {'id': 'm1', 'inventory_item_id': 'i1', 'mrp_minor': 5000, 'stock_qty': 84, 'stock_known': true},
+      {'id': 'm2', 'inventory_item_id': 'i2', 'mrp_minor': 29000, 'stock_qty': 6, 'stock_known': true},
+      {'id': 'm3', 'inventory_item_id': 'i3', 'mrp_minor': 1000, 'stock_qty': 0, 'stock_known': true},
+    ]
+    ..stockFacts = [
+      {'id': 'i1', 'status': 'healthy', 'available': 84, 'stock_days': 6},
+      {'id': 'i2', 'status': 'low', 'available': 6, 'stock_days': 3},
+      {'id': 'i3', 'status': 'out', 'available': 0, 'stock_days': null},
+    ];
+  testWidgets('Discount', (t) => frame(t, 'Discount', SellScreen(env: stocked.env(carts: carts()))), skip: !on);
   testWidgets('Search', (t) => frame(t, 'Search', SearchScreen(env: till.env())), skip: !on);
   testWidgets('Search results', (t) => frame(t, 'Search results', SearchScreen(env: till.env(), initialQuery: 'a')), skip: !on);
   testWidgets('Search empty', (t) => frame(t, 'Search empty', SearchScreen(env: till.env(), initialQuery: 'oat milk')), skip: !on);

@@ -185,7 +185,7 @@ class _AddOutletScreenState extends State<AddOutletScreen> {
       final d = await widget.api.draftSave({..._fields(_step), 'step': to}, id: _draft?.id, key: _key);
       if (!mounted) return;
       if (leave) {
-        showToast(context, 'Saved. You can continue from “Restaurant status”.');
+        showToast(context, 'Saved. You can continue from “${outletNounTitle()} status”.');
         Navigator.of(context).pop();
         return;
       }
@@ -442,7 +442,7 @@ class _AddOutletScreenState extends State<AddOutletScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Add restaurant/store', style: inter(18, 700)),
+                  Text('Add ${outletNoun()}', style: inter(18, 700)),
                   if (s != null) Text('Step ${i + 1} of ${_steps.length} · ${_stepTitles[_step]}', key: const ValueKey('outlet-step'), style: inter(12.5, 500, color: kMuted)),
                 ]),
               ),

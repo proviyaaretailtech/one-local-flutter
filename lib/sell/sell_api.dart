@@ -28,6 +28,23 @@ class SellCatalog {
   final List<String> categories;
 }
 
+/// What the till's catalogue does not carry about an item (Figma "444 Discount"): the MRP to strike through and the stock behind it.
+/// From the catalogue list (MRP, stock count) and the stock list (low / out status, daily sales); any part may be missing.
+class SellFacts {
+  const SellFacts({this.mrp, this.stockQty, this.stockKnown = false, this.status, this.perDay});
+  final num? mrp, stockQty;
+  final bool stockKnown;
+
+  /// healthy / low / critical / out / near_expiry, from the stock list; null when this person cannot see stock.
+  final String? status;
+
+  /// Units sold per day, from the stock list (available ÷ days of stock); null when there are no recent sales.
+  final double? perDay;
+
+  bool get outOfStock => stockKnown && (stockQty ?? 0) <= 0;
+  bool get lowInventory => status == 'low' || status == 'critical' || status == 'out';
+}
+
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const _methodNames = {'cash': 'Cash', 'upi': 'UPI', 'card': 'Card', 'split': 'Split', 'wallet': 'Wallet', 'online': 'Online', 'other': 'Other', 'due': 'Due'};
 
@@ -165,6 +182,50 @@ class SellApi {
     } on RpcException catch (e) {
       throw OrdersApiException(e.status, e.message, e.code);
     }
+  }
+
+  /// MRP and stock for each sellable item, keyed by its catalogue id (the same id the till sells). The catalogue list gives MRP and the
+  /// stock count; the stock list (when this person may see stock) adds the low/out status and daily sales. Never throws: an empty map
+  /// only means the cards show the price alone and the stock tabs stay hidden.
+  Future<Map<String, SellFacts>> facts() async {
+    final cat = <Map<String, dynamic>>[];
+    try {
+      for (var page = 1; page <= 5; page++) {
+        final r = await _call('cat_item_list', {'page': page, 'page_size': 100});
+        final items = ((r['items'] as List?) ?? const []).cast<Map>().map((m) => m.cast<String, dynamic>()).toList();
+        cat.addAll(items);
+        if (items.length < 100) break;
+      }
+    } catch (_) {
+      return const {};
+    }
+    final stock = <String, Map<String, dynamic>>{};
+    try {
+      for (var page = 1; page <= 10; page++) {
+        final r = await _call('inv_stock_list', {'filter': 'all', 'page': page, 'page_size': 50});
+        final items = ((r['items'] as List?) ?? const []).cast<Map>().map((m) => m.cast<String, dynamic>()).toList();
+        for (final s in items) {
+          stock[s['id'].toString()] = s;
+        }
+        if (items.length < 50) break;
+      }
+    } catch (_) {
+      // no stock permission: MRP and the stock count still show
+    }
+    return {
+      for (final c in cat)
+        c['id'].toString(): () {
+          final s = stock[c['inventory_item_id']?.toString()];
+          final available = s?['available'] as num?, days = s?['stock_days'] as num?;
+          return SellFacts(
+            mrp: (c['mrp_minor'] as num?) == null ? null : (c['mrp_minor'] as num) / 100,
+            stockQty: c['stock_qty'] as num?,
+            stockKnown: c['stock_known'] == true,
+            status: s?['status'] as String?,
+            perDay: available != null && days != null && available > 0 && days > 0 ? available / days : null,
+          );
+        }(),
+    };
   }
 
   Future<SellCatalog> catalog({String q = '', String? category, bool availableOnly = false, String sort = 'name'}) async {

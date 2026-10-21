@@ -104,7 +104,7 @@ class _OrdersHomeState extends State<OrdersHome> {
             ),
           ),
         ),
-        PosBottomNav(active: 'bill', onTap: _tab),
+        PosBottomNav(active: 'online', onTap: _tab), // Orders History is the store's Online order tab
       ]),
     );
   }

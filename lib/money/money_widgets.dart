@@ -179,28 +179,40 @@ class _Switcher extends StatelessWidget {
   }
 }
 
-/// Filter pill; the active one is lime.
+/// Filter pill; the active one is lime. A [menu] chip (it opens a list or a date picker) reads like a dropdown field, as in Figma's
+/// Invoices, Transactions, Cashbook and Expenses: label on the left, an optional [icon] before it, a chevron on the right.
 class MoneyChip extends StatelessWidget {
-  const MoneyChip(this.label, {super.key, this.active = false, required this.onTap});
+  const MoneyChip(this.label, {super.key, this.active = false, required this.onTap, this.menu = false, this.icon});
   final String label;
-  final bool active;
+  final bool active, menu;
+  final IconData? icon;
   final VoidCallback? onTap;
   @override
-  Widget build(BuildContext context) => Semantics(
-        button: true,
-        selected: active,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 44),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: active ? kLimeH : Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: active ? kLimeH : kLine)),
-            child: Text(label, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, active ? 700 : 500)),
-          ),
+  Widget build(BuildContext context) {
+    final text = Text(label, textAlign: menu ? TextAlign.left : TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, active ? 700 : 500));
+    return Semantics(
+      button: true,
+      selected: active,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: EdgeInsets.symmetric(horizontal: menu ? 12 : 14, vertical: 10),
+          alignment: menu ? Alignment.centerLeft : Alignment.center,
+          decoration: BoxDecoration(color: active ? kLimeH : Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: active ? kLimeH : kLine)),
+          child: menu
+              ? Row(children: [
+                  if (icon != null) ...[Icon(icon, size: 16, color: kInk), const SizedBox(width: 8)],
+                  Expanded(child: text),
+                  const SizedBox(width: 4),
+                  const Icon(LucideIcons.chevronDown, size: 16, color: kInk),
+                ])
+              : text,
         ),
-      );
+      ),
+    );
+  }
 }
 
 /// Three chips in a row (dates, kind, status), equal width.
@@ -301,13 +313,14 @@ class MoneyStatus extends StatelessWidget {
 }
 
 /// A list card: bold heading and amount on one line, a muted line and a status chip on the next.
+/// [trailing] sits at the end of that second line (a chip, or a small action such as Void) so the card stays two lines tall.
 class MoneyRow extends StatelessWidget {
-  const MoneyRow({super.key, required this.title, required this.amount, required this.sub, this.status, this.amountColor = kInk, this.onTap, this.extra});
+  const MoneyRow({super.key, required this.title, required this.amount, required this.sub, this.status, this.amountColor = kInk, this.onTap, this.extra, this.trailing});
   final String title, amount, sub;
   final String? status;
   final Color amountColor;
   final VoidCallback? onTap;
-  final Widget? extra;
+  final Widget? extra, trailing;
   @override
   Widget build(BuildContext context) => InvCard(
         onTap: onTap,
@@ -321,9 +334,27 @@ class MoneyRow extends StatelessWidget {
           Row(children: [
             Expanded(child: Text(sub, style: inter(13, 400, color: kMuted))),
             if (status != null) MoneyStatus(status!),
+            if (trailing != null) ...[if (status != null) const SizedBox(width: 8), trailing!],
           ]),
           if (extra != null) ...[const SizedBox(height: 8), extra!],
         ]),
+      );
+}
+
+/// A small text action for the end of a [MoneyRow]'s second line ("Void"): a padded tap target that does not make the card taller.
+class MoneyAction extends StatelessWidget {
+  const MoneyAction(this.label, {super.key, required this.onTap, this.color = kInk});
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), child: Text(label, style: inter(13, 600, color: color))),
+        ),
       );
 }
 
@@ -502,7 +533,11 @@ class MoneyMore extends StatelessWidget {
 }
 
 /// The two-tile row used at the top of most screens.
-Widget tiles2(Widget a, Widget b) => Padding(padding: const EdgeInsets.only(bottom: 12), child: InvTiles([a, b]));
+/// Two tiles side by side, always the same height (one wrapping its sub-line no longer makes the pair uneven).
+Widget tiles2(Widget a, Widget b) => Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Expanded(child: a), const SizedBox(width: 9), Expanded(child: b)])),
+    );
 
 /// "upi" -> "UPI", "cash" -> "Cash".
 String methodLabel(String? m) => switch (m) { null || '' => '', 'upi' => 'UPI', _ => m[0].toUpperCase() + m.substring(1) };

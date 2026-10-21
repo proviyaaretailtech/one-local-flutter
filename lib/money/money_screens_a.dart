@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_widgets.dart' show InvDotChip, kGreenIconBg, kPostedText, kRedText, kCardLine;
 import '../ui/theme.dart';
@@ -55,14 +56,14 @@ class MoneyOverview extends StatelessWidget {
               title: 'Payments received',
               amount: money(pay.no('minor')),
               sub: '${rangeLabel(w.so('from'), w.so('to'))} • ${pay.n('count')} payments',
-              extra: const Align(alignment: Alignment.centerRight, child: InvDotChip('Received', bg: kGreenIconBg, fg: kPostedText)),
+              trailing: const InvDotChip('Received', bg: kGreenIconBg, fg: kPostedText),
             ),
             if (com != null)
               MoneyRow(
                 title: 'Commission earned',
                 amount: money(com.no('minor')),
                 sub: '${com.no('rate_bps') == null ? 'Commission' : '${(com.n('rate_bps') / 100).toStringAsFixed(com.n('rate_bps') % 100 == 0 ? 0 : 1)}% of net order value'} • this period',
-                extra: const Align(alignment: Alignment.centerRight, child: InvDotChip('Earned', bg: kGreenIconBg, fg: kPostedText)),
+                trailing: const InvDotChip('Earned', bg: kGreenIconBg, fg: kPostedText),
               ),
             if (next != null) MoneyFootnote(['Next settlement estimate: ${money(next.no('estimate_minor'))} from ${next.n('orders')} orders. Final payout is confirmed after the cycle closes.']),
             MoneyCta('Download summary', onPressed: () => exportCsv(c.context, c.api, 'payments', {'period': period})),
@@ -177,7 +178,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             decoration: InputDecoration(
               hintText: 'Transaction ID or description',
               hintStyle: inter(15, 400, color: kMuted),
-              prefixIcon: const Icon(Icons.search, size: 20, color: kMuted),
+              prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
               filled: true,
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(vertical: 14),
@@ -187,9 +188,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           ),
           const SizedBox(height: 10),
           MoneyChips([
-            MoneyChip(period == 'all' ? 'All dates' : rangeLabel(w.so('from'), w.so('to')), active: period != 'all', onTap: () => chooseFor(c.context, 'Dates', periods, period, (v) => c.set({'period': v}))),
-            MoneyChip(types.firstWhere((t) => t.$1 == type).$2, active: type != 'all', onTap: () => chooseFor(c.context, 'Type', types, type, (v) => c.set({'type': v}))),
-            MoneyChip(c.q['party'] == null ? 'All parties' : c.q['party'] as String, active: c.q['party'] != null, onTap: () => chooseFor(c.context, 'Party', [('', 'All parties'), for (final p in d.ls('parties')) (p, p)], (c.q['party'] as String?) ?? '', (v) => c.set({'party': v.isEmpty ? null : v, 'type': v.isEmpty ? type : 'party'}))),
+            MoneyChip(period == 'all' ? 'All dates' : rangeLabel(w.so('from'), w.so('to')), active: period != 'all', menu: true, icon: LucideIcons.calendar, onTap: () => chooseFor(c.context, 'Dates', periods, period, (v) => c.set({'period': v}))),
+            MoneyChip(types.firstWhere((t) => t.$1 == type).$2, active: type != 'all', menu: true, onTap: () => chooseFor(c.context, 'Type', types, type, (v) => c.set({'type': v}))),
+            MoneyChip(c.q['party'] == null ? 'All parties' : c.q['party'] as String, active: c.q['party'] != null, menu: true, onTap: () => chooseFor(c.context, 'Party', [('', 'All parties'), for (final p in d.ls('parties')) (p, p)], (c.q['party'] as String?) ?? '', (v) => c.set({'party': v.isEmpty ? null : v, 'type': v.isEmpty ? type : 'party'}))),
           ]),
           if (party != null)
             MoneyRow(
@@ -253,7 +254,7 @@ class InvoicesScreen extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'Invoice number, customer or supplier',
               hintStyle: inter(15, 400, color: kMuted),
-              prefixIcon: const Icon(Icons.search, size: 20, color: kMuted),
+              prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
               filled: true,
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(vertical: 14),
@@ -264,8 +265,8 @@ class InvoicesScreen extends StatelessWidget {
           const SizedBox(height: 10),
           MoneyChips([for (final k in kinds) MoneyChip(k.$2, active: kind == k.$1, onTap: () => c.set({'kind': k.$1}))]),
           MoneyChips([
-            MoneyChip(period == 'all' ? 'All dates' : periodLabel(period), active: period != 'all', onTap: () => chooseFor(c.context, 'Dates', periods, period, (v) => c.set({'period': v}))),
-            MoneyChip(pays.firstWhere((p) => p.$1 == pay).$2, active: pay != 'all', onTap: () => chooseFor(c.context, 'Payment', pays, pay, (v) => c.set({'payment': v}))),
+            MoneyChip(period == 'all' ? 'All dates' : periodLabel(period), active: period != 'all', menu: true, icon: LucideIcons.calendar, onTap: () => chooseFor(c.context, 'Dates', periods, period, (v) => c.set({'period': v}))),
+            MoneyChip(pays.firstWhere((p) => p.$1 == pay).$2, active: pay != 'all', menu: true, onTap: () => chooseFor(c.context, 'Payment', pays, pay, (v) => c.set({'payment': v}))),
           ]),
           Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('${d.n('total')} invoices • Newest first', style: inter(13, 400, color: kMuted))),
           if (rows.isEmpty) const MoneyEmpty('No invoices match these filters.'),
@@ -293,7 +294,7 @@ class InvoicesScreen extends StatelessWidget {
                   if (r.s('kind') == 'purchases' && r.s('status') != 'paid' && env.may('record'))
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: SizedBox(width: 120, child: InvSecondary('Record payment', onPressed: () async {
+                      child: SizedBox(width: 132, child: InvSecondary('Record payment', textSize: 13.5, onPressed: () async {
                         final left = r.n('total_minor') - r.n('paid_minor');
                         final done = await showMoneyForm(c.context, title: 'Pay ${r.s('party')}', action: 'Record payment', note: 'Still owed on ${r.s('ref')}: ${money(left)}', fields: [
                           FormFieldSpec('amount', 'Amount (₹)', kind: FieldKind.amount, initial: (left / 100).toStringAsFixed(left % 100 == 0 ? 0 : 2)),
@@ -302,7 +303,7 @@ class InvoicesScreen extends StatelessWidget {
                         if (done) await c.reload();
                       })),
                     ),
-                  SizedBox(width: 120, child: InvSecondary('Download', onPressed: () => env.later(c.context, 'PDF download'))),
+                  SizedBox(width: 120, child: InvSecondary('Download', color: kPostedText, onPressed: () => env.later(c.context, 'PDF download'))),
                 ]),
               ]),
             ),

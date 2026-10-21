@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vinii_pos/app_routes.dart';
 import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/home/side_nav.dart';
+import 'package:vinii_pos/orders/orders_board_screen.dart';
+import 'package:vinii_pos/orders/orders_home.dart';
 import 'package:vinii_pos/restaurant/restaurant_more_screen.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
@@ -16,6 +18,27 @@ Finder soonOn(String label) => find.descendant(of: find.ancestor(of: find.text(l
 void main() {
   setUp(HomeNav.reset);
   tearDown(HomeNav.reset);
+
+  group('order tab per kind of business', () {
+    Future<void> root(WidgetTester t, String kind, String label) async {
+      ignoreOverflow();
+      await t.pumpWidget(MaterialApp(theme: posTheme(), home: shellTabRoot(kind, label)!));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets("a store's Online order tab is Orders History (section E), not the restaurant board", (t) async {
+      await root(t, 'store', 'Online order');
+      expect(find.byType(OrdersHome), findsOneWidget);
+      expect(find.byType(OrdersBoardScreen), findsNothing);
+      expect(find.text('Dine In'), findsNothing);
+      expect(find.text('Hold orders'), findsNothing);
+    });
+
+    testWidgets("a restaurant's Orders tab is the Live | Hold board", (t) async {
+      await root(t, 'restaurant', 'Orders');
+      expect(find.byType(OrdersBoardScreen), findsOneWidget);
+    });
+  });
 
   test('installRoutes plugs every hook the side nav and the More page use', () {
     installRoutes();

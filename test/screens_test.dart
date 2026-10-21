@@ -28,8 +28,32 @@ void main() {
       await show(t, const SplashScreen());
       await t.tap(find.text('Sign In'));
       await t.pumpAndSettle();
-      expect(find.text('Where should we send your code?'), findsOneWidget);
+      expect(find.text('How would you like to sign in?'), findsOneWidget);
     });
+    testWidgets('the intro: logo and taglines first, then the buttons glide in and the taglines stay under them; a tap skips ahead', (t) async {
+      await show(t, const SplashScreen(intro: true, hold: Duration(seconds: 2)));
+      expect(find.text('Easy Selling starts here'), findsOneWidget);
+      expect(find.text('Your Business, Simplified'), findsOneWidget);
+      await t.tap(find.text('Sign In'), warnIfMissed: false); // not there yet: nothing opens
+      await t.pump();
+      expect(find.text('Where should we send your code?'), findsNothing);
+      await t.pump(const Duration(seconds: 2)); // the hold ends
+      await t.pumpAndSettle(); // the move to the second frame
+      expect(find.text('Easy Selling starts here'), findsOneWidget, reason: 'the taglines stay on the sign-up page');
+      await t.tap(find.text('Sign In'));
+      await t.pumpAndSettle();
+      expect(find.text('How would you like to sign in?'), findsOneWidget);
+    });
+
+    testWidgets('a tap during the first frame moves on at once', (t) async {
+      await show(t, const SplashScreen(intro: true, hold: Duration(seconds: 30)));
+      await t.tapAt(const Offset(200, 300));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Become a seller'));
+      await t.pumpAndSettle();
+      expect(find.text('Create your account.'), findsOneWidget);
+    });
+
     testWidgets('Become a seller opens registration', (t) async {
       await show(t, const SplashScreen());
       await t.tap(find.text('Become a seller'));
@@ -52,6 +76,16 @@ void main() {
       await t.tap(find.text('Send code'));
       await t.pumpAndSettle();
       expect(find.text('Back to business.'), findsOneWidget);
+    });
+    testWidgets('password goes to password login, and back to the chooser', (t) async {
+      await show(t, const SigninChooserScreen());
+      await t.tap(find.text('Use password'));
+      await t.pumpAndSettle();
+      expect(find.text('Good to see you again.'), findsOneWidget);
+      await t.tap(find.text('Use a sign-in code instead'));
+      await t.pumpAndSettle();
+      expect(find.text('How would you like to sign in?'), findsOneWidget);
+      expect(find.text('Good to see you again.'), findsNothing);
     });
   });
 
@@ -252,7 +286,7 @@ void main() {
       await show(t, PasswordLoginScreen(auth: FakeAuth()));
       await t.tap(find.text('Use a sign-in code instead'));
       await t.pumpAndSettle();
-      expect(find.text('Where should we send your code?'), findsOneWidget);
+      expect(find.text('How would you like to sign in?'), findsOneWidget);
     });
   });
 
@@ -459,7 +493,7 @@ void main() {
       await show(t, const RegisterAccountTypeScreen());
       await t.tap(find.text('Already registered? Sign in'));
       await t.pumpAndSettle();
-      expect(find.text('Where should we send your code?'), findsOneWidget);
+      expect(find.text('How would you like to sign in?'), findsOneWidget);
     });
   });
 

@@ -168,7 +168,7 @@ void main() {
       expect(menu, 1);
       await t.tap(find.byKey(const ValueKey('outlet-header-chip')));
       await t.pumpAndSettle();
-      expect(find.text('Restaurant status'), findsOneWidget);
+      expect(find.text('Store status'), findsOneWidget); // a store's app says store, never restaurant
     });
 
     testWidgets('the outlet name opens the switcher; "Manage outlets" opens Restaurant status and the header reloads on return', (t) async {
@@ -193,6 +193,22 @@ void main() {
       await t.pumpWidget(MaterialApp(home: OutletStatusScreen(api: (x ?? f).api)));
       await t.pumpAndSettle();
     }
+
+    testWidgets('a store says store: title, search, rush mode and "Add another store" never mention a restaurant or kitchen', (t) async {
+      await show(t);
+      expect(find.text('Store status'), findsOneWidget);
+      expect(find.text('Add another store'), findsOneWidget);
+      expect(find.textContaining('estaurant'), findsNothing);
+      expect(find.textContaining('kitchen'), findsNothing);
+      expect(find.textContaining('packing time'), findsWidgets);
+    });
+
+    test('the place word follows the kind of business', () {
+      expect(outletNoun('restaurant'), 'restaurant');
+      expect(outletNounTitle('restaurant'), 'Restaurant');
+      expect(outletNoun('store'), 'store');
+      expect(outletNoun(), 'store'); // outside the shell: never assume a restaurant
+    });
 
     testWidgets('lists every outlet with ID, locality, status and the two switches', (t) async {
       await show(t);
@@ -418,7 +434,7 @@ void main() {
       await tall(t);
       await t.pumpWidget(const MaterialApp(home: Scaffold(body: OutletHeader(title: 'Home', dashboard: true))));
       await t.pumpAndSettle();
-      expect(find.text('SHOWING DATA FOR'), findsOneWidget);
+      expect(find.text('ONELOCAL PARTNER'), findsOneWidget); // the banner's small line (founder, 22 Oct)
       expect(find.text('All outlets (2)'), findsOneWidget);
       expect(find.byKey(const ValueKey('outlet-header-bell')), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('outlet-header-name')));

@@ -140,7 +140,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 )
               : RefreshIndicator(onRefresh: _load, child: _body(v)),
         ),
-        PosBottomNav(active: 'bill', onTap: (id) {
+        PosBottomNav(active: 'online', onTap: (id) {
           if (id == 'bill') {
             Navigator.of(context).push(MaterialPageRoute(builder: (_) => CartScreen(api: _api, onNavigate: widget.onNavigate)));
           } else if (widget.onNavigate != null) {
