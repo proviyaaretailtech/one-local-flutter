@@ -45,7 +45,7 @@ src/rpc.ts          the gateway: allowlist lookup, token check, args check, call
 src/rpc-manifest.ts THE ALLOWLIST (one entry per function; kind db | secure | local)
 src/rpc-manifest.pending.md  functions of unmerged sections, ready to be listed
 src/schemas/        zod shapes for onboarding and setup arguments
-src/modules/secure/ secret-bearing handlers: pii.ts, storage.ts, me.ts, payments.ts (webhook hook, not connected)
+src/modules/secure/ secret-bearing handlers: pii.ts, storage.ts, me.ts, payments.ts (webhook hook, not connected), smsHook.ts (Supabase Send SMS hook → apitxt.com)
 src/modules/        home.ts, orders.ts (presentation: formatting of database facts, runs as the caller)
 src/http.ts         {detail, code} errors, body cap, rate limit, log redaction
 src/auth.ts         verifies the Bearer token with Supabase Auth (public key, cached 60 s)

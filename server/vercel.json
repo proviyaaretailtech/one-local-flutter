@@ -10,14 +10,17 @@
       "destination": "/t/index.html"
     },
     {
+      "source": "/m/:slug([a-z0-9][a-z0-9-]{0,62})",
+      "destination": "/t/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api/index"
     }
   ],
   "functions": {
     "api/index.js": {
-      "maxDuration": 30,
-      "memory": 512
+      "maxDuration": 30
     }
   },
   "regions": [

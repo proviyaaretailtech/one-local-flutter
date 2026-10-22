@@ -6,12 +6,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../inventory/inventory_api.dart' show Facts;
 import '../orders/order_widgets.dart' show TagChip;
 import '../ui/theme.dart';
+import 'menu_link_screen.dart' show MenuLinkApi;
 import 'builder_screen.dart';
 import 'sf_widgets.dart';
 import 'storefront_api.dart';
 
 /// Where store links point. The server answers only the path (`/noice-store`); the domain is the app's setting.
-const kStoreHost = 'onelocal.app';
 
 /// The storefront as a customer would see it, drawn from the server's `sf_preview` answer. [theme] overrides the colours (Theme & Publish
 /// previews unsaved colours). Ratings are not shown: the database holds no ratings for a store page yet.
@@ -352,14 +352,15 @@ class LiveScreen extends StatelessWidget {
   final Facts result;
   final String? coverUrl;
 
-  String get link => '$kStoreHost${result.s('path')}';
+  /// The public menu link (0571): `<guest web base>/m/<store link>`, the page anyone can open with no sign-in.
+  String get link => MenuLinkApi.urlFor('/m/${result.s('slug')}');
 
   @override
   Widget build(BuildContext context) => SfPage(
         title: 'Page Status',
         bottom: Column(mainAxisSize: MainAxisSize.min, children: [
           SfSave('View Live Store', lime: true, onPressed: () async {
-            final ok = await launchUrl(Uri.parse('https://$link'), mode: LaunchMode.externalApplication).catchError((_) => false);
+            final ok = await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication).catchError((_) => false);
             if (!ok && context.mounted) showToast(context, 'Could not open the store. Copy the link instead.');
           }),
           const SizedBox(height: 10),
@@ -388,7 +389,7 @@ class LiveScreen extends StatelessWidget {
             ]),
           ),
           SfSoft('Copy Store Link', icon: LucideIcons.copy, onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: 'https://$link'));
+            await Clipboard.setData(ClipboardData(text: link));
             if (context.mounted) showToast(context, 'Store link copied.');
           }),
           const SizedBox(height: 14),

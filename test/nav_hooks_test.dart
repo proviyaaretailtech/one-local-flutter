@@ -41,6 +41,7 @@ void main() {
     HomeNav.deliverySettings = rec('delivery');
     HomeNav.kitchen = rec('kitchen');
     HomeNav.tableQr = rec('tableQr');
+    HomeNav.menuLink = rec('menuLink');
     HomeNav.settings = rec('settings');
     HomeNav.setup = rec('setup');
     HomeNav.support = rec('support');
@@ -122,6 +123,7 @@ void main() {
         'Delivery settings': 'delivery',
         'Kitchen display': 'kitchen',
         'Table QR codes': 'tableQr',
+        'Menu link': 'menuLink',
         'Payout': 'money:payouts',
         'Invoices': 'money:invoices',
         'Fees & charges': 'money:settlements',
@@ -156,7 +158,7 @@ void main() {
 
     testWidgets('with no hooks plugged every link says "Soon"', (t) async {
       await showMore(t);
-      expect(find.text('Soon'), findsNWidgets(17));
+      expect(find.text('Soon'), findsNWidgets(18));
     });
   });
 }

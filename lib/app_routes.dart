@@ -1,3 +1,4 @@
+import 'storefront/menu_link_screen.dart';
 import 'package:flutter/material.dart';
 
 import 'account/routes.dart';
@@ -25,8 +26,6 @@ import 'purchasing/purchasing_api.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_board_screen.dart';
 import 'orders/orders_home.dart';
-import 'purchasing/po_history_screen.dart';
-import 'purchasing/purchasing_api.dart';
 import 'sell/sell_env.dart';
 import 'sell/sell_screen.dart';
 import 'service/calendar_screen.dart';
@@ -70,6 +69,7 @@ void installRoutes() {
   HomeNav.kitchen = HomeNav.kitchenDisplay;
   HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id == 'menu' ? 'item' : id)))));
   HomeNav.tables = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FloorScreen(env: TablesEnv(onNavigate: (id) => id == 'pos' ? null : id == 'orders' ? HomeNav.go(c, HomeNav.orders, 'Orders') : _tab(c, id)))));
+  HomeNav.menuLink = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuLinkScreen()));
   HomeNav.tableQr = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => TableQrScreen(env: TablesEnv())));
   HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));

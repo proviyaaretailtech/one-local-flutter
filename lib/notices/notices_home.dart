@@ -60,7 +60,7 @@ class _NoticesHomeState extends State<NoticesHome>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         OrdersTopBar(
-          title: 'OneLocal',
+          title: '', // the bar already shows the OneLocal logo
           onBack: widget.onBack ?? () => Navigator.of(context).maybePop(),
         ),
         TabBar(

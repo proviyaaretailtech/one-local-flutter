@@ -322,7 +322,7 @@ void main() {
       expect(s.last('sf_draft_save')['definition']['theme'], {'primary': '#FF0000', 'secondary': '#0A0A0A', 'background': '#FFFFFF', 'section_style': 'square'});
       expect(s.last('sf_publish'), {'expected_version': 0, 'expected_draft_version': 2});
       expect(find.text('Your page is live!'), findsOneWidget);
-      expect(find.textContaining('onelocal.app/noice-'), findsOneWidget);
+      expect(find.textContaining('/m/noice-'), findsOneWidget);   // the public menu link (0571)
       expect(find.text('Copy Store Link'), findsOneWidget);
       expect(find.text('View Live Store'), findsOneWidget);
     });

@@ -1,0 +1,95 @@
+# One Local POS: every change is tested before it reaches main, and main is what Vercel serves.
+#   test   (every push and pull request): Flutter analyze + tests, server type check + unit tests + guest page build.
+#   deploy (push to main, only when the Vercel secrets exist): builds the server and the guest menu page together and
+#          deploys them to production, so the guest page (/t/<code>, /m/<store link>) is always the one from this commit.
+# Repository secrets for deploy (Settings -> Secrets and variables -> Actions): VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
+# With deploy on, turn off Vercel's own Git deploys for this project so production is deployed once, after the tests.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.4
+          channel: stable
+          cache: true
+      - name: Flutter packages
+        run: flutter pub get
+      - name: Flutter analyze (errors fail the build)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Flutter tests
+        # golden images are drawn on a Mac; Linux fonts render differently, so they are checked locally only
+        run: flutter test --exclude-tags golden -j 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Server packages
+        working-directory: server
+        run: npm ci
+      - name: Server type check
+        working-directory: server
+        run: npx tsc --noEmit -p .
+      - name: Server unit tests
+        working-directory: server
+        run: npm test
+      - name: Guest menu page builds
+        run: sh tool/build_guest_web.sh
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Deploy is set up?
+        id: ready
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "Vercel secrets not set: skipping deploy (tests passed)."; echo "go=no" >> "$GITHUB_OUTPUT"
+          else echo "go=yes" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.ready.outputs.go == 'yes'
+      - uses: subosito/flutter-action@v2
+        if: steps.ready.outputs.go == 'yes'
+        with:
+          flutter-version: 3.47.4
+          channel: stable
+          cache: true
+      - uses: actions/setup-node@v4
+        if: steps.ready.outputs.go == 'yes'
+        with:
+          node-version: 22
+      - name: Build the guest menu page
+        if: steps.ready.outputs.go == 'yes'
+        run: flutter pub get && sh tool/build_guest_web.sh
+      - name: Build and deploy to Vercel production
+        if: steps.ready.outputs.go == 'yes'
+        working-directory: server
+        run: |
+          npm i -g vercel@latest
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          vercel build --prod --token="$VERCEL_TOKEN"
+          # the guest page is static: it goes next to the server's other static files
+          mkdir -p .vercel/output/static/t && cp -R public/t/. .vercel/output/static/t/
+          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"

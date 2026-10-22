@@ -63,6 +63,45 @@ class GuestVisit {
   final GuestMenu menu;
 }
 
+/// Where an accepted order is (0572 `track`): confirmed -> in_kitchen -> ready -> served, and the minutes left while it cooks.
+class GuestTrack {
+  GuestTrack(Facts f)
+      : stage = f.s('stage'),
+        minutesLeft = f.raw['minutes_left'] == null ? null : f.n('minutes_left').toInt(),
+        estimateMinutes = f.n('estimate_minutes').toInt(),
+        steps = [for (final x in f.l('steps')) (key: x.s('key'), done: x.b('done'), at: DateTime.tryParse(x.so('at') ?? '')?.toLocal())];
+  final String stage;
+  final int? minutesLeft;
+  final int estimateMinutes;
+  final List<({String key, bool done, DateTime? at})> steps;
+  static GuestTrack? of(Facts request) {
+    final t = request.m('order').raw['track'];
+    return t is Map ? GuestTrack(Facts(t.cast<String, dynamic>())) : null;
+  }
+}
+
+/// The table's bill as the guest may see it (0572 `guest_bill`): dishes and money only. Paying stays with the staff.
+class GuestBill {
+  GuestBill(Facts f)
+      : lines = [for (final o in f.l('orders')) for (final i in o.l('items')) (name: i.s('name'), qty: i.n('qty').toInt(), total: i.n('line_total'))],
+        subtotal = f.n('subtotal'),
+        gst = f.n('gst_amount'),
+        discount = f.l('orders').fold<num>(0, (a, o) => a + o.n('discount')),
+        serviceCharge = f.l('orders').fold<num>(0, (a, o) => a + o.n('service_charge')),
+        roundOff = f.l('orders').fold<num>(0, (a, o) => a + o.n('round_off')),
+        total = f.n('total'),
+        paid = f.n('paid'),
+        due = f.n('due'),
+        billReady = f.b('bill_ready'),
+        rating = f.raw['feedback'] is Map ? Facts((f.raw['feedback'] as Map).cast<String, dynamic>()).n('rating').toInt() : null;
+  final List<({String name, int qty, num total})> lines;
+  final num subtotal, gst, discount, serviceCharge, roundOff, total, paid, due;
+  final bool billReady;
+
+  /// The feedback this visit already left (1-5), or null.
+  final int? rating;
+}
+
 /// One line the guest wants: a dish, how many, an optional note.
 class GuestLine {
   GuestLine(this.item, this.qty, [this.notes]);
@@ -97,6 +136,12 @@ abstract class GuestGateway {
 
   /// This visit's orders, newest first (the web page only; Hand to guest has no list).
   Future<List<Facts>> status();
+
+  /// The table's bill (the web page only; null where there is none to show).
+  Future<GuestBill?> bill();
+
+  /// How the visit was, 1-5, with an optional comment (the web page only).
+  Future<void> feedback(int rating, {String? comment});
 
   static final _rand = Random.secure();
   static String newKey() => 'g-${List.generate(16, (_) => _rand.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
@@ -160,6 +205,43 @@ class WebGuestGateway implements GuestGateway {
 
   @override
   Future<List<Facts>> status() async => Facts(await _post('status', {'session': _s})).l('requests');
+
+  @override
+  Future<GuestBill?> bill() async => GuestBill(Facts(await _post('bill', {'session': _s})));
+
+  @override
+  Future<void> feedback(int rating, {String? comment}) async =>
+      _post('feedback', {'session': _s, 'rating': rating, if ((comment ?? '').trim().isNotEmpty) 'comment': comment!.trim()});
+}
+
+/// The public menu link (`<server>/m/<slug>`, database 0571): anyone may open it, with no sign-in and no table. Read-only: the menu card of a
+/// live business (`POST /guest/card`); there is nothing to send, so [send] refuses and [status] is empty.
+class MenuCardGateway implements GuestGateway {
+  MenuCardGateway({required this.slug, String? baseUrl, http.Client? client}) : _web = WebGuestGateway(code: '', baseUrl: baseUrl, client: client);
+  final String slug;
+  final WebGuestGateway _web;
+
+  @override
+  bool get waitsForStaff => false;
+
+  @override
+  Future<GuestVisit> open() async => GuestVisit(Facts(await _web._post('card', {'slug': slug})));
+
+  @override
+  Future<GuestMenu> menu() async => (await open()).menu;
+
+  @override
+  Future<Facts> send(List<GuestLine> lines, {String? guestName, String? note, required String key}) =>
+      Future.error(const GuestApiException(400, 'Ordering is done at the restaurant: scan the QR code on your table.', 'menu_only'));
+
+  @override
+  Future<List<Facts>> status() async => const [];
+
+  @override
+  Future<GuestBill?> bill() async => null;
+
+  @override
+  Future<void> feedback(int rating, {String? comment}) async {}
 }
 
 /// "Hand to guest": the staff member's own session, the table they opened, the same published menu (`guest_staff_menu`), and the order placed
@@ -206,4 +288,10 @@ class StaffGuestGateway implements GuestGateway {
 
   @override
   Future<List<Facts>> status() async => const [];
+
+  @override
+  Future<GuestBill?> bill() async => null;
+
+  @override
+  Future<void> feedback(int rating, {String? comment}) async {}
 }

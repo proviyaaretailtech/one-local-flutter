@@ -34,3 +34,13 @@ const session = z.string({ message: 'Please scan the table code again.' }).regex
 export const Open = z.object({ code: z.string({ message: 'This table code is not in use.' }).regex(/^[0-9a-f]{32,128}$/, 'This table code is not in use.') }).strict();
 export const Session = z.object({ session }).strict();
 export const Send = z.object({ session, idempotency_key: key, lines, guest_name: name, note }).strict();
+
+// ---- the public menu link (POST /guest/card, no sign-in, no table; database 0571): the business's address name only
+export const Card = z.object({ slug: z.string({ message: 'This menu link is not in use.' }).trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{0,62}$/, 'This menu link is not in use.') }).strict();
+
+// ---- the guest's bill and feedback (database 0572)
+export const Feedback = z.object({
+  session,
+  rating: z.number({ message: 'Choose how your visit was.' }).int('Choose how your visit was.').min(1, 'Choose how your visit was.').max(5, 'Choose how your visit was.'),
+  comment: z.string().max(500, 'A comment can be up to 500 characters.').nullish(),
+}).strict();

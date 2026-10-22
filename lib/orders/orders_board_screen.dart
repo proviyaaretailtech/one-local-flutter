@@ -600,7 +600,7 @@ class _HoldCard extends StatelessWidget {
                 key: ValueKey('resume-${b.id}'),
                 onPressed: busy ? null : onResume,
                 style: FilledButton.styleFrom(backgroundColor: kLime, foregroundColor: kInk, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                child: Text('Resume POS', style: inter(15, 700)),
+                child: Text('Resume order', style: inter(15, 700)),
               ),
             ),
           ),

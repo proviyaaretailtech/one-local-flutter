@@ -14,13 +14,18 @@ import { clientIp, HttpError, json, limit, readBody, sha256 } from './http.ts';
 import { parse } from './validate.ts';
 import * as gst from './schemas/guest.ts';
 
-export type GuestEntry = { alias: string; fn: string; args: z.ZodTypeAny; perMinute: number; subject: 'code' | 'session' };
+export type GuestEntry = { alias: string; fn: string; args: z.ZodTypeAny; perMinute: number; subject: 'code' | 'session' | 'slug' };
 
 export const GUEST_DOOR: GuestEntry[] = [
   { alias: 'open', fn: 'guest_qr_open', args: gst.Open, perMinute: 30, subject: 'code' },
   { alias: 'menu', fn: 'guest_menu', args: gst.Session, perMinute: 60, subject: 'session' },
   { alias: 'send', fn: 'guest_order_send', args: gst.Send, perMinute: 12, subject: 'session' },
   { alias: 'status', fn: 'guest_order_status', args: gst.Session, perMinute: 120, subject: 'session' },
+  // the table's bill and one feedback per visit (0572): read-only bill, feedback into the restaurant's inbox
+  { alias: 'bill', fn: 'guest_bill', args: gst.Session, perMinute: 60, subject: 'session' },
+  { alias: 'feedback', fn: 'guest_feedback', args: gst.Feedback, perMinute: 6, subject: 'session' },
+  // the public menu link (0571): read-only menu of a live business by its address name, no table and no session
+  { alias: 'card', fn: 'guest_menu_by_slug', args: gst.Card, perMinute: 60, subject: 'slug' },
 ];
 const byAlias = new Map(GUEST_DOOR.map(e => [e.alias, e]));
 export const guestFunctions = (): string[] => GUEST_DOOR.map(e => e.fn);
@@ -35,7 +40,7 @@ export async function guestCall(request: Request, params: Record<string, string>
   limit(ip, 'guest:any', PER_ADDRESS, 60_000);
   limit(ip, `guest:${entry.alias}`, entry.perMinute, 60_000);
   const args = parse(entry.args, await readBody(request, 16 * 1024)) as Record<string, unknown>;
-  const subject = String(entry.subject === 'code' ? args.code : args.session);
+  const subject = String(args[entry.subject]);
   limit(await sha256(subject), `guest:${entry.alias}:subject`, entry.perMinute, 60_000);
   const p = entry.alias === 'open' ? { ...args, client: ip === 'direct' ? null : (await sha256(`guest-client:${ip}`)).slice(0, 32) } : args;
   const { data, error } = await db().rpc(entry.fn, { p });

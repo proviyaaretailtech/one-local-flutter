@@ -236,7 +236,7 @@ void main() {
       expect(find.text('1× Garlic Bread, 1× Coke'), findsOneWidget);
       expect(find.text('Delayed (45m)'), findsOneWidget);
       expect(find.text('Cancel Order'), findsOneWidget);
-      expect(find.text('Resume POS'), findsOneWidget);
+      expect(find.text('Resume order'), findsOneWidget);
       expect(find.byKey(const ValueKey('new-order')), findsNothing);
     });
 
@@ -273,10 +273,10 @@ void main() {
       expect(toast('#P-00012 cancelled.'), findsOneWidget);
     });
 
-    testWidgets('Resume POS opens the held bill in the cart; a change is written to the SAME order, then paid on it', (t) async {
+    testWidgets('Resume order opens the held bill in the cart; a change is written to the SAME order, then paid on it', (t) async {
       final s = tabServer();
       await openTab(t, s, tab: 'hold');
-      await t.tap(find.text('Resume POS'));
+      await t.tap(find.text('Resume order'));
       await t.pumpAndSettle();
       expect(find.byType(CartScreen), findsOneWidget);
       expect(find.text('Cart · held bill #P-00012'), findsOneWidget);
@@ -305,10 +305,10 @@ void main() {
       expect(find.text('Order Confirmation'), findsOneWidget);
     });
 
-    testWidgets('Resume POS without changes pays the held order directly', (t) async {
+    testWidgets('Resume order without changes pays the held order directly', (t) async {
       final s = tabServer();
       await openTab(t, s, tab: 'hold');
-      await t.tap(find.text('Resume POS'));
+      await t.tap(find.text('Resume order'));
       await t.pumpAndSettle();
       await t.tap(find.textContaining('Proceed to Checkout'));
       await t.pumpAndSettle();
@@ -323,7 +323,7 @@ void main() {
     testWidgets('Save & Hold from a resumed bill keeps the same order and updates the reason', (t) async {
       final s = tabServer();
       await openTab(t, s, tab: 'hold');
-      await t.tap(find.text('Resume POS'));
+      await t.tap(find.text('Resume order'));
       await t.pumpAndSettle();
       await t.tap(find.text('Save & Hold'));
       await t.pumpAndSettle();

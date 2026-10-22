@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import 'guest/guest_api.dart';
 import 'guest/guest_app.dart';
 
-/// The guest menu web page: what a customer's phone opens after scanning a table's QR code (`<server>/t/<code>`).
+/// The guest menu web page: what a customer's phone opens after scanning a table's QR code (`<server>/t/<code>`), and the business's public
+/// menu link (`<server>/m/<slug>`): the same screens, read-only, with no sign-in and no table.
 /// Built on its own (`tool/build_guest_web.sh`: `flutter build web -t lib/guest_web_main.dart --base-href /t/`) and served by the POS gateway,
 /// which also answers its calls (`POST /guest/<name>`), so the page needs no key, no sign-in and no other address.
 /// `--dart-define=GUEST_API_BASE_URL` points it at another gateway (development only).
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(GuestWebPage(code: tableCodeFrom(Uri.base)));
+  runApp(GuestWebPage(code: tableCodeFrom(Uri.base), slug: menuSlugFrom(Uri.base)));
 }
 
 /// The table code in the page address: `/t/<code>` (a `#/t/<code>` or `?t=<code>` address works too).
@@ -24,23 +25,37 @@ String? tableCodeFrom(Uri u) {
   return ok(u.queryParameters['t']) ? u.queryParameters['t'] : null;
 }
 
+/// The business's address name in a public menu link: `/m/<slug>` (or `#/m/<slug>`).
+String? menuSlugFrom(Uri u) {
+  bool ok(String? s) => s != null && RegExp(r'^[a-z0-9][a-z0-9-]{0,62}$').hasMatch(s);
+  for (final segs in [u.pathSegments, u.fragment.split('/')]) {
+    final list = segs.where((s) => s.isNotEmpty).toList();
+    final i = list.indexOf('m');
+    if (i >= 0 && i + 1 < list.length && ok(list[i + 1].toLowerCase())) return list[i + 1].toLowerCase();
+  }
+  return null;
+}
+
 class GuestWebPage extends StatelessWidget {
-  const GuestWebPage({super.key, required this.code, this.gateway});
+  const GuestWebPage({super.key, required this.code, this.slug, this.gateway});
   final String? code;
+
+  /// The public menu link's business (no table): the read-only menu card.
+  final String? slug;
   final GuestGateway? gateway;
 
   @override
   Widget build(BuildContext context) {
     const base = String.fromEnvironment('GUEST_API_BASE_URL');
     return MaterialApp(
-      title: 'Order at your table',
+      title: code == null && slug != null ? 'Menu' : 'Order at your table',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true, fontFamily: 'Inter'),
       builder: (context, child) => ColoredBox(
         color: const Color(0xFF1B1F1C),
         child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 480), child: child)),
       ),
-      home: code == null && gateway == null
+      home: code == null && slug == null && gateway == null
           ? const Scaffold(
               key: ValueKey('guest-no-code'),
               body: Center(
@@ -50,7 +65,12 @@ class GuestWebPage extends StatelessWidget {
                 ),
               ),
             )
-          : GuestApp(gateway: gateway ?? WebGuestGateway(code: code!, baseUrl: base.isEmpty ? Uri.base.origin : base)),
+          : GuestApp(
+              gateway: gateway ??
+                  (code != null
+                      ? WebGuestGateway(code: code!, baseUrl: base.isEmpty ? Uri.base.origin : base)
+                      : MenuCardGateway(slug: slug!, baseUrl: base.isEmpty ? Uri.base.origin : base)),
+            ),
     );
   }
 }

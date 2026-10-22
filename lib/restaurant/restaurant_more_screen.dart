@@ -6,7 +6,7 @@ import '../home/home_widgets.dart';
 import '../ui/theme.dart';
 
 /// Figma section D "restraunt side nav bar" (45:7539): the restaurant's More page, opened from ☰ and
-/// from "Show all" on the dashboard. Outlet card, 16 quick links, Logout.
+/// from "Show all" on the dashboard. Outlet card, 17 quick links, Logout.
 /// A link whose screen is not built (its HomeNav hook unplugged) shows a "Soon" tag and does nothing,
 /// instead of looking live and answering with a toast (control rule).
 class RestaurantMoreScreen extends StatelessWidget {
@@ -35,6 +35,7 @@ class RestaurantMoreScreen extends StatelessWidget {
       (LucideIcons.fileText, 'Order history', HomeNav.orderHistory ?? HomeNav.orders),
       (LucideIcons.chefHat, 'Kitchen display', HomeNav.kitchen), // KDS; replaces "Share feedback" (founder, 2026-10-20)
       (LucideIcons.qrCode, 'Table QR codes', HomeNav.tableQr), // codes guests scan to order (0560)
+      (LucideIcons.globe, 'Menu link', HomeNav.menuLink), // public menu, no sign-in (0571)
       (LucideIcons.creditCard, 'Payout', moneyAt('payouts')),
       (LucideIcons.circleQuestionMark, 'Customer support', HomeNav.support),
       (LucideIcons.bell, 'Notifications', HomeNav.notifications),
