@@ -23,6 +23,9 @@ One codebase: `npm run dev` (node:http, local) and the Vercel function (`api/ind
 | `TRUSTED_PROXY_HOPS` | no | `1` (Vercel is one proxy in front) |
 | `NODE_ENV` | no | Vercel sets `production` itself |
 | `CORS_ORIGINS` | no | optional, comma list of browser origins |
+| `SEND_SMS_HOOK_SECRET` | **yes** | the `v1,whsec_...` secret Supabase generates for the Send SMS hook (`POST /hooks/send-sms`). See `docs/runbooks/SMS_SIGNIN_APITXT.md` |
+| `APITXT_AUTH_KEY` | **yes** | apitxt.com API key; sends the sign-in codes. Without it real numbers get "Sign-in by SMS is not set up yet." |
+| `APITXT_OTP_TEMPLATE_ID` | no | optional apitxt dashboard template id for the OTP text; unset = apitxt's default OTP template |
 | `RAZORPAY_WEBHOOK_SECRET`, `CASHFREE_WEBHOOK_SECRET` | **yes** | reserved; the webhook hooks answer 501 until a provider is connected |
 
 Run the hosted SQL files in `docs/online-migrations/` (0360, 0361, 0362 and what they need) **before** the first deploy.

@@ -370,6 +370,7 @@ export const MANIFEST: Entry[] = [
   // ---- table QR codes and guest orders (0560, 0561; spec specs/table-qr-guest-menu). Body = the function's `p` object; the database checks
   //      organisation, store and role (floor staff read; table managers issue / replace / switch codes; order:place accepts guest orders).
   //      The guest's own calls do not come through here: they use the guest door (src/guest-door.ts, POST /guest/<name>).
+  db('menu_link_get', { args: st.Empty, map: P, rate: 'read', roles: 'any member of the business (its public menu link and why it is not live)' }),
   db('tbl_qr_list', { args: gst.QrList, map: P, rate: 'read', roles: 'floor staff (the code itself: table managers only)' }),
   db('tbl_qr_issue', { args: gst.QrIssue, map: P, rate: 'write', roles: 'table managers; replacing names the table' }),
   db('tbl_qr_set_enabled', { args: gst.QrEnabled, map: P, rate: 'write', roles: 'table managers' }),

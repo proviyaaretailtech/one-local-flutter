@@ -29,6 +29,8 @@ for (const w of webhookRoutes) add('POST', w.path, w.handler);
 
 // ---- the guest door and the guest menu page (table QR codes, 0561): no sign-in; see src/guest-door.ts and src/guest-web.ts
 add('POST', '/guest/:name', guestCall);
+// the public menu link of a business (0571): /m/<slug> answers the same guest page, which reads the name from its address
+for (const path of ['/m/:a']) add('GET', path, guestWeb);
 for (const path of ['/t', '/t/:a', '/t/:a/:b', '/t/:a/:b/:c', '/t/:a/:b/:c/:d', '/t/:a/:b/:c/:d/:e']) add('GET', path, guestWeb);
 
 // ---- (the sign-in check `me`, onboarding and setup moved to the gateway: POST /rpc/<name>, see src/rpc-manifest.ts)

@@ -10,6 +10,7 @@ import { me } from './me.ts';
 import { webhook } from './payments.ts';
 import { describeDish } from './menuAi.ts';
 import { removeBackground } from './removeBg.ts';
+import { smsHook } from './smsHook.ts';
 
 export type SecureCtx = { request: Request; userId: string; args: Record<string, unknown> };
 export type SecureHandler = (ctx: SecureCtx) => Promise<unknown>;
@@ -37,6 +38,8 @@ export const secureHandlers = {
 export const webhookRoutes: { path: string; handler: Handler }[] = [
   { path: '/webhooks/razorpay', handler: webhook('razorpay') },
   { path: '/webhooks/cashfree', handler: webhook('cashfree') },
+  // Supabase Auth "Send SMS" hook: sign-in codes for both apps, delivered by apitxt.com (signed by Supabase; see smsHook.ts)
+  { path: '/hooks/send-sms', handler: smsHook() },
 ];
 
 export { withImageLinks } from './storage.ts';

@@ -28,9 +28,10 @@ for (const fn of dbFunctions()) {
   }
 }
 // The guest door (src/guest-door.ts) calls its functions with the service role, so the rule is the opposite: NO anon, NO authenticated,
-// service_role yes, a pinned definer, and a body that checks the guest's code or session (qr_token / guest__session).
+// service_role yes, a pinned definer, and a body that checks the guest's code or session (qr_token / guest__session), or for the public menu link (0571) that the business is live
+// (guest__public_blockers).
 for (const fn of guestFunctions()) {
-  const line = psql(`select p.oid::regprocedure::text||E'\\t'||p.prosecdef||E'\\t'||coalesce((select c from unnest(p.proconfig) c where c like 'search_path=%'),'')||E'\\t'||has_function_privilege('anon',p.oid,'execute')||E'\\t'||has_function_privilege('authenticated',p.oid,'execute')||E'\\t'||has_function_privilege('service_role',p.oid,'execute')||E'\\t'||exists(select 1 from aclexplode(coalesce(p.proacl, acldefault('f',p.proowner))) a where a.grantee=0 and a.privilege_type='EXECUTE')||E'\\t'||(p.prosrc ~ '(guest__session\\(|qr_token)') from pg_proc p where p.pronamespace='public'::regnamespace and p.proname='${fn}'`);
+  const line = psql(`select p.oid::regprocedure::text||E'\\t'||p.prosecdef||E'\\t'||coalesce((select c from unnest(p.proconfig) c where c like 'search_path=%'),'')||E'\\t'||has_function_privilege('anon',p.oid,'execute')||E'\\t'||has_function_privilege('authenticated',p.oid,'execute')||E'\\t'||has_function_privilege('service_role',p.oid,'execute')||E'\\t'||exists(select 1 from aclexplode(coalesce(p.proacl, acldefault('f',p.proowner))) a where a.grantee=0 and a.privilege_type='EXECUTE')||E'\\t'||(p.prosrc ~ '(guest__session\\(|qr_token|guest__public_blockers\\()') from pg_proc p where p.pronamespace='public'::regnamespace and p.proname='${fn}'`);
   if (!line) { rows.push({ fn, problem: 'MISSING in database (guest door)' }); bad++; continue; }
   const [sig, definer, sp, anon, authd, srv, pub, looks] = line.split('\t');
   const problems = [];
@@ -39,7 +40,7 @@ for (const fn of guestFunctions()) {
   if (authd === 'true') problems.push('AUTHENTICATED CAN EXECUTE (guest door is service_role only)');
   if (srv !== 'true') problems.push('service_role cannot execute');
   if (definer === 'true' && !sp) problems.push('DEFINER WITHOUT PINNED search_path');
-  if (looks !== 'true') problems.push('body does not check the code or session');
+  if (looks !== 'true') problems.push('body does not check the code, session or live business');
   rows.push({ fn: `${sig} [guest door]`, type: definer === 'true' ? 'DEFINER' : 'invoker', search_path: sp.replace('search_path=', '') || '-', anon, authenticated: authd, public: pub, caller_check: looks, problem: problems.join('; ') || 'ok' });
   if (problems.length) bad++;
 }

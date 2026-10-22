@@ -18,11 +18,25 @@ const get = (path: string) => dispatch(new Request(`http://x${path}`));
 const code = 'a'.repeat(64), session = 'b'.repeat(64);
 const line = { menu_item_id: '56000000-0000-0000-0000-0000000000f1', qty: 2 };
 
-test('guest door: four names only, none of them reachable through /rpc', () => {
-  assert.deepEqual(GUEST_DOOR.map(e => e.alias), ['open', 'menu', 'send', 'status']);
-  assert.deepEqual(guestFunctions(), ['guest_qr_open', 'guest_menu', 'guest_order_send', 'guest_order_status']);
+test('guest door: seven names only, none of them reachable through /rpc', () => {
+  assert.deepEqual(GUEST_DOOR.map(e => e.alias), ['open', 'menu', 'send', 'status', 'bill', 'feedback', 'card']);
+  assert.deepEqual(guestFunctions(), ['guest_qr_open', 'guest_menu', 'guest_order_send', 'guest_order_status', 'guest_bill', 'guest_feedback', 'guest_menu_by_slug']);
   for (const fn of guestFunctions()) assert.equal(lookup(fn), undefined, fn);
   assert.equal(lookup('tbl_qr_list')?.kind, 'db');
+});
+
+test('feedback: a rating of 1 to 5 and nothing else, checked before the database', async () => {
+  const peer = { 'x-ol-peer': '10.0.0.4' };
+  assert.equal((await post('/guest/feedback', JSON.stringify({ session, rating: 6 }), peer)).status, 400);
+  assert.equal((await post('/guest/feedback', JSON.stringify({ session, rating: '5' }), peer)).status, 400);
+  assert.equal((await post('/guest/feedback', JSON.stringify({ session, rating: 5, table: 'x' }), peer)).status, 400, 'extra keys are refused');
+  assert.equal((await post('/guest/bill', JSON.stringify({ session: 'nope' }), peer)).status, 400);
+});
+
+test('public menu link: a bad name or an extra key is 400 before the database; /m/<slug> is a page address', async () => {
+  assert.equal((await post('/guest/card', JSON.stringify({ slug: '../etc' }), { 'x-ol-peer': '10.0.0.3' })).status, 400);
+  assert.equal((await post('/guest/card', JSON.stringify({ slug: 'demo-spice', table: 'x' }), { 'x-ol-peer': '10.0.0.3' })).status, 400, 'extra keys are refused');
+  assert.notEqual((await get('/m/demo-spice')).status, 404);
 });
 
 test('guest door: unknown name 404, GET 405, a bad body is 400 before the database', async () => {

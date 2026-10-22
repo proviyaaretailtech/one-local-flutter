@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vinii_pos/screens/email_login_screen.dart';
-import 'package:vinii_pos/screens/intro_splash_screen.dart';
 import 'package:vinii_pos/screens/email_verify_pending_screen.dart';
 import 'package:vinii_pos/screens/mobile_login_screen.dart';
 import 'package:vinii_pos/screens/otp_verify_screen.dart';
@@ -20,7 +19,7 @@ Future<void> main() async {
   await Supabase.initialize(url: 'http://127.0.0.1:54321', publishableKey: 'gallery-not-a-key');
   final s = Uri.base.queryParameters['s'] ?? 'splash';
   final screens = <String, Widget>{
-    'intro': IntroSplashScreen(onDone: () {}),
+    'intro': const SplashScreen(intro: true),
     'splash': const SplashScreen(),
     'chooser': const SigninChooserScreen(),
     'mobile': const MobileLoginScreen(),

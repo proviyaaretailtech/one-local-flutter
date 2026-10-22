@@ -56,6 +56,8 @@ class HomeNav {
   static HomeRoute? tables;
   // Table QR codes (0560): print, share, switch, replace the codes guests scan to order.
   static HomeRoute? tableQr;
+  // The public menu link (0571): the business's published menu for anyone, no sign-in.
+  static HomeRoute? menuLink;
   static HomeRoute? bill;
   // Section I: the Service POS calendar, used instead of `bill` by service partners (partner_type 'service').
   static HomeRoute? service;
@@ -101,7 +103,7 @@ class HomeNav {
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
     home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = customers = wallet = account = menu = null;
-    tableQr = null;
+    tableQr = menuLink = null;
     shell = null;
     openMenu = null;
     storeName = null;
