@@ -6,6 +6,7 @@ import '../home/home_nav.dart';
 import '../orders/order_widgets.dart' show OrdersTopBar, kWarnBg, kWarnText;
 import '../states/state_kit.dart' show StateTone, StatusCard;
 import '../ui/theme.dart';
+import 'integrations_screen.dart';
 import 'settings_api.dart';
 import 'settings_sheets.dart';
 import 'settings_widgets.dart';
@@ -194,6 +195,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         SettingRow(icon: LucideIcons.qrCode, title: 'Upload your QR', subtitle: s.qrUploaded ? 'QR uploaded' : 'Upload or manage your store QR code', actions: [RowAction('Edit', onTap: () => _sheet(openQrSheet))]),
         SettingRow(icon: LucideIcons.languages, title: 'Language', subtitle: kLanguages[s.language] ?? s.language, onTap: edit ? () => _sheet(openLanguageSheet) : null, actions: [if (edit) RowAction('Edit', onTap: () => _sheet(openLanguageSheet))]),
         SettingRow(icon: LucideIcons.mapPin, title: 'Location', subtitle: s.address ?? 'Not added', actions: [editBtn(openLocationSheet)]),
+      ]),
+      const GroupTitle('Integrations'),
+      GroupCard(children: [
+        // The Integrations page loads its own state and decides for itself who may change it.
+        SettingRow(
+          icon: LucideIcons.plug,
+          title: 'POS & billing software',
+          subtitle: 'Connect Petpooja or GoFrugal',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => IntegrationsScreen(env: widget.env))),
+          actions: const [Icon(LucideIcons.chevronRight, size: 18, color: kMuted)],
+        ),
       ]),
       const SizedBox(height: 14),
       GroupCard(children: [

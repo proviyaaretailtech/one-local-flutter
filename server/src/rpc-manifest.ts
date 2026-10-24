@@ -32,6 +32,7 @@ import * as team from './schemas/team.ts';
 import * as sf from './schemas/storefront.ts';
 import * as nt from './schemas/notices.ts';
 import * as st from './schemas/settings.ts';
+import * as ig from './schemas/integrations.ts';
 import { helpContent } from './modules/help.ts';
 import * as out from './schemas/outlets.ts';
 import * as cu from './schemas/customers.ts';
@@ -339,6 +340,15 @@ export const MANIFEST: Entry[] = [
   sec('pos_settings_file_slot', { args: st.FileAsk, rate: 'secure', roles: STAFF }),
   sec('pos_settings_file_attach', { args: st.FileAttach, rate: 'secure', roles: STAFF }),
   sec('pos_settings_file_link', { args: st.FileLink, rate: 'secure', roles: STAFF }),
+  // ---- Settings -> Integrations: Petpooja and GoFrugal (db/migrations/pos_integrations.sql, to be numbered into database/migrations). The page and
+  //      the switches run as the caller; connecting and checking need the providers and PARTNER_PII_KEY (keys are encrypted in the database and
+  //      never come back), so they are secure handlers. The service-role functions they call (pos_integration_save / _secret / _record_check)
+  //      are not reachable through the gateway.
+  db('pos_integrations_get', { args: ig.Empty, map: P, rate: 'read', roles: STAFF }),
+  db('pos_integration_set_sync', { args: ig.Sync, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('pos_integration_disconnect', { args: ig.Which, map: P, rate: 'write', roles: 'owner or manager' }),
+  sec('pos_integration_connect', { args: 'passthrough', rate: 'secure', roles: 'owner or manager (pos_integrations_get can_edit, checked before the provider is called)', maxBytes: 8 * 1024 }),
+  sec('pos_integration_test', { args: ig.Which, rate: 'secure', roles: 'owner or manager (checked in the database)' }),
   // ---- Customers, One Local Wallet, Manage account (0510-0512). Body = the function's `p` object; the database checks organisation, outlet and
   //      role (customers: order:place, edit pos_customers:manage; wallet: settlements:read; account: the signed-in person only).
   db('cust_list', { args: cu.List, map: P, rate: 'read', roles: 'staff who may place orders, or customer managers' }),

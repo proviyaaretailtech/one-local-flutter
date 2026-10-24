@@ -171,7 +171,7 @@ class StatusPill extends StatelessWidget {
 
 /// A labelled soft-grey field (Figma: #F7F8F6, 12 radius, 44 tall).
 class SheetField extends StatelessWidget {
-  const SheetField({super.key, required this.label, required this.controller, this.hint, this.keyboardType, this.maxLines = 1, this.maxLength, this.prefix, this.inputFormatters, this.fieldKey, this.helper});
+  const SheetField({super.key, required this.label, required this.controller, this.hint, this.keyboardType, this.maxLines = 1, this.maxLength, this.prefix, this.inputFormatters, this.fieldKey, this.helper, this.obscure = false});
   final String label;
   final String? hint, helper, prefix;
   final TextEditingController controller;
@@ -180,6 +180,8 @@ class SheetField extends StatelessWidget {
   final int? maxLength;
   final List<TextInputFormatter>? inputFormatters;
   final Key? fieldKey;
+  /// Dots instead of the text (keys and secrets). Single line only.
+  final bool obscure;
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
@@ -199,11 +201,13 @@ class SheetField extends StatelessWidget {
                   key: fieldKey,
                   controller: controller,
                   keyboardType: keyboardType,
-                  maxLines: maxLines,
+                  maxLines: obscure ? 1 : maxLines,
                   minLines: 1,
                   maxLength: maxLength,
                   inputFormatters: inputFormatters,
                   autocorrect: false,
+                  obscureText: obscure,
+                  enableSuggestions: !obscure,
                   style: inter(13.5, 400),
                   decoration: InputDecoration(border: InputBorder.none, isCollapsed: false, contentPadding: const EdgeInsets.symmetric(vertical: 12), hintText: hint, counterText: '', hintStyle: inter(13.5, 400, color: kMuted)),
                 ),

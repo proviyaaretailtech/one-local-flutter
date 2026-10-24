@@ -188,3 +188,24 @@ Static files of the Flutter web build `lib/guest_web_main.dart` (`../tool/build_
 under `/t/` that is not a built file gets the page; the page reads the code from its own address. `Referrer-Policy: no-referrer` so the
 code never leaks to other sites. On Vercel the build is served from `public/t/` and `vercel.json` rewrites `/t/<code>` to the page.
 E2E: `node scripts/guest-e2e.mjs` (two businesses, cross-tenant, abuse limits, replaced code, accept into an order, Hand to guest).
+
+## Settings -> Integrations: Petpooja and GoFrugal — `lib/settings/integrations_api.dart`, `src/schemas/integrations.ts`, `src/modules/secure/integrations.ts`, `../db/migrations/pos_integrations.sql` (not numbered yet)
+
+Through `POST /rpc/<name>`. The page and the switches run as the caller; connecting and checking are secure handlers because they call the
+provider and need `PARTNER_PII_KEY`: the keys are encrypted inside the database and never come back (only the last four characters as
+`key_hint`). A connection is saved only after the provider accepted the keys. The GoFrugal store URL is called only at a public address
+(every resolved address is checked when the connection is made; no redirects). Petpooja: `PETPOOJA_MENU_URL` overrides the menu endpoint.
+
+| Name | Request | Answer | Rate | Who |
+|---|---|---|---|---|
+| `pos_integrations_get` | `{}` | page: `{can_edit, integrations:[{provider, status: connected\|error\|disconnected, account, key_hint, sync:{menu, orders, stock}, last_check:{at, ok, message} \| null, connected_at}]}`; `account` and `key_hint` only for editors | read | staff |
+| `pos_integration_connect` | Petpooja `{provider:'petpooja', restaurant_id, app_key, app_secret, access_token}`; GoFrugal `{provider:'gofrugal', store_url, api_key, outlet_id?}` (strict) | page | secure | owner or manager (checked before the provider is called) |
+| `pos_integration_test` | `{provider}` | page + `check:{provider, ok, message}`; a failed check sets `status:'error'` and keeps the keys | secure | owner or manager |
+| `pos_integration_set_sync` | `{provider, menu?, orders?, stock?}` (at least one) | page | write | owner or manager; connected providers only |
+| `pos_integration_disconnect` | `{provider}` | page (keys, account and switches deleted) | write | owner or manager |
+
+Error codes: `integration_refused` (422, the provider refused the keys; its own reason when it gave one), `integration_bad_address` (422, GoFrugal
+URL private, not the API, or redirecting), `integration_unreachable` (502), `not_configured` (503, no `PARTNER_PII_KEY` in production),
+`wrong_state` (409, sync or test before connecting). Service-role functions behind the handlers (`pos_integration_save`, `pos_integration_secret`,
+`pos_integration_record_check`) are not reachable through the gateway. Unit: `tests/unit/integrations.test.ts`. Not built yet: the sync jobs that
+act on the switches.
