@@ -7,7 +7,9 @@ import { fail, redact } from './http.ts';
 
 function cors(origin: string | undefined): Record<string, string> {
   const allowed = (process.env.CORS_ORIGINS ?? '').split(',').map(s => s.trim()).filter(Boolean);
-  if (!origin || !allowed.includes(origin)) return {};
+  // Any local dev origin (Flutter web picks a port per run). Auth is a bearer token, not cookies.
+  const isLocalDev = !!origin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  if (!origin || !(isLocalDev || allowed.includes(origin))) return {};
   return {
     'Access-Control-Allow-Origin': origin, 'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key',
