@@ -472,8 +472,8 @@ void main() {
       final f = Fake();
       final env = MoneyEnv(api: f.env.api, onNavigate: ids.add);
       await show(t, moneyScreenFor(env..screenFor = moneyScreenFor, 'payments'));
-      await t.tap(find.bySemanticsLabel('Stock'));
-      expect(ids, ['stock']);
+      await t.tap(find.bySemanticsLabel('Item'));
+      expect(ids, ['item']);
     });
 
     test('HomeNav.money is plugged in by installRoutes', () {

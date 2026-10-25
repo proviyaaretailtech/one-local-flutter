@@ -122,6 +122,12 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
     if (mounted) _load();
   }
 
+  void _receive() {
+    final open = widget.stock.onOpenReceiving;
+    if (open == null) return showToast(context, 'Receiving is not available here.');
+    open(context);
+  }
+
   Future<void> _openOrder(PurchaseOrder po) => _push(PoGrnScreen(env: env, orderId: po.id));
   Future<void> _newOrder() => _push(PoCreateScreen(env: env));
 
@@ -299,6 +305,9 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
         Text('To do', style: inter(16, 700)),
         const SizedBox(height: 10),
         _todo(),
+        const SizedBox(height: 12),
+        // goods that came in, with or without a purchase order: count them, note damaged ones, send for approval
+        InvPrimary('Receive a delivery', key: const ValueKey('receive-delivery'), onPressed: _receive),
         const SizedBox(height: 20),
         Row(children: [
           Expanded(child: Text('Purchase orders', style: inter(16, 700))),

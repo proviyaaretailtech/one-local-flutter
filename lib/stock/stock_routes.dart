@@ -5,7 +5,7 @@ import 'alerts_screen.dart';
 import 'labels_screens.dart';
 import 'low_stock_view_screen.dart';
 import 'move_stock_screen.dart';
-import 'receive_screen.dart';
+import '../home/home_nav.dart';
 import 'reorder_screen.dart';
 import 'stock_count_screen.dart';
 import 'stock_env.dart';
@@ -18,12 +18,16 @@ import 'update_stock_screen.dart';
 const stockHomeRoute = '/inventory';
 
 /// Opens one stock page on top of the current one (with a back arrow); Stock itself has its own route name.
-Future<void> openStockPage(BuildContext context, StockEnv env, String page, {String? itemId}) {
-  if (page == StockPage.home) return Navigator.of(context).push(StockHomeScreen.route(env));
+Future<void> openStockPage(BuildContext context, StockEnv env, String page, {String? itemId}) async {
+  if (page == StockPage.home) {
+    await Navigator.of(context).push(StockHomeScreen.route(env));
+    return;
+  }
+  // receiving and matching live in Item → Purchase
+  if (page == StockPage.receive) return HomeNav.grn?.call(context);
   final Widget screen = switch (page) {
     StockPage.item => ProductPage(env: env, inventoryId: itemId),
     StockPage.movements => StockMovementsScreen(env: env, itemId: itemId),
-    StockPage.receive => ReceiveScreen(env: env, itemId: itemId),
     StockPage.adjust => AdjustStockScreen(env: env, itemId: itemId),
     StockPage.transfer => MoveStockScreen(env: env, itemId: itemId),
     StockPage.low => LowStockViewScreen(env: env, itemId: itemId),
@@ -33,5 +37,5 @@ Future<void> openStockPage(BuildContext context, StockEnv env, String page, {Str
     StockPage.productLabels => ProductLabelsScreen(env: env, itemId: itemId),
     _ => UpdateStockScreen(env: env, itemId: itemId),
   };
-  return Navigator.of(context).push(MaterialPageRoute(settings: RouteSettings(name: 'stock/$page'), builder: (_) => screen));
+  await Navigator.of(context).push(MaterialPageRoute(settings: RouteSettings(name: 'stock/$page'), builder: (_) => screen));
 }

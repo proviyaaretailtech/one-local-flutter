@@ -83,6 +83,7 @@ class Fake {
     catalogue: CatalogueApi(baseUrl: 'http://t.test', accessToken: () => 't', client: client),
     rpc: RpcClient(baseUrl: 'http://t.test', accessToken: () => 't', client: client),
     open: (context, page, {itemId}) async => opened.add(page),
+    onOpenReceiving: (_) => opened.add('receiving'),
   );
   late final env = PurEnv(api: PurchasingApi(baseUrl: 'http://t.test', accessToken: () => 't', client: client), inv: stock.inv);
 
@@ -190,6 +191,14 @@ void main() {
     await tap(t, find.byKey(const ValueKey('supplier-save')));
     expect(find.text('You already have a supplier named ABC Foods.'), findsOneWidget);
     expect(find.byKey(const ValueKey('supplier-save')), findsOneWidget);
+  });
+
+  testWidgets('Receive a delivery is one tap, with or without a purchase order', (t) async {
+    final f = Fake();
+    await phone(t, PurchaseHubScreen(env: f.env, stock: f.stock));
+    await t.ensureVisible(find.byKey(const ValueKey('receive-delivery')));
+    await t.tap(find.byKey(const ValueKey('receive-delivery')));
+    expect(f.opened, ['receiving']);
   });
 
   testWidgets('inside the Item tab it shows the Products · Stock · Purchase switcher first', (t) async {

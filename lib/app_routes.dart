@@ -6,6 +6,7 @@ import 'auth/auth_repository.dart';
 import 'auth/partner_api.dart';
 import 'catalogue/catalogue_screen.dart';
 import 'catalogue/grn_screens.dart';
+import 'catalogue/item_parts.dart';
 import 'home/app_shell.dart';
 import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
@@ -22,11 +23,12 @@ import 'notices/notices_home.dart';
 import 'menu/menu_screen.dart';
 import 'orders/cart_screen.dart';
 import 'purchasing/po_create_screen.dart';
-import 'purchasing/po_history_screen.dart';
+import 'purchasing/purchase_hub_screen.dart';
 import 'purchasing/purchasing_api.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_board_screen.dart';
 import 'orders/orders_home.dart';
+import 'stock/product_page.dart';
 import 'stock/stock_env.dart';
 import 'stock/stock_home.dart';
 import 'stock/stock_routes.dart';
@@ -69,18 +71,20 @@ void installRoutes() {
     if (HomeNav.shell?.kind == 'store' && _inShell('Bill')) return;
     Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'sell'), builder: (_) => SellScreen(env: SellEnv(onTab: (id) => _tab(c, id)))));
   };
-  HomeNav.items = (c) {
-    if (_inShell('Item')) return;
-    Navigator.of(c).push(MaterialPageRoute(builder: (_) => CatalogueScreen(onNavigate: (id) => _tab(c, id))));
-  };
+  HomeNav.items = (c) => _itemPart(c, 'products');
   HomeNav.menu = (c) {
     if (_inShell('Menu')) return;
     Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuScreen()));
   };
-  HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(
-      builder: (_) => GrnQueueScreen(onReceive: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(ctx)))))));
-  // Stock management (founder, 24 Oct 2026): the Stock tab's home, one item's stock, and every stock page by id (side menu sections).
+  // A store's Stock and Purchase are parts of Item (founder, 25 Oct 2026); a restaurant keeps its Stock tab and receipts page.
+  HomeNav.grn = (c) => _restaurant
+      ? Navigator.of(c).push(MaterialPageRoute(
+          builder: (_) => GrnQueueScreen(onReceive: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(ctx)))))))
+      : _itemPart(c, 'purchase');
+  // "Open Receipt" on a purchase review: that delivery's receipt in Receiving.
+  HomeNav.receipt = (c, documentId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(c), documentId: documentId)));
   HomeNav.stock = (c) {
+    if (!_restaurant) return _itemPart(c, 'stock');
     if (_inShell('Stock')) return;
     Navigator.of(c).push(StockHomeScreen.route(_stockEnv(c)));
   };
@@ -122,9 +126,29 @@ void installRoutes() {
 
 InvEnv _inventoryEnv(BuildContext c) => InvEnv(
     onNavigate: (id) => _tab(c, id),
-    onOpenPurchasing: (ctx) => Navigator.of(ctx).push(PoHistoryScreen.pageRoute(PurEnv(inv: _inventoryEnv(ctx)))),
+    onOpenPurchasing: (ctx) => HomeNav.grn?.call(ctx), // Item → Purchase
     onOpenLowStock: (ctx) => HomeNav.lowStock?.call(ctx),
     onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
+
+bool get _restaurant => (HomeNav.shell?.kind ?? HomeNav.partnerType) == 'restaurant';
+
+/// The store's Item tab: Products · Stock · Purchase (founder, 25 Oct 2026). A product opens its one Product page.
+Widget _itemHome(BuildContext c) => ItemHome(parts: {
+      'products': (ctx) => CatalogueScreen(
+            onNavigate: (id) => _tab(c, id),
+            openProduct: (ctx, item) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ProductPage(env: _stockEnv(ctx), item: item))),
+          ),
+      'stock': (ctx) => StockHomeScreen(env: _stockEnv(ctx)),
+      'purchase': (ctx) => PurchaseHubScreen(env: PurEnv(inv: _inventoryEnv(ctx)), stock: _stockEnv(ctx)),
+    });
+
+/// Opens Item on one of its parts: switches to the Item tab when the shell has it, else opens Item on top.
+void _itemPart(BuildContext c, String part) {
+  ItemHome.requested.value = part;
+  WidgetsBinding.instance.addPostFrameCallback((_) => ItemHome.requested.value = null); // asked once, not every later visit
+  if (_inShell('Item')) return;
+  Navigator.of(c).push(MaterialPageRoute(builder: (_) => _itemHome(c)));
+}
 
 /// Every stock page's environment: the stock API and bottom bar, and the ways to Purchase (new purchase order) and Receiving.
 StockEnv _stockEnv(BuildContext c) => StockEnv(
@@ -144,7 +168,7 @@ Widget appShell({AuthRepository? auth}) => AppShell(rootFor: (kind, label) => sh
 /// The first screen of the bar tab [label] for a business of [kind] ('store', 'restaurant', 'service'); null when the tab has none.
 Widget? shellTabRoot(String kind, String label, {AuthRepository? auth}) => switch (label) {
         'Home' => ControlCentreScreen(auth: auth),
-        'Item' => Builder(builder: (c) => CatalogueScreen(onNavigate: (id) => _tab(c, id))),
+        'Item' => Builder(builder: _itemHome),
         'Menu' => const MenuScreen(),
         'Bill' => Builder(
             builder: (c) => switch (kind) {

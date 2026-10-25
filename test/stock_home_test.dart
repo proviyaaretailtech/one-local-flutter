@@ -14,7 +14,6 @@ import 'package:vinii_pos/home/side_nav.dart';
 import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart';
 import 'package:vinii_pos/stock/alerts_screen.dart';
-import 'package:vinii_pos/stock/receive_screen.dart';
 import 'package:vinii_pos/stock/stock_env.dart';
 import 'package:vinii_pos/stock/stock_home.dart';
 import 'package:vinii_pos/stock/product_page.dart';
@@ -82,12 +81,13 @@ void main() {
   tearDown(HomeNav.reset);
 
   group('Stock page', () {
-    testWidgets('opens Stock Management only: no tab strip, no Count', (t) async {
+    testWidgets('opens Stock Management with no tab strip; its jobs are small buttons', (t) async {
       final f = Fake();
       await phone(t, StockHomeScreen(env: f.env));
       expect(find.text('Stock Management'), findsOneWidget);
-      for (final gone in ['Movements', 'Receive', 'Adjust', 'Transfer', 'Count', 'Low stock', 'Reorder', 'Alerts']) {
-        expect(find.text(gone), findsNothing, reason: gone);
+      expect(find.byWidgetPredicate((w) => w.key is ValueKey<String> && '${(w.key! as ValueKey<String>).value}'.startsWith('stock-tab-')), findsNothing);
+      for (final b in ['Needs attention', 'Adjust', 'Transfer', 'Movements', 'Count stock']) {
+        expect(find.text(b), findsOneWidget, reason: b);
       }
     });
 
@@ -108,7 +108,7 @@ void main() {
     testWidgets('each stock page opens on top with a back arrow, from its button elsewhere', (t) async {
       final f = Fake();
       const titles = {
-        StockPage.movements: 'Stock movements', StockPage.receive: 'Receive stock', StockPage.adjust: 'Adjust stock',
+        StockPage.movements: 'Stock movements', StockPage.adjust: 'Adjust stock', StockPage.count: 'Count stock',
         StockPage.transfer: 'Transfer stock', StockPage.low: 'Low stock', StockPage.reorder: 'Reorder', StockPage.alerts: 'Alerts',
       };
       for (final MapEntry(key: page, value: title) in titles.entries) {
@@ -179,17 +179,6 @@ void main() {
       await t.tap(find.text('go'));
       await t.pumpAndSettle();
       expect(find.byType(ProductPage), findsOneWidget);
-    });
-  });
-
-  group('Receive (J.100)', () {
-    testWidgets('Receive a delivery opens Receiving; the latest deliveries show where they stand', (t) async {
-      final f = Fake(record: true);
-      await phone(t, ReceiveScreen(env: f.env));
-      final doc = (fx['documents_receipt']['documents'] as List).first as Map<String, dynamic>;
-      expect(find.text(doc['doc_no'] as String), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('receive-start')));
-      expect(f.opened, ['receiving']);
     });
   });
 

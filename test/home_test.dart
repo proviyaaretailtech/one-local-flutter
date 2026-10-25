@@ -295,9 +295,12 @@ void main() {
 
     testWidgets('store tab bar (the restaurant bar is checked in restaurant_dashboard_test.dart)', (t) async {
       await showHome(t);
-      for (final l in ['Home', 'Item', 'Bill', 'Online order', 'Stock']) {
+      for (final l in ['Home', 'Item', 'Bill', 'Online order']) {
         expect(find.byKey(ValueKey('tab-$l')), findsOneWidget);
       }
+      // the fifth slot is kept as an empty circle (Stock and Purchase are parts of Item, founder 25 Oct 2026)
+      expect(find.byKey(const ValueKey('tab-')), findsOneWidget);
+      expect(find.byKey(const ValueKey('tab-Stock')), findsNothing);
     });
 
     testWidgets('screens owned by other phases: honest toast until plugged in, then they open', (t) async {

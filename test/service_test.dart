@@ -219,9 +219,10 @@ void main() {
       expect(find.text('Deposit pending'), findsOneWidget);
       expect(find.text('Neha Rao · Chair 2'), findsOneWidget);
       expect(find.text('+ Book appointment'), findsOneWidget);
-      for (final tab in ['Home', 'Item', 'Bill', 'Online order', 'Stock']) {
+      for (final tab in ['Home', 'Item', 'Bill', 'Online order']) {
         expect(find.text(tab), findsOneWidget, reason: tab);
       }
+      expect(find.text('Stock'), findsNothing, reason: 'the fifth slot is kept empty (Stock is a part of Item)');
     });
 
     testWidgets('tapping a day asks the server for that day', (t) async {

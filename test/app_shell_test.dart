@@ -59,8 +59,8 @@ void main() {
     expect(find.text('detail store Item'), findsOneWidget);
     expect(find.byKey(const ValueKey('tab-Item')), findsOneWidget, reason: 'the bar stays over a pushed page');
 
-    await _tab(t, 'Stock');
-    expect(find.text('root store Stock'), findsOneWidget);
+    await _tab(t, 'Bill');
+    expect(find.text('root store Bill'), findsOneWidget);
     await _tab(t, 'Item');
     expect(find.text('detail store Item'), findsOneWidget, reason: 'Item kept its place');
     await _tab(t, 'Item');
@@ -116,9 +116,10 @@ void main() {
 
   testWidgets('HomeNav hooks switch tabs while the shell is up', (t) async {
     await _show(t);
-    expect(HomeNav.shell!.show('Stock'), isTrue);
+    expect(HomeNav.shell!.show('Item'), isTrue);
     await t.pumpAndSettle();
-    expect(find.text('root store Stock'), findsOneWidget);
+    expect(find.text('root store Item'), findsOneWidget);
+    expect(HomeNav.shell!.show('Stock'), isFalse, reason: 'a store has no Stock tab any more: it is a part of Item');
     expect(HomeNav.shell!.show('Menu'), isFalse, reason: 'a store has no Menu tab: the caller opens it the old way');
   });
 }

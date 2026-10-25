@@ -8,7 +8,6 @@ import 'package:http/testing.dart';
 import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/purchasing/po_create_screen.dart';
 import 'package:vinii_pos/purchasing/po_grn_screen.dart';
-import 'package:vinii_pos/purchasing/po_history_screen.dart';
 import 'package:vinii_pos/purchasing/purchasing_api.dart';
 import 'package:vinii_pos/purchasing/purchasing_widgets.dart';
 import 'package:vinii_pos/purchasing/supplier_price_screen.dart';
@@ -126,48 +125,6 @@ void main() {
           {'name': 'Receiving temperature', 'result': 'fail', 'detail': '8.1C'}
         ]
       });
-    });
-  });
-
-  group('Purchase History', () {
-    testWidgets('shows the open count, filters and every order with its lifecycle status, lines and totals', (t) async {
-      final s = Fake();
-      await showTall(t, PoHistoryScreen(env: s.env));
-      expect(find.text('Purchase History'), findsOneWidget);
-      expect(find.text('Open 2 orders'), findsOneWidget);
-      for (final x in ['All Orders', 'Open', 'Pending', 'Received', 'All', 'Overdue', '+ New Order', 'More Filters']) {
-        expect(find.text(x), findsWidgets, reason: x);
-      }
-      expect(find.text('SPO-0007 · ABC Foods'), findsOneWidget);
-      for (final x in ['Pending approval', 'Approved', 'Draft', 'Cancelled', 'Received']) {
-        expect(find.text(x), findsWidgets, reason: x);
-      }
-      expect(find.text('Red Tomatoes'), findsWidgets);
-      expect(find.text('Discrepancy'), findsWidgets);
-      expect(find.text('1.5 kg rejected'), findsOneWidget);
-      expect(find.text('LOT-PAN-20260908'), findsWidgets);
-      expect(find.text('Subtotal accepted goods'), findsWidgets);
-    });
-
-    testWidgets('a status chip asks the server for that filter', (t) async {
-      final s = Fake();
-      await showTall(t, PoHistoryScreen(env: s.env));
-      await t.tap(find.byKey(const ValueKey('chip-pending')));
-      await t.pumpAndSettle();
-      expect(argsOf(s.requests.last)['status'], 'pending');
-      await t.tap(find.byKey(const ValueKey('chip-overdue')));
-      await t.pumpAndSettle();
-      expect(argsOf(s.requests.last)['due'], 'overdue');
-    });
-
-    testWidgets('an empty answer says so; an error offers a retry', (t) async {
-      final s = Fake((r) => fnOf(r) == 'pur_po_list' ? ok({'open_count': 0, 'orders': []}) : null);
-      await showTall(t, PoHistoryScreen(env: s.env));
-      expect(find.text('No purchase orders match.'), findsOneWidget);
-      final e = Fake((r) => err(403, 'Your role cannot see purchasing.', 'forbidden'));
-      await showTall(t, PoHistoryScreen(env: e.env));
-      expect(find.text('Could not load this'), findsOneWidget);
-      expect(find.textContaining('cannot see purchasing'), findsOneWidget);
     });
   });
 

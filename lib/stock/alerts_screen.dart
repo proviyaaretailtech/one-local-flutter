@@ -86,7 +86,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
         kind: 'mismatch',
         title: d.s('doc_no'),
         line: audit ? 'Count differs from the app by ${signed(d.n('variance'))}' : '${qty(d.n('rejected'))} units damaged or rejected in a delivery',
-        action: audit ? 'Fix it in Adjust' : 'Open receive',
+        action: audit ? 'Fix it in Adjust' : 'Open Purchase',
         page: audit ? StockPage.adjust : StockPage.receive,
         itemId: null,
         urgent: false,
