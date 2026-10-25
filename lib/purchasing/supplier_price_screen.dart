@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../inventory/inventory_api.dart';
-import '../inventory/inventory_dashboard.dart';
+import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
 import 'purchasing_api.dart';
@@ -101,7 +101,7 @@ class _SupplierPriceScreenState extends State<SupplierPriceScreen> {
         padding: const EdgeInsets.only(bottom: 6),
         child: Text('${d.s('emoji')} ${d.s('ingredient_name')}'.trim(), style: inter(24, 700)),
       ),
-      Text('Supplier: ${d.m('supplier').s('name')} · UOM: Per ${unit.toUpperCase()}${d.s('sku_id').isEmpty ? '' : ' · SKU ID: ${d.s('sku_id')}'}', style: inter(14.5, 400, color: kMuted, height: 1.4)),
+      Text('Supplier: ${d.m('supplier').s('name')} · UOM: Per ${unit.toUpperCase()}${d.s('sku_id').isEmpty ? '' : ' · System Code: ${d.s('sku_id')}'}', style: inter(14.5, 400, color: kMuted, height: 1.4)),
       if (src.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Align(alignment: Alignment.centerLeft, child: PoChip(src, bg: kBlueIconBg, fg: kBlueIcon))),
       const SizedBox(height: 12),
       Row(children: [

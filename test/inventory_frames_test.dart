@@ -9,16 +9,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:vinii_pos/inventory/adjustment_screen.dart';
-import 'package:vinii_pos/inventory/audit_screen.dart';
-import 'package:vinii_pos/inventory/forecast_screen.dart';
+import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart';
-import 'package:vinii_pos/inventory/inventory_dashboard.dart';
-import 'package:vinii_pos/inventory/movement_screen.dart';
 import 'package:vinii_pos/inventory/receiving_screen.dart';
-import 'package:vinii_pos/inventory/stock_detail_screen.dart';
-import 'package:vinii_pos/inventory/stock_list_screen.dart';
-import 'package:vinii_pos/inventory/transfer_screen.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
 Future<void> _font(String family, String asset) async {
@@ -67,13 +60,5 @@ void main() {
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('frames_h/$file.png'));
   }
 
-  testWidgets('Inventory Dashboard', (t) => frame(t, 'Inventory Dashboard', InventoryDashboard(env: env('receipt_draft')), height: 1180), skip: !on);
-  testWidgets('Stock', (t) => frame(t, 'Stock', StockListScreen(env: env('receipt_draft')), height: 900), skip: !on);
-  testWidgets('Stock Detail', (t) => frame(t, 'Stock Detail', StockDetailScreen(env: env('receipt_draft'), itemId: 'x'), height: 1180), skip: !on);
-  testWidgets('Movement Detail', (t) => frame(t, 'Movement Detail', MovementScreen(env: env('receipt_draft'), movementId: 1), height: 1130), skip: !on);
   testWidgets('Receiving', (t) => frame(t, 'Receiving', ReceivingScreen(env: env('receipt_draft')), height: 1450), skip: !on);
-  testWidgets('Adjustment', (t) => frame(t, 'Adjustment', AdjustmentScreen(env: env('adjustment_draft')), height: 1430), skip: !on);
-  testWidgets('Transfer', (t) => frame(t, 'Transfer', TransferScreen(env: env('transfer_draft')), height: 1400), skip: !on);
-  testWidgets('Stock Audit', (t) => frame(t, 'Stock Audit', AuditScreen(env: env('audit_counted')), height: 1300), skip: !on);
-  testWidgets('Inventory Forecast', (t) => frame(t, 'Inventory Forecast', ForecastScreen(env: env('receipt_draft'), itemId: 'x'), height: 1320), skip: !on);
 }

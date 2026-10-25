@@ -4,15 +4,13 @@ import 'package:flutter/material.dart';
 import 'account/routes.dart';
 import 'auth/auth_repository.dart';
 import 'auth/partner_api.dart';
-import 'backoffice/low_stock_screen.dart';
 import 'catalogue/catalogue_screen.dart';
 import 'catalogue/grn_screens.dart';
 import 'home/app_shell.dart';
 import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
-import 'inventory/inventory_dashboard.dart';
+import 'inventory/inv_env.dart';
 import 'inventory/receiving_screen.dart';
-import 'inventory/stock_detail_screen.dart';
 import 'kitchen/kds_screen.dart';
 import 'kitchen/kitchen_setup_screen.dart';
 import 'kitchen/kitchen_widgets.dart';
@@ -23,11 +21,15 @@ import 'notices/notices_api.dart';
 import 'notices/notices_home.dart';
 import 'menu/menu_screen.dart';
 import 'orders/cart_screen.dart';
+import 'purchasing/po_create_screen.dart';
 import 'purchasing/po_history_screen.dart';
 import 'purchasing/purchasing_api.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_board_screen.dart';
 import 'orders/orders_home.dart';
+import 'stock/stock_env.dart';
+import 'stock/stock_home.dart';
+import 'stock/stock_routes.dart';
 import 'sell/sell_env.dart';
 import 'sell/sell_screen.dart';
 import 'service/calendar_screen.dart';
@@ -77,12 +79,13 @@ void installRoutes() {
   };
   HomeNav.grn = (c) => Navigator.of(c).push(MaterialPageRoute(
       builder: (_) => GrnQueueScreen(onReceive: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(ctx)))))));
-  const inventoryEnv = _inventoryEnv;
+  // Stock management (founder, 24 Oct 2026): the Stock tab's home, one item's stock, and every stock page by id (side menu sections).
   HomeNav.stock = (c) {
     if (_inShell('Stock')) return;
-    Navigator.of(c).push(InventoryDashboard.route(inventoryEnv(c)));
+    Navigator.of(c).push(StockHomeScreen.route(_stockEnv(c)));
   };
-  HomeNav.stockItem = (c, itemId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => StockDetailScreen(env: inventoryEnv(c), itemId: itemId)));
+  HomeNav.stockItem = (c, itemId) => openStockPage(c, _stockEnv(c), StockPage.item, itemId: itemId);
+  HomeNav.stockPage = (c, page, {itemId}) => openStockPage(c, _stockEnv(c), page, itemId: itemId);
   KitchenEnv kitchenEnv(BuildContext c) => KitchenEnv(onNavigate: (id) => _kitchenTab(c, id));
   HomeNav.kitchenSetup = (c) => Navigator.of(c).push(KitchenSetupScreen.route(kitchenEnv(c)));
   HomeNav.kitchenDisplay = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => KdsScreen(env: kitchenEnv(c))));
@@ -94,8 +97,7 @@ void installRoutes() {
   };
   HomeNav.menuLink = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuLinkScreen()));
   HomeNav.tableQr = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => TableQrScreen(env: TablesEnv())));
-  HomeNav.lowStock = (c) => Navigator.of(c).push(MaterialPageRoute(
-      builder: (_) => LowStockScreen(onNavigate: (id) => _tab(c, id), onItems: () => HomeNav.go(c, HomeNav.items, 'Items'), onViewItem: HomeNav.stockItem)));
+  HomeNav.lowStock = (c) => openStockPage(c, _stockEnv(c), StockPage.low);
   HomeNav.service = (c) {
     if (HomeNav.shell?.kind == 'service' && _inShell('Bill')) return;   // a service partner's Bill tab is the calendar
     Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
@@ -124,6 +126,12 @@ InvEnv _inventoryEnv(BuildContext c) => InvEnv(
     onOpenLowStock: (ctx) => HomeNav.lowStock?.call(ctx),
     onOpenOrder: (ctx, orderId) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => OrderScreen(orderId: orderId, onNavigate: (id) => _tab(ctx, id)))));
 
+/// Every stock page's environment: the stock API and bottom bar, and the ways to Purchase (new purchase order) and Receiving.
+StockEnv _stockEnv(BuildContext c) => StockEnv(
+    inv: _inventoryEnv(c),
+    onOpenPurchase: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => PoCreateScreen(env: PurEnv(inv: _inventoryEnv(ctx))))),
+    onOpenReceiving: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(ctx)))));
+
 /// Switches the app shell to the tab with this bar label, when the shell is up and has that tab.
 bool _inShell(String label) => HomeNav.shell?.show(label) ?? false;
 
@@ -149,7 +157,7 @@ Widget? shellTabRoot(String kind, String label, {AuthRepository? auth}) => switc
         // dine-in / takeaway / delivery is the restaurant's Orders tab (section H), so a store never sees it.
         'Online order' => Builder(builder: (c) => OrdersHome(onNavigate: (id) => _tab(c, id))),
         'Orders' => Builder(builder: (c) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))),
-        'Stock' => Builder(builder: (c) => InventoryDashboard(env: _inventoryEnv(c))),
+        'Stock' => Builder(builder: (c) => StockHomeScreen(env: _stockEnv(c))),
         _ => null,
       };
 

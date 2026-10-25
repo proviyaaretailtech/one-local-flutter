@@ -3,12 +3,12 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../ui/theme.dart';
 import 'document_flow.dart';
+import 'inv_env.dart';
 import 'inventory_api.dart';
-import 'inventory_dashboard.dart';
 import 'inventory_widgets.dart';
 
 /// Figma "Receiving": verify a delivery before the goods-received note is approved. Counts, rejects with a reason, the supplier lot and expiry,
-/// and a reconciliation. Drafts never change stock; "Send to GRN Review" then the approver posting it does.
+/// and a reconciliation. Drafts never change stock; "Send to Purchase Review" then the approver posting it does.
 class ReceivingScreen extends StatefulWidget {
   const ReceivingScreen({super.key, required this.env, this.documentId});
   final InvEnv env;
@@ -69,7 +69,7 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
       await _f.save(fields: _fields, lines: _lines);
       await _f.act('submit');
       _adopt();
-    }, done: 'Sent to GRN review. Stock changes when the receipt is posted.');
+    }, done: 'Sent to purchase review. Stock changes when the receipt is posted.');
     if (ok && mounted) setState(() {});
   }
 
@@ -170,7 +170,7 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
   @override
   Widget build(BuildContext context) => InvScaffold(env: env, onRefresh: _init, children: [
         const InvTitle('Receiving', subtitle: 'Verify physical deliveries before goods received note approval'),
-        InvChips(active: _tab, onTap: _setTab, items: const [('receiving', 'Receiving', null), ('grn', 'GRN', null), ('putaway', 'Putaway', null)]),
+        InvChips(active: _tab, onTap: _setTab, items: const [('receiving', 'Receiving', null), ('grn', 'Purchase', null), ('putaway', 'Putaway', null)]),
         InvInput(controller: _search, hint: 'Search supplier, batch, invoice…', prefixIcon: LucideIcons.search, onChanged: (_) => setState(() {})),
         const SizedBox(height: 10),
         if (!_loaded && _f.error == null) const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(color: kInk))),
@@ -196,7 +196,7 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
     final inReview = d != null && d.status == 'review';
     final tabMatches = d == null ? true : (_tab == 'grn') == inReview;
     return [
-      if (d == null || !tabMatches) ...docEmpty(_tab == 'grn' ? 'No receipt is waiting in GRN review.' : 'No receipt is open. Start one when a delivery arrives.',
+      if (d == null || !tabMatches) ...docEmpty(_tab == 'grn' ? 'No receipt is waiting in purchase review.' : 'No receipt is open. Start one when a delivery arrives.',
           action: 'Scan / Enter Items', onAction: () async {
         _f.startNew();
         _lines = [];
@@ -262,7 +262,7 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
         if (_lines.isNotEmpty)
           InvNote(received >= expected && hasExpected
               ? 'Receipt complete.${rejected > 0 ? ' ${qty(rejected)} ${rejected == 1 ? 'unit is' : 'units are'} rejected; keep ${rejected == 1 ? 'it' : 'them'} in inbound quarantine, separate from current damaged stock.' : ''}'
-              : 'Count what arrived, then send the receipt to GRN review.'),
+              : 'Count what arrived, then send the receipt to purchase review.'),
       ])),
       if (editable) ...[
         if (_lines.length > 1)
@@ -305,7 +305,7 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
             _adopt();
           })),
       if (editable) ...[
-        InvPrimary('Send to GRN Review', busy: _f.busy, onPressed: _submit),
+        InvPrimary('Send to Purchase Review', busy: _f.busy, onPressed: _submit),
         InvSecondary('Scan / Enter Items', onPressed: _addItem),
         InvSecondary('Review Discrepancies · ${qty(rejected)} ${rejected == 1 ? 'reject' : 'rejects'}', onPressed: () => _discrepancies(rejected)),
         InvSecondary('Save Draft', onPressed: () => _save(done: 'Draft saved.')),
@@ -332,7 +332,7 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
 
   Widget _inspect(DraftLine l, String unit) => InvCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         InvCardHead('Count and inspect', subtitle: '${l.itemName} • ${l.sku}'),
-        const InvLabel('Scan barcode / SKU'),
+        const InvLabel('Scan barcode / System Code'),
         SizedBox(
           height: 46,
           child: TextField(

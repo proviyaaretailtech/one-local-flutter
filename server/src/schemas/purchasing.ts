@@ -29,6 +29,13 @@ export const PoCreate = obj({
   submit: z.boolean().optional(),   // true = Pending (awaiting approval), otherwise a Draft
   lines: z.array(PoLine).min(1, 'Add at least one item.').max(100, 'An order can have at most 100 items.'), ...key,
 });
+// A supplier added (no id) or changed (id) from Item → Purchase → Suppliers. Only the name is required.
+export const SupplierSave = obj({
+  id: z.string().trim().min(1).max(100).optional(),
+  name: z.string({ message: 'Enter the supplier name.' }).trim().min(2, 'Enter the supplier name.').max(80, 'The supplier name is too long.'),
+  phone: z.string().trim().max(16).optional(), gstin: z.string().trim().max(15, 'A GSTIN has 15 letters and numbers.').optional(),
+  city: z.string().trim().max(60, 'The city name is too long.').optional(), ...key,
+});
 export const PoAct = obj({ id, action: z.enum(['submit', 'approve', 'reject', 'cancel'], { message: 'Unknown action.' }), note: z.string().max(200).nullish() });
 export const PoReceive = obj({ id, ...key });
 export const PriceView = obj({ price_id: id });

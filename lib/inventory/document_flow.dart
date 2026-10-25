@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../auth/partner_api.dart';
 import '../ui/theme.dart';
+import 'inv_env.dart';
 import 'inventory_api.dart';
-import 'inventory_dashboard.dart';
 import 'inventory_widgets.dart';
 
 /// The open document of one stock screen (receipt, adjustment, transfer or audit) and the three things a person does to it:

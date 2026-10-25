@@ -117,7 +117,7 @@ class _GrnMatchingState extends State<GrnMatchingScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: 'GRN Matching', onBack: () => Navigator.of(context).maybePop()),
+        OrdersTopBar(title: 'Purchase matching', onBack: () => Navigator.of(context).maybePop()),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
@@ -135,7 +135,7 @@ class _GrnMatchingState extends State<GrnMatchingScreen> {
                     const SizedBox(height: 4),
                     Text(d.hasInvoice ? '${d.invoiceNo} • ${d.supplier}' : 'No supplier invoice entered yet • ${d.supplier}', style: inter(19, 500)),
                     const SizedBox(height: 4),
-                    Text('Review exceptions before Confirm Receiving.\nNext: GRN Approval/Posting • not posted yet.', style: inter(16, 400, color: kMuted, height: 1.35)),
+                    Text('Review exceptions before Confirm Receiving.\nNext: purchase approval and posting • not posted yet.', style: inter(16, 400, color: kMuted, height: 1.35)),
                   ]),
                 ),
                 const SizedBox(height: 14),
@@ -298,7 +298,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
   Widget _tabs() => SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(children: [
-          for (final (label, on) in [('Receiving', false), ('GRN', true), ('Putaway', false), ('Shelf Labels', false)]) ...[
+          for (final (label, on) in [('Receiving', false), ('Purchase', true), ('Putaway', false), ('Shelf Labels', false)]) ...[
             InkWell(
               borderRadius: BorderRadius.circular(999),
               onTap: on ? null : () => label == 'Receiving' ? HomeNav.go(context, HomeNav.stock, 'Receiving') : showToast(context, '$label is not in this release.'),
@@ -501,13 +501,13 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: 'GRN', onBack: () => Navigator.of(context).maybePop()),
+        OrdersTopBar(title: 'Purchase', onBack: () => Navigator.of(context).maybePop()),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
             child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
               Row(children: [
-                Expanded(child: Text('GRN Dashboard', style: inter(28, 800))),
+                Expanded(child: Text('Purchase dashboard', style: inter(28, 800))),
                 InkWell(
                   borderRadius: BorderRadius.circular(18),
                   onTap: () => HomeNav.go(context, HomeNav.items, 'Items'),
@@ -561,7 +561,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
                 const SizedBox(height: 14),
                 _actions(v),
                 const SizedBox(height: 12),
-                Text('Review Exceptions → Confirm Receiving → GRN Approval/Posting\nDrafts do not change posted stock.', style: inter(14, 400, color: kMuted, height: 1.4)),
+                Text('Review Exceptions → Confirm Receiving → Purchase approval and posting\nDrafts do not change posted stock.', style: inter(14, 400, color: kMuted, height: 1.4)),
               ],
             ]),
           ),
@@ -617,7 +617,7 @@ class GrnQueueScreen extends StatefulWidget {
   const GrnQueueScreen({super.key, this.api, this.onReceive});
   final CatalogueApi? api;
 
-  /// Opens Receiving (count a delivery and send it to GRN review). Null: the Stock tab.
+  /// Opens Receiving (count a delivery and send it to purchase review). Null: the Stock tab.
   final void Function(BuildContext context)? onReceive;
   @override
   State<GrnQueueScreen> createState() => _GrnQueueState();
@@ -667,7 +667,7 @@ class _GrnQueueState extends State<GrnQueueScreen> {
   Widget _tabs() => SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(children: [
-          for (final (label, on) in [('Receiving', false), ('GRN', true), ('Putaway', false), ('Shelf Labels', false)]) ...[
+          for (final (label, on) in [('Receiving', false), ('Purchase', true), ('Putaway', false), ('Shelf Labels', false)]) ...[
             InkWell(
               borderRadius: BorderRadius.circular(999),
               onTap: on ? null : () => label == 'Receiving' ? _receive() : showToast(context, '$label is not in this release.'),
@@ -748,9 +748,9 @@ class _GrnQueueState extends State<GrnQueueScreen> {
             child: const Icon(LucideIcons.packageCheck, size: 22, color: kGreenText),
           ),
           const SizedBox(height: 12),
-          Text('No receipts waiting for GRN', style: inter(18, 700)),
+          Text('No purchases waiting for review', style: inter(18, 700)),
           const SizedBox(height: 4),
-          Text('When a delivery arrives, count it in Receiving and send it to GRN review. It shows up here to match against the supplier invoice.',
+          Text('When a delivery arrives, count it in Receiving and send it to purchase review. It shows up here to match against the supplier invoice.',
               style: inter(14, 400, color: kMuted, height: 1.4)),
           const SizedBox(height: 14),
           for (final (i, step) in const ['Count the delivery in Receiving', 'Match it against the supplier invoice', 'Owner approves · stock is posted'].indexed)
@@ -782,12 +782,12 @@ class _GrnQueueState extends State<GrnQueueScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: 'GRN', onBack: () => Navigator.of(context).maybePop()),
+        OrdersTopBar(title: 'Purchase', onBack: () => Navigator.of(context).maybePop()),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
             child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
-              Text('Goods receipts', style: inter(24, 800)),
+              Text('Purchases', style: inter(24, 800)),
               const SizedBox(height: 2),
               Text('Open receipt → Scan/Enter Products → Match Invoice', style: inter(14, 400, color: kMuted)),
               const SizedBox(height: 14),

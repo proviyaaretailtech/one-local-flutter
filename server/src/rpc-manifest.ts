@@ -157,6 +157,11 @@ export const MANIFEST: Entry[] = [
   db('cat_item_save', { args: cat.Save, map: P, rate: 'write', idem: true, roles: 'staff with menu:create (new) or menu:update (change)' }),
   // Item form "Remove background (AI)": remove.bg with REMOVE_BG_API_KEY (server only); a photo up to 5 MB, nothing saved.
   sec('cat_image_remove_bg', { args: cat.RemoveBg, rate: 'secure', roles: 'active staff of a business (checked on the server)', maxBytes: 7 * 1024 * 1024 + 64 * 1024 }),
+  // The item's saved photo (item-images bucket): signed upload slot, confirm, remove. The server checks menu:create / menu:update on the
+  // item's business before signing; cat_item_photo_attach / _remove (service-only) check it again and record the link on the item.
+  sec('cat_item_photo_slot', { args: cat.PhotoAsk, rate: 'secure', roles: 'staff with menu:create or menu:update' }),
+  sec('cat_item_photo_attach', { args: cat.PhotoAttach, rate: 'secure', roles: 'staff with menu:create or menu:update' }),
+  sec('cat_item_photo_remove', { args: cat.PhotoRemove, rate: 'secure', roles: 'staff with menu:update' }),
   db('grn_list', { args: grn.List, map: P, rate: 'read', roles: STAFF }),
   db('grn_view', { args: grn.Receipt, map: P, rate: 'read', roles: STAFF }),
   db('grn_matching_view', { args: grn.Receipt, map: P, rate: 'read', roles: STAFF }),
@@ -237,6 +242,9 @@ export const MANIFEST: Entry[] = [
   db('pur_po_view', { args: pur.PoView, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
   db('pur_price_view', { args: pur.PriceView, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
   db('pur_po_create', { args: pur.PoCreate, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
+  // Item → Purchase → Suppliers (C:\onelocal\hosted_add_supplier.sql): the list with contact details, and add / change one.
+  db('pur_supplier_list', { args: pur.Options, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
+  db('pur_supplier_save', { args: pur.SupplierSave, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
   db('pur_po_act', { args: pur.PoAct, map: P, rate: 'write', roles: 'purchasing:record (submit, cancel a draft or pending order); purchasing:approve_po (approve, reject, cancel an approved order)' }),
   db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
   db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),

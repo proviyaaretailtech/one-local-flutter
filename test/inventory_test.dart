@@ -8,17 +8,10 @@ import 'package:http/testing.dart';
 import 'package:vinii_pos/app_routes.dart';
 import 'package:vinii_pos/auth/partner_api.dart';
 import 'package:vinii_pos/home/home_nav.dart';
-import 'package:vinii_pos/inventory/adjustment_screen.dart';
-import 'package:vinii_pos/inventory/audit_screen.dart';
-import 'package:vinii_pos/inventory/forecast_screen.dart';
+import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart';
-import 'package:vinii_pos/inventory/inventory_dashboard.dart';
 import 'package:vinii_pos/inventory/inventory_widgets.dart';
-import 'package:vinii_pos/inventory/movement_screen.dart';
 import 'package:vinii_pos/inventory/receiving_screen.dart';
-import 'package:vinii_pos/inventory/stock_detail_screen.dart';
-import 'package:vinii_pos/inventory/stock_list_screen.dart';
-import 'package:vinii_pos/inventory/transfer_screen.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
 import 'helpers.dart';
@@ -177,146 +170,6 @@ void main() {
     });
   });
 
-  group('Dashboard (Figma "Inventory Dashboard")', () {
-    testWidgets('shows the store, counts, attention, actions, tools and planning from the server', (t) async {
-      final s = Fake();
-      await showTall(t, InventoryDashboard(env: InvEnv(api: s.api)));
-      expect(find.text('Inventory Dashboard'), findsOneWidget);
-      expect(find.textContaining('Latur Main Branch'), findsOneWidget);
-      for (final x in ['Stock Overview', 'Total items', 'Low Stock', 'Critical', 'Needs Attention', 'Quick Actions', 'Receive Stock', 'View Inventory', 'Transfer Stock', 'Stock Adjustment', 'Start Stock Audit', 'Inventory Tools', 'Expiry', 'Reservations', 'Warehouse', 'Locations', 'Batch / Lot Tracking', 'Movement History', 'Planning', 'Replenishment', 'Inventory Forecast', 'Stock Risk', 'Inventory Positioning']) {
-        expect(find.text(x), findsOneWidget, reason: x);
-      }
-      expect(find.text('Damaged stock quarantined'), findsOneWidget);
-      expect(find.textContaining('AUD-001'), findsOneWidget);
-      expect(find.textContaining('75 free · 24 inbound · 99 nominal total'), findsOneWidget);
-      expect(find.textContaining('Drafts do not change posted stock'), findsOneWidget);
-    });
-
-    testWidgets('a server failure shows its message and a retry', (t) async {
-      final s = Fake((r) => err(403, 'INV_FORBIDDEN: your role cannot see stock'));
-      await showTall(t, InventoryDashboard(env: InvEnv(api: s.api)));
-      expect(find.textContaining('your role cannot see stock'), findsOneWidget);
-      expect(find.text('Try again'), findsOneWidget);
-    });
-
-    testWidgets('Receive Stock, View Inventory, Transfer, Adjustment and Audit open their screens; later tools say so', (t) async {
-      final s = Fake();
-      await showTall(t, InventoryDashboard(env: InvEnv(api: s.api)));
-      for (final (label, type) in [
-        ('Receive Stock', ReceivingScreen),
-        ('View Inventory', StockListScreen),
-        ('Transfer Stock', TransferScreen),
-        ('Stock Adjustment', AdjustmentScreen),
-        ('Start Stock Audit', AuditScreen),
-      ]) {
-        await t.tap(find.text(label));
-        await t.pumpAndSettle();
-        expect(find.byType(type), findsOneWidget, reason: label);
-        Navigator.of(t.element(find.byType(type))).pop();
-        await t.pumpAndSettle();
-      }
-      await t.tap(find.text('Warehouse'));
-      await t.pump();
-      expect(toast('Warehouse opens in a later release.'), findsOneWidget);
-    });
-
-    testWidgets('the bottom bar sends other tabs out and Stock returns here', (t) async {
-      final s = Fake();
-      final out = <String>[];
-      await showTall(t, InventoryDashboard(env: InvEnv(api: s.api, onNavigate: out.add)));
-      await t.tap(find.byKey(const ValueKey('inv-tab-home')));
-      await t.tap(find.byKey(const ValueKey('inv-tab-online')));
-      expect(out, ['home', 'online']);
-    });
-  });
-
-  group('Stock list (Figma "Stock")', () {
-    testWidgets('shows filters, search, the server items with their status and the page footer', (t) async {
-      final s = Fake();
-      await showTall(t, StockListScreen(env: InvEnv(api: s.api)));
-      expect(find.text('Store Inventory View'), findsOneWidget);
-      for (final x in ['All Items', 'Healthy', 'Low Stock', 'Critical', 'SKU', 'Ingredients', 'Adjust Stock', 'Export', 'View Details']) {
-        expect(find.text(x), findsWidgets, reason: x);
-      }
-      expect(find.text('Paneer'), findsOneWidget);
-      expect(find.text('Out of Stock'), findsOneWidget);
-      expect(find.textContaining('Showing 1-2 of 2 items'), findsOneWidget);
-    });
-
-    testWidgets('a filter chip asks the server for that filter, and so does search', (t) async {
-      final s = Fake();
-      await showTall(t, StockListScreen(env: InvEnv(api: s.api)));
-      await t.tap(find.byKey(const ValueKey('chip-low')));
-      await t.pumpAndSettle();
-      expect(argsOf(s.requests.last)['filter'], 'low');
-      await t.enterText(find.byType(TextField), 'cola');
-      await t.pump(const Duration(milliseconds: 400));
-      await t.pumpAndSettle();
-      expect(argsOf(s.requests.last)['q'], 'cola');
-    });
-
-    testWidgets('tapping an item opens its detail', (t) async {
-      final s = Fake();
-      await showTall(t, StockListScreen(env: InvEnv(api: s.api)));
-      await t.tap(find.text('Paneer'));
-      await t.pumpAndSettle();
-      expect(find.byType(StockDetailScreen), findsOneWidget);
-      expect(s.requests.where((r) => fnOf(r) == 'inv_stock_detail' && argsOf(r)['item_id'] == '40b00000-0000-0000-0000-000000000002'), hasLength(1));
-    });
-
-    testWidgets('export is honest about not being built', (t) async {
-      final s = Fake();
-      await showTall(t, StockListScreen(env: InvEnv(api: s.api)));
-      await t.tap(find.text('Export'));
-      await t.pump();
-      expect(toast('Export opens in a later release.'), findsOneWidget);
-    });
-  });
-
-  group('Stock detail (Figma "Stock Detail")', () {
-    testWidgets('shows availability, location bars, batches and the latest movement', (t) async {
-      final s = Fake();
-      await showTall(t, StockDetailScreen(env: InvEnv(api: s.api), itemId: 'x'));
-      expect(find.text('Stock Detail'), findsOneWidget);
-      expect(find.text('Coca-Cola 500ml'), findsWidgets);
-      for (final x in ['Available units', 'Stock days', 'Reserved (Active Carts)', 'In Transit (From Warehouse)', 'Damaged / Quarantine', 'Overview', 'Lots', 'Movements', 'Available by location', 'Batch and expiry', 'Latest posted movement', 'View Movements', 'View Lots', 'Transfer Stock']) {
-        expect(find.text(x), findsWidgets, reason: x);
-      }
-      expect(find.textContaining('Quarantine Q-01'), findsOneWidget);
-    });
-
-    testWidgets('Lots and Movements tabs and the movement link', (t) async {
-      final s = Fake();
-      await showTall(t, StockDetailScreen(env: InvEnv(api: s.api), itemId: 'x'));
-      await t.tap(find.text('View Lots'));
-      await t.pumpAndSettle();
-      expect(find.text('Earliest expiry first'), findsOneWidget);
-      await t.tap(find.text('View Movements'));
-      await t.pumpAndSettle();
-      expect(find.text('Newest first · posted only'), findsOneWidget);
-    });
-  });
-
-  group('Movement detail (Figma "Movement Detail")', () {
-    testWidgets('shows before, delta, after, source, the linked bill and the audit trail', (t) async {
-      final s = Fake();
-      String? opened;
-      await showTall(t, MovementScreen(env: InvEnv(api: s.api, onOpenOrder: (c, id) => opened = id), movementId: 1));
-      expect(find.text('Movement Detail'), findsOneWidget);
-      expect(find.text('Posted'), findsOneWidget);
-      expect(find.text('90'), findsOneWidget);
-      expect(find.text('−6'), findsOneWidget);
-      expect(find.text('84'), findsOneWidget);
-      expect(find.text('Transaction reference'), findsOneWidget);
-      expect(find.text('Posting method'), findsOneWidget);
-      expect(find.text('POS checkout'), findsOneWidget);
-      expect(find.text('Audit trail'), findsOneWidget);
-      expect(find.textContaining('Posted records cannot be edited'), findsOneWidget);
-      await t.tap(find.textContaining('Open Linked Transaction'));
-      expect(opened, isNotNull);
-    });
-  });
-
   group('Receiving (Figma "Receiving")', () {
     http.Response? route(http.Request r, {String status = 'draft'}) {
       final key = status == 'review' ? 'receipt_review' : 'receipt_draft';
@@ -330,7 +183,7 @@ void main() {
       final s = Fake(route);
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
       expect(find.text('Receiving'), findsWidgets);
-      for (final x in ['GRN', 'Putaway', 'Count and inspect', 'Receipt reconciliation', 'Send to GRN Review', 'Scan / Enter Items', 'Save Draft', 'Expected shipment', 'Received physical count', 'Accepted / rejected quarantine', 'Quantity still to receive']) {
+      for (final x in ['Purchase', 'Putaway', 'Count and inspect', 'Receipt reconciliation', 'Send to Purchase Review', 'Scan / Enter Items', 'Save Draft', 'Expected shipment', 'Received physical count', 'Accepted / rejected quarantine', 'Quantity still to receive']) {
         expect(find.text(x), findsWidgets, reason: x);
       }
       expect(find.textContaining('Accepted = received − rejected'), findsOneWidget);
@@ -346,7 +199,7 @@ void main() {
         return base;
       });
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
-      await t.tap(find.text('Send to GRN Review'));
+      await t.tap(find.text('Send to Purchase Review'));
       await t.pumpAndSettle();
       final posts = s.requests.where(isWrite).toList();
       expect(posts, hasLength(2));
@@ -354,7 +207,7 @@ void main() {
       expect(s.body(posts[0])['lines'], isA<List>());
       expect(s.body(posts[1]), allOf(containsPair('action', 'submit'), containsPair('version', 3)));
       expect(posts[1].headers['Idempotency-Key'], startsWith('inv-'));
-      expect(toast('Sent to GRN review. Stock changes when the receipt is posted.'), findsOneWidget);
+      expect(toast('Sent to purchase review. Stock changes when the receipt is posted.'), findsOneWidget);
     });
 
     testWidgets('a stale version shows the server message and reloads the document', (t) async {
@@ -375,7 +228,7 @@ void main() {
         return route(r, status: 'review');
       });
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api), documentId: (fx['receipt_review'] as Map)['id'] as String));
-      expect(find.text('Send to GRN Review'), findsNothing);
+      expect(find.text('Send to Purchase Review'), findsNothing);
       await t.tap(find.text('Post Receipt'));
       await t.pumpAndSettle();
       expect(s.body(s.lastPost)['action'], 'post');
@@ -401,205 +254,15 @@ void main() {
     });
   });
 
-  group('Adjustment (Figma "Adjustment")', () {
-    http.Response? route(http.Request r, {String key = 'adjustment_draft', String? status}) {
-      final p = fnOf(r);
-      if (p == 'inv_document_list') return ok(docList('adjustment', [row(doc(key, status: status))]));
-      if (p == 'inv_document_view') return ok(doc(key, status: status));
-      return null;
-    }
-
-    testWidgets('shows the draft: product, place and lot, type, quantity, reason, the proposed change, evidence and the banner', (t) async {
-      final s = Fake(route);
-      await showTall(t, AdjustmentScreen(env: InvEnv(api: s.api)));
-      expect(find.text('Stock Adjustment'), findsOneWidget);
-      for (final x in ['Draft', 'Awaiting approval', 'Posted', 'Product', 'Location / lot', 'Adjustment type', 'Quantity (units)', 'Reason', 'Proposed balance change', 'Evidence and approval', 'Operator note', 'Requested by', 'Required approver', 'Submit for Approval', 'Save Draft']) {
-        expect(find.text(x), findsWidgets, reason: x);
-      }
-      expect(find.textContaining('Decrease available stock', findRichText: true), findsOneWidget);
-      expect(find.textContaining('Current availability stays'), findsOneWidget);
-    });
-
-    testWidgets('Submit for Approval saves then submits, and says stock has not changed', (t) async {
-      final s = Fake((r) {
-        final base = route(r);
-        if (fnOf(r) == 'inv_document_act') return ok(doc('adjustment_awaiting'));
-        if (isWrite(r)) return ok(doc('adjustment_draft', version: 5));
-        return base;
-      });
-      await showTall(t, AdjustmentScreen(env: InvEnv(api: s.api)));
-      await t.tap(find.text('Submit for Approval'));
-      await t.pumpAndSettle();
-      final posts = s.requests.where(isWrite).toList();
-      expect(posts, hasLength(2));
-      expect(s.body(posts[0])['lines'][0]['adjust_type'], 'decrease');
-      expect(s.body(posts[1]), allOf(containsPair('action', 'submit'), containsPair('version', 5)));
-      expect(toast('Submitted for approval. Stock has not changed yet.'), findsOneWidget);
-    });
-
-    testWidgets('an approver sees Approve and Send Back', (t) async {
-      final withApprove = doc('adjustment_awaiting', actions: ['approve', 'reject', 'cancel']);
-      final s1 = Fake((r) {
-        if (fnOf(r) == 'inv_document_list') return ok(docList('adjustment', [row(withApprove)]));
-        if (fnOf(r) == 'inv_document_view') return ok(withApprove);
-        if (isWrite(r)) return ok(doc('adjustment_posted'));
-        return null;
-      });
-      await showTall(t, AdjustmentScreen(env: InvEnv(api: s1.api)));
-      expect(find.text('Approve and Post'), findsOneWidget);
-      expect(find.text('Send Back'), findsOneWidget);
-      await t.tap(find.text('Approve and Post'));
-      await t.pumpAndSettle();
-      expect(s1.body(s1.lastPost)['action'], 'approve');
-      expect(toast('Adjustment posted.'), findsOneWidget);
-    });
-
-    testWidgets('someone who cannot approve sees who is waited for and no approve button', (t) async {
-      final s2 = Fake((r) => route(r, key: 'adjustment_awaiting'));
-      await showTall(t, AdjustmentScreen(env: InvEnv(api: s2.api)));
-      expect(find.text('Approve and Post'), findsNothing);
-      expect(find.textContaining('Waiting for'), findsOneWidget);
-    });
-  });
-
-  group('Transfer (Figma "Transfer")', () {
-    http.Response? route(http.Request r, {String key = 'transfer_draft'}) {
-      final p = fnOf(r);
-      if (p == 'inv_document_list') return ok(docList('transfer', [row(doc(key))]));
-      if (p == 'inv_document_view') return ok(doc(key));
-      return null;
-    }
-
-    testWidgets('shows the draft: places, quantity, balance preview, handling checks, reason, operator, banner', (t) async {
-      final s = Fake(route);
-      await showTall(t, TransferScreen(env: InvEnv(api: s.api)));
-      expect(find.text('Transfer'), findsOneWidget);
-      for (final x in ['Internal transfer', 'Inter-facility', 'Product / lot', 'From location', 'To location', 'Transfer quantity (units)', 'Balance preview', 'Handling checks', 'Reason', 'Assigned operator', 'Independent draft', 'Review Transfer', 'Save Draft']) {
-        expect(find.text(x), findsWidgets, reason: x);
-      }
-      expect(find.text('No reserved units selected'), findsOneWidget);
-    });
-
-    testWidgets('Review Transfer asks first, then saves and posts', (t) async {
-      final s = Fake((r) {
-        final base = route(r);
-        if (fnOf(r) == 'inv_document_act') return ok(doc('transfer_posted'));
-        if (isWrite(r)) return ok(doc('transfer_draft', version: 7));
-        return base;
-      });
-      await showTall(t, TransferScreen(env: InvEnv(api: s.api)));
-      await t.tap(find.text('Review Transfer'));
-      await t.pumpAndSettle();
-      expect(find.text('Post transfer?'), findsOneWidget);
-      expect(s.requests.where(isWrite), isEmpty, reason: 'nothing is sent before the person confirms');
-      await t.tap(find.text('Post transfer'));
-      await t.pumpAndSettle();
-      expect(s.body(s.lastPost), allOf(containsPair('action', 'post'), containsPair('version', 7)));
-      expect(toast('Transfer posted.'), findsOneWidget);
-    });
-
-    testWidgets('an in-transit transfer offers Receive Transfer', (t) async {
-      final s = Fake((r) {
-        if (isWrite(r)) return ok(doc('transfer_posted'));
-        return route(r, key: 'transfer_in_transit');
-      });
-      await showTall(t, TransferScreen(env: InvEnv(api: s.api)));
-      await t.tap(find.text('Receive Transfer'));
-      await t.pumpAndSettle();
-      expect(s.body(s.lastPost)['action'], 'receive');
-    });
-  });
-
-  group('Stock audit (Figma "Stock Audit")', () {
-    http.Response? route(http.Request r, {String key = 'audit_review'}) {
-      final p = fnOf(r);
-      if (p == 'inv_document_list') return ok(docList('audit', [row(doc(key))]));
-      if (p == 'inv_document_view') return ok(doc(key));
-      return null;
-    }
-
-    testWidgets('shows progress, the counted item with its variance, the summary and the buttons', (t) async {
-      final s = Fake((r) => route(r, key: 'audit_counted'));
-      await showTall(t, AuditScreen(env: InvEnv(api: s.api)));
-      expect(find.text('Stock Audit'), findsOneWidget);
-      for (final x in ['In progress', 'Completed', 'System snapshot', 'Counter / approver', 'Count progress', 'Audit summary', 'Net variance', 'Variance explanation', 'Save Audit', 'Send for Review']) {
-        expect(find.text(x), findsWidgets, reason: x);
-      }
-      expect(find.text('1 of 1 SKUs counted'), findsOneWidget);
-      expect(find.textContaining('−2 units'), findsWidgets);
-      expect(find.textContaining('Count evidence is not a posted balance'), findsOneWidget);
-    });
-
-    testWidgets('in review with a variance: Create Adjustment Draft calls the server once and opens the adjustment', (t) async {
-      final s = Fake((r) {
-        if (fnOf(r) == 'inv_audit_to_adjustment') return ok(doc('adjustment_from_audit'));
-        if (fnOf(r) == 'inv_document_list') return ok(docList('audit', [row(doc('audit_review'))]));
-        if (fnOf(r) == 'inv_document_view' && argsOf(r)['id'] == (fx['adjustment_from_audit'] as Map)['id']) return ok(doc('adjustment_from_audit'));
-        if (fnOf(r) == 'inv_document_view') return ok(doc('audit_review'));
-        return null;
-      });
-      await showTall(t, AuditScreen(env: InvEnv(api: s.api)));
-      await t.tap(find.text('Create Adjustment Draft'));
-      await t.pumpAndSettle();
-      expect(s.requests.where((r) => fnOf(r) == 'inv_audit_to_adjustment'), hasLength(1));
-      expect(s.requests.where((r) => fnOf(r) == 'inv_audit_to_adjustment').single.headers['Idempotency-Key'], startsWith('inv-'));
-      expect(find.byType(AdjustmentScreen), findsOneWidget);
-    });
-
-    testWidgets('no count in progress: offer to start one', (t) async {
-      final s = Fake((r) {
-        if (fnOf(r) == 'inv_document_list') return ok(docList('audit', []));
-        return null;
-      });
-      await showTall(t, AuditScreen(env: InvEnv(api: s.api)));
-      expect(find.textContaining('No count is in progress'), findsOneWidget);
-      expect(find.text('Start Stock Audit'), findsOneWidget);
-    });
-  });
-
-  group('Forecast (Figma "Inventory Forecast")', () {
-    testWidgets('shows the horizon tabs, tiles, chart, assumptions, sensitivity and buttons', (t) async {
-      final s = Fake();
-      await showTall(t, ForecastScreen(env: InvEnv(api: s.api), itemId: 'x'));
-      expect(find.text('Inventory Forecast'), findsOneWidget);
-      for (final x in ['7 days', '14 days', '30 days', 'Product', 'Projected available stock', 'Assumptions', 'Opening available', 'Demand model', 'Inbound scenario', 'Rejected delivery units', 'Projection', 'Review Scenario', 'Edit Assumptions']) {
-        expect(find.text(x), findsWidgets, reason: x);
-      }
-      expect(find.textContaining('Sensitivity · next 7 days'), findsOneWidget);
-      expect(argsOf(s.requests.last)['days'], 7);
-    });
-
-    testWidgets('a longer horizon and a what-if demand are sent to the server, never saved', (t) async {
-      final s = Fake();
-      await showTall(t, ForecastScreen(env: InvEnv(api: s.api), itemId: 'x'));
-      await t.tap(find.byKey(const ValueKey('chip-14')));
-      await t.pumpAndSettle();
-      expect(argsOf(s.requests.last)['days'], 14);
-      await t.tap(find.text('Edit Assumptions'));
-      await t.pumpAndSettle();
-      await t.enterText(find.byType(TextField).last, '14');
-      await t.tap(find.text('Apply'));
-      await t.pumpAndSettle();
-      expect(argsOf(s.requests.last)['demand_per_day'], 14);
-      expect(s.requests.where(isWrite), isEmpty);
-    });
-  });
 
   group('Wiring', () {
-    test('installRoutes plugs the Stock tab of the control centre into the inventory dashboard', () {
+    test('installRoutes plugs the Stock tab, one item, every stock page and Low stock into the new stock screens', () {
       HomeNav.reset();
       installRoutes();
       expect(HomeNav.stock, isNotNull);
-    });
-
-    testWidgets('the Stock hook opens the dashboard', (t) async {
-      HomeNav.reset();
-      installRoutes();
-      await show(t, Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => HomeNav.stock!(c), child: const Text('go')))));
-      await t.tap(find.text('go'));
-      await t.pump();
-      await t.pump(const Duration(milliseconds: 400));
-      expect(find.byType(InventoryDashboard), findsOneWidget);
+      expect(HomeNav.stockItem, isNotNull);
+      expect(HomeNav.stockPage, isNotNull);
+      expect(HomeNav.lowStock, isNotNull);
     });
   });
 }

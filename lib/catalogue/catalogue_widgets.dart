@@ -124,19 +124,32 @@ class ItemGridCard extends StatelessWidget {
 }
 
 /// "Active Items 340" tile.
+/// A count card. With [onTap] it is a filter: tap to show those items (lime when [selected]), with a small arrow so it reads as tappable.
 class StatTile extends StatelessWidget {
-  const StatTile(this.label, this.value, {super.key});
+  const StatTile(this.label, this.value, {super.key, this.onTap, this.selected = false});
   final String label;
   final int value;
+  final VoidCallback? onTap;
+  final bool selected;
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFECEDE8))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-          Text(label, style: inter(13, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 4),
-          Text('$value', style: inter(15, 700)),
-        ]),
+  Widget build(BuildContext context) => Material(
+        color: selected ? kLimeSoft : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: BorderSide(color: selected ? kLime : const Color(0xFFECEDE8), width: selected ? 1.5 : 1)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Text(label, style: inter(13, selected ? 600 : 400, color: selected ? kInk : kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 4),
+              Row(children: [
+                Expanded(child: Text('$value', style: inter(15, 700))),
+                if (onTap != null) Icon(selected ? LucideIcons.check : LucideIcons.chevronRight, size: 15, color: selected ? kInk : kMuted),
+              ]),
+            ]),
+          ),
+        ),
       );
 }
 
@@ -283,4 +296,56 @@ class BigTitle extends StatelessWidget {
         Expanded(child: Text(title, style: inter(26, 800).copyWith(letterSpacing: -0.4))),
         ?trailing,
       ]);
+}
+
+/// The empty product-photo spot: a full-width dashed box with a camera, "Tap to add photo". Used by Item creation and Quick add.
+class AddPhotoBox extends StatelessWidget {
+  const AddPhotoBox({super.key, required this.onTap, this.height = 120});
+  final VoidCallback? onTap;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: CustomPaint(
+          painter: const _DashedBorder(color: Color(0xFFC9CDC4), radius: 16),
+          child: Container(
+            height: height,
+            width: double.infinity,
+            decoration: BoxDecoration(color: const Color(0xFFF8F9F6), borderRadius: BorderRadius.circular(16)),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(LucideIcons.camera, size: 26, color: kMuted),
+              const SizedBox(height: 8),
+              Text('Tap to add photo', style: inter(14, 500, color: kMuted)),
+              const SizedBox(height: 2),
+              Text('JPG, PNG or WebP · up to 5 MB', style: inter(11.5, 400, color: const Color(0xFF9CA3AF))),
+            ]),
+          ),
+        ),
+      );
+}
+
+class _DashedBorder extends CustomPainter {
+  const _DashedBorder({required this.color, required this.radius});
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.3;
+    final outline = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)));
+    const dash = 6.0, gap = 4.0;
+    for (final m in outline.computeMetrics()) {
+      for (var d = 0.0; d < m.length; d += dash + gap) {
+        canvas.drawPath(m.extractPath(d, d + dash), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorder old) => old.color != color || old.radius != radius;
 }

@@ -339,7 +339,8 @@ class _Body extends StatelessWidget {
             else
               for (final o in s.activeOrders) ...[_OrderCard(o), const SizedBox(height: 8)],
             const SizedBox(height: 12),
-            SectionHeader('Stock health', action: 'Full report', onAction: () => HomeNav.go(context, HomeNav.stock, 'Stock')),
+            // "Full report" is the stock alerts (low stock, expiry, not selling, mismatch) (founder, 25 Oct 2026)
+            SectionHeader('Stock health', action: 'Full report', onAction: () => HomeNav.go(context, HomeNav.stockPage == null ? null : (c) => HomeNav.stockPage!(c, 'alerts'), 'Stock alerts')),
             const SizedBox(height: 12),
             _StockCard(s),
             if (s.stock.isNotEmpty) ...[
@@ -593,7 +594,7 @@ class _RevenueCard extends StatelessWidget {
         const SizedBox(height: 4),
         _InsightRow(
           dot: kGreenDot,
-          label: 'GRN received',
+          label: 'Purchase received',
           value: grnBills == null ? 'Not reported' : grnBills == 0 ? 'None today' : '$grnBills bill${grnBills == 1 ? '' : 's'} · ${s.grnAmount == null ? 'cost not entered' : rupees(s.grnAmount!)}',
           valueColor: kInk,
         ),

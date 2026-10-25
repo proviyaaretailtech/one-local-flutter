@@ -6,7 +6,7 @@ import { UUID } from '../validate.ts';
 
 const id = z.string({ message: 'Not a valid id.' }).regex(UUID, 'Not a valid id.');
 const money = z.number().int().min(0).max(100_000_000_000);
-const version = z.number({ message: 'Refresh the GRN and try again.' }).int().min(1);
+const version = z.number({ message: 'Refresh the purchase and try again.' }).int().min(1);
 const receipt = { receipt_document_id: id };
 
 export const List = z.object({}).strict();

@@ -135,7 +135,7 @@ class PoLineCard extends StatelessWidget {
   static String _pct(num v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 }
 
-/// "Subtotal accepted goods / Tax total · GST 5% + 12% / GRN total".
+/// "Subtotal accepted goods / Tax total · GST 5% + 12% / Purchase total".
 class PoTotalsCard extends StatelessWidget {
   const PoTotalsCard(this.po, {super.key});
   final PurchaseOrder po;
@@ -156,7 +156,7 @@ class PoTotalsCard extends StatelessWidget {
         row('Subtotal accepted goods', money(t.n('subtotal_minor'), fixed: true)),
         row(taxLabel, money(t.n('tax_minor'), fixed: true)),
         const Divider(height: 18, color: kCardLine),
-        row('GRN total', money(t.n('total_minor'), fixed: true), big: true, color: kPostedText),
+        row('Purchase total', money(t.n('total_minor'), fixed: true), big: true, color: kPostedText),
       ]),
     );
   }

@@ -26,6 +26,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
   late final _owner = TextEditingController(text: widget.app?.ownerName ?? '');
   late final _phone = TextEditingController(text: _tenDigits(widget.app?.phone ?? widget.phone ?? ''));
   String? _category, _sub, _mode;
+  List<String> _cuisines = []; // restaurant: every cuisine it serves, first = main
   bool _saving = false;
 
   @override
@@ -36,6 +37,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
       _category = a['category'] as String?;
       final subs = (a['subcategories'] as List?)?.cast<String>() ?? const [];
       _sub = widget.type == 'store' && subs.isNotEmpty ? subs.first : null;
+      if (widget.type == 'restaurant') _cuisines = subs.isNotEmpty ? List.of(subs) : [?_category];
       _mode = a['selling_mode'] as String?;
     }
   }
@@ -55,11 +57,15 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
 
   String get _title => switch (widget.type) { 'restaurant' => 'Register as a Restaurant', 'service' => 'Register as service', _ => 'Register as a Store' };
   String get _kicker => widget.type == 'restaurant' ? 'Registration · Merchant' : 'Registration · Partner';
+  bool get _rst => widget.type == 'restaurant';
+  /// What the business is called on this form: a restaurant registers a "Restaurant", everyone else a "Shop".
+  String get _noun => _rst ? 'Restaurant' : 'Shop';
 
   Future<void> _save() async {
     if (_saving) return;
-    if (_name.text.trim().length < 2) return showToast(context, 'Enter your shop name.');
-    if (_category == null) return showToast(context, widget.type == 'service' ? 'Choose your service.' : 'Choose your category.');
+    if (_name.text.trim().length < 2) return showToast(context, 'Enter your ${_noun.toLowerCase()} name.');
+    if (_rst && _cuisines.isEmpty) return showToast(context, 'Choose the cuisines you serve.');
+    if (!_rst && _category == null) return showToast(context, widget.type == 'service' ? 'Choose your service.' : 'Choose your category.');
     if (widget.type == 'store' && _sub == null) return showToast(context, 'Choose your subcategory.');
     if (_owner.text.trim().length < 2) return showToast(context, "Enter the owner's full name.");
     if (!RegExp(r'^[6-9]\d{9}$').hasMatch(_phone.text)) return showToast(context, 'Enter a 10-digit mobile number.');
@@ -73,7 +79,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
         'owner_name': _owner.text.trim(),
         'phone': _phone.text,
         'selling_mode': _mode,
-        'category': _category,
+        if (_rst) 'categories': _cuisines else 'category': _category,
         if (widget.type == 'store') 'subcategory': _sub,
       }),
     );
@@ -95,7 +101,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
       builder: (context, snap) {
         if (snap.hasError) {
           return OnbPage(
-            kicker: _kicker, title: _title, caption: 'Shop profile',
+            kicker: _kicker, title: _title, caption: '$_noun profile',
             subtitle: 'We could not load the lists. Check your connection and try again.',
             children: const [],
             actions: [PrimaryAction(label: 'Go back', onPressed: () => Navigator.maybePop(context))],
@@ -113,22 +119,31 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
           kicker: _kicker,
           title: _title,
           titleSize: 30,
-          caption: 'Shop profile',
-          subtitle: 'Start with your ${widget.type == 'restaurant' ? 'Restaurant' : 'shop'} profile. You can review every detail before submitting.',
+          caption: '$_noun profile',
+          subtitle: 'Start with your ${_rst ? 'restaurant' : 'shop'} profile. You can review every detail before submitting.',
           children: [
-            LabeledField(label: 'Shop name', controller: _name, labelSize: 14, labelWeight: 500, textInputAction: TextInputAction.next),
-            SelectField(
-              label: widget.type == 'service' ? 'Services' : 'Category',
-              value: _category,
-              options: cats,
-              onChanged: (v) => setState(() {
-                if (v != _category) _sub = null;
-                _category = v;
-              }),
-            ),
+            LabeledField(label: '$_noun name', controller: _name, labelSize: 14, labelWeight: 500, textInputAction: TextInputAction.next),
+            if (_rst)
+              MultiChipField(
+                label: 'Cuisines you serve',
+                hint: 'Pick all that apply. The first one you pick is shown as your main cuisine.',
+                options: cats,
+                selected: _cuisines,
+                onChanged: (v) => setState(() => _cuisines = v),
+              )
+            else
+              SelectField(
+                label: widget.type == 'service' ? 'Services' : 'Category',
+                value: _category,
+                options: cats,
+                onChanged: (v) => setState(() {
+                  if (v != _category) _sub = null;
+                  _category = v;
+                }),
+              ),
             if (widget.type == 'store')
               SelectField(label: 'Subcategory', value: _sub, options: subs, hint: _category == null ? 'Choose a category first' : 'Choose', onChanged: (v) => setState(() => _sub = v)),
-            LabeledField(label: "Shop owner", controller: _owner, labelSize: 14, labelWeight: 500, textInputAction: TextInputAction.next),
+            LabeledField(label: '$_noun owner', controller: _owner, labelSize: 14, labelWeight: 500, textInputAction: TextInputAction.next),
             LabeledField(
               label: 'Owner mobile',
               controller: _phone,
@@ -141,7 +156,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('How do you sell?', style: inter(17, 600)),
               const SizedBox(height: 14),
-              ChoiceCard(icon: lucideStore, title: 'Physical store', body: 'Customers visit my shop.', selected: _mode == 'physical', onTap: () => setState(() => _mode = 'physical')),
+              ChoiceCard(icon: _rst ? Icons.restaurant_outlined : lucideStore, title: _rst ? 'Dine-in & takeaway' : 'Physical store', body: _rst ? 'Customers eat in or pick up at my restaurant.' : 'Customers visit my shop.', selected: _mode == 'physical', onTap: () => setState(() => _mode = 'physical')),
               const SizedBox(height: 12),
               ChoiceCard(icon: Icons.shopping_bag_outlined, title: 'Online or both', body: 'I also take orders online.', selected: _mode == 'online_or_both', onTap: () => setState(() => _mode = 'online_or_both')),
             ]),

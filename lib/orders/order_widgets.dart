@@ -408,7 +408,7 @@ class PosBottomNav extends StatelessWidget {
     ('item', 'Item', LucideIcons.archive),
     ('bill', 'Bill', LucideIcons.receiptText),
     ('online', 'Online order', LucideIcons.shoppingBag),
-    ('stock', 'Stock', LucideIcons.boxes),
+    ('slot', '', LucideIcons.circle), // the store's kept, empty slot (Stock is in Item now)
   ];
   // The app's one bottom bar ([AppTabBar]); tabs are keyed 'pos-tab-…'.
   @override

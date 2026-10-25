@@ -188,7 +188,9 @@ class _OutletHeaderState extends State<OutletHeader> {
     final label = o == null || cur == null ? (HomeNav.storeName ?? widget.title) : all ? 'All outlets (${o.verified.length})' : cur.name;
     // The banner (founder, 22 Oct 2026): ONELOCAL PARTNER over the store's name; under it the outlet ("Main ▾", the switcher) and its
     // status in a pill. The outlet's own name repeats the store's ("Sharma General Store - Main"), so only the part after it shows.
-    final store = HomeNav.storeName ?? (cur == null ? widget.title : cur.name);
+    // The dashboard's name may be the outlet's ("Sharma General Store - Main"): the title is the business part, the outlet shows below.
+    final raw = HomeNav.storeName ?? (cur == null ? widget.title : cur.name);
+    final store = raw.contains(' - ') ? raw.substring(0, raw.indexOf(' - ')) : raw;
     // An outlet named exactly like the store says where it is instead (its locality, else its code: "MAIN" -> "Main").
     String short(Outlet x) {
       final n = x.name.startsWith('$store - ') ? x.name.substring(store.length + 3) : x.name;
@@ -211,16 +213,16 @@ class _OutletHeaderState extends State<OutletHeader> {
         onBell: widget.onBell,
         subtitle: o == null || cur == null
             ? null
-            : Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            // compact (founder, 22 Oct 2026): the outlet switcher and its status share one line, wrapping only on a very narrow screen
+            : Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
                 InkWell(
                   onTap: () => _pick(o),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Flexible(child: Text(outlet!, key: const ValueKey('outlet-header-name'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(15, 500, color: kMuted))),
+                    Flexible(child: Text(outlet!, key: const ValueKey('outlet-header-name'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, 500, color: kMuted))),
                     const SizedBox(width: 2),
-                    const Icon(LucideIcons.chevronDown, size: 16, color: kMuted),
+                    const Icon(LucideIcons.chevronDown, size: 14, color: kMuted),
                   ]),
                 ),
-                const SizedBox(height: 6),
                 Material(
                   color: const Color(0xFFEDEFEA),
                   shape: const StadiumBorder(),
@@ -229,13 +231,13 @@ class _OutletHeaderState extends State<OutletHeader> {
                     customBorder: const StadiumBorder(),
                     onTap: () => OutletHeader.openStatus(context),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Container(width: 8, height: 8, decoration: BoxDecoration(color: outletStatusColor(all ? (o.chip == 'All online' ? 'online' : 'paused') : cur.status), shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
+                        Container(width: 7, height: 7, decoration: BoxDecoration(color: outletStatusColor(all ? (o.chip == 'All online' ? 'online' : 'paused') : cur.status), shape: BoxShape.circle)),
+                        const SizedBox(width: 5),
                         Flexible(
                           child: Text(all ? o.chip : cur.statusLabel,
-                              key: const ValueKey('outlet-header-status'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12.5, 600, color: kInk)),
+                              key: const ValueKey('outlet-header-status'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11.5, 600, color: kInk)),
                         ),
                       ]),
                     ),

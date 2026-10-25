@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
 import '../inventory/inventory_api.dart';
-import '../inventory/inventory_dashboard.dart';
+import '../inventory/inv_env.dart';
 
 /// Purchasing calls through the one generic door, `POST /rpc/<pur_function>` ([RpcClient]); the database functions of migration 0430 do the work and
 /// check the business, the location, the role and every rule. Money is whole paise (`*_minor`); the app only formats it. Creating an order, starting
@@ -61,6 +61,18 @@ class PurchasingApi {
   /// Makes the supplier of [priceId] the preferred one for its ingredient (the database logs who, when, before and after).
   Future<Facts> selectSourcing(String priceId, {String? note, String? key}) async =>
       Facts(await _call('pur_sourcing_select', {'price_id': priceId, 'note': note}, key: key ?? newKey()));
+
+  /// This business's suppliers with their contact details (`suppliers`: id, name, phone, gstin, city, contact_person, payment_terms).
+  Future<List<Facts>> suppliers() async => Facts(await _call('pur_supplier_list', {})).l('suppliers');
+
+  /// Adds a supplier ([id] null) or changes one. Only [name] is required; the database checks phone, GSTIN and duplicates.
+  Future<Facts> saveSupplier({String? id, required String name, String? phone, String? gstin, String? city, String? key}) async => Facts(await _call('pur_supplier_save', {
+        'id': id,
+        'name': name.trim(),
+        if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        if (gstin != null && gstin.trim().isNotEmpty) 'gstin': gstin.trim(),
+        if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
+      }, key: key ?? newKey()));
 
   /// One audit round: `{name, detail, result: pass|warning|fail}` per check.
   Future<Facts> recordAudit(String priceId, List<Map<String, String>> checks) async => Facts(await _call('pur_audit_record', {'price_id': priceId, 'checks': checks}));

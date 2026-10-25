@@ -113,9 +113,9 @@ class _SearchScreenState extends State<SearchScreen> {
       context,
       title: 'Scan barcode',
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Scan with the barcode scanner or type the EAN or SKU.', style: inter(13, 400, color: kMuted)),
+        Text('Scan the barcode, or type the barcode number or System Code.', style: inter(13, 400, color: kMuted)),
         const SizedBox(height: 12),
-        TextField(controller: c, autofocus: true, textInputAction: TextInputAction.search, onSubmitted: (v) => Navigator.pop(ctx, v.trim()), decoration: const InputDecoration(hintText: 'EAN or SKU')),
+        TextField(controller: c, autofocus: true, textInputAction: TextInputAction.search, onSubmitted: (v) => Navigator.pop(ctx, v.trim()), decoration: const InputDecoration(hintText: 'Barcode or System Code')),
         const SizedBox(height: 14),
         DarkCta(label: 'Find', onPressed: () => Navigator.pop(ctx, c.text.trim())),
       ]),
@@ -248,7 +248,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Widget> _landing() => [
         Text('Find a product', style: inter(20, 800)),
         const SizedBox(height: 6),
-        Text('Search the catalogue by product name or SKU. Or scan a barcode to find an item.', style: inter(14, 400, color: kMuted, height: 1.4)),
+        Text('Search the catalogue by product name or System Code. Or scan a barcode to find an item.', style: inter(14, 400, color: kMuted, height: 1.4)),
         const SizedBox(height: 14),
         if (_recent.isNotEmpty) ...[
           OrderCardBox(
@@ -269,7 +269,7 @@ class _SearchScreenState extends State<SearchScreen> {
           radius: 22,
           child: Material(type: MaterialType.transparency, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Try a search', style: inter(18, 800)),
-            for (final (term, hint) in const [('500', 'Search pack sizes and SKUs'), ('CC500', 'Search by product code')])
+            for (final (term, hint) in const [('500', 'Search pack sizes and System Codes'), ('CC500', 'Search by product code')])
               ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(LucideIcons.search, size: 20), title: Text(term, style: inter(16, 500)), subtitle: Text(hint, style: inter(13, 400, color: kMuted)), trailing: const Icon(LucideIcons.arrowUpLeft, size: 16), onTap: () {
                 _q.text = term;
                 _run();
@@ -326,7 +326,7 @@ class _SearchScreenState extends State<SearchScreen> {
         StateCard(
           icon: LucideIcons.search,
           title: filtered ? 'No matching results' : 'No products found',
-          body: filtered ? 'No products match "$_ran" with these filters. Clear the filters or edit your search.' : 'No products match "$_ran". Check the spelling or try a product name, SKU or barcode.',
+          body: filtered ? 'No products match "$_ran" with these filters. Clear the filters or edit your search.' : 'No products match "$_ran". Check the spelling or try a product name, System Code or barcode.',
           primary: filtered ? 'Clear filters' : 'Clear search',
           onPrimary: filtered ? _clearFilters : _clearAll,
           secondary: filtered ? 'Edit search' : 'Scan barcode',

@@ -126,8 +126,8 @@ class _HubScreenState extends State<HubScreen> {
                       key: const ValueKey('hub-outlet'),
                       onTap: () => _pickOutlet(loaded),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Flexible(child: Text(loaded.scopeLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(15, 500, color: kMuted))),
-                        if (loaded.outlets.length > 1 || _location != null) ...[const SizedBox(width: 2), const Icon(LucideIcons.chevronDown, size: 16, color: kMuted)],
+                        Flexible(child: Text(loaded.scopeLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, 500, color: kMuted))),
+                        if (loaded.outlets.length > 1 || _location != null) ...[const SizedBox(width: 2), const Icon(LucideIcons.chevronDown, size: 14, color: kMuted)],
                       ]),
                     ),
             );

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
 
 import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
@@ -22,20 +23,22 @@ class ItemPhotoUnavailable implements Exception {
   String toString() => message;
 }
 
-/// The item form's photo tools: choose a picture, remove its background (AI), and attach it to the saved item.
-/// Kept behind one interface so the background-removal service and the item-photo storage can be plugged in without
-/// touching the form; until they are, the default says plainly what is not set up.
+/// The item form's photo tools: choose a picture, remove its background (AI), attach it to the saved item or take it off.
+/// Kept behind one interface so the screens can be tested without a camera, storage or remove.bg.
 abstract class ItemPhotoService {
   const ItemPhotoService();
   Future<ItemPhoto?> pick();
   Future<ItemPhoto> removeBackground(ItemPhoto photo);
   Future<void> attach(String itemId, ItemPhoto photo);
+  /// Takes the saved photo off the item.
+  Future<void> remove(String itemId);
 }
 
 /// JPG, PNG or WebP up to 5 MB, the same limits the server uses for pictures.
 class DeviceItemPhotos extends ItemPhotoService {
-  const DeviceItemPhotos({this.rpc});
+  const DeviceItemPhotos({this.rpc, this.client});
   final RpcClient? rpc;
+  final http.Client? client; // the upload to storage
   static const maxBytes = 5 * 1024 * 1024;
 
   @override
@@ -62,8 +65,30 @@ class DeviceItemPhotos extends ItemPhotoService {
     }
   }
 
-  // Needs item-photo storage in the database (the catalogue save has no photo yet).
+  // Three steps through the server: a signed upload slot for this item, the bytes straight to storage, then confirm, which puts the
+  // photo's link on the item (and deletes the photo it replaced). The server checks the person may change this item first.
   @override
-  Future<void> attach(String itemId, ItemPhoto photo) async =>
-      throw const ItemPhotoUnavailable('Saving product photos is not set up yet.');
+  Future<void> attach(String itemId, ItemPhoto photo) async {
+    final api = rpc ?? RpcClient();
+    try {
+      final ask = {'item_id': itemId, 'content_type': photo.contentType, 'size': photo.bytes.length};
+      final slot = await api.callMap('cat_item_photo_slot', ask);
+      final put = await (client ?? http.Client())
+          .put(Uri.parse(slot['upload_url'] as String), headers: {'Content-Type': photo.contentType, 'x-upsert': 'true'}, body: photo.bytes)
+          .timeout(const Duration(seconds: 120));
+      if (put.statusCode < 200 || put.statusCode >= 300) throw const ItemPhotoUnavailable('The photo did not finish uploading. Please try again.');
+      await api.callMap('cat_item_photo_attach', {...ask, 'path': slot['path']});
+    } on PartnerApiException catch (e) {
+      throw ItemPhotoUnavailable(e.message);
+    }
+  }
+
+  @override
+  Future<void> remove(String itemId) async {
+    try {
+      await (rpc ?? RpcClient()).callMap('cat_item_photo_remove', {'item_id': itemId});
+    } on PartnerApiException catch (e) {
+      throw ItemPhotoUnavailable(e.message);
+    }
+  }
 }

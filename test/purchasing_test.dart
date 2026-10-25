@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:vinii_pos/inventory/inventory_dashboard.dart';
+import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/purchasing/po_create_screen.dart';
 import 'package:vinii_pos/purchasing/po_grn_screen.dart';
 import 'package:vinii_pos/purchasing/po_history_screen.dart';
@@ -184,7 +184,7 @@ void main() {
       expect(find.text('Subtotal accepted goods'), findsOneWidget);
       expect(find.text('₹3,632.50'), findsOneWidget);
       expect(find.text('₹239.90'), findsOneWidget);
-      expect(find.text('GRN total'), findsOneWidget);
+      expect(find.text('Purchase total'), findsOneWidget);
       expect(find.text('₹3,872.40'), findsOneWidget);
       expect(find.text('Confirm Receipt & Update Stock'), findsNothing);
     });
@@ -291,7 +291,7 @@ void main() {
       await showTall(t, SupplierPriceScreen(env: s.env, priceId: 'p-1'));
       expect(find.text('Suppliers'), findsOneWidget);
       expect(find.textContaining('Fresh Malai Paneer'), findsOneWidget);
-      expect(find.textContaining('Supplier: ABC Foods · UOM: Per KG · SKU ID: INGR-042'), findsOneWidget);
+      expect(find.textContaining('Supplier: ABC Foods · UOM: Per KG · System Code: INGR-042'), findsOneWidget);
       expect(find.text('AI Inferred'), findsOneWidget);
       for (final x in ['Re-Audit', 'Select Sourcing', 'Overview & Trends', 'Alternative Bids', 'Quality Audit', 'Active Supplier Selection', 'Sourcing Contract Parameters']) {
         expect(find.text(x), findsWidgets, reason: x);

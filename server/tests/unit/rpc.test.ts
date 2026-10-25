@@ -61,6 +61,12 @@ test('profile arguments are checked against the lists', () => {
   assert.equal(ok.phone, '9876543210');
   assert.deepEqual(ok.subcategories, ['Indian']);
   assert.throws(() => ob.profileArgs(ob.Profile.parse({ ...base, category: 'Not a type' })), (e: HttpError) => e.status === 400);
+  // Several cuisines: kept in order without repeats, the first is the main category; every one must be on the list.
+  const many = ob.profileArgs(ob.Profile.parse({ ...base, categories: ['Chinese', 'North Indian', 'Chinese'] }));
+  assert.equal(many.category, 'Chinese');
+  assert.deepEqual(many.subcategories, ['Chinese', 'North Indian']);
+  assert.throws(() => ob.profileArgs(ob.Profile.parse({ ...base, categories: ['Chinese', 'Not a type'] })), (e: HttpError) => e.status === 400);
+  assert.throws(() => ob.profileArgs(ob.Profile.parse({ ...base, categories: [] })), (e: HttpError) => e.status === 400);
 });
 
 test('inventory (section H): every function is listed, reads are "read", writes carry the Idempotency-Key, shapes are checked', async () => {

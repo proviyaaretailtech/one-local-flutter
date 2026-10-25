@@ -150,9 +150,34 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('Register as a Restaurant'), findsOneWidget);
       expect(find.text('Subcategory'), findsNothing);
+      // A restaurant registers a restaurant, not a shop or store.
+      expect(find.text('Restaurant name'), findsOneWidget);
+      expect(find.text('Restaurant owner'), findsOneWidget);
+      expect(find.text('Dine-in & takeaway'), findsOneWidget);
+      expect(find.textContaining(RegExp(r'\b([Ss]hop|[Ss]tore)\b')), findsNothing);
       await show(t, MerchantProfileScreen(api: FakeOnb(), type: 'service'));
       await t.pumpAndSettle();
       expect(find.text('Services'), findsOneWidget);
+    });
+
+    testWidgets('restaurant: picks several cuisines, in the order tapped; none is refused', (t) async {
+      final api = FakeOnb(initial: sample(done: 2, plan: null));
+      await show(t, MerchantProfileScreen(api: api, type: 'restaurant', phone: '9876543210'));
+      await t.pumpAndSettle();
+      expect(find.text('Cuisines you serve'), findsOneWidget);
+      await t.enterText(find.byType(TextField).at(0), 'Demo Spice');
+      await t.enterText(find.byType(TextField).at(1), 'Asha Rao');
+      await tapText(t, 'Dine-in & takeaway');
+      await tapText(t, 'Continue to business details');
+      expect(toast('Choose the cuisines you serve.'), findsOneWidget);
+      expect(api.calls, isNot(contains('profile')));
+      await tapText(t, 'Cafe');
+      await tapText(t, 'Bakery');
+      await tapText(t, 'Continue to business details');
+      expect(api.bodies['profile'], {
+        'partner_type': 'restaurant', 'business_name': 'Demo Spice', 'owner_name': 'Asha Rao', 'phone': '9876543210',
+        'selling_mode': 'physical', 'categories': ['Cafe', 'Bakery'],
+      });
     });
 
     testWidgets('the server\'s own message is shown when a save is refused', (t) async {

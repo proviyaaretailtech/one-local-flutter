@@ -78,6 +78,20 @@ class _Tab extends StatelessWidget {
   final Key tabKey;
   @override
   Widget build(BuildContext context) {
+    // A tab with no label is a kept slot (founder, 25 Oct 2026: Stock moved into Item; the slot stays, empty, until decided):
+    // a faint empty circle that does nothing.
+    if (tab.label.isEmpty) {
+      return ExcludeSemantics(
+        child: Center(
+          child: Container(
+            key: tabKey,
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x55FFFFFF), width: 1.5)),
+          ),
+        ),
+      );
+    }
     final outlined = tab.primary && !current;
     return Semantics(
       button: true,

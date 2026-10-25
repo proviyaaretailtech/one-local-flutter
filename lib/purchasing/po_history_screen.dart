@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../inventory/inventory_api.dart';
-import '../inventory/inventory_dashboard.dart';
+import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
 import 'po_create_screen.dart';

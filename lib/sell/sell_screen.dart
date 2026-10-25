@@ -7,6 +7,7 @@ import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
 import 'carts_screen.dart';
+import '../catalogue/new_category_sheet.dart';
 import '../shift/shift_api.dart';
 import '../shift/shift_screens.dart';
 import 'pay_screen.dart';
@@ -82,6 +83,20 @@ class _SellScreenState extends State<SellScreen> {
       if (!mounted || mine != _seq) return;
       setState(() => _error = sellErrorText(e));
     }
+  }
+
+  // "+ New" category: name it, then add its first product (Quick add in that category). The new category opens once it has one.
+  Future<void> _newCategory() async {
+    final existing = _catalog?.categories ?? const <String>[];
+    final name = await askNewCategory(context, existing: existing);
+    if (name == null || !mounted) return;
+    final same = existing.where((c) => c.toLowerCase() == name.toLowerCase());
+    final added = await env.addFirstItem(context, same.isEmpty ? name : same.first);
+    if (!added || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    setState(() => _category = same.isEmpty ? name : same.first);
+    showToast(context, same.isEmpty ? 'Category $name is ready with its first product.' : 'Product added to ${same.first}.');
   }
 
   Future<void> _requote() async {
@@ -234,7 +249,7 @@ class _SellScreenState extends State<SellScreen> {
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
           child: SellSearchField(
             controller: _search,
-            hint: 'Scan bar code or type EAN/SKU…',
+            hint: 'Scan or type barcode / System Code…',
             leading: LucideIcons.scanBarcode,
             onChanged: (_) {
               _debounce?.cancel();
@@ -302,30 +317,57 @@ class _SellScreenState extends State<SellScreen> {
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SizedBox(
         width: 72,
-        child: ListView(children: [
-          for (final c in cats)
-            Semantics(
-              button: true,
-              selected: c == _category,
-              label: c.isEmpty ? 'All items' : c,
-              child: InkWell(
-                onTap: () => setState(() => _category = c),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(color: c == _category ? const Color(0xFFFFF4E0) : null, border: Border(left: BorderSide(width: 3, color: c == _category ? const Color(0xFFF59E0B) : Colors.transparent))),
-                  child: Column(children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: kLine)),
-                      child: Icon(c.isEmpty ? LucideIcons.layoutGrid : LucideIcons.tag, size: 16, color: c == _category ? const Color(0xFFD97706) : kMuted),
-                    ),
-                    const SizedBox(height: 6),
-                    ExcludeSemantics(child: Text(c.isEmpty ? 'All items' : c, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(11, c == _category ? 700 : 500, color: c == _category ? const Color(0xFFB45309) : kMuted))),
-                  ]),
-                ),
+        child: Column(children: [
+          // Pinned above the list so it is always in sight, however many categories there are: make one (with its first product).
+          Semantics(
+            button: true,
+            label: 'New category',
+            child: InkWell(
+              key: const ValueKey('sell-new-category'),
+              onTap: _newCategory,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Column(children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(color: kLime, shape: BoxShape.circle, border: Border.all(color: kGreenText, width: 1.5)),
+                    child: const Icon(LucideIcons.plus, size: 18, color: kInk),
+                  ),
+                  const SizedBox(height: 6),
+                  ExcludeSemantics(child: Text('New\ncategory', textAlign: TextAlign.center, style: inter(11, 700, color: kInk))),
+                ]),
               ),
             ),
+          ),
+          const Divider(height: 1, indent: 12, endIndent: 12),
+          Expanded(
+            child: ListView(children: [
+              for (final c in cats)
+                Semantics(
+                  button: true,
+                  selected: c == _category,
+                  label: c.isEmpty ? 'All items' : c,
+                  child: InkWell(
+                    onTap: () => setState(() => _category = c),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(color: c == _category ? const Color(0xFFFFF4E0) : null, border: Border(left: BorderSide(width: 3, color: c == _category ? const Color(0xFFF59E0B) : Colors.transparent))),
+                      child: Column(children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: kLine)),
+                          child: Icon(c.isEmpty ? LucideIcons.layoutGrid : LucideIcons.tag, size: 16, color: c == _category ? const Color(0xFFD97706) : kMuted),
+                        ),
+                        const SizedBox(height: 6),
+                        ExcludeSemantics(child: Text(c.isEmpty ? 'All items' : c, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(11, c == _category ? 700 : 500, color: c == _category ? const Color(0xFFB45309) : kMuted))),
+                      ]),
+                    ),
+                  ),
+                ),
+            ]),
+          ),
         ]),
       ),
       Expanded(
@@ -333,7 +375,7 @@ class _SellScreenState extends State<SellScreen> {
             ? Padding(
                 padding: const EdgeInsets.all(12),
                 child: _tab == 'all'
-                    ? StateCard(icon: LucideIcons.search, title: 'No items found', body: 'Try another name or SKU, or pick another category.', primary: 'Open search', onPrimary: _openSearch)
+                    ? StateCard(icon: LucideIcons.search, title: 'No items found', body: 'Try another name or System Code, or pick another category.', primary: 'Open search', onPrimary: _openSearch)
                     : StateCard(
                         icon: LucideIcons.package,
                         title: switch (_tab) { 'stock' => 'Nothing in stock here', 'fast' => 'No recent sales yet', _ => 'Nothing is running low' },

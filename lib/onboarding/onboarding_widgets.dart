@@ -229,6 +229,45 @@ class SelectField extends StatelessWidget {
       ]);
 }
 
+/// Pick any number of [options], all shown at once as wrapping chips (no sheet, no sideways scroll). Order of tapping is kept.
+class MultiChipField extends StatelessWidget {
+  const MultiChipField({super.key, required this.label, required this.options, required this.selected, required this.onChanged, this.hint});
+  final String label;
+  final String? hint;
+  final List<String> options;
+  final List<String> selected;
+  final ValueChanged<List<String>> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: inter(14, 500)),
+        if (hint != null) ...[const SizedBox(height: 4), Text(hint!, style: inter(12.5, 400, color: kMuted))],
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final o in options)
+            Builder(builder: (_) {
+              final on = selected.contains(o);
+              return InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => onChanged(on ? (List.of(selected)..remove(o)) : [...selected, o]),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: on ? kNote : kField,
+                    border: Border.all(color: on ? kLink : kFieldBorder),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (on) ...[const Icon(Icons.check, size: 15, color: kLink), const SizedBox(width: 4)],
+                    Text(o, style: inter(13.5, on ? 600 : 400, color: on ? kLink : kInk)),
+                  ]),
+                ),
+              );
+            }),
+        ]),
+      ]);
+}
+
 /// Radio-style choice card for onboarding (selected = light green).
 class ChoiceCard extends StatelessWidget {
   const ChoiceCard({super.key, required this.icon, required this.title, required this.body, required this.selected, required this.onTap});

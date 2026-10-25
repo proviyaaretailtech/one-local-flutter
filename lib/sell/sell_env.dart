@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../catalogue/catalogue_api.dart';
+import '../catalogue/item_sheets.dart' show showQuickAdd;
 import '../orders/orders_api.dart';
 import '../orders/orders_home.dart';
 import '../shift/shift_api.dart';
@@ -17,8 +19,10 @@ import 'sell_widgets.dart';
 /// What every till screen shares: the two API clients, the open carts, and where the other sections' tabs lead.
 /// Tests pass fakes; the app passes nothing and gets the live ones.
 class SellEnv {
-  SellEnv({SellApi? sell, OrdersApi? orders, ShiftApi? shift, SellCarts? carts, this.onTab, this.storeName = 'OneLocal', this.branchName, this.initials = 'RP', Future<bool> Function(Uri)? openUrl})
-      : sell = sell ?? SellApi(),
+  SellEnv({SellApi? sell, OrdersApi? orders, ShiftApi? shift, SellCarts? carts, this.onTab, this.storeName = 'OneLocal', this.branchName, this.initials = 'RP', Future<bool> Function(Uri)? openUrl,
+      Future<bool> Function(BuildContext context, String category)? addFirstItem})
+      : addFirstItem = addFirstItem ?? ((context, category) async => await showQuickAdd(context, CatalogueApi(), category: category) != null),
+        sell = sell ?? SellApi(),
         shift = shift ?? ShiftApi(),
         openUrl = openUrl ?? ((u) => launchUrl(u, mode: LaunchMode.externalApplication)),
         orders = orders ?? OrdersApi(),
@@ -29,6 +33,8 @@ class SellEnv {
   final SellCarts carts;
   final SellNavigate? onTab;
   final Future<bool> Function(Uri) openUrl; // WhatsApp links; tests replace it
+  /// "+ New" category on the Bill: a category is made with its first product, so this opens Quick add in it; true when one was added.
+  final Future<bool> Function(BuildContext context, String category) addFirstItem;
   final String storeName, initials;
   final String? branchName;
 

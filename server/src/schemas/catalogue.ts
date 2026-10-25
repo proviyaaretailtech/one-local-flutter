@@ -34,3 +34,13 @@ export const RemoveBg = z.object({
   image_b64: z.string().min(16, 'That photo is empty.').max(Math.ceil(IMAGE_MAX_BYTES / 3) * 4 + 8, 'Each photo can be up to 5 MB.').regex(/^[A-Za-z0-9+/]+=*$/, 'That photo could not be read.'),
   content_type: z.enum(['image/jpeg', 'image/png', 'image/webp'], { message: 'Use a JPG, PNG or WebP photo.' }),
 }).strict();
+
+// The item's saved photo (item-images bucket): ask for an upload slot, confirm the upload, or take the photo off.
+export const PHOTO_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+export const PhotoAsk = z.object({
+  item_id: id,
+  content_type: z.enum(['image/jpeg', 'image/png', 'image/webp'], { message: 'Use a JPG, PNG or WebP photo.' }),
+  size: z.number().int().min(1, 'That photo is empty.').max(IMAGE_MAX_BYTES, 'Each photo can be up to 5 MB.'),
+}).strict();
+export const PhotoAttach = PhotoAsk.extend({ path: z.string().min(5).max(300) }).strict();
+export const PhotoRemove = z.object({ item_id: id }).strict();

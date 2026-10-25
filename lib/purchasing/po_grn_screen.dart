@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../inventory/inventory_dashboard.dart';
+import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
 import '../inventory/receiving_screen.dart';
 import '../ui/theme.dart';
@@ -88,7 +88,7 @@ class _PoGrnScreenState extends State<PoGrnScreen> {
       PoHeaderCard(po),
       for (final l in po.lines) PoLineCard(l, supplier: po.supplierName),
       PoTotalsCard(po),
-      if (draft != null) InvNote('A receipt (${draft.s('doc_no')}) is waiting in ${draft.s('status') == 'review' ? 'GRN review' : 'draft'}. Stock changes only when it is posted.'),
+      if (draft != null) InvNote('A receipt (${draft.s('doc_no')}) is waiting in ${draft.s('status') == 'review' ? 'purchase review' : 'draft'}. Stock changes only when it is posted.'),
       if (po.canReceive) InvPrimary('Confirm Receipt & Update Stock', busy: _busy, onPressed: _confirm),
       if (po.status == 'Pending' && !po.can('approve') && po.can('reject')) InvNote('You raised this order and it is above ${money(po.n('self_approval_limit_minor'))}: someone else approves it.'),
       if (po.status == 'Draft' || po.status == 'Pending') InvNote(po.status == 'Draft' ? 'A draft is not sent for approval yet.' : 'Waiting for approval. Goods can be received once it is approved.'),

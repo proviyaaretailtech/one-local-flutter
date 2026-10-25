@@ -178,7 +178,7 @@ const kStoreTabs = [
   BarTab('Item', LucideIcons.archive),
   BarTab('Bill', LucideIcons.receiptText, hero: true),
   BarTab('Online order', LucideIcons.shoppingBag),
-  BarTab('Stock', LucideIcons.boxes),
+  BarTab('', LucideIcons.circle), // Stock and Purchase live in Item now (25 Oct 2026); the slot stays empty until decided
 ];
 
 const kHubTabs = [

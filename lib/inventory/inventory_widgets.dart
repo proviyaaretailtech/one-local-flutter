@@ -88,7 +88,7 @@ String stamp(DateTime d) => '${dayMonth(d, year: true)}, ${hm(d)}';
 /// Document status chip ("• Draft", "• Unposted", "• Review", "• Posted").
 (String, Color, Color) docLook(String type, String s) => switch (s) {
       'draft' => (type == 'receipt' ? 'Unposted' : 'Draft', kGreyBg, kMuted),
-      'review' => (type == 'receipt' ? 'GRN review' : 'Review', kGreyBg, kMuted),
+      'review' => (type == 'receipt' ? 'Purchase review' : 'Review', kGreyBg, kMuted),
       'awaiting_approval' => ('Awaiting approval', kAmberBgH, kAmberText),
       'in_transit' => ('In transit', kBlueIconBg, kBlueIcon),
       'posted' => (type == 'receipt' ? 'Completed' : 'Posted', kMintBg, kPostedText),
@@ -119,7 +119,7 @@ class InvTopBar extends StatelessWidget {
 
 /// Floating dark bottom bar: Money, Item, Bill, Online order, Stock. The active tab is a lime tile with its label inside.
 class InvBottomNav extends StatelessWidget {
-  const InvBottomNav({super.key, this.active = 'stock', required this.onTap});
+  const InvBottomNav({super.key, this.active = 'item', required this.onTap}); // stock and purchase live in Item
   final String active;
   final ValueChanged<String> onTap;
   static const tabs = [
@@ -127,7 +127,7 @@ class InvBottomNav extends StatelessWidget {
     ('item', 'Item', LucideIcons.archive),
     ('bill', 'Bill', LucideIcons.receiptText),
     ('online', 'Online order', LucideIcons.shoppingBag),
-    ('stock', 'Stock', LucideIcons.boxes),
+    ('slot', '', LucideIcons.circle), // the store's kept, empty slot (Stock is in Item now)
   ];
   // The app's one bottom bar ([AppTabBar]); tabs keep their 'inv-tab-…' keys.
   @override
@@ -496,12 +496,15 @@ class InvPickBox extends StatelessWidget {
 
 /// Text / number box in the same style as [InvPickBox].
 class InvInput extends StatelessWidget {
-  const InvInput({super.key, required this.controller, this.number = false, this.hint, this.onChanged, this.label, this.prefixIcon});
+  const InvInput({super.key, required this.controller, this.number = false, this.hint, this.onChanged, this.label, this.prefixIcon, this.suffix});
   final TextEditingController controller;
   final bool number;
   final String? hint, label;
   final ValueChanged<String>? onChanged;
   final IconData? prefixIcon;
+
+  /// A button at the end of the box (for example "Scan a barcode").
+  final Widget? suffix;
   @override
   Widget build(BuildContext context) => SizedBox(
         height: 46,
@@ -517,6 +520,7 @@ class InvInput extends StatelessWidget {
             semanticCounterText: label,
             hintStyle: inter(15, 400, color: kMuted),
             prefixIcon: prefixIcon == null ? null : Icon(prefixIcon, size: 18, color: kMuted),
+            suffixIcon: suffix,
             filled: true,
             fillColor: Colors.white,
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -752,7 +756,7 @@ class _ItemPickerState extends State<_ItemPicker> {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('Choose a product', style: inter(18, 700)),
             const SizedBox(height: 12),
-            InvInput(controller: _q, hint: 'Search product name, SKU, barcode', prefixIcon: LucideIcons.search, onChanged: (_) => _load()),
+            InvInput(controller: _q, hint: 'Search product name, System Code, barcode', prefixIcon: LucideIcons.search, onChanged: (_) => _load()),
             const SizedBox(height: 8),
             if (_error != null) Text(_error!, style: inter(13, 400, color: kRedText)),
             Flexible(

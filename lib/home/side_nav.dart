@@ -9,10 +9,13 @@ import 'home_widgets.dart';
 /// One row of the side nav. [open] is null when the screen is not built yet: the row is then
 /// greyed with a "Soon" tag instead of looking live and answering with a toast (control rule).
 class SideNavEntry {
-  const SideNavEntry(this.icon, this.label, this.open);
+  const SideNavEntry(this.icon, this.label, this.open, {this.children = const []});
   final IconData icon;
   final String label;
   final VoidCallback? open;
+
+  /// Sub-pages shown right under this row in the menu itself (Stock management's three sections).
+  final List<SideNavEntry> children;
 }
 
 /// Figma section D "side Nav bar" (39:7416), store: profile, module list, Manage account, Sign out.
@@ -26,10 +29,10 @@ Future<void> showStoreSideNav(
 }) {
   // Each entry opens through its HomeNav hook; an unplugged hook makes the row "Soon".
   VoidCallback? hook(HomeRoute? r) => r == null ? null : () => r(context);
-  // Ordered by how often a shop needs them, daily tools first and the set-up-once pages last. Dashboard, Store POS,
-  // Catalogue and Stock management are not here: they are the bottom bar's Home, Bill, Item and Stock (founder, 20 Oct 2026).
+  // Ordered by how often a shop needs them, daily tools first and the set-up-once pages last. Dashboard, Store POS and
+  // Catalogue are not here: they are the bottom bar's Home, Bill and Item (founder, 20 Oct 2026). Stock and Purchase are not
+  // either: they are parts of Item now (founder, 25 Oct 2026).
   final entries = [
-    SideNavEntry(LucideIcons.package, 'GRN', hook(HomeNav.grn)),
     SideNavEntry(LucideIcons.qrCode, 'All Orders', hook(HomeNav.orderHistory ?? HomeNav.orders)),
     SideNavEntry(LucideIcons.indianRupee, 'Money', hook(HomeNav.money)),
     SideNavEntry(LucideIcons.circleUser, 'Customer', hook(HomeNav.customers)),
@@ -135,12 +138,21 @@ class _StoreSideNav extends StatelessWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final e = entries[i];
-                    return _NavRow(
+                    final row = _NavRow(
                       icon: e.icon,
                       label: e.label,
                       soon: e.open == null,
                       onTap: e.open == null ? null : () => _go(context, e.open!),
                     );
+                    if (e.children.isEmpty) return row;
+                    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      row,
+                      for (final c in e.children)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 22, top: 6),
+                          child: _NavRow(icon: c.icon, label: c.label, sub: true, soon: c.open == null, onTap: c.open == null ? null : () => _go(context, c.open!)),
+                        ),
+                    ]);
                   },
                 ),
               ),
@@ -155,16 +167,44 @@ class _StoreSideNav extends StatelessWidget {
 }
 
 class _NavRow extends StatelessWidget {
-  const _NavRow({required this.icon, required this.label, required this.onTap, this.soon = false, this.danger = false});
+  const _NavRow({required this.icon, required this.label, required this.onTap, this.soon = false, this.danger = false, this.sub = false});
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
   final bool soon, danger;
 
+  /// A section under a row (Stock management's three): lighter and a little smaller, with a lime edge.
+  final bool sub;
+
   @override
   Widget build(BuildContext context) {
     final fg = danger ? kRed : soon ? kMuted : kInk;
-    final bg = danger ? const Color(0xFFFEF2F2) : const Color(0xFFF3F4EE);
+    final bg = danger ? const Color(0xFFFEF2F2) : sub ? const Color(0xFFF8F9F4) : const Color(0xFFF3F4EE);
+    if (sub) {
+      return Semantics(
+        button: true,
+        enabled: onTap != null,
+        label: soon ? '$label, coming soon' : label,
+        child: Material(
+          color: bg,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10)), side: BorderSide(color: Color(0xFFE4E7DC))),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: onTap,
+            child: Container(
+              decoration: const BoxDecoration(border: Border(left: BorderSide(color: kLime, width: 3))),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Row(children: [
+                Icon(icon, size: 17, color: fg),
+                const SizedBox(width: 12),
+                Expanded(child: Text(label, style: inter(12.5, 600, color: fg))),
+                Icon(LucideIcons.chevronRight, size: 15, color: kMuted),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
     return Semantics(
       button: true,
       enabled: onTap != null,

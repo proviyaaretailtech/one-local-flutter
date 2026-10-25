@@ -62,20 +62,20 @@ class AppHeader extends StatelessWidget {
     final showBack = back ?? (onBack != null || (ModalRoute.of(context)?.canPop ?? false));
     final menu = onMenu ?? (HomeNav.openMenu == null ? null : () => HomeNav.openMenu!(context));
     final top = Text((kicker ?? HomeNav.storeName ?? 'OneLocal Partner').toUpperCase(),
-        maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 700, color: kMuted).copyWith(letterSpacing: 1));
+        maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10, 700, color: kMuted).copyWith(letterSpacing: 0.8));
     final name = Row(children: [
       // a long store name wraps onto a second line rather than being cut off
-      Flexible(child: Text(title, key: titleKey, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(19, 800, height: 1.15))),
-      if (onTitle != null) ...[const SizedBox(width: 2), const Icon(LucideIcons.chevronDown, size: 18, color: kInk)],
+      Flexible(child: Text(title, key: titleKey, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(17, 800, height: 1.15))),
+      if (onTitle != null) ...[const SizedBox(width: 2), const Icon(LucideIcons.chevronDown, size: 16, color: kInk)],
     ]);
     final account = profile ? HomeNav.account : null;
     return Container(
       color: kBg,
-      padding: EdgeInsets.fromLTRB(12, (safeTop ? MediaQuery.paddingOf(context).top : 0) + 8, 12, 6),
+      padding: EdgeInsets.fromLTRB(10, (safeTop ? MediaQuery.paddingOf(context).top : 0) + 6, 10, 4),
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: _ring),
           gradient: const LinearGradient(colors: [_tintLeft, _tintRight], begin: Alignment.centerLeft, end: Alignment.centerRight),
         ),
@@ -83,7 +83,7 @@ class AppHeader extends StatelessWidget {
           // the lighter sweep on the right of the card
           Positioned(right: -70, top: -60, bottom: -60, width: 260, child: DecoratedBox(decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.55), shape: BoxShape.circle))),
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            padding: const EdgeInsets.fromLTRB(8, 7, 8, 7), // compact (founder, 22 Oct 2026)
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               if (showBack)
                 _Round(icon: LucideIcons.arrowLeft, label: 'Back', onTap: onBack ?? () => Navigator.of(context).maybePop())
@@ -91,13 +91,13 @@ class AppHeader extends StatelessWidget {
                 _Round(key: menuKey, icon: LucideIcons.menu, label: 'Menu', onTap: menu)
               else
                 const SizedBox(width: 4),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                   top,
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   if (onTitle == null) name else InkWell(onTap: onTitle, child: name),
-                  if (subtitle != null) Padding(padding: const EdgeInsets.only(top: 4), child: subtitle),
+                  if (subtitle != null) Padding(padding: const EdgeInsets.only(top: 3), child: subtitle),
                 ]),
               ),
               if (trailing != null) ...[const SizedBox(width: 6), trailing!],
@@ -134,7 +134,7 @@ class _Round extends StatelessWidget {
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: onTap,
-            child: SizedBox(width: 42, height: 42, child: Icon(icon, size: 20, color: kInk)),
+            child: SizedBox(width: 36, height: 36, child: Icon(icon, size: 18, color: kInk)),
           ),
         ),
       );
@@ -166,9 +166,9 @@ class _Profile extends StatelessWidget {
           customBorder: const CircleBorder(),
           onTap: onTap,
           child: SizedBox(
-            width: 42,
-            height: 42,
-            child: Center(child: text.isEmpty ? const Icon(LucideIcons.user, size: 20, color: Colors.white) : Text(text, style: inter(14, 800, color: Colors.white))),
+            width: 36,
+            height: 36,
+            child: Center(child: text.isEmpty ? const Icon(LucideIcons.user, size: 18, color: Colors.white) : Text(text, style: inter(13, 800, color: Colors.white))),
           ),
         ),
       ),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/orders/orders_api.dart';
@@ -134,13 +135,14 @@ class Till {
 
   Iterable<http.Request> where(String method, String end) => calls.where((r) => r.method == method && r.url.path.endsWith(end));
 
-  SellEnv env({SellCarts? carts, SellNavigate? onTab, List<Uri>? opened}) => SellEnv(
+  SellEnv env({SellCarts? carts, SellNavigate? onTab, List<Uri>? opened, Future<bool> Function(BuildContext, String)? addFirstItem}) => SellEnv(
         sell: SellApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
         orders: OrdersApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
         shift: ShiftApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
         carts: carts ?? SellCarts(),
         onTab: onTab,
         branchName: 'Latur Main Branch',
+        addFirstItem: addFirstItem,
         openUrl: (u) async {
           opened?.add(u);
           return true;

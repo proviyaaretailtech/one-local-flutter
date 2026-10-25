@@ -6,6 +6,7 @@ import * as pii from './pii.ts';
 import * as storage from './storage.ts';
 import * as storefront from './storefront.ts';
 import * as settingsFiles from './settings_files.ts';
+import * as itemPhotos from './itemPhotos.ts';
 import { me } from './me.ts';
 import { webhook } from './payments.ts';
 import { describeDish } from './menuAi.ts';
@@ -32,6 +33,9 @@ export const secureHandlers = {
   pos_settings_file_link: settingsFiles.fileLink,
   menu_ai_describe: ctx => describeDish(ctx),
   cat_image_remove_bg: ctx => removeBackground(ctx),
+  cat_item_photo_slot: itemPhotos.photoSlot,
+  cat_item_photo_attach: itemPhotos.photoAttach,
+  cat_item_photo_remove: itemPhotos.photoRemove,
 } satisfies Record<string, SecureHandler>;
 
 /** Real HTTP endpoints (no user token): provider webhooks. */

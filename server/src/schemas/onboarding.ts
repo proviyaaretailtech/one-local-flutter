@@ -44,6 +44,7 @@ export const Profile = z.object({
   email: z.string().trim().toLowerCase().email('That email looks wrong.').max(200).optional().or(z.literal('')),
   selling_mode: z.enum(['physical', 'online_or_both'], { message: 'Choose how you sell.' }),
   category: text(80, 'Choose your category.').optional(),
+  categories: z.array(text(80, 'Choose your cuisines.')).max(30, 'Too many cuisines.').optional(), // restaurant: every cuisine it serves
   subcategory: text(80, 'Choose your subcategory.').optional(),
   specialty: text(80, 'Subcategory is too long.').optional().or(z.literal('')),
 });
@@ -53,9 +54,11 @@ export function profileArgs(b: z.infer<typeof Profile>) {
   let family: string | null = null, category: string | null = null, subs: string[] = [];
   const bad = (m: string) => new HttpError(400, m, undefined, 'validation');
   if (b.partner_type === 'restaurant') {
-    if (!b.category) throw bad('Choose your category.');
-    if (!restaurantTypes.includes(b.category)) throw bad('Choose your category from the list.');
-    category = b.category; subs = [b.category];
+    // A restaurant can serve several cuisines; the first one picked is its main category. An older app sends just `category`.
+    const picked = [...new Set(b.categories?.length ? b.categories : b.category ? [b.category] : [])];
+    if (picked.length === 0) throw bad('Choose the cuisines you serve.');
+    if (picked.some(c => !restaurantTypes.includes(c))) throw bad('Choose your cuisines from the list.');
+    category = picked[0]; subs = picked;
   } else if (b.partner_type === 'store') {
     const found = families.flatMap(f => f.categories.map(c => ({ f, c }))).find(x => x.c.name === b.category);
     if (!b.category) throw bad('Choose your category.');

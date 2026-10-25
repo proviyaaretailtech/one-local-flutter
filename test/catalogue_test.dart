@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:vinii_pos/api/rpc_client.dart';
 import 'package:vinii_pos/app_routes.dart';
 import 'package:vinii_pos/catalogue/catalogue_api.dart';
 import 'package:vinii_pos/catalogue/catalogue_format.dart';
@@ -218,13 +219,13 @@ void main() {
       await t.tap(find.byTooltip('Actions for Coca-Cola 500ml'));
       await t.pumpAndSettle();
       expect(find.text('CC500 · ₹40 · Item actions'), findsOneWidget);
-      for (final x in ['View product details', 'Open the catalogue record', 'Quick edit', 'Update existing product information', 'View product image', 'Open the image viewer', 'Copy SKU', 'Cancel']) {
+      for (final x in ['View product details', 'Open the catalogue record', 'Quick edit', 'Update existing product information', 'View product image', 'Open the image viewer', 'Copy System Code', 'Cancel']) {
         expect(find.text(x), findsOneWidget);
       }
-      await t.tap(find.text('Copy SKU'));
+      await t.tap(find.text('Copy System Code'));
       await t.pumpAndSettle();
       expect(copied, ['CC500']);
-      expect(toast('SKU CC500 copied.'), findsOneWidget);
+      expect(toast('System Code CC500 copied.'), findsOneWidget);
     });
 
     testWidgets('tapping an item shows "About this product", then the detail drawer with the catalogue record', (t) async {
@@ -233,8 +234,8 @@ void main() {
       await t.tap(find.text('Coca-Cola 500ml'));
       await t.pumpAndSettle();
       expect(find.text('About this product'), findsOneWidget);
-      expect(find.text('Check the pack and SKU before selecting.'), findsOneWidget);   // its own hint line under the facts
-      expect(find.text('SKU CC500'), findsOneWidget);
+      expect(find.text('Check the pack and System Code before selecting.'), findsOneWidget);   // its own hint line under the facts
+      expect(find.text('System Code CC500'), findsOneWidget);
       expect(find.text('Selling price'), findsOneWidget);
       expect(find.text('500ml bottle'), findsOneWidget);
       await t.tap(find.text('View product details'));
@@ -277,8 +278,124 @@ void main() {
       expect(toast('Oat added.'), findsOneWidget);
     });
 
+    testWidgets('the count cards are filters: Out of Stock lists those items, tapping it again or Show all lists everything', (t) async {
+      final s = server();
+      await phone(t, CatalogueScreen(api: s.api), height: 3000);
+      Map<String, dynamic> last() => s.body(s.where('POST', '/cat_item_list').last);
+      expect(last().containsKey('status'), isFalse);
+      await t.tap(find.text('Out of Stock'));
+      await t.pumpAndSettle();
+      expect(last()['status'], 'out');
+      expect(find.text('Showing out of stock items'), findsOneWidget);
+      await t.tap(find.text('Drafts'));
+      await t.pumpAndSettle();
+      expect(last()['status'], 'draft');
+      await t.tap(find.text('Drafts'));
+      await t.pumpAndSettle();
+      expect(last().containsKey('status'), isFalse);
+      await t.tap(find.text('Inactive Items'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cat-show-all')));
+      await t.pumpAndSettle();
+      expect(last().containsKey('status'), isFalse);
+      expect(find.text('Showing inactive items'), findsNothing);
+    });
+
+    testWidgets('the Categories card opens the categories; picking one lists its items', (t) async {
+      final s = server();
+      await phone(t, CatalogueScreen(api: s.api), height: 3000);
+      final cats = s.body(s.where('POST', '/cat_item_list').last);
+      expect(cats['category'], isNull);
+      await t.tap(find.text('Categories').first);
+      await t.pumpAndSettle();
+      expect(find.text('All categories'), findsOneWidget);
+      final name = find.descendant(of: find.byType(BottomSheet), matching: find.byType(ListTile)).at(2); // 0 New category, 1 All categories
+      final label = (t.widget<ListTile>(name).title as Text).data!;
+      await t.tap(name);
+      await t.pumpAndSettle();
+      expect(s.body(s.where('POST', '/cat_item_list').last)['category'], label);
+    });
+
+    testWidgets('New category chip: name it, add its first product, and that category is shown', (t) async {
+      final s = Fake((r) => r.url.path.endsWith('/cat_item_save') ? ok(item('n1', 'Shampoo', 'SH1', 9900, category: 'Personal care')) : ok(catalogueList(sixItems)));
+      await phone(t, CatalogueScreen(api: s.api), height: 3000);
+      await t.ensureVisible(find.byKey(const ValueKey('cat-new-category')));
+      await t.tap(find.byKey(const ValueKey('cat-new-category')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Personal care'));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('new-category-next')));
+      await t.pumpAndSettle();
+      expect(find.text('Category: Personal care'), findsOneWidget);
+      final fields = find.descendant(of: find.byType(Dialog), matching: find.byType(TextField));
+      await t.enterText(fields.at(0), 'Shampoo');
+      await t.enterText(fields.at(1), 'SH1');
+      await t.enterText(fields.at(2), '99');
+      await t.pump();
+      await t.tap(find.text('Add product'));
+      await t.pumpAndSettle();
+      expect(s.body(s.where('POST', '/cat_item_save').single)['category'], 'Personal care');
+      expect(s.body(s.where('POST', '/cat_item_list').last)['category'], 'Personal care');
+      expect(toast('Category Personal care is ready with Shampoo.'), findsOneWidget);
+    });
+
+    testWidgets('the Categories sheet starts with New category, which opens the name step', (t) async {
+      final s = server();
+      await phone(t, CatalogueScreen(api: s.api), height: 3000);
+      await t.tap(find.text('Categories').first);
+      await t.pumpAndSettle();
+      expect(t.getRect(find.byKey(const ValueKey('cat-sheet-new-category'))).top, lessThan(t.getRect(find.text('All categories')).top));
+      await t.tap(find.byKey(const ValueKey('cat-sheet-new-category')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('new-category-name')), findsOneWidget);
+      expect(find.text('All categories'), findsNothing);
+    });
+
+    testWidgets('Quick Add opened for a category says so and saves the product into it', (t) async {
+      final s = Fake((_) => ok(item('n1', 'Chips', 'CH1', 2000)));
+      await phone(t, Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => showQuickAdd(c, s.api, photos: _FakePhotos(), category: 'Snacks'), child: const Text('go')))), height: 3000);
+      await t.tap(find.text('go'));
+      await t.pumpAndSettle();
+      expect(find.text('Category: Snacks'), findsOneWidget);
+      final fields = find.descendant(of: find.byType(Dialog), matching: find.byType(TextField));
+      await t.enterText(fields.at(0), 'Chips');
+      await t.enterText(fields.at(1), 'CH1');
+      await t.enterText(fields.at(2), '20');
+      await t.pump();
+      await t.tap(find.text('Add product'));
+      await t.pumpAndSettle();
+      expect(s.body(s.requests.single), {'mode': 'quick', 'name': 'Chips', 'sku': 'CH1', 'price_minor': 2000, 'category': 'Snacks'});
+    });
+
+    testWidgets('Quick Add takes an optional photo, which goes on the product once it is added', (t) async {
+      final s = Fake((_) => ok(item('n1', 'Oat', 'OAT1', 4500)));
+      final photos = _FakePhotos();
+      await phone(t, Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => showQuickAdd(c, s.api, photos: photos), child: const Text('go')))), height: 3000);
+      await t.tap(find.text('go'));
+      await t.pumpAndSettle();
+      expect(find.text('Tap to add photo'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('quick-photo-add')));
+      await t.pumpAndSettle();
+      expect(find.text('Tap to add photo'), findsNothing);
+      expect(find.byKey(const ValueKey('quick-photo-replace')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('quick-photo-remove')));
+      await t.pumpAndSettle();
+      expect(find.text('Tap to add photo'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('quick-photo-add')));
+      await t.pumpAndSettle();
+      final fields = find.descendant(of: find.byType(Dialog), matching: find.byType(TextField));
+      await t.enterText(fields.at(0), 'Oat');
+      await t.enterText(fields.at(1), 'OAT1');
+      await t.enterText(fields.at(2), '45');
+      await t.pump();
+      await t.tap(find.text('Add product'));
+      await t.pumpAndSettle();
+      expect(photos.attached, ['n1']);
+      expect(find.text('Quick add product'), findsNothing);
+    });
+
     testWidgets('Quick Add shows the database refusal in the dialog and stays open', (t) async {
-      final s = Fake((r) => r.url.path.endsWith('/cat_item_save') ? err(409, 'Another item already uses SKU OAT1.', 'duplicate') : ok(catalogueList(sixItems)));
+      final s = Fake((r) => r.url.path.endsWith('/cat_item_save') ? err(409, 'Another item already uses System Code OAT1.', 'duplicate') : ok(catalogueList(sixItems)));
       await phone(t, CatalogueScreen(api: s.api), height: 3000);
       await t.tap(find.text('+ Add Items'));
       await t.pumpAndSettle();
@@ -291,19 +408,63 @@ void main() {
       await t.pump();
       await t.tap(find.text('Add product'));
       await t.pumpAndSettle();
-      expect(find.text('Another item already uses SKU OAT1.'), findsOneWidget);
+      expect(find.text('Another item already uses System Code OAT1.'), findsOneWidget);
       expect(find.text('Quick add product'), findsOneWidget);
     });
 
-    testWidgets('Scan barcode: type a barcode, Find product opens the item; an unknown code shows the message', (t) async {
+    testWidgets('Scan barcode: the search bar\'s barcode button reads with the camera and opens the product at once', (t) async {
       final s = server();
-      await phone(t, CatalogueScreen(api: s.api), height: 3000);
+      await phone(t, CatalogueScreen(api: s.api, scan: (_) async => 'CC500'), height: 3000);
+      await t.tap(find.byTooltip('Scan a barcode'));
+      await t.pumpAndSettle();
+      expect(s.body(s.where('POST', '/cat_item_lookup').single)['code'], 'CC500');
+      expect(find.text('Scan barcode'), findsNothing);
+      expect(find.text('About this product'), findsOneWidget);
+    });
+
+    testWidgets('Scan barcode: a code with no product offers to create one; "Type a different code" opens the sheet with it', (t) async {
+      final s = server();
+      await phone(t, CatalogueScreen(api: s.api, scan: (_) async => 'NOPE'), height: 3000);
+      await t.tap(find.byTooltip('Scan a barcode'));
+      await t.pumpAndSettle();
+      expect(find.text('New barcode'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('unknown-type')));
+      await t.pumpAndSettle();
+      expect(find.text('Scan barcode'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'NOPE'), findsOneWidget);
+      expect(find.text('No item has that code.'), findsOneWidget);
+    });
+
+    testWidgets('Unknown product: "Create product" opens Item creation with the scanned barcode filled in', (t) async {
+      final s = server();
+      await phone(t, CatalogueScreen(api: s.api, scan: (_) async => '8901234567890'), height: 3000);
+      await t.tap(find.byTooltip('Scan a barcode'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('unknown-create')));
+      await t.pumpAndSettle();
+      expect(find.byType(ItemFormScreen), findsOneWidget);
+      expect(find.widgetWithText(TextField, '8901234567890'), findsOneWidget);
+    });
+
+    testWidgets('Scan barcode: closing the camera does nothing', (t) async {
+      final s = server();
+      await phone(t, CatalogueScreen(api: s.api, scan: (_) async => null), height: 3000);
+      final before = s.requests.length;
+      await t.tap(find.byTooltip('Scan a barcode'));
+      await t.pumpAndSettle();
+      expect(s.requests.length, before);
+      expect(find.text('Scan barcode'), findsNothing);
+    });
+
+    testWidgets('Scan barcode: "Type the code instead" opens the sheet; type a barcode, Find product opens the item; an unknown code shows the message', (t) async {
+      final s = server();
+      await phone(t, CatalogueScreen(api: s.api, scan: (_) async => ''), height: 3000);
       await t.tap(find.byTooltip('Scan a barcode'));
       await t.pumpAndSettle();
       expect(find.text('Scan barcode'), findsOneWidget);
       expect(find.descendant(of: find.byType(Dialog), matching: find.textContaining('QR')), findsNothing);
-      expect(find.text('Camera scanning is coming soon'), findsOneWidget);
-      expect(find.text('Barcode or SKU'), findsOneWidget);
+      expect(find.text('Tap to scan with camera'), findsOneWidget);
+      expect(find.text('Barcode or System Code'), findsOneWidget);
       await t.enterText(find.descendant(of: find.byType(Dialog), matching: find.byType(TextField)), 'NOPE');
       await t.pump();
       await t.tap(find.text('Find product'));
@@ -314,6 +475,19 @@ void main() {
       await t.tap(find.text('Find product'));
       await t.pumpAndSettle();
       expect(find.text('About this product'), findsOneWidget);
+    });
+
+    testWidgets('Scan barcode: tapping the viewfinder scans with the camera and looks the code up straight away', (t) async {
+      final s = server();
+      CatItem? found;
+      await phone(t, Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () async => found = await showScanSheet(c, s.api, scan: (_) async => 'CC500'), child: const Text('go')))), height: 3000);
+      await t.tap(find.text('go'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('scan-camera')));
+      await t.pumpAndSettle();
+      expect(s.body(s.where('POST', '/cat_item_lookup').single)['code'], 'CC500');
+      expect(found?.sku, 'CC500');
+      expect(find.text('Scan barcode'), findsNothing);
     });
 
     test('installRoutes plugs the catalogue and the GRN queue into the control centre', () {
@@ -384,10 +558,10 @@ void main() {
       final s = Fake((_) => ok(item('n1', 'Oat', 'OAT1', 4000)));
       final photos = _FakePhotos();
       await phone(t, ItemFormScreen(api: s.api, photos: photos), height: 6400);
-      expect(find.text('Add product photo'), findsOneWidget);
+      expect(find.text('Tap to add photo'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('item-photo-add')));
       await t.pumpAndSettle();
-      expect(find.text('Add product photo'), findsNothing);
+      expect(find.text('Tap to add photo'), findsNothing);
       await t.tap(find.byKey(const ValueKey('item-photo-bg')));
       await t.pumpAndSettle();
       expect(find.text('Background removed'), findsOneWidget);
@@ -416,6 +590,61 @@ void main() {
       expect(current('Tax & price'), isFalse);
     });
 
+    testWidgets('the barcode field has a scan button: the code the camera reads is filled in', (t) async {
+      final s = Fake((_) => ok({}));
+      var opened = 0;
+      await phone(t, ItemFormScreen(api: s.api, scan: (_) async { opened++; return '8901234567890'; }), height: 6400);
+      await t.tap(find.byKey(const ValueKey('item-barcode-scan')));
+      await t.pumpAndSettle();
+      expect(opened, 1);
+      expect(find.widgetWithText(TextField, '8901234567890'), findsOneWidget);
+      expect(toast('Barcode 8901234567890 added.'), findsOneWidget);
+    });
+
+    testWidgets('editing an item shows its saved photo; Remove photo takes it off when the item is saved', (t) async {
+      final it = CatItem({...item('i1', 'Coca-Cola 500ml', 'CC500', 4000, version: 3), 'image_url': 'http://img.test/cc.png'});
+      final s = Fake((_) => ok(item('i1', 'Coca-Cola 500ml', 'CC500', 4000, version: 4)));
+      final photos = _FakePhotos();
+      await phone(t, ItemFormScreen(api: s.api, item: it, photos: photos), height: 6400);
+      expect(find.byKey(const ValueKey('item-photo-saved')), findsOneWidget);
+      expect(find.text('Tap to add photo'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('item-photo-remove')));
+      await t.pumpAndSettle();
+      expect(find.text('Tap to add photo'), findsOneWidget);
+      await t.ensureVisible(find.text('Save item'));
+      await t.tap(find.text('Save item'));
+      await t.pumpAndSettle();
+      expect(photos.removed, ['i1']);
+      expect(photos.attached, isEmpty);
+    });
+
+    test('a saved photo goes to storage through the server: slot, upload, confirm', () async {
+      final seen = <String>[];
+      final client = MockClient((r) async {
+        seen.add('${r.method} ${r.url.host}${r.url.path}');
+        if (r.url.path.endsWith('/cat_item_photo_slot')) {
+          expect(jsonDecode(r.body), {'item_id': 'i1', 'content_type': 'image/png', 'size': 4});
+          return ok({'path': 'org/items/i1/a.png', 'upload_url': 'http://storage.test/upload/a.png'});
+        }
+        if (r.url.host == 'storage.test') {
+          expect(r.headers['Content-Type'], startsWith('image/png'));
+          expect(r.bodyBytes, [0x89, 0x50, 0x4E, 0x47]);
+          return http.Response('{}', 200);
+        }
+        expect(jsonDecode(r.body)['path'], 'org/items/i1/a.png');
+        return ok({'id': 'i1', 'image_url': 'http://img.test/a.png'});
+      });
+      final photos = DeviceItemPhotos(rpc: RpcClient(baseUrl: 'http://pos.test', accessToken: () => 'token-123', client: client), client: client);
+      await photos.attach('i1', ItemPhoto(bytes: Uint8List.fromList(const [0x89, 0x50, 0x4E, 0x47]), contentType: 'image/png'));
+      expect(seen, ['POST pos.test/rpc/cat_item_photo_slot', 'PUT storage.test/upload/a.png', 'POST pos.test/rpc/cat_item_photo_attach']);
+    });
+
+    test('a refused photo save says why', () async {
+      final client = MockClient((r) async => err(403, 'Your role cannot change catalogue items.', 'forbidden'));
+      final photos = DeviceItemPhotos(rpc: RpcClient(baseUrl: 'http://pos.test', accessToken: () => 'token-123', client: client), client: client);
+      expect(() => photos.remove('i1'), throwsA(isA<ItemPhotoUnavailable>().having((e) => e.message, 'message', 'Your role cannot change catalogue items.')));
+    });
+
     testWidgets('editing an item pre-fills it and sends its version; a stale save says so', (t) async {
       final it = CatItem(item('i1', 'Coca-Cola 500ml', 'CC500', 4000, version: 3));
       final s = Fake((_) => err(409, 'This item was changed on another device.', 'version_conflict'));
@@ -437,7 +666,7 @@ void main() {
     testWidgets('invoice and receiving tables with the exception colours, counts and Review Exceptions', (t) async {
       final s = Fake((r) => r.url.path.endsWith('/grn_matching_view') ? ok(matchingView()) : ok(grnView()));
       await phone(t, GrnMatchingScreen(receiptId: 'r1', api: s.api), height: 3200);
-      expect(find.text('GRN Matching'), findsOneWidget);
+      expect(find.text('Purchase matching'), findsOneWidget);
       expect(find.text('RCV-2026-BB4 • MATCH INVOICE'), findsOneWidget);
       expect(find.text('INV-2024-0047 • Metro Cash & Carry'), findsOneWidget);
       expect(find.text('Supplier Invoice'), findsOneWidget);
@@ -463,7 +692,7 @@ void main() {
       await phone(t, GrnMatchingScreen(receiptId: 'r1', api: s.api), height: 3200);
       await t.tap(find.text('Review Exceptions'));
       await t.pumpAndSettle();
-      expect(find.text('GRN Dashboard'), findsOneWidget);
+      expect(find.text('Purchase dashboard'), findsOneWidget);
     });
 
     testWidgets('no invoice yet: says so instead of inventing rows', (t) async {
@@ -479,10 +708,10 @@ void main() {
       final s = Fake((_) => ok(grnView()));
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
       expect(s.requests.first.url.path, '/rpc/grn_open');
-      expect(find.text('GRN Dashboard'), findsOneWidget);
+      expect(find.text('Purchase dashboard'), findsOneWidget);
       expect(find.text('Open receipt → Scan/Enter Products → Match Invoice'), findsOneWidget);
-      for (final c in ['Receiving', 'GRN', 'Putaway', 'Shelf Labels']) {
-        expect(find.text(c), c == 'GRN' ? findsWidgets : findsOneWidget);   // 'GRN' is also the banner's title
+      for (final c in ['Receiving', 'Purchase', 'Putaway', 'Shelf Labels']) {
+        expect(find.text(c), c == 'Purchase' ? findsWidgets : findsOneWidget);   // 'Purchase' is also the banner's title
       }
       expect(find.text('GRN-105'), findsOneWidget);
       expect(find.text('RCV-105 / PO-105 / INV-5512'), findsOneWidget);
@@ -631,7 +860,7 @@ void main() {
             })
           : ok(grnView()));
       await phone(t, GrnQueueScreen(api: s.api));
-      expect(find.text('Goods receipts'), findsOneWidget);
+      expect(find.text('Purchases'), findsOneWidget);
       expect(find.text('GRN-105'), findsOneWidget);
       expect(find.text('RCV-105 / INV-5512'), findsOneWidget);
       expect(find.text('Coca-Cola Bottling'), findsOneWidget);
@@ -639,17 +868,17 @@ void main() {
       expect(find.text('RCV-106'), findsOneWidget);
       expect(find.text('Not opened'), findsOneWidget);
       expect(find.text('Needs review'), findsOneWidget);
-      expect(find.text('No receipts waiting for GRN'), findsNothing);
+      expect(find.text('No purchases waiting for review'), findsNothing);
       await t.tap(find.text('GRN-105'));
       await t.pumpAndSettle();
-      expect(find.text('GRN Dashboard'), findsOneWidget);
+      expect(find.text('Purchase dashboard'), findsOneWidget);
     });
 
     testWidgets('no receipts: explains the flow and Receive stock opens Receiving', (t) async {
       final s = Fake((r) => ok({'items': []}));
       var received = 0;
       await phone(t, GrnQueueScreen(api: s.api, onReceive: (_) => received++));
-      expect(find.text('No receipts waiting for GRN'), findsOneWidget);
+      expect(find.text('No purchases waiting for review'), findsOneWidget);
       expect(find.text('Count the delivery in Receiving'), findsOneWidget);
       await t.tap(find.text('Receive stock'));
       await t.pump();
@@ -670,4 +899,7 @@ class _FakePhotos extends ItemPhotoService {
   Future<ItemPhoto> removeBackground(ItemPhoto p) async => ItemPhoto(bytes: p.bytes, contentType: 'image/png', backgroundRemoved: true);
   @override
   Future<void> attach(String itemId, ItemPhoto p) async => attached.add('$itemId${p.backgroundRemoved ? ' bg' : ''}');
+  final removed = <String>[];
+  @override
+  Future<void> remove(String itemId) async => removed.add(itemId);
 }

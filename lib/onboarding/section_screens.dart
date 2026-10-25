@@ -71,7 +71,7 @@ class _AddressScreenState extends State<AddressScreen> {
       kicker: 'Business setup',
       title: 'Locate your business.',
       caption: 'Section 3 of 7',
-      subtitle: 'Confirm your shop address and map pin. You can always enter the address manually.',
+      subtitle: 'Confirm your business address and map pin. You can always enter the address manually.',
       children: [
         Container(
           height: 160,
@@ -256,7 +256,7 @@ class _IdentityScreenState extends State<IdentityScreen> {
           action: 'Add proof',
           onAction: _next,
           lines: [
-            '${_structure ?? 'Business type not chosen'} · ${(_app.app['subcategories'] as List?)?.firstOrNull ?? _app.app['category'] ?? ''}',
+            '${_structure ?? 'Business type not chosen'} · ${_app.partnerType == 'restaurant' ? ((_app.app['subcategories'] as List?) ?? const []).join(', ') : (_app.app['subcategories'] as List?)?.firstOrNull ?? _app.app['category'] ?? ''}',
             proof == null ? 'Business proof: not yet uploaded' : 'Business proof: ${proof['file_name']}',
             'Shop Act or other applicable business proof',
           ],

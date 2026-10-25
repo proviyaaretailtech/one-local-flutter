@@ -49,6 +49,8 @@ class HomeNav {
   static HomeRoute? stock;
   // Section H: one item's stock detail (section J's low-stock "view item" uses it).
   static ItemRoute? stockItem;
+  // Stock management: one stock page by its id (lib/stock/stock_env.dart StockPage), for one stock item when [itemId] is given.
+  static void Function(BuildContext context, String page, {String? itemId})? stockPage;
   // Section H kitchen: stations setup and the Kitchen Display System.
   static HomeRoute? kitchenSetup;
   static HomeRoute? kitchenDisplay;
@@ -100,6 +102,7 @@ class HomeNav {
   /// Clears every hook (tests).
   static void reset() {
     stockItem = null;
+    stockPage = null;
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
     home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = customers = wallet = account = menu = null;

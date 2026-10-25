@@ -310,6 +310,42 @@
     "icon": "rest-south-indian"
    },
    {
+    "name": "North Indian",
+    "icon": "rest-north-indian"
+   },
+   {
+    "name": "Chinese",
+    "icon": "rest-chinese"
+   },
+   {
+    "name": "Mughlai",
+    "icon": "rest-mughlai"
+   },
+   {
+    "name": "Maharashtrian",
+    "icon": "rest-maharashtrian"
+   },
+   {
+    "name": "Thali",
+    "icon": "rest-thali"
+   },
+   {
+    "name": "Street food",
+    "icon": "rest-street-food"
+   },
+   {
+    "name": "Fast food",
+    "icon": "rest-fast-food"
+   },
+   {
+    "name": "Seafood",
+    "icon": "rest-seafood"
+   },
+   {
+    "name": "Juices & beverages",
+    "icon": "rest-juices-beverages"
+   },
+   {
     "name": "Desserts & ice cream",
     "icon": "rest-desserts-ice-cream"
    },

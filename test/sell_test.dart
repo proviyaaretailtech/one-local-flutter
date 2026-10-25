@@ -103,6 +103,53 @@ void main() {
       expect(find.byType(CartsScreen), findsOneWidget);
     });
 
+    testWidgets('+ New category: name it (or tap one), add its first product, and the category opens', (t) async {
+      final till = Till();
+      final asked = <String>[];
+      final env = till.env(addFirstItem: (_, c) async {
+        asked.add(c);
+        return true;
+      });
+      await tall(t, SellScreen(env: env));
+      // pinned at the top of the category column, above All items, so it is never scrolled out of sight
+      expect(t.getRect(find.byKey(const ValueKey('sell-new-category'))).top, lessThan(t.getRect(find.text('All items').first).top));
+      final loads = till.calls.where((r) => r.url.path.endsWith('/rpc/pos_sell_catalog')).length;
+      await t.tap(find.byKey(const ValueKey('sell-new-category')));
+      await t.pumpAndSettle();
+      expect(find.text('New category'), findsWidgets);
+      expect(find.text('Snacks'), findsWidgets); // already a category: not offered as an idea
+      expect(find.text('Personal care'), findsOneWidget);
+      await t.tap(find.text('Personal care'));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('new-category-next')));
+      await t.pumpAndSettle();
+      expect(asked, ['Personal care']);
+      expect(till.calls.where((r) => r.url.path.endsWith('/rpc/pos_sell_catalog')).length, greaterThan(loads));
+      expect(toast('Category Personal care is ready with its first product.'), findsOneWidget);
+    });
+
+    testWidgets('+ New category: an existing name adds to that category; Cancel does nothing', (t) async {
+      final till = Till();
+      final asked = <String>[];
+      await tall(t, SellScreen(env: till.env(addFirstItem: (_, c) async {
+        asked.add(c);
+        return true;
+      })));
+      await t.tap(find.byKey(const ValueKey('sell-new-category')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Cancel'));
+      await t.pumpAndSettle();
+      expect(asked, isEmpty);
+      await t.tap(find.byKey(const ValueKey('sell-new-category')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('new-category-name')), 'dairy');
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('new-category-next')));
+      await t.pumpAndSettle();
+      expect(asked, ['Dairy']);
+      expect(toast('Product added to Dairy.'), findsOneWidget);
+    });
+
     testWidgets('shows the catalogue; an unavailable item cannot be added; ADD fills the cart and PAY shows the server total', (t) async {
       final till = Till();
       final env = till.env();

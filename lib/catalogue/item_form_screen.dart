@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
+import '../ui/barcode_scanner.dart';
 import '../ui/theme.dart';
 import 'catalogue_api.dart';
 import 'catalogue_format.dart';
@@ -14,13 +15,19 @@ import 'item_sheets.dart' show parsePriceMinor;
 /// Also used to change an existing item (Quick edit, Edit catalogue details): [item] pre-fills the form and carries its version.
 /// The screen only collects and sends; the database decides what is valid (tax needed to save, price not above MRP, unique SKU and barcode).
 class ItemFormScreen extends StatefulWidget {
-  const ItemFormScreen({super.key, this.api, this.item, this.onNavigate, this.photos = const DeviceItemPhotos()});
+  const ItemFormScreen({super.key, this.api, this.item, this.onNavigate, this.photos = const DeviceItemPhotos(), this.scan = scanBarcode, this.barcode});
   final CatalogueApi? api;
   final CatItem? item;
   final ValueChanged<String>? onNavigate;
 
+  /// A new product's barcode, already known (a scanned code no product has yet).
+  final String? barcode;
+
   /// Choosing the product photo, removing its background, attaching it to the saved item.
   final ItemPhotoService photos;
+
+  /// The barcode field's scan button: opens the camera and answers the code read (null when closed).
+  final Future<String?> Function(BuildContext) scan;
   @override
   State<ItemFormScreen> createState() => _ItemFormScreenState();
 }
@@ -31,7 +38,9 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   final _netQty = TextEditingController(), _packUnits = TextEditingController(text: '1'), _hsn = TextEditingController();
   final _cost = TextEditingController(), _price = TextEditingController(), _mrp = TextEditingController();
   final _keyIdentity = GlobalKey(), _keyUnits = GlobalKey(), _keyPricing = GlobalKey(), _keyReview = GlobalKey();
-  ItemPhoto? _photo;
+  ItemPhoto? _photo; // a new photo picked here, put on the item when it is saved
+  late String? _savedUrl = widget.item?.imageUrl; // the photo the item already has
+  bool _dropSaved = false; // "Remove photo" on the saved one: taken off when the item is saved
   bool _photoBusy = false;
   late final String _saveKey = CatalogueApi.newKey();
   String _unit = 'pc', _netUnit = 'g';
@@ -66,6 +75,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
       _cost.text = _rupees(i.costMinor);
       _price.text = _rupees(i.priceMinor);
       _mrp.text = _rupees(i.mrpMinor);
+    } else if (widget.barcode != null) {
+      _barcode.text = widget.barcode!;
     }
     for (final c in [_name, _sku, _category, _barcode, _netQty, _hsn, _cost, _price, _mrp]) {
       c.addListener(() => setState(() {}));
@@ -139,7 +150,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   Future<void> _save({required bool draft}) async {
     final price = parsePriceMinor(_price.text);
     if (_name.text.trim().isEmpty) return showToast(context, 'Enter the product name.');
-    if (_sku.text.trim().isEmpty) return showToast(context, 'Enter the SKU.');
+    if (_sku.text.trim().isEmpty) return showToast(context, 'Enter the System Code.');
     if (price == null) return showToast(context, 'Enter the selling price.');
     final mrp = _mrp.text.trim().isEmpty ? null : parsePriceMinor(_mrp.text);
     final cost = _cost.text.trim().isEmpty ? null : parsePriceMinor(_cost.text);
@@ -175,14 +186,16 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     });
     try {
       final saved = await _api.save(fields, id: widget.item?.id, key: _saveKey);
-      // The photo goes on once the item exists; when photo storage is not set up the item is still saved, and the toast says so.
+      // The photo goes on (or comes off) once the item exists; when that fails the item is still saved, and the toast says why.
       String? photoNote;
-      if (_photo != null) {
-        try {
+      try {
+        if (_photo != null) {
           await widget.photos.attach(saved.id, _photo!);
-        } catch (e) {
-          photoNote = e is ItemPhotoUnavailable ? e.message : 'The photo could not be saved.';
+        } else if (_dropSaved) {
+          await widget.photos.remove(saved.id);
         }
+      } catch (e) {
+        photoNote = e is ItemPhotoUnavailable ? e.message : 'The photo could not be saved.';
       }
       if (!mounted) return;
       final done = draft ? '${saved.name} saved as a draft.' : '${saved.name} saved.';
@@ -229,32 +242,36 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   }
 
   Widget _photoBox() {
-    final p = _photo;
-    if (p == null) {
-      return InkWell(
-        key: const ValueKey('item-photo-add'),
-        borderRadius: BorderRadius.circular(14),
-        onTap: _pickPhoto,
-        child: Container(
-          height: 104,
+    final p = _photo, saved = _savedUrl;
+    Widget frame(Widget image) => Container(
+          width: 96,
+          height: 96,
           decoration: BoxDecoration(color: kSoftField, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFDADCD5))),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            const Icon(LucideIcons.imagePlus, size: 26, color: kMuted),
-            const SizedBox(height: 6),
-            Text('Add product photo', style: inter(14, 600)),
-            Text('JPG, PNG or WebP · up to 5 MB', style: inter(12, 400, color: kMuted)),
+          clipBehavior: Clip.antiAlias,
+          child: image,
+        );
+    const broken = Icon(LucideIcons.imageOff, color: kMuted);
+    if (p == null && saved != null) {
+      // The photo this item already has: replace it or take it off (background removal needs the original file, so not here).
+      return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        frame(Image.network(saved, key: const ValueKey('item-photo-saved'), fit: BoxFit.contain, errorBuilder: (_, _, _) => broken)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _smallAction(LucideIcons.refreshCw, 'Replace photo', _pickPhoto, const ValueKey('item-photo-replace')),
+            _smallAction(LucideIcons.trash2, 'Remove photo', () => setState(() {
+              _savedUrl = null;
+              _dropSaved = true;
+            }), const ValueKey('item-photo-remove'), danger: true),
           ]),
         ),
-      );
+      ]);
+    }
+    if (p == null) {
+      return AddPhotoBox(key: const ValueKey('item-photo-add'), onTap: _pickPhoto);
     }
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(
-        width: 96,
-        height: 96,
-        decoration: BoxDecoration(color: kSoftField, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFDADCD5))),
-        clipBehavior: Clip.antiAlias,
-        child: Image.memory(p.bytes, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(LucideIcons.imageOff, color: kMuted)),
-      ),
+      frame(Image.memory(p.bytes, fit: BoxFit.contain, errorBuilder: (_, _, _) => broken)),
       const SizedBox(width: 12),
       Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -322,18 +339,39 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   BoxDecoration _box(bool bad) =>
       BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: bad ? kError : const Color(0xFFDADCD5), width: bad ? 1.5 : 1));
 
-  Widget _input(TextEditingController c, String hint, {TextInputType? type, List<TextInputFormatter>? formatters, bool bad = false}) => Container(
+  Widget _input(TextEditingController c, String hint, {TextInputType? type, List<TextInputFormatter>? formatters, bool bad = false, Widget? trailing}) => Container(
         height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: EdgeInsets.only(left: 12, right: trailing == null ? 12 : 4),
         alignment: Alignment.centerLeft,
         decoration: _box(bad),
-        child: TextField(
-          controller: c,
-          keyboardType: type,
-          inputFormatters: formatters,
-          style: inter(14, 400),
-          decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(14, 400, color: bad ? kError : kMuted)),
-        ),
+        child: Row(children: [
+          Expanded(
+            child: TextField(
+              controller: c,
+              keyboardType: type,
+              inputFormatters: formatters,
+              style: inter(14, 400),
+              decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(14, 400, color: bad ? kError : kMuted)),
+            ),
+          ),
+          ?trailing,
+        ]),
+      );
+
+  // ---------------------------------------------------------------- barcode scan
+  Future<void> _scanBarcode() async {
+    final code = await widget.scan(context);
+    if (code == null || code.isEmpty || !mounted) return;
+    setState(() => _barcode.text = code);
+    showToast(context, 'Barcode $code added.');
+  }
+
+  Widget _scanButton() => IconButton(
+        key: const ValueKey('item-barcode-scan'),
+        tooltip: 'Scan barcode with camera',
+        onPressed: _busy ? null : _scanBarcode,
+        style: IconButton.styleFrom(backgroundColor: kDark, minimumSize: const Size(38, 38), fixedSize: const Size(38, 38), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+        icon: const Icon(LucideIcons.scanBarcode, size: 20, color: Color(0xFFA1FE2F)),
       );
 
   Widget _dropdown<T>({required T? value, required List<(T, String)> items, required ValueChanged<T?> onChanged, String hint = 'Select', bool bad = false}) => Container(
@@ -429,9 +467,9 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
               const SizedBox(height: 6),
               _photoBox(),
               _field('Product name *', _input(_name, 'Product name')),
-              _field('SKU *', _input(_sku, 'Unique SKU, for example OC-200-PK')),
+              _field('System Code *', _input(_sku, 'Unique System Code, for example OC-200-PK')),
               _pair(_field('Category *', _input(_category, 'Snacks')), _field('Brand', _input(_brand, 'Add brand'))),
-              _field('Barcode *', _input(_barcode, 'Scan or type the barcode')),
+              _field('Barcode *', _input(_barcode, 'Scan or type the barcode', trailing: _scanButton())),
               const SizedBox(height: 6),
               Text(_barcode.text.trim().isEmpty ? 'Without a barcode this item cannot be found by scan.' : 'Identifier has no saved catalogue link. Confirm uniqueness again when saving.',
                   style: inter(12, 400, color: kMuted, height: 1.35)),
@@ -494,10 +532,10 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
               ),
             _section(_keyReview, 4, 'Save checklist', 'What is still needed before this item can be sold', identityDone && unitsDone && pricingDone, [
               const SizedBox(height: 4),
-              _check(_name.text.trim().isNotEmpty && _category.text.trim().isNotEmpty && _sku.text.trim().isNotEmpty, 'Name, category and SKU completed'),
+              _check(_name.text.trim().isNotEmpty && _category.text.trim().isNotEmpty && _sku.text.trim().isNotEmpty, 'Name, category and System Code completed'),
               _check(_barcode.text.trim().isNotEmpty, 'Barcode entered'),
               _check(mrp != null && cost != null && !taxOpen, 'Verify pack MRP, cost and tax'),
-              _check(_photo != null, 'Product photo added (optional)'),
+              _check(_photo != null || _savedUrl != null, 'Product photo added (optional)'),
               _check(_editing, 'Save item before receiving or printing labels'),
             ]),
             Text('A draft is not sold and does not change stock. Stock is received in Stock.', style: inter(12, 400, color: kMuted, height: 1.35)),
