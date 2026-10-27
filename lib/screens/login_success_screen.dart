@@ -4,21 +4,17 @@ import '../auth/auth_repository.dart';
 import '../auth/partner_api.dart';
 import '../app_routes.dart';
 import '../onboarding/checklist_screen.dart';
-import '../settings/settings_api.dart';
 import '../ui/i18n.dart';
 import '../ui/mask.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
-/// Figma "Login Success". Name and restaurant come from the One Local server (`GET /api/partner/me`). The first thing after signing in is
-/// the language (founder, 27 Oct 2026): English, हिन्दी or Hinglish, right above Continue; the app switches at once and the store keeps it.
+/// Figma "Login Success". Name and restaurant come from the One Local server (`GET /api/partner/me`). The language is chosen just
+/// before this, on its own screen (LanguageGate).
 class LoginSuccessScreen extends StatefulWidget {
-  const LoginSuccessScreen({super.key, this.api, this.auth, this.saveLanguage});
+  const LoginSuccessScreen({super.key, this.api, this.auth});
   final PartnerApi? api;
   final AuthRepository? auth;
-
-  /// Keeps the chosen language for the store (tests pass their own).
-  final Future<void> Function(String code)? saveLanguage;
   @override
   State<LoginSuccessScreen> createState() => _LoginSuccessScreenState();
 }
@@ -26,46 +22,6 @@ class LoginSuccessScreen extends StatefulWidget {
 class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
   late final _auth = widget.auth ?? AuthRepository();
   late Future<PartnerMe> _me = (widget.api ?? PartnerApi()).me();
-
-  Future<void> _pick(String code) async {
-    setAppLanguage(code); // every screen switches at once
-    setState(() {});
-    try {
-      await (widget.saveLanguage ?? (c) => SettingsApi().saveLanguage(c))(code);
-    } catch (_) {} // a role that may not change store settings still gets the language on this phone for now
-  }
-
-  Widget _languages() => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(tr('Choose your language'), key: const ValueKey('login-language-title'), style: inter(15, 700)),
-        const SizedBox(height: 10),
-        Row(children: [
-          for (final (i, (code, label, sample)) in const [('en', 'English', 'Hello'), ('hi', 'हिन्दी', 'नमस्ते'), ('hi-en', 'Hinglish', 'Namaste')].indexed) ...[
-            if (i > 0) const SizedBox(width: 8),
-            Expanded(
-              child: Material(
-                color: appLang.value == code ? const Color(0xFFA1FE2F) : Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(color: appLang.value == code ? const Color(0xFF8BE800) : kLine, width: 1.5),
-                ),
-                child: InkWell(
-                  key: ValueKey('login-language-$code'),
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () => _pick(code),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Column(children: [
-                      Text(label, style: inter(15, 700)),
-                      const SizedBox(height: 2),
-                      Text(sample, style: inter(12, 400, color: kMuted)),
-                    ]),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ]),
-      ]);
 
   void _retry() {
     final next = (widget.api ?? PartnerApi()).me();
@@ -159,8 +115,6 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    _languages(),
                     const SizedBox(height: 20),
                     PrimaryAction(label: '${tr('Continue to')} ${tr(_kindLabel(me.kind))}', onPressed: () => openWorkspace(context, auth: _auth)),
                     const SizedBox(height: 12),

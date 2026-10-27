@@ -66,6 +66,15 @@ class AuthRepository {
     }
   }
 
+  /// The signed-in login's id, or null.
+  String? get currentUserId {
+    try {
+      return _auth.currentUser?.id;
+    } catch (_) {
+      return null;
+    }
+  }
+
   String? get currentEmail {
     try {
       return _auth.currentUser?.email;

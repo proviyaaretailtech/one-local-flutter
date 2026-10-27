@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../auth/auth_repository.dart';
+import '../ui/language_step.dart';
 import '../ui/mask.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -90,7 +91,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
       if (!mounted) return;
       if (widget.registering) {
         // straight into the application (founder, 27 Oct 2026): the store type is asked once there, and nothing in between
-        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => OnboardingEntry(auth: _auth, phone: widget.phone, name: widget.name)), (r) => r.isFirst);
+        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => LanguageGate(userId: _auth.currentUserId, child: OnboardingEntry(auth: _auth, phone: widget.phone, name: widget.name))), (r) => r.isFirst);
       } else {
         Navigator.of(context).popUntil((r) => r.isFirst);
       }

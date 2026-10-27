@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthApiException;
 import 'package:vinii_pos/auth/partner_api.dart';
+import 'package:vinii_pos/ui/language_step.dart';
 import 'package:vinii_pos/onboarding/checklist_screen.dart' show OnboardingEntry;
 import 'package:vinii_pos/ui/i18n.dart';
 import 'package:vinii_pos/home/control_centre_screen.dart';
@@ -531,23 +533,31 @@ void main() {
       expect(find.textContaining('Sharma Store'), findsOneWidget);
       expect(find.text('r•••@sharmastore.in'), findsOneWidget);
     });
-    testWidgets('the language comes first after signing in: English, Hindi, Hinglish; the screen switches and the store keeps it', (t) async {
+    testWidgets('the language comes first after signing in, on its own screen; then the welcome; asked once per account', (t) async {
       addTearDown(() => setAppLanguage('en'));
+      SharedPreferences.setMockInitialValues({});
       final saved = <String>[];
       final api = FakeApi(() async => PartnerMe(name: 'Riya', email: 'r@x.in', outlet: 'S'));
-      await show(t, LoginSuccessScreen(api: api, auth: FakeAuth(), saveLanguage: (c) async => saved.add(c)));
+      Widget gate() => LanguageGate(userId: 'u1', saveToStore: (c) async => saved.add(c), child: LoginSuccessScreen(api: api, auth: FakeAuth()));
+      await show(t, gate());
       await t.pumpAndSettle();
       expect(find.text('Choose your language'), findsOneWidget);
+      expect(find.textContaining('Welcome back'), findsNothing); // not yet
       for (final c in ['en', 'hi', 'hi-en']) {
         expect(find.byKey(ValueKey('login-language-$c')), findsOneWidget);
       }
-      // above Continue: the choice comes before going in
-      expect(t.getTopLeft(find.byKey(const ValueKey('login-language-hi'))).dy, lessThan(t.getTopLeft(find.text('Continue to Store POS')).dy));
-      await t.ensureVisible(find.byKey(const ValueKey('login-language-hi')));
       await t.tap(find.byKey(const ValueKey('login-language-hi')));
       await t.pumpAndSettle();
+      expect(find.text('अपनी भाषा चुनें'), findsOneWidget); // switches at once
+      await t.tap(find.byKey(const ValueKey('language-continue')));
+      await t.pumpAndSettle();
       expect(saved, ['hi']);
-      expect(find.text('अपनी भाषा चुनें'), findsOneWidget);
+      expect(find.byKey(const ValueKey('language-step')), findsNothing);
+      // signing in again on this phone: straight to the welcome
+      await t.pumpWidget(const SizedBox());
+      await show(t, gate());
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('language-step')), findsNothing);
     });
     testWidgets('Continue to store opens the control centre', (t) async {
       final api = FakeApi(() async => PartnerMe(name: 'Riya', email: 'r@x.in', outlet: ''));

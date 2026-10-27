@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/email_verify_pending_screen.dart';
 import 'screens/login_success_screen.dart';
 import 'screens/splash_screen.dart';
+import 'settings/settings_api.dart';
+import 'ui/language_step.dart';
 import 'ui/theme.dart';
 
 class PosApp extends StatelessWidget {
@@ -49,7 +51,8 @@ class _AuthGateState extends State<AuthGate> {
         } else if (user.email != null && user.email!.isNotEmpty && user.emailConfirmedAt == null && (user.phone ?? '').isEmpty) {
           page = EmailVerifyPendingScreen(key: const ValueKey('pending'), email: user.email!);
         } else {
-          page = const LoginSuccessScreen(key: ValueKey('success'));
+          // the language first, then the welcome (founder, 27 Oct 2026)
+          page = LanguageGate(key: ValueKey('success-${user.id}'), userId: user.id, saveToStore: (c) => SettingsApi().saveLanguage(c), child: const LoginSuccessScreen());
         }
         return AnimatedSwitcher(duration: const Duration(milliseconds: 350), child: page);
       },

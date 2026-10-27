@@ -958,6 +958,7 @@ const _words = <String, (String, String)>{
   'Change how customers see your shop': ('ग्राहकों को दुकान कैसी दिखे, बदलें', 'Customers ko dukaan kaisi dikhe, badlein'),
   'Edit page': ('पेज बदलें', 'Page badlein'),
   'Choose your language': ('अपनी भाषा चुनें', 'Apni bhasha chunein'),
+  'The app will use it everywhere. You can change it later in Settings.': ('ऐप हर जगह इसी भाषा में चलेगा। आप इसे बाद में सेटिंग्स में बदल सकते हैं।', 'App har jagah isi bhasha mein chalega. Aap ise baad mein Settings mein badal sakte hain.'),
   'Continue to': ('आगे बढ़ें', 'Aage badhein'),
   'Welcome back': ('फिर से स्वागत है', 'Welcome back'),
   'there': ('आपका', 'aapka'),
