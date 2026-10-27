@@ -357,6 +357,8 @@ void main() {
     testWidgets('upload sends kind, name and type; an oversize file never leaves the phone', (t) async {
       final api = FakeOnb();
       await show(t, DocumentsScreen(api: api, app: sample(), picker: FakePicker(PickedDocument(name: 'pan.pdf', bytes: Uint8List(10), contentType: 'application/pdf'))));
+      await t.pumpAndSettle();
+      await tapIt(t, find.byKey(const ValueKey('docs-needed-ok'))); // the "keep these handy" sheet
       await tapText(t, 'Upload file');
       expect(api.calls, contains('upload pan_copy pan.pdf application/pdf'));
       final api2 = FakeOnb();
@@ -382,6 +384,17 @@ void main() {
   });
 
   group('PAN card scan', () {
+    testWidgets('before the first upload: what to keep handy; it can be opened again', (t) async {
+      await show(t, DocumentsScreen(api: FakeOnb(), app: sample()));
+      await t.pumpAndSettle();
+      expect(find.text('Keep these handy'), findsOneWidget);
+      expect(find.text('PAN card'), findsWidgets);
+      expect(find.textContaining('Gumasta'), findsOneWidget);
+      await tapIt(t, find.byKey(const ValueKey('docs-needed-ok')));
+      expect(find.text('Keep these handy'), findsNothing);
+      await tapIt(t, find.byKey(const ValueKey('docs-needed')));
+      expect(find.text('Keep these handy'), findsOneWidget);
+    });
     test('reads the PAN and knows a PAN card', () {
       expect(readPanText('INCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number\nABCDE1234F'), (pan: 'ABCDE1234F', looksLikePan: true));
       expect(readPanText('Electricity bill 12345'), (pan: null, looksLikePan: false));
@@ -395,12 +408,16 @@ void main() {
     testWidgets('the camera scan is uploaded as a JPG', (t) async {
       final api = FakeOnb();
       await show(t, DocumentsScreen(api: api, app: sample(), scanner: FakeScanner(panScan())));
+      await t.pumpAndSettle();
+      await tapIt(t, find.byKey(const ValueKey('docs-needed-ok'))); // the "keep these handy" sheet
       await tapIt(t, find.byKey(const ValueKey('pan-scan')));
       expect(api.calls, contains('upload pan_copy pan_card_scan.jpg image/jpeg'));
     });
     testWidgets('a photo that is not a PAN card is questioned before upload', (t) async {
       final api = FakeOnb();
       await show(t, DocumentsScreen(api: api, app: sample(), scanner: FakeScanner(panScan(pan: null, looks: false))));
+      await t.pumpAndSettle();
+      await tapIt(t, find.byKey(const ValueKey('docs-needed-ok'))); // the "keep these handy" sheet
       await tapIt(t, find.byKey(const ValueKey('pan-scan')));
       expect(find.textContaining('This does not look like a PAN card'), findsOneWidget);
       await tapText(t, 'Use it anyway');
@@ -409,6 +426,8 @@ void main() {
     testWidgets('a card with a different PAN from tax details is questioned', (t) async {
       final api = FakeOnb();
       await show(t, DocumentsScreen(api: api, app: sample(extra: {'tax': {'pan_masked': '••••••999Z'}}), scanner: FakeScanner(panScan())));
+      await t.pumpAndSettle();
+      await tapIt(t, find.byKey(const ValueKey('docs-needed-ok'))); // the "keep these handy" sheet
       await tapIt(t, find.byKey(const ValueKey('pan-scan')));
       expect(find.textContaining('is not the one in your tax details'), findsOneWidget);
     });

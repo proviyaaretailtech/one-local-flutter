@@ -371,6 +371,13 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
   static const _max = 5 * 1024 * 1024;
 
+  @override
+  void initState() {
+    super.initState();
+    // nothing added yet: say what to keep ready before starting (founder, 27 Oct 2026)
+    if (_app.documents.isEmpty) WidgetsBinding.instance.addPostFrameCallback((_) => mounted ? showDocumentsNeeded(context, _app) : null);
+  }
+
   Future<void> _upload(String kind, [PickedDocument? given]) async {
     if (_busy != null) return;
     final f = given ?? await widget.picker.pick();
@@ -553,6 +560,16 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       subtitle: 'Add clear, readable copies of applicable documents.',
       onBack: () => Navigator.of(context).pop(_app),
       children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const ValueKey('docs-needed'),
+            onPressed: () => showDocumentsNeeded(context, _app),
+            icon: const Icon(Icons.checklist_rounded, size: 18, color: kLink),
+            label: Text('What you’ll need', style: inter(14, 600, color: kLink)),
+            style: TextButton.styleFrom(padding: EdgeInsets.zero),
+          ),
+        ),
         _panCard(),
         _small('Business proof', 'business_proof', 'Shop Act certificate or applicable alternative', 'Pending · No file added', actionIdle: 'Upload'),
         _small('Food License · if applicable', 'food_license', 'Add for applicable food activities only.', 'Applicability has not been confirmed.', actionIdle: 'Review', optional: true),
@@ -568,6 +585,54 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       ],
     );
   }
+}
+
+/// "Keep these handy": the documents and details the verification needs, shown before the first upload and from "What you'll need".
+Future<void> showDocumentsNeeded(BuildContext context, Application app) {
+  final food = app.partnerType == 'restaurant';
+  final items = <(IconData, String, String)>[
+    (Icons.badge_outlined, 'PAN card', 'The original card, to scan with your camera, or a clear copy. Your own PAN, or the firm’s if it has one.'),
+    (Icons.storefront_outlined, 'Business proof', 'One of: Shop Act (Gumasta) certificate, Udyam registration, GST certificate or trade licence.'),
+    (Icons.restaurant_outlined, food ? 'FSSAI food licence' : 'FSSAI food licence (if you sell food)', food ? 'Your FSSAI licence or registration certificate.' : 'Only if you make or sell food items.'),
+    (Icons.account_balance_outlined, 'Bank details', 'Account number and IFSC. A cheque or passbook has both. The account should be in your or the business’s name.'),
+    (Icons.phone_android_outlined, 'Your phone', 'The mobile number linked to your Aadhaar, for any verification code.'),
+  ];
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.white,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (c) => SafeArea(
+      child: Padding(
+        key: const ValueKey('docs-needed-sheet'),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Keep these handy', style: inter(22, 700)),
+          const SizedBox(height: 6),
+          Text('You’ll need them to verify your business. Clear, readable copies get approved faster.', style: inter(14, 400, color: kMuted, height: 1.4)),
+          const SizedBox(height: 16),
+          for (final (icon, title, body) in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(width: 38, height: 38, decoration: BoxDecoration(color: kNote, borderRadius: BorderRadius.circular(10)), child: Icon(icon, size: 20, color: kInk)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(title, style: inter(15, 600)),
+                    const SizedBox(height: 2),
+                    Text(body, style: inter(13, 400, color: kMuted, height: 1.35)),
+                  ]),
+                ),
+              ]),
+            ),
+          Text('Never share your full Aadhaar number or any OTP in messages.', style: inter(12.5, 500, color: kMuted)),
+          const SizedBox(height: 14),
+          PrimaryAction(key: const ValueKey('docs-needed-ok'), label: 'I have them ready', onPressed: () => Navigator.of(c).pop()),
+        ]),
+      ),
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
