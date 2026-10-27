@@ -35,13 +35,17 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   bool _introDone = false;
 
+  /// The login that signed in while the app was open (not one kept from last time): only then is the language asked.
+  String? _signedInNow;
+
   @override
   Widget build(BuildContext context) {
     final auth = Supabase.instance.client.auth;
     return StreamBuilder<AuthState>(
       stream: auth.onAuthStateChange,
-      builder: (context, _) {
+      builder: (context, snap) {
         final user = auth.currentSession?.user;
+        if (snap.data?.event == AuthChangeEvent.signedIn && user != null) _signedInNow = user.id;
         final Widget page;
         if (user == null) {
           // One screen for both splash frames: the first build plays the intro (logo, then the buttons glide in); coming back to it
@@ -51,8 +55,11 @@ class _AuthGateState extends State<AuthGate> {
         } else if (user.email != null && user.email!.isNotEmpty && user.emailConfirmedAt == null && (user.phone ?? '').isEmpty) {
           page = EmailVerifyPendingScreen(key: const ValueKey('pending'), email: user.email!);
         } else {
-          // the language first, then the welcome (founder, 27 Oct 2026)
-          page = LanguageGate(key: ValueKey('success-${user.id}'), userId: user.id, saveToStore: (c) => SettingsApi().saveLanguage(c), child: const LoginSuccessScreen());
+          // right after signing in: the language, then the welcome (founder, 27 Oct 2026). Opening the app already signed in goes
+          // straight on, in the language kept on this phone.
+          page = _signedInNow == user.id
+              ? LanguageGate(key: ValueKey('success-${user.id}'), userId: user.id, saveToStore: (c) => SettingsApi().saveLanguage(c), child: const LoginSuccessScreen())
+              : const LoginSuccessScreen(key: ValueKey('success'));
         }
         return AnimatedSwitcher(duration: const Duration(milliseconds: 350), child: page);
       },
