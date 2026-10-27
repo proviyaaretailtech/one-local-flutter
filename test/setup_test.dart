@@ -260,6 +260,21 @@ void main() {
       await tap(t, 'Continue');
       expect(api.calls, ['plan null']);
     });
+    testWidgets('POS only: shows what is included and what is not', (t) async {
+      final api = FakeSetup(initial: sampleSetup(extra: {'plan': {'selected_code': null, 'available': [], 'sell_plan': 'pos_only'}}));
+      await show(t, PlanScreen(api: api, state: api.state));
+      expect(find.text('POS billing'), findsOneWidget);
+      final not = find.byKey(const ValueKey('plan-not-included'));
+      for (final m in ['OneLocal listing', 'Online orders', 'Delivery & pickup']) {
+        expect(find.descendant(of: not, matching: find.text(m)), findsOneWidget);
+      }
+      expect(find.descendant(of: not, matching: find.text('POS billing')), findsNothing);
+    });
+    testWidgets('selling and POS: everything included, no Not included list', (t) async {
+      final api = FakeSetup(initial: sampleSetup(extra: {'plan': {'selected_code': null, 'available': [], 'sell_plan': 'pos_and_onelocal'}}));
+      await show(t, PlanScreen(api: api, state: api.state));
+      expect(find.byKey(const ValueKey('plan-not-included')), findsNothing);
+    });
     testWidgets('tip 2 shows inline', (t) async {
       final api = FakeSetup(initial: sampleSetup(seen: const []));
       await show(t, PlanScreen(api: api, state: api.state));

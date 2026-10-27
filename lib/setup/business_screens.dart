@@ -20,6 +20,14 @@ List<String> _modules(Object? v) => ((v as List?) ?? const [])
     .where((s) => s.isNotEmpty)
     .toList();
 
+/// Everything a OneLocal plan can include, and what each selling plan has (founder, 28 Oct 2026: show what is not included too).
+const kAllModules = ['POS billing', 'Catalogue', 'Stock & purchase', 'OneLocal listing', 'Online orders', 'Delivery & pickup'];
+List<String> modulesOf(String? sellPlan) => switch (sellPlan) {
+      'pos_only' => const ['POS billing', 'Catalogue', 'Stock & purchase'],
+      'onelocal_app' => const ['Catalogue', 'OneLocal listing', 'Online orders', 'Delivery & pickup'],
+      _ => kAllModules,
+    };
+
 /// Figma 18 "Plan & Subscription". The choice is recorded; no subscription or charge starts here.
 class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key, required this.api, required this.state});
@@ -79,7 +87,9 @@ class _PlanScreenState extends State<PlanScreen> with TourHost {
   Widget build(BuildContext context) {
     final p = _plan;
     final sell = widget.state.plan['sell_plan'] as String?;
-    final modules = p != null ? _modules(p['modules']) : ['POS billing', 'Catalogue', 'OneLocal listing'].where((m) => (sell != 'onelocal_app' || m != 'POS billing') && (sell != 'pos_only' || m != 'OneLocal listing')).toList(); // POS only: no listing
+    final modules = p != null ? _modules(p['modules']) : modulesOf(sell);
+    final have = modules.map((m) => m.toLowerCase()).toSet();
+    final missing = kAllModules.where((m) => !have.contains(m.toLowerCase())).toList();
     final users = p?['users_limit'];
     final locations = p?['locations_limit'];
     return SetupDialog(
@@ -101,6 +111,33 @@ class _PlanScreenState extends State<PlanScreen> with TourHost {
         const SetupHeading('Included modules'),
         const SizedBox(height: 8),
         SetupBox(children: [for (final m in modules) SetupCheck(value: true, title: m)]),
+        if (missing.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const SetupHeading('Not included'),
+          const SizedBox(height: 8),
+          SetupBox(key: const ValueKey('plan-not-included'), children: [
+            for (final m in missing)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                child: Row(children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(color: const Color(0xFFE9EAEE), borderRadius: BorderRadius.circular(6)),
+                    child: const Icon(Icons.close, size: 15, color: kMuted),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(m, style: inter(14, 500, color: kMuted))),
+                ]),
+              ),
+          ]),
+          if (sell == 'pos_only' || sell == 'onelocal_app') ...[
+            const SizedBox(height: 8),
+            SetupNote(sell == 'pos_only'
+                ? 'Want online orders? They come with Sell on OneLocal and Purchase POS. You can upgrade any time from Online orders.'
+                : 'Want billing at your counter? It comes with Sell on OneLocal and Purchase POS.'),
+          ],
+        ],
         const SizedBox(height: 16),
         SetupHeading(p == null ? 'Usage limits' : 'Usage limits · ${p['name']}'),
         const SizedBox(height: 8),
