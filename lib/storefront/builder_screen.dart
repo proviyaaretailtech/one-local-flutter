@@ -145,6 +145,49 @@ IconData sectionIcon(String type) => switch (type) {
       _ => LucideIcons.image,
     };
 
+/// The store's other settings, from the builder's and the profile's "Profile · Offers · Hours · Delivery" link (founder, 27 Oct 2026):
+/// a short list that opens the chosen screen. From the profile it also offers the store page itself ([withPage]); from the builder,
+/// the profile ([withProfile]).
+Future<void> openStoreSettings(BuildContext context, StorefrontApi api, {List<Facts> categories = const [], bool withPage = false, bool withProfile = true}) async {
+  final go = await showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (ctx) => SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const SizedBox(height: 8),
+        for (final e in [
+          if (withPage) ('page', 'Store page', 'Sections, theme, preview and publish', LucideIcons.layoutTemplate),
+          if (withProfile) ('profile', 'Business profile', 'Name, logo, banner, address and store link', LucideIcons.store),
+          ('offers', 'Offers & promotions', 'Deals shown on your page', LucideIcons.tag),
+          ('hours', 'Business hours', 'When you are open', LucideIcons.clock),
+          ('delivery', 'Delivery & pickup', 'Area, fee and minimum order', LucideIcons.truck),
+          ('ads', 'Ads', 'Boost your visibility with ads', LucideIcons.megaphone),
+        ])
+          ListTile(
+            key: ValueKey('store-settings-${e.$1}'),
+            leading: Icon(e.$4),
+            title: Text(e.$2, style: inter(15, 700)),
+            subtitle: Text(e.$3, style: inter(12.5, 400, color: kMuted)),
+            trailing: const Icon(LucideIcons.chevronRight, size: 18),
+            onTap: () => Navigator.pop(ctx, e.$1),
+          ),
+        const SizedBox(height: 8),
+      ]),
+    ),
+  );
+  if (go == null || !context.mounted) return;
+  final Widget screen = switch (go) {
+    'page' => StorePageBuilder(api: api),
+    'profile' => ProfileScreen(api: api),
+    'offers' => OffersScreen(api: api),
+    'hours' => HoursScreen(api: api),
+    'delivery' => DeliveryScreen(api: api),
+    _ => AdsScreen(api: api, categories: categories),
+  };
+  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+}
+
 /// Figma "Store Page Builder": Sections / Theme, the section list with reorder handles, Add Section, shortcuts and Preview Store.
 class StorePageBuilder extends StatefulWidget {
   const StorePageBuilder({super.key, required this.api, this.picker = const ImagePicker()});
@@ -210,26 +253,8 @@ class _StorePageBuilderState extends State<StorePageBuilder> {
   }
 
   Future<void> _settingsHub() async {
-    final api = widget.api;
-    final go = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.white,
-      builder: (_) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (final e in const [('profile', 'Business profile', LucideIcons.store), ('offers', 'Offers & promotions', LucideIcons.tag), ('hours', 'Business hours', LucideIcons.clock), ('ads', 'Ads', LucideIcons.megaphone)])
-            ListTile(leading: Icon(e.$3), title: Text(e.$2), trailing: const Icon(LucideIcons.chevronRight, size: 18), onTap: () => Navigator.pop(context, e.$1)),
-        ]),
-      ),
-    );
-    if (go == null || !mounted) return;
-    final Widget screen = switch (go) {
-      'profile' => ProfileScreen(api: api),
-      'offers' => OffersScreen(api: api),
-      'hours' => HoursScreen(api: api),
-      _ => AdsScreen(api: api, categories: c.catalogueCategories),
-    };
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
-    c.load();
+    await openStoreSettings(context, widget.api, categories: c.catalogueCategories);
+    if (mounted) c.load();
   }
 
   Future<void> _preview() async {

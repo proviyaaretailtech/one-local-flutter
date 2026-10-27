@@ -6,6 +6,7 @@ import '../home/control_centre_screen.dart' show initials;
 import '../home/home_widgets.dart' show kLime;
 import '../settings/settings_widgets.dart' show GroupCard, GroupTitle, RowAction, SettingRow, StatusPill;
 import '../ui/theme.dart';
+import '../auth/partner_api.dart' show PartnerApiException;
 import 'account_api.dart';
 
 /// Side nav "Manage account": the signed-in person's name, email and mobile, how they can sign in, where they are signed in, and
@@ -120,6 +121,47 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
     await _run(() => _auth.confirmPhone(e164, code), 'Mobile number changed.');
   }
 
+  /// Set a password, or change it (founder, 27 Oct 2026). It is for signing in with the email and this password, so an email is
+  /// needed first. When the login server asks for proof, a one-time code goes to the email and is asked for here.
+  Future<void> _password(bool has) async {
+    final a = _a;
+    if (a == null) return;
+    if (a.email.isEmpty) {
+      showToast(context, 'Add an email first: you sign in with your email and this password.');
+      return;
+    }
+    final p = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _PasswordSheet(has: has, email: a.email),
+    );
+    if (p == null || !mounted) return;
+    final done = has ? 'Password changed.' : 'Password set. You can now sign in with ${a.email} and this password.';
+    try {
+      setState(() => _busy = true);
+      try {
+        await _auth.setPassword(p);
+      } on PasswordNeedsCode {
+        await _auth.reauthenticate();
+        if (!mounted) return;
+        setState(() => _busy = false);
+        final code = await _ask('Enter the code', 'Code sent to ${a.email}', type: TextInputType.number, action: 'Confirm');
+        if (code == null || code.isEmpty || !mounted) return;
+        setState(() => _busy = true);
+        await _auth.setPassword(p, nonce: code);
+      }
+      if (!mounted) return;
+      showToast(context, done);
+      await _load();
+    } catch (e) {
+      if (mounted) showToast(context, e is PartnerApiException ? e.message : e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _signOutEverywhere() async {
     final yes = await showDialog<bool>(
       context: context,
@@ -219,7 +261,11 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
                         subtitle: m.method == 'partner_code' && m.code != null
                             ? (m.enabled ? '${m.code} · until ${cwaDate(m.validUntil)}' : 'Expired')
                             : (m.enabled ? 'You can sign in this way' : 'Not set up'),
-                        actions: [StatusPill(m.enabled ? 'On' : 'Off', good: m.enabled)],
+                        actions: [
+                          StatusPill(m.enabled ? 'On' : 'Off', good: m.enabled),
+                          // the password is the one method set here: Set when there is none, Change when there is
+                          if (m.method == 'password') _act(m.enabled ? 'Change' : 'Set', () => _password(m.enabled), const ValueKey('acct-password')),
+                        ],
                       ),
                   ]),
                   const GroupTitle('Where you are signed in'),
@@ -258,4 +304,78 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
       ]),
     );
   }
+}
+
+/// New password, typed twice; it can be shown. At least 8 characters with a letter and a number (the login server checks again).
+class _PasswordSheet extends StatefulWidget {
+  const _PasswordSheet({required this.has, required this.email});
+  final bool has;
+  final String email;
+  @override
+  State<_PasswordSheet> createState() => _PasswordSheetState();
+}
+
+class _PasswordSheetState extends State<_PasswordSheet> {
+  final _one = TextEditingController(), _two = TextEditingController();
+  bool _show = false;
+  String? _problem;
+
+  @override
+  void dispose() {
+    _one.dispose();
+    _two.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final p = _one.text;
+    final why = p.length < 8
+        ? 'Use at least 8 characters.'
+        : !RegExp(r'[A-Za-z]').hasMatch(p) || !RegExp(r'\d').hasMatch(p)
+            ? 'Use letters and numbers.'
+            : p != _two.text
+                ? 'The two passwords are not the same.'
+                : null;
+    if (why != null) return setState(() => _problem = why);
+    Navigator.pop(context, p);
+  }
+
+  Widget _field(TextEditingController c, String label, Key key) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextField(
+          key: key,
+          controller: c,
+          obscureText: !_show,
+          autocorrect: false,
+          enableSuggestions: false,
+          onChanged: (_) => setState(() => _problem = null),
+          decoration: InputDecoration(
+            labelText: label,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            suffixIcon: IconButton(
+              tooltip: _show ? 'Hide password' : 'Show password',
+              onPressed: () => setState(() => _show = !_show),
+              icon: Icon(_show ? LucideIcons.eyeOff : LucideIcons.eye, size: 18),
+            ),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
+        child: SafeArea(
+          top: false,
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(widget.has ? 'Change password' : 'Set a password', style: inter(18, 700)),
+            const SizedBox(height: 4),
+            Text('You sign in with ${widget.email} and this password. At least 8 characters, with letters and numbers.', style: inter(13, 400, color: kMuted, height: 1.35)),
+            const SizedBox(height: 14),
+            _field(_one, widget.has ? 'New password' : 'Password', const ValueKey('acct-password-new')),
+            _field(_two, 'Type it again', const ValueKey('acct-password-again')),
+            if (_problem != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_problem!, key: const ValueKey('acct-password-problem'), style: inter(13, 600, color: kError))),
+            CwaButton(key: const ValueKey('acct-password-save'), label: widget.has ? 'Change password' : 'Set password', onPressed: _save),
+          ]),
+        ),
+      );
 }

@@ -8,6 +8,9 @@ class WalletColors {
   static const orange = [Color(0xFFC2410C), Color(0xFFF97316)];
   static const red = [Color(0xFFB91C1C), Color(0xFFEF4444)];
   static const slate = [Color(0xFF475569), Color(0xFF94A3B8)];
+  static const blue = [Color(0xFF1D4ED8), Color(0xFF60A5FA)];
+  static const purple = [Color(0xFF6D28D9), Color(0xFFA855F7)];
+  static const rose = [Color(0xFFBE123C), Color(0xFFFB7185)];
 }
 
 /// One wallet card: a gradient, rounded, with a soft shadow; [onTap] makes the whole card a button.

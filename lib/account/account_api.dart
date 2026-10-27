@@ -45,6 +45,12 @@ class AccountApiException extends PartnerApiException {
   const AccountApiException(super.status, super.message);
 }
 
+/// The login server wants a one-time code before it changes the password (Supabase's "secure password change"): send one with
+/// [AccountAuth.reauthenticate], then set the password again with that code.
+class PasswordNeedsCode implements Exception {
+  const PasswordNeedsCode();
+}
+
 /// Manage account (database: 0512): profile and memberships through the database, the login itself through Supabase auth.
 class AccountApi {
   AccountApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc})
@@ -75,6 +81,13 @@ abstract class AccountAuth {
   Future<void> confirmPhone(String e164, String code);
   /// Revokes every session of this login (every device), including this one.
   Future<void> signOutEverywhere();
+
+  /// Sets a password, or changes it (27 Oct 2026). [nonce]: the code from [reauthenticate], when the server asked for one
+  /// ([PasswordNeedsCode]). A refusal is an [AccountApiException] with a plain sentence.
+  Future<void> setPassword(String password, {String? nonce});
+
+  /// Sends a one-time code to the account's email (or mobile) for a password change.
+  Future<void> reauthenticate();
 }
 
 class SupabaseAccountAuth implements AccountAuth {
@@ -92,4 +105,23 @@ class SupabaseAccountAuth implements AccountAuth {
   Future<void> confirmPhone(String e164, String code) => _auth.verifyOTP(phone: e164, token: code, type: OtpType.phoneChange);
   @override
   Future<void> signOutEverywhere() => _auth.signOut(scope: SignOutScope.global);
+
+  @override
+  Future<void> setPassword(String password, {String? nonce}) async {
+    try {
+      await _auth.updateUser(UserAttributes(password: password, nonce: nonce));
+    } on AuthException catch (e) {
+      final code = e.code ?? '';
+      if (code == 'reauthentication_needed' || e.message.toLowerCase().contains('reauthentication')) throw const PasswordNeedsCode();
+      throw AccountApiException(int.tryParse(e.statusCode ?? '') ?? 400, switch (code) {
+        'same_password' => 'That is already your password. Choose a new one.',
+        'weak_password' => 'Choose a stronger password: at least 8 characters, with letters and numbers.',
+        'reauthentication_not_valid' => 'That code is wrong or has expired. Try again.',
+        _ => e.message,
+      });
+    }
+  }
+
+  @override
+  Future<void> reauthenticate() => _auth.reauthenticate();
 }

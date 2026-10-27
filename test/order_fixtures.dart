@@ -92,9 +92,9 @@ Map<String, dynamic> view(String stage, {int version = 2}) {
   };
 }
 
-Map<String, dynamic> card(String id, String status, String label) => {
+Map<String, dynamic> card(String id, String status, String label, {String? state, String delivery = 'Not started · bill unpaid'}) => {
       'id': id, 'display_no': 'P-$id', 'channel_label': 'Store Checkout', 'customer': 'Rahul Mehta', 'placed_at': '09 Oct 2026 · 5:15 PM',
       'status': status, 'status_label': label, 'total': 980, 'items': '3 lines · 5 units', 'payment_status': 'Unpaid · ₹980 due', 'payment_mode': 'Not chosen',
-      'delivery_status': 'Not started · bill unpaid', 'delivery_time': 'Not delivered', 'refund_damages': 'None',
+      'delivery_status': delivery, 'delivery_time': 'Not delivered', 'refund_damages': 'None', 'state': ?state,
     };
 

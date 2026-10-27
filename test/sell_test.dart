@@ -103,22 +103,58 @@ void main() {
       expect(find.byType(CartsScreen), findsOneWidget);
     });
 
-    testWidgets('shows the catalogue; an unavailable item cannot be added; ADD fills the cart and PAY shows the server total', (t) async {
+    testWidgets('shows the catalogue; an unavailable item cannot be added; tapping a card fills the cart and PAY shows the server total', (t) async {
       final till = Till();
       final env = till.env();
       await tall(t, SellScreen(env: env));
       expect(find.text('Coca-Cola 500ml'), findsOneWidget);
       expect(find.text('Out of Stock'), findsOneWidget);
       expect(find.text('PAY'), findsOneWidget);
-      await t.tap(find.text('ADD').first);
+      expect(find.text('ADD'), findsNothing); // the card is the button
+      await t.tap(find.byKey(const ValueKey('product-m1')));
       await t.pumpAndSettle();
-      expect(find.text('×1'), findsOneWidget);
-      await t.tap(find.text('ADD').first);
+      expect(t.widget<Text>(find.descendant(of: find.byKey(const ValueKey('product-count-m1')), matching: find.byType(Text))).data, '1');
+      await t.tap(find.byKey(const ValueKey('product-m1')));
       await t.pumpAndSettle();
       expect(env.carts.active.units, 2);
+      expect(t.widget<Text>(find.descendant(of: find.byKey(const ValueKey('product-count-m1')), matching: find.byType(Text))).data, '2');
       expect(find.text('PAY ₹84'), findsOneWidget); // 2 x ₹40 + 5% GST, as the server quoted it
       final q = jsonDecode(till.where('POST', '/quote').last.body);
       expect(q['lines'], [{'menu_item_id': 'm1', 'qty': 2}]);
+    });
+
+    testWidgets('a picked card turns green with its count; − takes one back', (t) async {
+      final env = Till().env();
+      await tall(t, SellScreen(env: env));
+      expect(find.byKey(const ValueKey('product-less-m1')), findsNothing);
+      await t.tap(find.byKey(const ValueKey('product-m1')));
+      await t.tap(find.byKey(const ValueKey('product-m1')));
+      await t.pumpAndSettle();
+      expect(find.text('In cart · tap to add one more'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('product-less-m1')));
+      await t.pumpAndSettle();
+      expect(env.carts.active.units, 1);
+      await t.tap(find.byKey(const ValueKey('product-less-m1')));
+      await t.pumpAndSettle();
+      expect(env.carts.active.isEmpty, isTrue);
+      expect(find.byKey(const ValueKey('product-count-m1')), findsNothing);
+    });
+
+    testWidgets('All items puts first what is bought together with the cart (market basket); a best seller when the cart is empty', (t) async {
+      final till = Till();
+      final env = till.env();
+      await tall(t, SellScreen(env: env));
+      // empty cart: the server's best seller (butter) leads, tagged Popular
+      expect(till.basketAsked.first, isEmpty);
+      expect(t.getTopLeft(find.byKey(const ValueKey('product-m2'))).dy, lessThanOrEqualTo(t.getTopLeft(find.byKey(const ValueKey('product-m1'))).dy));
+      expect(t.getTopLeft(find.byKey(const ValueKey('product-m2'))).dx, lessThan(t.getTopLeft(find.byKey(const ValueKey('product-m1'))).dx));
+      expect(find.text('Popular'), findsOneWidget);
+      // Coca-Cola in the cart: the till asks what goes with it, and butter is tagged Bought together
+      await t.tap(find.byKey(const ValueKey('product-m1')));
+      await t.pump(const Duration(milliseconds: 500));
+      await t.pumpAndSettle();
+      expect(till.basketAsked.last, ['m1']);
+      expect(find.text('Bought together'), findsOneWidget);
     });
 
     group('444 Discount', () {
@@ -140,9 +176,9 @@ void main() {
         final mrp = t.widget<Text>(find.text('₹50'));
         expect(mrp.style?.decoration, TextDecoration.lineThrough);
         expect(find.text('₹280'), findsOneWidget); // no MRP above the price: nothing struck through
-        expect(find.text('Available'), findsOneWidget); // Coca-Cola
+        expect(find.text('Tap to add'), findsWidgets); // Coca-Cola
         expect(find.text('Out of Stock'), findsNWidgets(2)); // butter (stock 0) and the item not on sale
-        await t.tap(find.text('ADD').at(1)); // butter
+        await t.tap(find.byKey(const ValueKey('product-m2'))); // butter
         await t.pumpAndSettle();
         expect(env.carts.active.isEmpty, isTrue);
       });
@@ -162,9 +198,9 @@ void main() {
       testWidgets('the cart shows what each line saves against MRP', (t) async {
         final env = stocked().env();
         await tall(t, SellScreen(env: env));
-        await t.tap(find.text('ADD').first); // Coca-Cola, ₹10 under MRP
+        await t.tap(find.byKey(const ValueKey('product-m1'))); // Coca-Cola, ₹10 under MRP
         await t.pumpAndSettle();
-        await t.tap(find.text('ADD').first);
+        await t.tap(find.byKey(const ValueKey('product-m1')));
         await t.pumpAndSettle();
         expect(find.text('Coca-Cola 500ml: ₹20 off MRP'), findsOneWidget);
       });
@@ -554,17 +590,19 @@ void main() {
       await t.tap(find.byKey(const ValueKey('wallet-card-hold')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('wallet-hold')), findsOneWidget);
-      expect(find.text('P-00090'), findsOneWidget);
+      expect(find.textContaining('P-00090'), findsOneWidget);
       expect(find.text('Neha Shah'), findsOneWidget);
+      // the customer leads, in the card's colour
+      expect(t.widget<Text>(find.text('Neha Shah')).style?.color, isNot(Colors.white));
       // the held bill opens, with its items, Pay and Cancel
-      await t.tap(find.text('P-00090'));
+      await t.tap(find.byKey(const ValueKey('wallet-held-h1')));
       await t.pumpAndSettle();
       await t.tap(find.text('Show items').first);
       await t.pumpAndSettle();
       expect(find.text('Hide items'), findsWidgets);
       // the parked cart opens and becomes the active one again
       final parked = env.carts.carts.first;
-      await t.tap(find.text('Cart #1').last);
+      await t.tap(find.byKey(ValueKey('wallet-held-${parked.id}')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(ValueKey('cart-activate-${parked.id}')));
       await t.pumpAndSettle();
@@ -619,7 +657,7 @@ void main() {
       // the held bill
       await t.tap(find.byKey(const ValueKey('wallet-card-hold')));
       await t.pumpAndSettle();
-      await t.tap(find.text('P-00090'));
+      await t.tap(find.byKey(const ValueKey('wallet-held-h1')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('cart-add-h1')));
       await t.pumpAndSettle();
@@ -639,7 +677,7 @@ void main() {
       final before = parked.units;
       await t.tap(find.byKey(const ValueKey('wallet-card-hold')));
       await t.pumpAndSettle();
-      await t.tap(find.text('Cart #1').last);
+      await t.tap(find.byKey(ValueKey('wallet-held-${parked.id}')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(ValueKey('cart-add-${parked.id}')));
       await t.pumpAndSettle();
@@ -654,7 +692,7 @@ void main() {
       await tall(t, CartsScreen(env: till.env()));
       await t.tap(find.byKey(const ValueKey('wallet-card-hold')));
       await t.pumpAndSettle();
-      await t.tap(find.text('P-00090'));
+      await t.tap(find.byKey(const ValueKey('wallet-held-h1')));
       await t.pumpAndSettle();
       await t.tap(find.text('Cancel this held bill'));
       await t.pumpAndSettle();

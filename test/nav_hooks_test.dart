@@ -61,6 +61,7 @@ void main() {
     HomeNav.moneyScreen = (_, screen) => opened.add('money:$screen');
     HomeNav.team = rec('team');
     HomeNav.storefront = rec('storefront');
+    HomeNav.businessProfile = rec('business-profile');
     HomeNav.deliverySettings = rec('delivery');
     HomeNav.kitchen = rec('kitchen');
     HomeNav.tableQr = rec('tableQr');
@@ -95,8 +96,8 @@ void main() {
       await t.pumpAndSettle();
     }
 
-    testWidgets('Money, Team, OneLocal page, Settings and Help open their screens', (t) async {
-      for (final (label, hook) in [('Money', 'money'), ('Team', 'team'), ('OneLocal page', 'storefront'), ('Settings', 'settings'), ('Help & support', 'support')]) {
+    testWidgets('Money, Team, Business profile, Settings and Help open their screens', (t) async {
+      for (final (label, hook) in [('Money', 'money'), ('Team', 'team'), ('Business profile', 'business-profile'), ('Settings', 'settings'), ('Help & support', 'support')]) {
         final opened = fakeHooks();
         await openSideNav(t);
         expect(soonOn(label), findsNothing, reason: label);

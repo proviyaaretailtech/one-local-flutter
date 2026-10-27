@@ -124,6 +124,7 @@ void installRoutes() {
   HomeNav.team = (c) => Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id), kind: HomeNav.shell?.kind)));
   // Section M: the storefront page builder (profile, hours, delivery, offers, ads and publishing hang off it).
   HomeNav.storefront = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'storefront'), builder: (_) => StorePageBuilder(api: StorefrontApi())));
+  HomeNav.businessProfile = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'business-profile'), builder: (_) => ProfileScreen(api: StorefrontApi())));
   HomeNav.deliverySettings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => DeliveryScreen(api: StorefrontApi())));
   // Section N: notification and announcement centres, customer messages and feedback.
   HomeNav.notifications = (c) => Navigator.of(c).push(NoticesHome.route());

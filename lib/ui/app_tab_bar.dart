@@ -104,8 +104,12 @@ class _Tab extends StatelessWidget {
             child: Icon(tab.icon, size: 20, color: current ? AppTabBar._bar : outlined ? AppTabBar._lime : Colors.white),
           ),
           const SizedBox(height: 4),
+          // a long name ("Online order", or its Hindi) shrinks a little to fit its fifth of the bar instead of being cut with "…"
           ExcludeSemantics(
-            child: Text(tr(tab.label), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, current ? 700 : 500, color: Colors.white)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: FittedBox(fit: BoxFit.scaleDown, child: Text(tr(tab.label), maxLines: 1, softWrap: false, style: inter(11, current ? 700 : 500, color: Colors.white))),
+            ),
           ),
         ]),
       ),

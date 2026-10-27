@@ -57,6 +57,9 @@ class _SellScreenState extends State<SellScreen> {
   bool _busy = false;
   ShiftState? _shift; // the store's cash drawer (S5.1); null until read, or when it could not be read
   int _heldBills = 0; // bills held on the server, shown on the cart bar's pile
+  List<String> _related = const []; // bought together with the cart (or best sellers), best first: All items shows them first
+  String _relatedFor = '-';
+  Timer? _relatedWait;
 
   @override
   void initState() {
@@ -66,6 +69,7 @@ class _SellScreenState extends State<SellScreen> {
     _loadFacts();
     _loadShift();
     _loadHeld();
+    _loadRelated();
     _requote();
   }
 
@@ -92,6 +96,7 @@ class _SellScreenState extends State<SellScreen> {
   @override
   void dispose() {
     env.carts.removeListener(_cartChanged);
+    _relatedWait?.cancel();
     _debounce?.cancel();
     _search.dispose();
     super.dispose();
@@ -99,6 +104,23 @@ class _SellScreenState extends State<SellScreen> {
 
   void _cartChanged() {
     if (mounted) setState(() {});
+    _relatedWait?.cancel();
+    _relatedWait = Timer(const Duration(milliseconds: 400), _loadRelated);
+  }
+
+  /// Market basket analysis (founder, 27 Oct 2026): what other bills had with the products in this cart; nothing in the cart, the best sellers.
+  Future<void> _loadRelated() async {
+    final ids = [for (final l in cart.lines) l.menuItemId]..sort();
+    final key = ids.join(',');
+    if (key == _relatedFor) return;
+    try {
+      final r = await env.sell.boughtWith(ids);
+      if (!mounted) return;
+      setState(() {
+        _related = r;
+        _relatedFor = key;
+      });
+    } catch (_) {} // the list stays in its usual order
   }
 
   Future<void> _load() async {
@@ -206,7 +228,25 @@ class _SellScreenState extends State<SellScreen> {
   // the products of the chosen category (no All / In Stock / Fast Moving / Low Inventory tabs: founder, 26 Oct 2026)
   List<SellItem> get _items {
     final all = _catalog?.items ?? const <SellItem>[];
-    return _category.isEmpty ? all : all.where((i) => i.category == _category).toList();
+    if (_category.isNotEmpty) return all.where((i) => i.category == _category).toList();
+    // All items: the related products first, in their order, then the rest as they come
+    final rank = {for (final (i, id) in _related.indexed) id: i};
+    return [...all.where((i) => rank.containsKey(i.id)).toList()..sort((a, b) => rank[a.id]!.compareTo(rank[b.id]!)), ...all.where((i) => !rank.containsKey(i.id))];
+  }
+
+  /// Why a card is near the top of All items (null when it is not one of the related products).
+  String? _why(SellItem item) {
+    if (_category.isNotEmpty || !_related.contains(item.id)) return null;
+    return cart.isEmpty ? 'Popular' : 'Bought together';
+  }
+
+  void _less(SellItem item) {
+    final l = cart.lines.where((l) => l.menuItemId == item.id).firstOrNull;
+    if (l == null) return;
+    cart.setQty(l, l.qty - 1);
+    env.carts.changed();
+    _quote = null;
+    _requote();
   }
 
   /// Savings against MRP for what is in the cart ("Atta 5kg: ₹15 off MRP"): the selling price is below the printed MRP.
@@ -353,7 +393,12 @@ class _SellScreenState extends State<SellScreen> {
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: 196),
                 itemCount: _items.length,
                 itemBuilder: (_, i) => ProductCard(
-                    item: _items[i], facts: _facts[_items[i].id], inCart: cart.lines.where((l) => l.menuItemId == _items[i].id).firstOrNull?.qty ?? 0, onAdd: () => _add(_items[i])),
+                    item: _items[i],
+                    facts: _facts[_items[i].id],
+                    inCart: cart.lines.where((l) => l.menuItemId == _items[i].id).firstOrNull?.qty ?? 0,
+                    why: _why(_items[i]),
+                    onAdd: () => _add(_items[i]),
+                    onLess: () => _less(_items[i])),
               ),
       ),
     ]);
@@ -503,79 +548,138 @@ class _Shortcut extends StatelessWidget {
 
 /// One product card (Figma "439 Sell" / "444 Discount"): SKU chip, picture, name, the MRP struck through when the price is lower, the
 /// price, a lime ADD, and whether it is in stock. An item that is not on sale, or that stock says is out, cannot be added.
+/// A product on the till (founder, 27 Oct 2026): the whole card is the button (no ADD). In the cart it turns green, with a gradient
+/// border, the count in its corner and a small − to take one back. [why] tags a related product ("Bought together", "Popular").
 class ProductCard extends StatelessWidget {
-  const ProductCard({super.key, required this.item, required this.onAdd, this.inCart = 0, this.facts});
+  const ProductCard({super.key, required this.item, required this.onAdd, this.onLess, this.inCart = 0, this.facts, this.why});
   final SellItem item;
   final VoidCallback onAdd;
+  final VoidCallback? onLess;
   final int inCart;
   final SellFacts? facts;
+  final String? why;
 
   bool get _out => !item.available || facts?.outOfStock == true;
+
+  static const _gradient = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF8BE800), Color(0xFF2F8F4E)]);
 
   @override
   Widget build(BuildContext context) {
     final mrp = facts?.mrp;
     final low = !_out && facts?.lowInventory == true;
-    final canAdd = !_out;
-    return Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFECEDE8))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Stack(children: [
-            Container(
-              height: 76,
-              width: double.infinity,
-              decoration: BoxDecoration(color: const Color(0xFFF3F4F1), borderRadius: BorderRadius.circular(14)),
-              clipBehavior: Clip.antiAlias,
-              child: item.imageUrl == null
-                  ? const Icon(LucideIcons.package, size: 30, color: kKicker)
-                  : Image.network(item.imageUrl!, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(LucideIcons.package, size: 30, color: kKicker)),
-            ),
-            if (item.sku.isNotEmpty)
-              Positioned(left: 6, top: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(8)), child: Text(item.sku, style: inter(10.5, 700, color: kMuted)))),
-            if (inCart > 0)
-              Positioned(right: 6, top: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: kDark, borderRadius: BorderRadius.circular(8)), child: Text('×$inCart', style: inter(10.5, 700, color: kLime)))),
-          ]),
-          const SizedBox(height: 6),
-          Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(13, 600, height: 1.2)),
-          const Spacer(),
-          Row(children: [
-            // MRP and price stay together; on a narrow card they shrink a little rather than lose the price
-            Expanded(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                  if (mrp != null && mrp > item.price) ...[
-                    Text(rupees(mrp), style: inter(12.5, 600, color: kKicker).copyWith(decoration: TextDecoration.lineThrough, decorationColor: kKicker)),
-                    const SizedBox(width: 5),
-                  ],
-                  Text(rupees(item.price), style: inter(15, 800)),
+    final picked = inCart > 0;
+    return Semantics(
+      button: true,
+      enabled: !_out,
+      label: 'Add ${item.name}${picked ? ', $inCart in cart' : ''}',
+      child: Container(
+        key: ValueKey('product-${item.id}'),
+        // the border: a green gradient when it is in the cart
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          gradient: picked ? _gradient : null,
+          color: picked ? null : const Color(0xFFECEDE8),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: picked ? const [BoxShadow(color: Color(0x332F8F4E), blurRadius: 10, offset: Offset(0, 3))] : null,
+        ),
+        child: Material(
+          color: picked ? const Color(0xFFF4FDE9) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: _out ? () => showToast(context, '${item.name} is out of stock.') : onAdd,
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Stack(clipBehavior: Clip.none, children: [
+                  Container(
+                    height: 76,
+                    width: double.infinity,
+                    decoration: BoxDecoration(color: const Color(0xFFF3F4F1), borderRadius: BorderRadius.circular(14)),
+                    clipBehavior: Clip.antiAlias,
+                    child: item.imageUrl == null
+                        ? const Icon(LucideIcons.package, size: 30, color: kKicker)
+                        : Image.network(item.imageUrl!, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(LucideIcons.package, size: 30, color: kKicker)),
+                  ),
+                  if (item.sku.isNotEmpty)
+                    Positioned(left: 6, top: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(8)), child: Text(item.sku, style: inter(10.5, 700, color: kMuted)))),
+                  if (why != null && !picked)
+                    Positioned(
+                      left: 6,
+                      bottom: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFF2F8F4E), borderRadius: BorderRadius.circular(8)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(LucideIcons.sparkles, size: 10, color: Colors.white),
+                          const SizedBox(width: 3),
+                          Text(tr(why!), style: inter(10, 700, color: Colors.white)),
+                        ]),
+                      ),
+                    ),
+                  // how many are in the cart, in the corner
+                  if (picked)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        key: ValueKey('product-count-${item.id}'),
+                        constraints: const BoxConstraints(minWidth: 28),
+                        height: 28,
+                        padding: const EdgeInsets.symmetric(horizontal: 7),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(gradient: _gradient, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white, width: 2)),
+                        child: Text('$inCart', style: inter(13, 800, color: Colors.white)),
+                      ),
+                    ),
                 ]),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Semantics(
-              button: true,
-              enabled: canAdd,
-              label: 'Add ${item.name}',
-              child: Material(
-                color: canAdd ? const Color(0xFF8BE800) : const Color(0xFFEEF0EB),
-                shape: const StadiumBorder(),
-                child: InkWell(
-                  customBorder: const StadiumBorder(),
-                  onTap: canAdd ? onAdd : null,
-                  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7), child: ExcludeSemantics(child: Text(tr('ADD'), style: inter(12.5, 800, color: canAdd ? kInk : kKicker)))),
+                const SizedBox(height: 6),
+                Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(13, 600, height: 1.2)),
+                const Spacer(),
+                Row(children: [
+                  // MRP and price stay together; on a narrow card they shrink a little rather than lose the price
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                        if (mrp != null && mrp > item.price) ...[
+                          Text(rupees(mrp), style: inter(12.5, 600, color: kKicker).copyWith(decoration: TextDecoration.lineThrough, decorationColor: kKicker)),
+                          const SizedBox(width: 5),
+                        ],
+                        Text(rupees(item.price), style: inter(15, 800)),
+                      ]),
+                    ),
+                  ),
+                  if (picked && onLess != null)
+                    Semantics(
+                      button: true,
+                      label: 'One less ${item.name}',
+                      child: InkWell(
+                        key: ValueKey('product-less-${item.id}'),
+                        customBorder: const CircleBorder(),
+                        onTap: onLess,
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: const Color(0xFF8BE800), width: 1.5)),
+                          child: const Icon(LucideIcons.minus, size: 15, color: Color(0xFF2F8F4E)),
+                        ),
+                      ),
+                    ),
+                ]),
+                const SizedBox(height: 4),
+                Text(
+                  _out ? 'Out of Stock' : low ? 'Low stock${facts?.stockKnown == true ? ' · ${facts!.stockQty} left' : ''}' : picked ? tr('In cart · tap to add one more') : tr('Tap to add'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: inter(11.5, 600, color: _out ? kBadText : low ? kWarnText : picked ? const Color(0xFF2F8F4E) : kMuted),
                 ),
-              ),
+              ]),
             ),
-          ]),
-          const SizedBox(height: 4),
-          Text(
-            _out ? 'Out of Stock' : low ? 'Low stock${facts?.stockKnown == true ? ' · ${facts!.stockQty} left' : ''}' : 'Available',
-            style: inter(11.5, 600, color: _out ? kBadText : low ? kWarnText : kMuted),
           ),
-        ]),
-      );
+        ),
+      ),
+    );
   }
 }

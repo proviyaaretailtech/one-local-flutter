@@ -109,6 +109,7 @@ export const MANIFEST: Entry[] = [
   // ---- the till on top of the counter bill, section F (0380-0383). Body = the function's `p` object; the database checks organisation,
   //      store, role and every amount. Money calls carry the Idempotency-Key header; manager-only rules answer 403 for anyone else.
   db('pos_sell_catalog', { args: sell.Catalog, map: P, rate: 'read', roles: STAFF }),
+  db('pos_basket_suggest', { args: sell.Basket, map: P, rate: 'read', roles: STAFF }), // bought together, for All items
   db('pos_receipt_list', { args: sell.Receipts, map: P, rate: 'read', roles: STAFF }),
   db('pos_split_pay', { args: sell.SplitPay, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
   db('pos_payment_attempt_record', { args: sell.Attempt, map: P, rate: 'write', roles: 'staff allowed to take payment' }),

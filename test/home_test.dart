@@ -328,7 +328,7 @@ void main() {
       await t.tap(find.byKey(const ValueKey('home-menu')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('side-nav')), findsOneWidget);
-      for (final l in ['All Orders', 'One Local Wallet', 'Money', 'Customer', 'Reports', 'Settings', 'OneLocal page', 'Sign out']) {
+      for (final l in ['All Orders', 'One Local Wallet', 'Money', 'Customer', 'Business profile', 'Reports', 'Settings', 'Sign out']) {
         expect(find.text(l), findsOneWidget, reason: l);
       }
       // Ordered by priority, set-up-once pages lower; Home, Bill and Item are the bottom bar's, and Stock and Purchase are parts of
@@ -336,7 +336,8 @@ void main() {
       for (final gone in ['Dashboard', 'Store POS', 'Catalogue', 'Stock management', 'Purchase']) {
         expect(find.text(gone), findsNothing, reason: '$gone is on the bottom bar or in Item');
       }
-      const order = ['All Orders', 'Money', 'Customer', 'Reports', 'Team', 'Settings', 'OneLocal page', 'One Local Wallet', 'Help & support'];
+      expect(find.text('OneLocal page'), findsNothing); // now Business profile
+      const order = ['All Orders', 'Money', 'Customer', 'Business profile', 'Reports', 'Team', 'Settings', 'One Local Wallet', 'Help & support'];
       final ys = [for (final l in order) t.getTopLeft(find.text(l)).dy];
       for (var i = 1; i < ys.length; i++) {
         expect(ys[i], greaterThan(ys[i - 1]), reason: '${order[i]} comes after ${order[i - 1]}');

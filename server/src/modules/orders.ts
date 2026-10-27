@@ -299,6 +299,18 @@ export function shapeCard(r: Row) {
     delivery = ({ placed: 'Awaiting acceptance', accepted: 'Preparing', packed: 'Packed · waiting for rider', out: 'Out for delivery' } as Row)[ol.status] ?? 'In progress';
     when = 'Not delivered';
   } else { delivery = 'Not started · bill unpaid'; when = 'Not delivered'; }
+  // where the order is, in the words of the Online order tab (founder, 27 Oct 2026):
+  //   new (waiting to be accepted) · ongoing (being packed, or on the way) · ready (packed, waiting for a delivery partner)
+  //   · delivered · return (delivered, and the customer asked for a return) · cancelled · counter (a bill at the counter: not an online order)
+  const asked = r.return_status === 'requested' || r.return_status === 'approved';
+  const fs_ = f?.stage as string | undefined, os = ol?.status as string | undefined;
+  const state = cancelled ? 'cancelled'
+    : asked ? 'return'
+    : completed ? (f || ol ? 'delivered' : 'counter')
+    : fs_ === 'awaiting_acceptance' || os === 'placed' ? 'new'
+    : (fs_ === 'ready' && !f?.exception) || os === 'packed' ? 'ready'
+    : f || ol ? 'ongoing'
+    : 'counter';
   const missing = Number(f?.units_missing ?? 0);
   const damages = [refunded > 0 ? `${rupees(refunded)} issued` : null, missing ? plural(missing, 'missing unit') : null].filter(Boolean).join(' · ') || 'None';
   return {
@@ -306,6 +318,7 @@ export function shapeCard(r: Row) {
     status: cancelled ? 'cancelled' : completed ? 'completed' : 'pending', status_label: cancelled ? 'Cancelled' : completed ? 'Completed' : 'Pending',
     total, items: `${plural(Number(r.lines), 'line')} · ${plural(units, 'unit')}`, payment_status: payStatus, payment_mode: mode,
     delivery_status: delivery, delivery_time: when, refund_damages: damages,
+    state, return_status: r.return_status ?? null,
   };
 }
 

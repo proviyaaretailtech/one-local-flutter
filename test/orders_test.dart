@@ -85,35 +85,71 @@ void main() {
   });
 
   group('OrdersHome (Orders History)', () {
-    testWidgets('a wallet: orders sit in Pending, Completed and Cancelled piles; a pile fans out; a card opens', (t) async {
+    testWidgets('online orders sit in piles by where they are; counter bills are not here; cancelled is a small link', (t) async {
       final s = FakeServer((r) => ok({
-            'orders': [card('1', 'pending', 'Pending'), card('3', 'completed', 'Completed'), card('2', 'cancelled', 'Cancelled'), card('4', 'pending', 'Pending')]
+            'orders': [
+              card('1', 'pending', 'Pending', state: 'new', delivery: 'Awaiting acceptance · not dispatched'),
+              card('2', 'pending', 'Pending', state: 'new', delivery: 'Awaiting acceptance · not dispatched'),
+              card('3', 'pending', 'Pending', state: 'ongoing', delivery: 'Picking · 2 of 5 units'),
+              card('4', 'pending', 'Pending', state: 'ready', delivery: 'Ready · not handed over'),
+              card('5', 'completed', 'Completed', state: 'delivered', delivery: 'Delivered · 5 of 5 units'),
+              card('6', 'completed', 'Completed', state: 'return', delivery: 'Delivered · 5 of 5 units'),
+              card('7', 'cancelled', 'Cancelled', state: 'cancelled'),
+              card('8', 'pending', 'Pending', state: 'counter'), // a held counter bill
+            ]
           }));
       await showTall(t, OrdersHome(api: s.api));
-      expect(find.text('Orders History'), findsOneWidget);
-      expect(s.requests.last.url.queryParameters['filter'], 'all'); // one list; the piles sort it
-      expect(find.text('4 orders'), findsOneWidget);
-      expect(find.text('Pending · 2'), findsOneWidget);
-      expect(find.text('Completed · 1'), findsOneWidget);
+      expect(find.text('7 orders'), findsOneWidget); // the counter bill is not an online order
+      for (final p in ['New orders · 2', 'In progress · 1', 'Packed · waiting for rider · 1', 'Return requested · 1', 'Delivered · 1']) {
+        expect(find.text(p), findsOneWidget, reason: p);
+      }
       expect(find.text('Cancelled · 1'), findsOneWidget);
-      expect(find.text('Order #P-1'), findsNothing); // closed piles
-      await t.tap(find.byKey(const ValueKey('orders-pile-pending')));
+      // the New orders pile comes first and fans out
+      expect(t.getTopLeft(find.byKey(const ValueKey('orders-pile-new'))).dy, lessThan(t.getTopLeft(find.byKey(const ValueKey('orders-pile-delivered'))).dy));
+      await t.tap(find.byKey(const ValueKey('orders-pile-new')));
       await t.pumpAndSettle();
-      expect(find.text('Order #P-1'), findsOneWidget);
-      expect(find.text('Order #P-4'), findsOneWidget);
-      expect(find.text('Order #P-3'), findsNothing);
-      await t.tap(find.text('Order #P-1'));
+      expect(find.byKey(const ValueKey('order-card-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('order-card-2')), findsOneWidget);
+      expect(find.byKey(const ValueKey('order-card-3')), findsNothing);
+      expect(find.text('Awaiting acceptance · not dispatched'), findsNWidgets(2));
+      // cards one after another, none covering the next; a back arrow with the pile's name
+      expect(t.getRect(find.byKey(const ValueKey('order-card-2'))).top, greaterThanOrEqualTo(t.getRect(find.byKey(const ValueKey('order-card-1'))).bottom));
+      expect(find.text('New orders · 2'), findsOneWidget);
+      // the customer leads, in the pile's colour; the order number is small
+      final name = t.widget<Text>(find.descendant(of: find.byKey(const ValueKey('order-card-1')), matching: find.text('Rahul Mehta')));
+      expect(name.style?.color, const Color(0xFFC2410C));
+      expect(find.descendant(of: find.byKey(const ValueKey('order-card-1')), matching: find.textContaining('#P-1 ·')), findsOneWidget);
+      expect(find.text('Waiting for you to accept'), findsOneWidget);
+      // the phone's back button closes the pile first
+      await t.binding.handlePopRoute();
       await t.pumpAndSettle();
-      expect(find.text('Unpaid · ₹980 due'), findsOneWidget);
+      expect(find.byKey(const ValueKey('orders-piles')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('orders-pile-new')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('order-card-1')));
+      await t.pumpAndSettle();
       expect(find.text('View details'), findsOneWidget);
-      // switch pile from the tabs on top
-      await t.tap(find.byKey(const ValueKey('orders-tab-cancelled')));
+      // another pile from the tabs on top
+      await t.ensureVisible(find.byKey(const ValueKey('orders-tab-return')));
       await t.pumpAndSettle();
-      expect(find.text('Order #P-2'), findsOneWidget);
-      expect(find.text('Order #P-1'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('orders-tab-return')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('order-card-6')), findsOneWidget);
+      expect(find.textContaining('Return requested ·'), findsWidgets);
+      // back, then the cancelled link
       await t.tap(find.byKey(const ValueKey('orders-all-piles')));
       await t.pumpAndSettle();
-      expect(find.text('Pending · 2'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('orders-cancelled')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('order-card-7')), findsOneWidget);
+      expect(find.byKey(const ValueKey('order-card-8')), findsNothing);
+    });
+
+    testWidgets('an older server without states: orders are still placed (completed → Delivered, otherwise In progress)', (t) async {
+      final s = FakeServer((r) => ok({'orders': [card('1', 'pending', 'Pending'), card('3', 'completed', 'Completed')]}));
+      await showTall(t, OrdersHome(api: s.api));
+      expect(find.text('In progress · 1'), findsOneWidget);
+      expect(find.text('Delivered · 1'), findsOneWidget);
     });
 
     testWidgets('search waits for typing to stop', (t) async {
@@ -129,9 +165,9 @@ void main() {
     testWidgets('View details opens the order', (t) async {
       final s = FakeServer((r) => r.url.path.endsWith('/pos-orders') ? ok({'orders': [card(orderId, 'pending', 'Pending')]}) : ok(view('preparing')));
       await showTall(t, OrdersHome(api: s.api));
-      await t.tap(find.byKey(const ValueKey('orders-pile-pending')));
+      await t.tap(find.byKey(const ValueKey('orders-pile-ongoing')));
       await t.pumpAndSettle();
-      await t.tap(find.text('Order #P-$orderId'));
+      await t.tap(find.byKey(ValueKey('order-card-$orderId')));
       await t.pumpAndSettle();
       await t.tap(find.text('View details'));
       await t.pumpAndSettle();

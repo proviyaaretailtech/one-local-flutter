@@ -38,10 +38,11 @@ Future<void> showStoreSideNav(
     SideNavEntry(LucideIcons.qrCode, 'All Orders', hook(HomeNav.orderHistory ?? HomeNav.orders)),
     SideNavEntry(LucideIcons.indianRupee, 'Money', hook(HomeNav.money)),
     SideNavEntry(LucideIcons.circleUser, 'Customer', hook(HomeNav.customers)),
+    // how the shop looks to customers (founder, 27 Oct 2026): next to the customers it is for
+    SideNavEntry(LucideIcons.store, 'Business profile', hook(HomeNav.businessProfile ?? HomeNav.storefront)),
     SideNavEntry(LucideIcons.fileText, 'Reports', onReports),
     SideNavEntry(LucideIcons.users, 'Team', hook(HomeNav.team)),
     SideNavEntry(LucideIcons.settings, 'Settings', hook(HomeNav.settings ?? HomeNav.setup)),
-    SideNavEntry(LucideIcons.globe, 'OneLocal page', hook(HomeNav.storefront)),
     SideNavEntry(LucideIcons.wallet, 'One Local Wallet', hook(HomeNav.wallet)),
     SideNavEntry(LucideIcons.circleQuestionMark, 'Help & support', hook(HomeNav.support)),
   ];

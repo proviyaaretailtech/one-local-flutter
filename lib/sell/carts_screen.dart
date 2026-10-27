@@ -540,97 +540,132 @@ class _CartsScreenState extends State<CartsScreen> {
         if (held.isEmpty) Text(tr('No carts on hold.'), style: inter(13, 500, color: kMuted)),
         // a wallet: each closed card tucks under the next one; the open card shows in full
         for (final (i, h) in held.indexed)
-          Align(
-            alignment: Alignment.topCenter,
-            heightFactor: h.key == _openKey || i == held.length - 1 ? 1 : 0.72,
-            child: Padding(padding: const EdgeInsets.only(bottom: 10), child: _heldCard(h, _warm[i % _warm.length])),
-          ),
+          // one after another, none covering the next
+          Padding(padding: EdgeInsets.only(bottom: i == held.length - 1 ? 0 : 10), child: _heldCard(h, _warm[i % _warm.length])),
       ]);
 
+  /// A button on a held card, in the card's colour: filled for the main step, outlined for the others.
+  Widget _accentButton(String label, VoidCallback onTap, Color accent, {Key? key, bool solid = false}) => Material(
+        key: key,
+        color: solid ? accent : Colors.white,
+        shape: StadiumBorder(side: BorderSide(color: accent.withValues(alpha: solid ? 1 : 0.5))),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Text(tr(label), textAlign: TextAlign.center, style: inter(13.5, 800, color: solid ? Colors.white : accent)),
+          ),
+        ),
+      );
+
+  /// A held cart or bill (founder, 27 Oct 2026, like the online orders): a white card with its colour as the border and accent; the
+  /// customer leads, big and in that colour; the number is small. Tap to open its items and actions.
   Widget _heldCard(_Held h, List<Color> colors) {
     final open = h.key == _openKey;
+    final accent = colors.first;
     final c = h.cart, b = h.bill;
     final amount = b?.total ?? c!.estimate;
     final counts = b?.counts ?? '${c!.lines.length} ${c.lines.length == 1 ? 'line' : 'lines'} · ${c.units} ${c.units == 1 ? 'unit' : 'units'}';
-    return _walletCard(
+    Widget line(String name, num money) => Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(children: [
+            Expanded(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, 600))),
+            Text(rupees(money), style: inter(13.5, 700)),
+          ]),
+        );
+    return Container(
       key: ValueKey('wallet-held-${h.key}'),
-      colors: colors,
-      onTap: () => setState(() => _openKey = open ? null : h.key),
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 200),
-        alignment: Alignment.topCenter,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Text(h.label, style: inter(17, 800, color: Colors.white)),
-            const SizedBox(width: 8),
-            _chip(tr('On hold')),
-            const Spacer(),
-            Text(rupees(amount), style: inter(18, 800, color: Colors.white)),
-          ]),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: accent.withValues(alpha: open ? 1 : 0.55), width: open ? 2 : 1.5),
+        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.10), blurRadius: 10, offset: const Offset(0, 3))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => setState(() => _openKey = open ? null : h.key),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              alignment: Alignment.topCenter,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _onCard(h.customer, size: 15.5, weight: 700, alpha: 1),
-                _onCard(h.phone.isEmpty ? tr('Add a mobile number') : h.phone),
-              ]),
-            ),
-            _editButton(ValueKey('cart-edit-${h.key}'), () => c != null ? _editCart(c) : _editBill(b!)),
-          ]),
-          const SizedBox(height: 6),
-          _onCard([counts, if (b != null) b.when else tr('On this till')].join(' · '), size: 12.5),
-          if (open) ...[
-            const SizedBox(height: 10),
-            if (b != null && _billItems.contains(b.id)) ...[
-              for (final i in b.items)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(children: [
-                    Expanded(child: _onCard('${i['qty']}× ${i['name']}', size: 13.5, weight: 600, alpha: 1)),
-                    Text(rupees((i['amount'] as num?) ?? 0), style: inter(13.5, 700, color: Colors.white)),
-                  ]),
-                ),
-              const SizedBox(height: 6),
-            ],
-            if (c != null) ...[
-              if (_billItems.contains(c.id)) ...[
-                if (c.isEmpty) _onCard(tr('No items yet.'), size: 13),
-                for (final l in c.lines)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(children: [
-                      Expanded(child: _onCard('${l.qty}× ${l.name}', size: 13.5, weight: 600, alpha: 1)),
-                      Text(rupees((c.unitPrice[l.menuItemId] ?? 0) * l.qty), style: inter(13.5, 700, color: Colors.white)),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(h.customer, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(17, 800, color: accent)),
+                      const SizedBox(height: 1),
+                      Text([h.label, if (h.phone.isNotEmpty) h.phone else tr('Add a mobile number')].join(' · '),
+                          maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12, 500, color: kMuted)),
                     ]),
                   ),
+                  const SizedBox(width: 8),
+                  Text(rupees(amount), style: inter(17, 800)),
+                  const SizedBox(width: 2),
+                  IconButton(
+                    key: ValueKey('cart-edit-${h.key}'),
+                    tooltip: tr('Edit customer'),
+                    visualDensity: VisualDensity.compact,
+                    style: IconButton.styleFrom(backgroundColor: accent.withValues(alpha: 0.10)),
+                    onPressed: () => c != null ? _editCart(c) : _editBill(b!),
+                    icon: Icon(LucideIcons.pencil, size: 15, color: accent),
+                  ),
+                ]),
                 const SizedBox(height: 6),
-              ],
-              Row(children: [
-                Expanded(child: _cardButton(_billItems.contains(c.id) ? 'Hide items' : 'Show items', () => setState(() => _billItems.contains(c.id) ? _billItems.remove(c.id) : _billItems.add(c.id)))),
-                const SizedBox(width: 8),
-                Expanded(child: _cardButton('+ Add items', () => _addToParked(c), key: ValueKey('cart-add-${h.key}'))),
+                Row(children: [
+                  Container(width: 7, height: 7, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text([tr('On hold'), counts, if (b != null) b.when else tr('On this till')].join(' · '),
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12.5, 600)),
+                  ),
+                  Icon(open ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 16, color: kMuted),
+                  const SizedBox(width: 4),
+                ]),
+                if (open) ...[
+                  const Divider(height: 20, color: kLine),
+                  if (b != null && _billItems.contains(b.id)) ...[
+                    for (final i in b.items) line('${i['qty']}× ${i['name']}', (i['amount'] as num?) ?? 0),
+                    const SizedBox(height: 6),
+                  ],
+                  if (c != null) ...[
+                    if (_billItems.contains(c.id)) ...[
+                      if (c.isEmpty) Text(tr('No items yet.'), style: inter(13, 400, color: kMuted)),
+                      for (final l in c.lines) line('${l.qty}× ${l.name}', (c.unitPrice[l.menuItemId] ?? 0) * l.qty),
+                      const SizedBox(height: 6),
+                    ],
+                    Row(children: [
+                      Expanded(child: _accentButton(_billItems.contains(c.id) ? 'Hide items' : 'Show items', () => setState(() => _billItems.contains(c.id) ? _billItems.remove(c.id) : _billItems.add(c.id)), accent)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _accentButton('+ Add items', () => _addToParked(c), accent, key: ValueKey('cart-add-${h.key}'))),
+                    ]),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(child: _accentButton('Make active', () => _makeActive(c), accent, key: ValueKey('cart-activate-${h.key}'), solid: true)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _accentButton('Remove', () => _discard(c), accent, key: ValueKey('cart-remove-${h.key}'))),
+                    ]),
+                  ] else ...[
+                    Row(children: [
+                      Expanded(child: _accentButton(_billItems.contains(b!.id) ? 'Hide items' : 'Show items', () => setState(() => _billItems.contains(b.id) ? _billItems.remove(b.id) : _billItems.add(b.id)), accent)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _accentButton('+ Add items', () => _addToBill(b), accent, key: ValueKey('cart-add-${h.key}'))),
+                    ]),
+                    const SizedBox(height: 8),
+                    SizedBox(width: double.infinity, child: _accentButton('Pay', () => _payHeld(b), accent, key: ValueKey('cart-pay-${h.key}'), solid: true)),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(onPressed: () => _cancelHeld(b), child: Text(tr('Cancel this held bill'), style: inter(13, 700, color: kBadText))),
+                    ),
+                  ],
+                ],
               ]),
-              const SizedBox(height: 8),
-              Row(children: [
-                Expanded(child: _cardButton('Make active', () => _makeActive(c), key: ValueKey('cart-activate-${h.key}'), solid: true)),
-                const SizedBox(width: 8),
-                Expanded(child: _cardButton('Remove', () => _discard(c), key: ValueKey('cart-remove-${h.key}'))),
-              ]),
-            ] else ...[
-              Row(children: [
-                Expanded(child: _cardButton(_billItems.contains(b!.id) ? 'Hide items' : 'Show items', () => setState(() => _billItems.contains(b.id) ? _billItems.remove(b.id) : _billItems.add(b.id)))),
-                const SizedBox(width: 8),
-                Expanded(child: _cardButton('+ Add items', () => _addToBill(b), key: ValueKey('cart-add-${h.key}'))),
-              ]),
-              const SizedBox(height: 8),
-              _cardButton('Pay', () => _payHeld(b), key: ValueKey('cart-pay-${h.key}'), solid: true),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(onPressed: () => _cancelHeld(b), child: Text(tr('Cancel this held bill'), style: inter(13, 700, color: Colors.white))),
-              ),
-            ],
-          ],
-        ]),
+            ),
+          ),
+        ),
       ),
     );
   }

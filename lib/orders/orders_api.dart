@@ -78,6 +78,14 @@ class OrderCard {
   String get deliveryStatus => _s('delivery_status');
   String get deliveryTime => _s('delivery_time');
   String get refundDamages => _s('refund_damages');
+
+  /// Where an online order is (founder, 27 Oct 2026): new · ongoing · ready · return · delivered · cancelled, or counter (a counter
+  /// bill, not an online order). An older server sends no state: it is worked out from [status].
+  String get state {
+    final s = _s('state');
+    if (s.isNotEmpty) return s;
+    return switch (status) { 'completed' => 'delivered', 'cancelled' => 'cancelled', _ => 'ongoing' };
+  }
 }
 
 int _int(Object? v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;

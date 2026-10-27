@@ -83,6 +83,17 @@ class FakeAccountAuth implements AccountAuth {
   Future<void> confirmPhone(String e164, String code) async => calls.add('confirm $e164 $code');
   @override
   Future<void> signOutEverywhere() async => calls.add('signOutEverywhere');
+
+  /// When true, the first password change is answered "send a code first", like Supabase's secure password change.
+  bool wantsCode = false;
+  @override
+  Future<void> setPassword(String password, {String? nonce}) async {
+    if (wantsCode && nonce == null) throw const PasswordNeedsCode();
+    calls.add('password $password${nonce == null ? '' : ' $nonce'}');
+  }
+
+  @override
+  Future<void> reauthenticate() async => calls.add('reauthenticate');
 }
 
 Map<String, dynamic> wallet({bool owed = false, bool legacy = false}) => {
@@ -351,6 +362,54 @@ void main() {
       await t.tap(find.byKey(const ValueKey('acct-ask-ok')));
       await t.pumpAndSettle();
       expect(auth.calls, ['email new@example.com']);
+    });
+
+    testWidgets('no password yet: Set a password (checked here: 8+ characters, letters and numbers, typed twice the same)', (t) async {
+      final auth = FakeAccountAuth();
+      final noPassword = acct()..['sign_in_methods'] = [{'method': 'password', 'label': 'Email and password', 'enabled': false}];
+      final s = FakeRpc((fn, b) => fn == 'acct_get' ? ok(noPassword) : ok({}));
+      await show(t, ManageAccountScreen(api: s.account, auth: auth));
+      expect(find.text('Set'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('acct-password')));
+      await t.pumpAndSettle();
+      expect(find.text('Set a password'), findsOneWidget);
+      Future<void> tryPassword(String a, String b) async {
+        await t.enterText(find.byKey(const ValueKey('acct-password-new')), a);
+        await t.enterText(find.byKey(const ValueKey('acct-password-again')), b);
+        await t.tap(find.byKey(const ValueKey('acct-password-save')));
+        await t.pumpAndSettle();
+      }
+
+      await tryPassword('short1', 'short1');
+      expect(find.text('Use at least 8 characters.'), findsOneWidget);
+      await tryPassword('onlyletters', 'onlyletters');
+      expect(find.text('Use letters and numbers.'), findsOneWidget);
+      await tryPassword('Sharma2026', 'Sharma2025');
+      expect(find.text('The two passwords are not the same.'), findsOneWidget);
+      expect(auth.calls, isEmpty);
+      await tryPassword('Sharma2026', 'Sharma2026');
+      expect(auth.calls, ['password Sharma2026']);
+      expect(find.text('Password set. You can now sign in with priya@example.com and this password.'), findsOneWidget);
+    });
+
+    testWidgets('a password: Change; when the server wants proof, a code goes to the email and is asked for', (t) async {
+      final auth = FakeAccountAuth()..wantsCode = true;
+      final s = FakeRpc((fn, b) => fn == 'acct_get' ? ok(acct()) : ok({}));
+      await show(t, ManageAccountScreen(api: s.account, auth: auth));
+      await t.tap(find.byKey(const ValueKey('acct-password')));
+      await t.pumpAndSettle();
+      expect(find.text('Change password'), findsWidgets);
+      await t.enterText(find.byKey(const ValueKey('acct-password-new')), 'NewPass99');
+      await t.enterText(find.byKey(const ValueKey('acct-password-again')), 'NewPass99');
+      await t.tap(find.byKey(const ValueKey('acct-password-save')));
+      await t.pumpAndSettle();
+      expect(auth.calls, ['reauthenticate']);
+      expect(find.text('Code sent to priya@example.com'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('acct-ask')), '123456');
+      await t.tap(find.byKey(const ValueKey('acct-ask-ok')));
+      await t.pumpAndSettle();
+      expect(auth.calls, ['reauthenticate', 'password NewPass99 123456']);
+      expect(find.text('Password changed.'), findsOneWidget);
     });
 
     testWidgets('sign out of all devices: confirm, record, revoke, leave', (t) async {

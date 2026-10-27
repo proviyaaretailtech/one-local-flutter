@@ -71,6 +71,9 @@ class HomeNav {
   static String? partnerType;
   // Section M: the storefront page builder and its settings.
   static HomeRoute? storefront;
+
+  /// Business profile (founder, 27 Oct 2026): how the shop looks to customers, every storefront screen in one place.
+  static HomeRoute? businessProfile;
   static HomeRoute? money;
   // Section K: one Money screen by its key ('payouts', 'invoices', 'settlements', ...), for links that name a screen.
   static void Function(BuildContext context, String screen)? moneyScreen;
@@ -113,7 +116,7 @@ class HomeNav {
     loadLanguage = null;
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
-    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = customers = wallet = account = menu = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = businessProfile = settings = customers = wallet = account = menu = null;
     tableQr = menuLink = null;
     shell = null;
     openMenu = null;

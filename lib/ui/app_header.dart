@@ -88,12 +88,21 @@ class AppHeader extends StatelessWidget {
             padding: const EdgeInsets.only(top: 2),
             child: Row(children: [
               if (showBack)
-                IconButton(
-                  key: backKey,
-                  tooltip: 'Back',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onBack ?? () => Navigator.of(context).maybePop(),
-                  icon: const Icon(LucideIcons.arrowLeft, size: 20, color: kInk),
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: IconButton(
+                    key: backKey,
+                    tooltip: 'Back',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      fixedSize: const Size(40, 40),
+                      minimumSize: const Size(40, 40),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Color(0xFFDADCD5))),
+                    ),
+                    onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                    icon: const Icon(LucideIcons.arrowLeft, size: 20, color: kInk),
+                  ),
                 ),
               if (under != null) Expanded(child: under!),
             ]),
