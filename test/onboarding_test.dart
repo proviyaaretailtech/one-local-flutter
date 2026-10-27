@@ -251,6 +251,28 @@ void main() {
       await tapText(t, 'Confirm address');
       expect(api.bodies['address'], {'address_line': '12, 2nd Main Road', 'locality': 'Indiranagar', 'city': 'Bengaluru', 'state': 'Karnataka', 'pin_code': '560038', 'confirmed': true});
     });
+    testWidgets('the state first, then a city from that state (search, or Other to type it)', (t) async {
+      SharedPreferences.setMockInitialValues({});
+      final api = FakeOnb();
+      await show(t, AddressScreen(api: api, app: sample(done: 1, extra: {'address': <String, dynamic>{}})));
+      await t.pumpAndSettle();
+      expect(t.getTopLeft(find.byKey(const ValueKey('address-state'))).dy, lessThan(t.getTopLeft(find.byKey(const ValueKey('address-city'))).dy));
+      expect(find.text('Choose your state first'), findsOneWidget);
+      await tapIt(t, find.byKey(const ValueKey('address-state')));
+      await tapIt(t, find.text('Karnataka'));
+      await tapIt(t, find.byKey(const ValueKey('address-city')));
+      await t.enterText(find.byKey(const ValueKey('select-search')), 'mys');
+      await t.pumpAndSettle();
+      expect(find.text('Bengaluru'), findsNothing);
+      await tapIt(t, find.text('Mysuru'));
+      expect(find.descendant(of: find.byKey(const ValueKey('address-city')), matching: find.text('Mysuru')), findsOneWidget);
+      // a town not in the list
+      await tapIt(t, find.byKey(const ValueKey('address-city')));
+      await t.enterText(find.byKey(const ValueKey('select-search')), 'ausa road'); // not in the list: Other stays
+      await t.pumpAndSettle();
+      await tapIt(t, find.text('Other (type your city)'));
+      expect(find.text('Your city or town'), findsOneWidget);
+    });
     testWidgets('a short PIN code is refused before any call', (t) async {
       final api = FakeOnb();
       await show(t, AddressScreen(api: api, app: sample(done: 2)));

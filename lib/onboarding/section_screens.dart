@@ -6,6 +6,7 @@ import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'document_picker.dart';
 import 'onboarding_api.dart';
+import 'india_cities.dart';
 import 'onboarding_draft.dart';
 import 'onboarding_widgets.dart';
 
@@ -26,6 +27,9 @@ class _AddressScreenState extends State<AddressScreen> {
   late final _line = TextEditingController(text: widget.app.address['address_line'] as String? ?? '');
   late final _area = TextEditingController(text: widget.app.address['locality'] as String? ?? '');
   late final _city = TextEditingController(text: widget.app.address['city'] as String? ?? '');
+
+  /// The city is typed because it is not in the state's list.
+  late bool _otherCity = _city.text.isNotEmpty && !citiesOf(widget.app.address['state'] as String?).contains(_city.text);
   late final _pin = TextEditingController(text: widget.app.address['pin_code'] as String? ?? '');
   late String? _state = widget.app.address['state'] as String?;
   late bool _confirmed = widget.app.address['confirmed'] == true;
@@ -44,6 +48,7 @@ class _AddressScreenState extends State<AddressScreen> {
           if (c.text.isEmpty) c.text = d[k] ?? '';
         }
         _state ??= d['state'];
+        _otherCity = _city.text.isNotEmpty && !citiesOf(_state).contains(_city.text);
       });
     });
   }
@@ -63,8 +68,8 @@ class _AddressScreenState extends State<AddressScreen> {
     if (_saving) return;
     if (_line.text.trim().length < 3) return showToast(context, 'Enter your address line.');
     if (_area.text.trim().length < 2) return showToast(context, 'Enter your area or locality.');
-    if (_city.text.trim().length < 2) return showToast(context, 'Enter your city.');
     if (_state == null) return showToast(context, 'Choose your state.');
+    if (_city.text.trim().length < 2) return showToast(context, _otherCity ? 'Enter your city.' : 'Choose your city.');
     if (!RegExp(r'^[1-9][0-9]{5}$').hasMatch(_pin.text)) return showToast(context, 'PIN code must be 6 digits.');
     if (!_confirmed) return showToast(context, 'Confirm that the address identifies your business.');
     setState(() => _saving = true);
@@ -113,11 +118,33 @@ class _AddressScreenState extends State<AddressScreen> {
         ),
         LabeledField(label: 'Address line', controller: _line, labelSize: 13, labelWeight: 500, onChanged: (_) => setState(() {})),
         LabeledField(label: 'Area / locality', controller: _area, labelSize: 13, labelWeight: 500, onChanged: (_) => setState(() {})),
-        LabeledField(label: 'City', controller: _city, labelSize: 13, labelWeight: 500, onChanged: (_) => setState(() {})),
+        // the state first, then its cities (founder, 27 Oct 2026)
         FutureBuilder<Taxonomy>(
           future: _tax,
-          builder: (_, s) => SelectField(label: 'State', value: _state, options: s.data?.states ?? const [], hint: s.hasError ? 'Could not load states' : 'Choose', onChanged: (v) => setState(() => _state = v)),
+          builder: (_, s) => SelectField(
+            key: const ValueKey('address-state'),
+            label: 'State',
+            value: _state,
+            options: s.data?.states ?? const [],
+            hint: s.hasError ? 'Could not load states' : 'Choose',
+            onChanged: (v) => setState(() {
+              if (v != _state && !_otherCity) _city.clear(); // a city of the old state
+              _state = v;
+            }),
+          ),
         ),
+        SelectField(
+          key: const ValueKey('address-city'),
+          label: 'City',
+          value: _otherCity ? kOtherCity : (_city.text.isEmpty ? null : _city.text),
+          options: _state == null ? const [] : citiesOf(_state),
+          hint: _state == null ? 'Choose your state first' : 'Choose',
+          onChanged: (v) => setState(() {
+            _otherCity = v == kOtherCity;
+            _city.text = _otherCity ? '' : v;
+          }),
+        ),
+        if (_otherCity) LabeledField(label: 'Your city or town', controller: _city, labelSize: 13, labelWeight: 500, onChanged: (_) => setState(() {})),
         LabeledField(
           label: 'PIN code',
           controller: _pin,
