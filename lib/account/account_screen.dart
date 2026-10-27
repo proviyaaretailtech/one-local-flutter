@@ -126,8 +126,10 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
   Future<void> _password(bool has) async {
     final a = _a;
     if (a == null) return;
-    if (a.email.isEmpty) {
-      showToast(context, 'Add an email first: you sign in with your email and this password.');
+    // the password goes with the email or the mobile number: one of them is needed
+    final login = [if (a.email.isNotEmpty) a.email, if (a.phone != null) '+${a.phone}'].join(' or ');
+    if (login.isEmpty) {
+      showToast(context, 'Add an email or a mobile number first: you sign in with it and this password.');
       return;
     }
     final p = await showModalBottomSheet<String>(
@@ -135,10 +137,10 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => _PasswordSheet(has: has, email: a.email),
+      builder: (_) => _PasswordSheet(has: has, email: login),
     );
     if (p == null || !mounted) return;
-    final done = has ? 'Password changed.' : 'Password set. You can now sign in with ${a.email} and this password.';
+    final done = has ? 'Password changed.' : 'Password set. You can now sign in with $login and this password.';
     try {
       setState(() => _busy = true);
       try {
@@ -147,7 +149,7 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
         await _auth.reauthenticate();
         if (!mounted) return;
         setState(() => _busy = false);
-        final code = await _ask('Enter the code', 'Code sent to ${a.email}', type: TextInputType.number, action: 'Confirm');
+        final code = await _ask('Enter the code', 'Code sent to ${a.email.isNotEmpty ? a.email : '+${a.phone}'}', type: TextInputType.number, action: 'Confirm');
         if (code == null || code.isEmpty || !mounted) return;
         setState(() => _busy = true);
         await _auth.setPassword(p, nonce: code);

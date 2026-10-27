@@ -7,7 +7,7 @@ import '../ui/widgets.dart';
 import 'register_personal_screen.dart';
 import 'signin_chooser_screen.dart';
 
-/// Figma "Password Login".
+/// Figma "Password Login". The account is found by its email or its mobile number (founder, 27 Oct 2026), one box for either.
 class PasswordLoginScreen extends StatefulWidget {
   const PasswordLoginScreen({super.key, this.auth});
   final AuthRepository? auth;
@@ -33,9 +33,13 @@ class _PasswordLoginScreenState extends State<PasswordLoginScreen> {
 
   Future<void> _signIn() async {
     if (_busy) return;
-    final email = _email.text.trim().toLowerCase();
-    if (!isEmail(email)) {
-      showToast(context, 'Please enter your account email.');
+    final typed = _email.text.trim();
+    final email = typed.toLowerCase();
+    // a mobile number: Indian, 10 digits (a leading +91, 91 or 0 and any spaces are fine)
+    final digits = typed.replaceAll(RegExp(r'[\s\-()]'), '').replaceFirst(RegExp(r'^\+'), '').replaceFirst(RegExp(r'^(91|0)(?=[6-9]\d{9}$)'), '');
+    final phone = RegExp(r'^[6-9]\d{9}$').hasMatch(digits) ? '+91$digits' : null;
+    if (!isEmail(email) && phone == null) {
+      showToast(context, typed.isEmpty ? 'Please enter your account email or mobile number.' : 'Enter your account email, or a 10-digit mobile number.');
       return;
     }
     if (_password.text.isEmpty) {
@@ -44,10 +48,14 @@ class _PasswordLoginScreenState extends State<PasswordLoginScreen> {
     }
     setState(() => _busy = true);
     try {
-      await _auth.signInWithPassword(email, _password.text);
+      if (phone != null) {
+        await _auth.signInWithPhonePassword(phone, _password.text);
+      } else {
+        await _auth.signInWithPassword(email, _password.text);
+      }
       if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
     } catch (e) {
-      if (mounted) showToast(context, friendlyAuthError(e, fallback: 'Email or password is not right.'));
+      if (mounted) showToast(context, friendlyAuthError(e, fallback: phone != null ? 'Mobile number or password is not right.' : 'Email or password is not right.'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -65,7 +73,7 @@ class _PasswordLoginScreenState extends State<PasswordLoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               LabeledField(
-                label: 'Account email',
+                label: 'Email or mobile number',
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,

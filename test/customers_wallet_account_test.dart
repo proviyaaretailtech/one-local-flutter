@@ -389,7 +389,7 @@ void main() {
       expect(auth.calls, isEmpty);
       await tryPassword('Sharma2026', 'Sharma2026');
       expect(auth.calls, ['password Sharma2026']);
-      expect(find.text('Password set. You can now sign in with priya@example.com and this password.'), findsOneWidget);
+      expect(find.text('Password set. You can now sign in with priya@example.com or +919876500512 and this password.'), findsOneWidget);
     });
 
     testWidgets('a password: Change; when the server wants proof, a code goes to the email and is asked for', (t) async {

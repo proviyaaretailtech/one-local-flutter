@@ -204,10 +204,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: onTap,
+            // the label reads on its button: dark on a light one (the lime "Become a seller"), white on a dark one
             child: Center(
               child: Text(
                 label,
-                style: inter(16, 600, color: Colors.white, shadows: kSplashTextShadow),
+                style: color.computeLuminance() > 0.5
+                    ? inter(16, 700, color: const Color(0xFF0C1F15))
+                    : inter(16, 600, color: Colors.white, shadows: kSplashTextShadow),
               ),
             ),
           ),

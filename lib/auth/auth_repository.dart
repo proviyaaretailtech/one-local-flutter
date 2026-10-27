@@ -29,6 +29,10 @@ class AuthRepository {
   Future<AuthResponse> signInWithPassword(String email, String password) =>
       _auth.signInWithPassword(email: email, password: password);
 
+  // Mobile number + password (27 Oct 2026): the same password, with the account's mobile number instead of its email.
+  Future<AuthResponse> signInWithPhonePassword(String e164, String password) =>
+      _auth.signInWithPassword(phone: e164, password: password);
+
   Future<void> sendPasswordReset(String email) => _auth.resetPasswordForEmail(email);
 
   // Registration is OTP-based (Figma "Create account" -> verify contact). No password is set here.

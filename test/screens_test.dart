@@ -56,6 +56,8 @@ void main() {
 
     testWidgets('Become a seller opens registration', (t) async {
       await show(t, const SplashScreen());
+      // dark text on the lime button, so it is not washed out
+      expect(t.widget<Text>(find.text('Become a seller')).style?.color, const Color(0xFF0C1F15));
       await t.tap(find.text('Become a seller'));
       await t.pumpAndSettle();
       expect(find.text('Create your account.'), findsOneWidget);
@@ -225,7 +227,7 @@ void main() {
       await show(t, PasswordLoginScreen(auth: a));
       await t.tap(find.text('Sign in'));
       await t.pump();
-      expect(toast('Please enter your account email.'), findsOneWidget);
+      expect(toast('Please enter your account email or mobile number.'), findsOneWidget);
       await t.enterText(find.byType(TextField).at(0), 'a@b.co');
       await t.tap(find.text('Sign in'));
       await t.pump();
@@ -240,6 +242,26 @@ void main() {
       await t.tap(find.text('Sign in'));
       await t.pumpAndSettle();
       expect(a.calls, ['signInWithPassword a@b.co']);
+    });
+    testWidgets('a mobile number works too: +91 added, spaces and a leading 0 or 91 are fine', (t) async {
+      final a = FakeAuth();
+      await show(t, PasswordLoginScreen(auth: a));
+      expect(find.text('Email or mobile number'), findsOneWidget);
+      await t.enterText(find.byType(TextField).at(0), '098765 43210');
+      await t.enterText(find.byType(TextField).at(1), 'secret123');
+      await t.tap(find.text('Sign in'));
+      await t.pumpAndSettle();
+      expect(a.calls, ['signInWithPhonePassword +919876543210']);
+    });
+    testWidgets('neither an email nor a mobile number: said so, nothing sent', (t) async {
+      final a = FakeAuth();
+      await show(t, PasswordLoginScreen(auth: a));
+      await t.enterText(find.byType(TextField).at(0), '12345');
+      await t.enterText(find.byType(TextField).at(1), 'secret123');
+      await t.tap(find.text('Sign in'));
+      await t.pump();
+      expect(toast('Enter your account email, or a 10-digit mobile number.'), findsOneWidget);
+      expect(a.calls, isEmpty);
     });
     testWidgets('wrong password says so', (t) async {
       final a = FakeAuth()..failWith = AuthApiException('Invalid login credentials', statusCode: '400', code: 'invalid_credentials');
