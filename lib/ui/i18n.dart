@@ -957,4 +957,9 @@ const _words = <String, (String, String)>{
   'Your shop on OneLocal': ('OneLocal पर आपकी दुकान', 'OneLocal par aapki dukaan'),
   'Change how customers see your shop': ('ग्राहकों को दुकान कैसी दिखे, बदलें', 'Customers ko dukaan kaisi dikhe, badlein'),
   'Edit page': ('पेज बदलें', 'Page badlein'),
+  'Choose your language': ('अपनी भाषा चुनें', 'Apni bhasha chunein'),
+  'Continue to': ('आगे बढ़ें', 'Aage badhein'),
+  'Welcome back': ('फिर से स्वागत है', 'Welcome back'),
+  'there': ('आपका', 'aapka'),
+  'Switch account': ('खाता बदलें', 'Account badlein'),
 };

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthApiException;
 import 'package:vinii_pos/auth/partner_api.dart';
+import 'package:vinii_pos/ui/i18n.dart';
 import 'package:vinii_pos/home/control_centre_screen.dart';
 import 'package:vinii_pos/screens/email_login_screen.dart';
 import 'package:vinii_pos/screens/email_verify_pending_screen.dart';
@@ -527,6 +528,24 @@ void main() {
       expect(find.text('Welcome back, Riya.'), findsOneWidget);
       expect(find.textContaining('Sharma Store'), findsOneWidget);
       expect(find.text('r•••@sharmastore.in'), findsOneWidget);
+    });
+    testWidgets('the language comes first after signing in: English, Hindi, Hinglish; the screen switches and the store keeps it', (t) async {
+      addTearDown(() => setAppLanguage('en'));
+      final saved = <String>[];
+      final api = FakeApi(() async => PartnerMe(name: 'Riya', email: 'r@x.in', outlet: 'S'));
+      await show(t, LoginSuccessScreen(api: api, auth: FakeAuth(), saveLanguage: (c) async => saved.add(c)));
+      await t.pumpAndSettle();
+      expect(find.text('Choose your language'), findsOneWidget);
+      for (final c in ['en', 'hi', 'hi-en']) {
+        expect(find.byKey(ValueKey('login-language-$c')), findsOneWidget);
+      }
+      // above Continue: the choice comes before going in
+      expect(t.getTopLeft(find.byKey(const ValueKey('login-language-hi'))).dy, lessThan(t.getTopLeft(find.text('Continue to Store POS')).dy));
+      await t.ensureVisible(find.byKey(const ValueKey('login-language-hi')));
+      await t.tap(find.byKey(const ValueKey('login-language-hi')));
+      await t.pumpAndSettle();
+      expect(saved, ['hi']);
+      expect(find.text('अपनी भाषा चुनें'), findsOneWidget);
     });
     testWidgets('Continue to store opens the control centre', (t) async {
       final api = FakeApi(() async => PartnerMe(name: 'Riya', email: 'r@x.in', outlet: ''));
