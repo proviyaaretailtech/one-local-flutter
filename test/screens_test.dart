@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthApiException;
 import 'package:vinii_pos/auth/partner_api.dart';
 import 'package:vinii_pos/ui/language_step.dart';
+import 'package:vinii_pos/ui/theme.dart' show StepNav;
 import 'package:vinii_pos/onboarding/checklist_screen.dart' show OnboardingEntry;
 import 'package:vinii_pos/ui/i18n.dart';
 import 'package:vinii_pos/home/control_centre_screen.dart';
@@ -75,6 +76,12 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('Choose your language'), findsOneWidget);
       expect(find.text('Create your account.'), findsNothing);
+      // a back button returns to the start
+      await t.tap(find.descendant(of: find.byType(StepNav), matching: find.byType(InkWell)));
+      await t.pumpAndSettle();
+      expect(find.text('Choose your language'), findsNothing);
+      await t.tap(find.text('Become a seller'));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('language-continue')));
       await t.pumpAndSettle();
       expect(find.text('Create your account.'), findsOneWidget);

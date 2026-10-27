@@ -101,6 +101,8 @@ class _LanguageStepScreenState extends State<LanguageStepScreen> {
         gradient: kRegistrationGradient,
         children: [
           const BrandNav(),
+          // back to the start (from Sign In or Become a seller)
+          if (ModalRoute.of(context)?.canPop ?? false) StepNav(caption: tr('Language'), onBack: () => Navigator.pop(context)),
           FormContent(children: [
             Kicker(tr('Language')),
             PageIntro(title: tr('Choose your language'), subtitle: tr('The app will use it everywhere. You can change it later in Settings.')),
