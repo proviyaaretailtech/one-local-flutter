@@ -94,7 +94,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
                       child: const Ico(lucideCircleCheck, size: 32),
                     ),
                     const SizedBox(height: 24),
-                    Text('${tr('Welcome back')}, ${first.isEmpty ? tr('there') : first}.', textAlign: TextAlign.center, style: inter(24, 700)),
+                    Text(first.isEmpty ? '${tr('Welcome back')}.' : '${tr('Welcome back')}, $first.', textAlign: TextAlign.center, style: inter(24, 700)), // no name on record: no stand-in
                     const SizedBox(height: 12),
                     Text(
                       'You’re signed in to ${me.outlet.isEmpty ? 'OneLocal' : me.outlet}. Your ${_kindLabel(me.kind)} is ready to open.',

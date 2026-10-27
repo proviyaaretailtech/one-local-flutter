@@ -616,6 +616,13 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('language-step')), findsNothing);
     });
+    testWidgets('no name on record: just "Welcome back."', (t) async {
+      final api = FakeApi(() async => PartnerMe(name: '', email: 'a@x.in', outlet: 'ABC General Store'));
+      await show(t, LoginSuccessScreen(api: api, auth: FakeAuth()));
+      await t.pumpAndSettle();
+      expect(find.text('Welcome back.'), findsOneWidget);
+      expect(find.textContaining('there'), findsNothing);
+    });
     testWidgets('Continue to store opens the control centre', (t) async {
       final api = FakeApi(() async => PartnerMe(name: 'Riya', email: 'r@x.in', outlet: ''));
       await show(t, LoginSuccessScreen(api: api, auth: FakeAuth()));
