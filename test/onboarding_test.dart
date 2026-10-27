@@ -255,6 +255,19 @@ void main() {
     });
   });
 
+  group('Save & exit', () {
+    testWidgets('closes the application but stays signed in', (t) async {
+      final auth = FakeAuth();
+      await t.pumpWidget(MaterialApp(home: Builder(builder: (c) => TextButton(onPressed: () => Navigator.of(c).push(MaterialPageRoute(builder: (_) => ChecklistScreen(api: FakeOnb(), app: sample(done: 2), auth: auth))), child: const Text('open')))));
+      await t.tap(find.text('open'));
+      await t.pumpAndSettle();
+      await tapText(t, 'Save & exit');
+      expect(find.byType(ChecklistScreen), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+      expect(auth.calls, isNot(contains('signOut')));
+    });
+  });
+
   group('Address', () {
     testWidgets('needs the confirmation, then saves every part', (t) async {
       final api = FakeOnb();

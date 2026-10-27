@@ -137,7 +137,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         else if (next != null)
           PrimaryAction(label: 'Resume ${(next['title'] as String).toLowerCase()}', onPressed: () => _open(next['key'] as String)),
         const SizedBox(height: 12),
-        SecondaryAction(label: 'Save & exit', onPressed: () => leaveOnboarding(context, widget.auth)),
+        SecondaryAction(label: 'Save & exit', onPressed: () => exitOnboarding(context)),
       ],
     );
   }

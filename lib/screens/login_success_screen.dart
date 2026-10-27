@@ -51,7 +51,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
                 PageIntro(
                   title: noStore ? 'Your account is ready.' : offline ? 'We could not reach OneLocal.' : 'Something went wrong.',
                   subtitle: noStore
-                      ? 'You are signed in, but no store is set up on this account yet. OneLocal will open your store once onboarding is complete.'
+                      ? 'Your application is saved. Continue it any time; OneLocal opens your store once it is approved.'
                       : offline
                           ? 'Check your internet connection and try again.'
                           : err.toString(),
@@ -61,7 +61,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
             actions: [
               if (!noStore) ...[PrimaryAction(label: 'Try again', onPressed: _retry), const SizedBox(height: 12)],
               if (noStore) ...[
-                PrimaryAction(label: 'Set up your business', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OnboardingEntry(auth: _auth, phone: _auth.currentPhone, name: _auth.currentName)))),
+                PrimaryAction(label: 'Continue your application', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OnboardingEntry(auth: _auth, phone: _auth.currentPhone, name: _auth.currentName)))),
                 const SizedBox(height: 12),
               ],
               SecondaryAction(label: 'Switch account', onPressed: () => _auth.signOut()),

@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthApiException;
 import 'package:vinii_pos/auth/partner_api.dart';
+import 'package:vinii_pos/screens/create_password_screen.dart';
+import 'package:vinii_pos/account/account_api.dart' show AccountAuth;
 import 'package:vinii_pos/ui/language_step.dart';
 import 'package:vinii_pos/ui/theme.dart' show StepNav;
 import 'package:vinii_pos/onboarding/checklist_screen.dart' show OnboardingEntry;
@@ -390,9 +392,17 @@ void main() {
       expect(find.text('Resend code in 00:03'), findsOneWidget);
       await t.pump(const Duration(seconds: 4));
     });
-    testWidgets('registering goes straight into the application (no extra stop)', (t) async {
+    testWidgets('registering: set a password first, then the application', (t) async {
       final a = FakeAuth();
       await show(t, OtpVerifyScreen(phone: '+919876543210', registering: true, auth: a, name: 'Riya Sharma'));
+      await t.enterText(find.byType(TextField), '246801');
+      await t.pumpAndSettle();
+      expect(find.byType(CreatePasswordScreen), findsOneWidget);
+      expect(find.text('Set a password.'), findsOneWidget);
+    });
+    testWidgets('registering without the password step goes straight into the application', (t) async {
+      final a = FakeAuth();
+      await show(t, OtpVerifyScreen(phone: '+919876543210', registering: true, auth: a, name: 'Riya Sharma', passwordStep: false));
       await t.enterText(find.byType(TextField), '246801');
       await t.pumpAndSettle();
       expect(find.byType(OnboardingEntry), findsOneWidget);
@@ -546,6 +556,31 @@ void main() {
     });
   });
 
+  group('Set a password after sign-up', () {
+    testWidgets('8+ characters with letters and numbers, typed twice; then the next screen', (t) async {
+      final auth = _PwAuth();
+      await show(t, CreatePasswordScreen(auth: auth, next: const Text('the application')));
+      await t.enterText(find.descendant(of: find.byKey(const ValueKey('new-password')), matching: find.byType(TextField)), 'short');
+      await t.tap(find.byKey(const ValueKey('save-password')));
+      await t.pump();
+      expect(find.text('Use at least 8 characters, with letters and numbers.'), findsOneWidget);
+      t.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar(); // the message goes
+      await t.pump();
+      await t.enterText(find.descendant(of: find.byKey(const ValueKey('new-password')), matching: find.byType(TextField)), 'sharma2026');
+      await t.enterText(find.descendant(of: find.byKey(const ValueKey('confirm-password')), matching: find.byType(TextField)), 'sharma2025');
+      await t.tap(find.byKey(const ValueKey('save-password')));
+      await t.pump();
+      expect(find.text('The two passwords do not match.'), findsOneWidget);
+      t.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar(); // the message goes
+      await t.pump();
+      await t.enterText(find.descendant(of: find.byKey(const ValueKey('confirm-password')), matching: find.byType(TextField)), 'sharma2026');
+      await t.tap(find.byKey(const ValueKey('save-password')));
+      await t.pumpAndSettle();
+      expect(auth.set, ['sharma2026']);
+      expect(find.text('the application'), findsOneWidget);
+    });
+  });
+
   group('Login success', () {
     testWidgets('shows the name and restaurant from the server', (t) async {
       final api = FakeApi(() async => PartnerMe(name: 'Riya Sharma', email: 'riya@sharmastore.in', outlet: 'Sharma Store'));
@@ -623,4 +658,12 @@ void main() {
       expect(find.text('Welcome back, Riya.'), findsOneWidget);
     });
   });
+}
+
+class _PwAuth implements AccountAuth {
+  final set = <String>[];
+  @override
+  Future<void> setPassword(String password, {String? nonce}) async => set.add(password);
+  @override
+  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }

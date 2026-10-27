@@ -382,6 +382,10 @@ String niceDate(String? iso) {
   return '${d.day.toString().padLeft(2, '0')} ${m[d.month - 1]} ${d.year}';
 }
 
+/// Closes the application and stays signed in (founder, 28 Oct 2026): everything is saved, and the welcome screen offers to continue.
+/// Signing out here locked out a person who signed up with only a code.
+void exitOnboarding(BuildContext context) => Navigator.of(context).popUntil((r) => r.isFirst);
+
 /// Signs out and drops every onboarding screen, so the sign-in screen the gate shows is what the person sees.
 Future<void> leaveOnboarding(BuildContext context, AuthRepository? auth) async {
   final nav = Navigator.of(context);
