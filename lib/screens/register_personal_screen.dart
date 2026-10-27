@@ -66,7 +66,7 @@ class _RegisterPersonalScreenState extends State<RegisterPersonalScreen> {
       await _auth.registerWithPhone(e164: e164, fullName: _name.text.trim(), email: _email.text.trim().toLowerCase());
       if (!mounted) return;
       showToast(context, 'Code sent to ${maskPhone(e164)}');
-      Navigator.push(context, MaterialPageRoute(builder: (_) => OtpVerifyScreen(phone: e164, registering: true, auth: _auth)));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => OtpVerifyScreen(phone: e164, registering: true, auth: _auth, name: _name.text.trim())));
     } catch (e) {
       if (mounted) showToast(context, friendlyAuthError(e, fallback: 'Could not create the account. Check the details and try again.'));
     } finally {

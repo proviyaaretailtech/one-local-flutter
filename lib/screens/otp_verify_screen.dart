@@ -6,17 +6,20 @@ import '../auth/auth_repository.dart';
 import '../ui/mask.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
-import 'register_account_type_screen.dart';
+import '../onboarding/checklist_screen.dart' show OnboardingEntry;
 
 /// Figma "OTP Verification". Exactly one of [phone] (+91XXXXXXXXXX) or [email] is set.
 /// [registering] sends the person on to the account-type screen instead of the signed-in home.
 class OtpVerifyScreen extends StatefulWidget {
-  const OtpVerifyScreen({super.key, this.phone, this.email, this.registering = false, this.auth, this.resendSeconds = 30});
+  const OtpVerifyScreen({super.key, this.phone, this.email, this.registering = false, this.auth, this.resendSeconds = 30, this.name});
   final String? phone;
   final String? email;
   final bool registering;
   final AuthRepository? auth;
   final int resendSeconds;
+
+  /// The name typed on Create account, for the shop owner on the application.
+  final String? name;
 
   @override
   State<OtpVerifyScreen> createState() => _OtpVerifyScreenState();
@@ -86,7 +89,8 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
       }
       if (!mounted) return;
       if (widget.registering) {
-        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const RegisterAccountTypeScreen()), (r) => r.isFirst);
+        // straight into the application (founder, 27 Oct 2026): the store type is asked once there, and nothing in between
+        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => OnboardingEntry(auth: _auth, phone: widget.phone, name: widget.name)), (r) => r.isFirst);
       } else {
         Navigator.of(context).popUntil((r) => r.isFirst);
       }

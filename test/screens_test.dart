@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthApiException;
 import 'package:vinii_pos/auth/partner_api.dart';
+import 'package:vinii_pos/onboarding/checklist_screen.dart' show OnboardingEntry;
 import 'package:vinii_pos/ui/i18n.dart';
 import 'package:vinii_pos/home/control_centre_screen.dart';
 import 'package:vinii_pos/screens/email_login_screen.dart';
@@ -365,12 +366,13 @@ void main() {
       expect(find.text('Resend code in 00:03'), findsOneWidget);
       await t.pump(const Duration(seconds: 4));
     });
-    testWidgets('registering goes on to choose an account type', (t) async {
+    testWidgets('registering goes straight into the application (no extra stop)', (t) async {
       final a = FakeAuth();
-      await show(t, OtpVerifyScreen(phone: '+919876543210', registering: true, auth: a));
+      await show(t, OtpVerifyScreen(phone: '+919876543210', registering: true, auth: a, name: 'Riya Sharma'));
       await t.enterText(find.byType(TextField), '246801');
       await t.pumpAndSettle();
-      expect(find.text('Welcome to OneLocal.'), findsOneWidget);
+      expect(find.byType(OnboardingEntry), findsOneWidget);
+      expect(t.widget<OnboardingEntry>(find.byType(OnboardingEntry)).name, 'Riya Sharma');
     });
     testWidgets('Edit mobile number goes back', (t) async {
       await show(t, Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => OtpVerifyScreen(phone: '+919876543210', auth: FakeAuth()))), child: const Text('go')))));

@@ -4,9 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
-import 'agreement_screens.dart';
 import 'document_picker.dart';
 import 'onboarding_api.dart';
+import 'onboarding_draft.dart';
 import 'onboarding_widgets.dart';
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -31,9 +31,28 @@ class _AddressScreenState extends State<AddressScreen> {
   late bool _confirmed = widget.app.address['confirmed'] == true;
   late final Future<Taxonomy> _tax = widget.api.taxonomy();
   bool _saving = false;
+  final _draft = OnbDraft('address');
+
+  // what was typed before the app closed, where the server has nothing yet
+  @override
+  void initState() {
+    super.initState();
+    _draft.load().then((d) {
+      if (!mounted || d.isEmpty) return;
+      setState(() {
+        for (final (c, k) in [(_line, 'line'), (_area, 'area'), (_city, 'city'), (_pin, 'pin')]) {
+          if (c.text.isEmpty) c.text = d[k] ?? '';
+        }
+        _state ??= d['state'];
+      });
+    });
+  }
+
+  void _keep() => _draft.keep({'line': _line.text, 'area': _area.text, 'city': _city.text, 'pin': _pin.text, 'state': _state});
 
   @override
   void dispose() {
+    _draft.dispose();
     for (final c in [_line, _area, _city, _pin]) {
       c.dispose();
     }
@@ -62,11 +81,14 @@ class _AddressScreenState extends State<AddressScreen> {
     );
     if (!mounted) return;
     setState(() => _saving = false);
-    if (saved != null) Navigator.of(context).pop(saved);
+    if (saved == null) return;
+    await _draft.clear();
+    if (mounted) Navigator.of(context).pop(saved);
   }
 
   @override
   Widget build(BuildContext context) {
+    _keep(); // every change rebuilds the screen: keep what is typed (a moment later, not on every key)
     return OnbPage(
       kicker: 'Business setup',
       title: 'Locate your business.',
@@ -129,9 +151,23 @@ class _TaxScreenState extends State<TaxScreen> {
   final _gstin = TextEditingController();
   late bool? _gst = widget.app.tax['gst_registered'] as bool?;
   bool _saving = false;
+  final _draft = OnbDraft('tax');
+
+  @override
+  void initState() {
+    super.initState();
+    _draft.load().then((d) {
+      if (!mounted || d.isEmpty) return;
+      setState(() {
+        _gst ??= d['gst'] == null ? null : d['gst'] == 'true';
+        if (_gstin.text.isEmpty) _gstin.text = d['gstin'] ?? '';
+      });
+    });
+  }
 
   @override
   void dispose() {
+    _draft.dispose();
     _pan.dispose();
     _gstin.dispose();
     super.dispose();
@@ -148,11 +184,14 @@ class _TaxScreenState extends State<TaxScreen> {
     final saved = await guarded(context, () => widget.api.saveTax({'pan': pan, 'gst_registered': _gst, if (_gst == true) 'gstin': _gstin.text.trim().toUpperCase()}));
     if (!mounted) return;
     setState(() => _saving = false);
-    if (saved != null) Navigator.of(context).pop(saved);
+    if (saved == null) return;
+    await _draft.clear();
+    if (mounted) Navigator.of(context).pop(saved);
   }
 
   @override
   Widget build(BuildContext context) {
+    _draft.keep({'gst': _gst?.toString(), 'gstin': _gstin.text}); // never the PAN
     final masked = widget.app.tax['pan_masked'] as String?;
     final gstMasked = widget.app.tax['gstin_masked'] as String?;
     final upper = TextInputFormatter.withFunction((o, n) => n.copyWith(text: n.text.toUpperCase()));
@@ -405,9 +444,25 @@ class _BankScreenState extends State<BankScreen> {
   late bool _auth = widget.app.bank?['authorised'] == true;
   late final Future<Taxonomy> _tax = widget.api.taxonomy();
   bool _saving = false;
+  final _draft = OnbDraft('bank');
+
+  @override
+  void initState() {
+    super.initState();
+    _draft.load().then((d) {
+      if (!mounted || d.isEmpty) return;
+      setState(() {
+        if (_ifsc.text.isEmpty) _ifsc.text = d['ifsc'] ?? '';
+        if ((d['holder'] ?? '').isNotEmpty && widget.app.bank?['holder_name'] == null) _holder.text = d['holder']!;
+        _bank ??= d['bank'];
+        _type ??= d['type'];
+      });
+    });
+  }
 
   @override
   void dispose() {
+    _draft.dispose();
     for (final c in [_holder, _acct, _confirm, _ifsc]) {
       c.dispose();
     }
@@ -441,13 +496,14 @@ class _BankScreenState extends State<BankScreen> {
     if (!mounted) return;
     setState(() => _saving = false);
     if (saved == null) return;
-    if (draft) return Navigator.of(context).pop(saved);
-    final after = await Navigator.of(context).push<Application>(MaterialPageRoute(builder: (_) => VerificationScreen(api: widget.api, app: saved)));
-    if (mounted) Navigator.of(context).pop(after ?? saved);
+    if (!draft) await _draft.clear();
+    // straight on (founder, 27 Oct 2026): the verification status is on the application status page, not a stop here
+    if (mounted) Navigator.of(context).pop(saved);
   }
 
   @override
   Widget build(BuildContext context) {
+    _draft.keep({'holder': _holder.text, 'bank': _bank, 'ifsc': _ifsc.text, 'type': _type}); // never the account number
     final saved = widget.app.bank;
     return OnbPage(
       kicker: 'Business setup',
@@ -484,7 +540,7 @@ class _BankScreenState extends State<BankScreen> {
         const NoteCard(green: true, title: 'No banking passwords needed', body: 'OneLocal does not ask for your PIN, OTP or internet banking password on this form.'),
       ],
       actions: [
-        PrimaryAction(label: _saving ? 'Saving…' : 'Save & verify ownership', onPressed: _saving ? null : () => _save(draft: false)),
+        PrimaryAction(label: _saving ? 'Saving…' : 'Save & continue', onPressed: _saving ? null : () => _save(draft: false)),
         const SizedBox(height: 12),
         SecondaryAction(label: 'Save for later', onPressed: _saving ? null : () => _save(draft: true)),
       ],

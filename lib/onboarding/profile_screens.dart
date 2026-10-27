@@ -5,17 +5,22 @@ import '../screens/register_account_type_screen.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'checklist_screen.dart';
+import 'onboarding_draft.dart';
 import 'onboarding_api.dart';
 import 'onboarding_widgets.dart';
 
-/// Figma "Merchant Registration" (three frames: store, restaurant, service). Sections 1 and 2: shop profile and owner contact.
-/// First time through it continues to "How do you want to sell?"; opened from the checklist it returns the saved application.
+/// Figma "Merchant Registration" (three frames: store, restaurant, service). Sections 1 and 2: shop profile and owner contact, and
+/// (founder, 27 Oct 2026) the plan right here, instead of two screens after it. The owner's name and mobile come from sign-up.
+/// First time through it goes on to the next section; opened from the checklist it returns the saved application.
 class MerchantProfileScreen extends StatefulWidget {
-  const MerchantProfileScreen({super.key, required this.api, required this.type, this.app, this.phone});
+  const MerchantProfileScreen({super.key, required this.api, required this.type, this.app, this.phone, this.name});
   final OnboardingApi api;
   final String type; // store | restaurant | service
   final Application? app;
   final String? phone;
+
+  /// The owner's name from sign-up (not typed twice).
+  final String? name;
   @override
   State<MerchantProfileScreen> createState() => _MerchantProfileScreenState();
 }
@@ -23,9 +28,11 @@ class MerchantProfileScreen extends StatefulWidget {
 class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
   late final Future<Taxonomy> _tax = widget.api.taxonomy();
   late final _name = TextEditingController(text: widget.app?.businessName ?? '');
-  late final _owner = TextEditingController(text: widget.app?.ownerName ?? '');
+  late final _owner = TextEditingController(text: (widget.app?.ownerName ?? '').isNotEmpty ? widget.app!.ownerName : (widget.name ?? ''));
   late final _phone = TextEditingController(text: _tenDigits(widget.app?.phone ?? widget.phone ?? ''));
   String? _category, _sub, _mode;
+  late String? _plan = widget.app?.sellPlan; // onelocal_app | pos_and_onelocal
+  final _draft = OnbDraft('profile');
   List<String> _cuisines = []; // restaurant: every cuisine it serves, first = main
   bool _saving = false;
 
@@ -40,10 +47,38 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
       if (widget.type == 'restaurant') _cuisines = subs.isNotEmpty ? List.of(subs) : [?_category];
       _mode = a['selling_mode'] as String?;
     }
+    // what was typed before the app closed, where the server has nothing yet
+    _draft.load().then((d) {
+      if (!mounted || d.isEmpty) return;
+      setState(() {
+        if (_name.text.isEmpty) _name.text = d['name'] ?? '';
+        if (_owner.text.isEmpty) _owner.text = d['owner'] ?? '';
+        if (_phone.text.isEmpty) _phone.text = d['phone'] ?? '';
+        _category ??= d['category'];
+        _sub ??= d['sub'];
+        _mode ??= d['mode'];
+        _plan ??= d['plan'];
+        if (_cuisines.isEmpty && (d['cuisines'] ?? '').isNotEmpty) _cuisines = d['cuisines']!.split('|');
+      });
+    });
+    for (final c in [_name, _owner, _phone]) {
+      c.addListener(_keep);
+    }
+  }
+
+  void _keep() => _draft.keep({
+        'name': _name.text, 'owner': _owner.text, 'phone': _phone.text, 'category': _category, 'sub': _sub, 'mode': _mode, 'plan': _plan,
+        'cuisines': _cuisines.join('|'),
+      });
+
+  void _set(VoidCallback change) {
+    setState(change);
+    _keep();
   }
 
   @override
   void dispose() {
+    _draft.dispose();
     _name.dispose();
     _owner.dispose();
     _phone.dispose();
@@ -70,6 +105,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
     if (_owner.text.trim().length < 2) return showToast(context, "Enter the owner's full name.");
     if (!RegExp(r'^[6-9]\d{9}$').hasMatch(_phone.text)) return showToast(context, 'Enter a 10-digit mobile number.');
     if (_mode == null) return showToast(context, 'Choose how you sell.');
+    if (_plan == null) return showToast(context, 'Choose your OneLocal plan.');
     setState(() => _saving = true);
     final saved = await guarded(
       context,
@@ -83,16 +119,27 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
         if (widget.type == 'store') 'subcategory': _sub,
       }),
     );
+    if (saved == null || !mounted) {
+      if (mounted) setState(() => _saving = false);
+      return;
+    }
+    // the plan, in the same tap
+    final planned = saved.sellPlan == _plan ? saved : await guarded(context, () => widget.api.choosePlan(_plan!));
     if (!mounted) return;
     setState(() => _saving = false);
-    if (saved == null) return;
+    if (planned == null) return;
+    await _draft.clear();
+    if (!mounted) return;
     final nav = Navigator.of(context);
-    if (saved.sellPlan == null) {
-      nav.pushReplacement(MaterialPageRoute(builder: (_) => ChooseSellScreen(api: widget.api, app: saved)));
+    if (widget.app?.exists == true && widget.app?.sellPlan != null) {
+      nav.pop(planned); // from the checklist: back to it, which opens the next section
     } else {
-      nav.pop(saved);
+      // first time through: the checklist, which opens the next section straight away
+      nav.pushReplacement(MaterialPageRoute(builder: (_) => ChecklistScreen(api: widget.api, app: planned, autoNext: true)));
     }
   }
+
+  Widget _planCard(String id, String title, String body, IconData icon) => ChoiceCard(icon: icon, title: title, body: body, selected: _plan == id, onTap: () => _set(() => _plan = id));
 
   @override
   Widget build(BuildContext context) {
@@ -129,20 +176,20 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                 hint: 'Pick all that apply. The first one you pick is shown as your main cuisine.',
                 options: cats,
                 selected: _cuisines,
-                onChanged: (v) => setState(() => _cuisines = v),
+                onChanged: (v) => _set(() => _cuisines = v),
               )
             else
               SelectField(
                 label: widget.type == 'service' ? 'Services' : 'Category',
                 value: _category,
                 options: cats,
-                onChanged: (v) => setState(() {
+                onChanged: (v) => _set(() {
                   if (v != _category) _sub = null;
                   _category = v;
                 }),
               ),
             if (widget.type == 'store')
-              SelectField(label: 'Subcategory', value: _sub, options: subs, hint: _category == null ? 'Choose a category first' : 'Choose', onChanged: (v) => setState(() => _sub = v)),
+              SelectField(label: 'Subcategory', value: _sub, options: subs, hint: _category == null ? 'Choose a category first' : 'Choose', onChanged: (v) => _set(() => _sub = v)),
             LabeledField(label: '$_noun owner', controller: _owner, labelSize: 14, labelWeight: 500, textInputAction: TextInputAction.next),
             LabeledField(
               label: 'Owner mobile',
@@ -156,15 +203,23 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('How do you sell?', style: inter(17, 600)),
               const SizedBox(height: 14),
-              ChoiceCard(icon: _rst ? Icons.restaurant_outlined : lucideStore, title: _rst ? 'Dine-in & takeaway' : 'Physical store', body: _rst ? 'Customers eat in or pick up at my restaurant.' : 'Customers visit my shop.', selected: _mode == 'physical', onTap: () => setState(() => _mode = 'physical')),
+              ChoiceCard(icon: _rst ? Icons.restaurant_outlined : lucideStore, title: _rst ? 'Dine-in & takeaway' : 'Physical store', body: _rst ? 'Customers eat in or pick up at my restaurant.' : 'Customers visit my shop.', selected: _mode == 'physical', onTap: () => _set(() => _mode = 'physical')),
               const SizedBox(height: 12),
-              ChoiceCard(icon: Icons.shopping_bag_outlined, title: 'Online or both', body: 'I also take orders online.', selected: _mode == 'online_or_both', onTap: () => setState(() => _mode = 'online_or_both')),
+              ChoiceCard(icon: Icons.shopping_bag_outlined, title: 'Online or both', body: 'I also take orders online.', selected: _mode == 'online_or_both', onTap: () => _set(() => _mode = 'online_or_both')),
+            ]),
+            // the plan, here instead of two screens after this one
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Your OneLocal plan', style: inter(17, 600)),
+              const SizedBox(height: 14),
+              _planCard('onelocal_app', 'Sell on the OneLocal app', 'Customers order from you on OneLocal. No POS to buy.', Icons.phone_iphone),
+              const SizedBox(height: 12),
+              _planCard('pos_and_onelocal', 'Also get the OneLocal POS', 'Billing, stock, prices and reports for your counter, synced with OneLocal.', Icons.point_of_sale_outlined),
             ]),
           ],
           actions: [
-            PrimaryAction(label: _saving ? 'Saving…' : 'Continue to business details', onPressed: _saving ? null : _save),
+            PrimaryAction(label: _saving ? 'Saving…' : 'Save & continue', onPressed: _saving ? null : _save),
             const SizedBox(height: 12),
-            const FooterNote('Next: business, contact and verification details.'),
+            const FooterNote('Next: your address. What you type is kept if you stop halfway.'),
           ],
         );
       },
@@ -281,11 +336,11 @@ class _BasicPosPlanScreenState extends State<BasicPosPlanScreen> {
 
 /// Signed in with no application yet: choose Restaurant, Store or Service, then fill the shop profile.
 class StartScreen extends StatelessWidget {
-  const StartScreen({super.key, required this.api, this.phone});
+  const StartScreen({super.key, required this.api, this.phone, this.name});
   final OnboardingApi api;
-  final String? phone;
+  final String? phone, name;
   @override
   Widget build(BuildContext context) => RegisterAccountTypeScreen(
-        onChosen: (t) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MerchantProfileScreen(api: api, type: t.name, phone: phone))),
+        onChosen: (t) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MerchantProfileScreen(api: api, type: t.name, phone: phone, name: name))),
       );
 }

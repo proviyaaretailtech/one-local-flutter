@@ -105,7 +105,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
             actions: [
               if (!noStore) ...[PrimaryAction(label: 'Try again', onPressed: _retry), const SizedBox(height: 12)],
               if (noStore) ...[
-                PrimaryAction(label: 'Set up your business', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OnboardingEntry(auth: _auth)))),
+                PrimaryAction(label: 'Set up your business', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OnboardingEntry(auth: _auth, phone: _auth.currentPhone, name: _auth.currentName)))),
                 const SizedBox(height: 12),
               ],
               SecondaryAction(label: 'Switch account', onPressed: () => _auth.signOut()),

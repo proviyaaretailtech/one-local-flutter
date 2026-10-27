@@ -46,6 +46,26 @@ class AuthRepository {
   Future<void> signOut() => _auth.signOut();
 
   /// The signed-in person's email, for the side nav profile. Null when Supabase has not started (tests).
+  /// The name given when the account was made (sign-up keeps it with the login), or null.
+  String? get currentName {
+    try {
+      final n = _auth.currentUser?.userMetadata?['full_name'];
+      return n is String && n.trim().isNotEmpty ? n.trim() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The login's mobile number (digits, with 91), or null.
+  String? get currentPhone {
+    try {
+      final p = _auth.currentUser?.phone;
+      return p == null || p.isEmpty ? null : p;
+    } catch (_) {
+      return null;
+    }
+  }
+
   String? get currentEmail {
     try {
       return _auth.currentUser?.email;

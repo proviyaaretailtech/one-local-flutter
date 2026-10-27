@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/auth/partner_api.dart';
@@ -121,28 +122,33 @@ void main() {
       await show(t, MerchantProfileScreen(api: api, type: 'store'));
       await t.pumpAndSettle();
       expect(find.text('Register as a Store'), findsOneWidget);
-      await tapText(t, 'Continue to business details');
+      await tapText(t, 'Save & continue');
       expect(toast('Enter your shop name.'), findsOneWidget);
       expect(api.calls, isNot(contains('profile')));
     });
 
-    testWidgets('store: a full form is saved and leads to "How do you want to sell?"', (t) async {
+    testWidgets('store: owner from sign-up; a full form saves the profile and the plan in one tap, then opens the next section', (t) async {
       final api = FakeOnb(initial: sample(done: 2, plan: null));
-      await show(t, MerchantProfileScreen(api: api, type: 'store', phone: '+919876543210'));
+      await show(t, MerchantProfileScreen(api: api, type: 'store', phone: '+919876543210', name: 'Riya Sharma'));
       await t.pumpAndSettle();
+      expect(find.text('Riya Sharma'), findsOneWidget); // the owner, from sign-up: not typed again
       await t.enterText(find.byType(TextField).at(0), 'Sharma General Store');
       await tapText(t, 'Choose'); // category
       await tapText(t, 'Grocery & essentials');
       await tapText(t, 'Choose'); // subcategory
       await tapText(t, 'General store');
-      await t.enterText(find.byType(TextField).at(1), 'Riya Sharma');
       await tapText(t, 'Online or both');
-      await tapText(t, 'Continue to business details');
+      await tapText(t, 'Save & continue');
+      expect(toast('Choose your OneLocal plan.'), findsOneWidget); // the plan is on this screen now
+      await tapText(t, 'Sell on the OneLocal app');
+      await tapText(t, 'Save & continue');
       expect(api.bodies['profile'], {
         'partner_type': 'store', 'business_name': 'Sharma General Store', 'owner_name': 'Riya Sharma', 'phone': '9876543210',
         'selling_mode': 'online_or_both', 'category': 'Grocery & essentials', 'subcategory': 'General store',
       });
-      expect(find.text('How do you want to sell?'), findsOneWidget);
+      expect(api.calls, contains('plan onelocal_app'));
+      expect(find.text('How do you want to sell?'), findsNothing); // no separate plan screen
+      expect(find.text('Let’s finish your setup.'), findsNothing); // straight on to the next section, not the checklist
     });
 
     testWidgets('restaurant has no subcategory; service says "Services"', (t) async {
@@ -168,12 +174,13 @@ void main() {
       await t.enterText(find.byType(TextField).at(0), 'Demo Spice');
       await t.enterText(find.byType(TextField).at(1), 'Asha Rao');
       await tapText(t, 'Dine-in & takeaway');
-      await tapText(t, 'Continue to business details');
+      await tapText(t, 'Save & continue');
       expect(toast('Choose the cuisines you serve.'), findsOneWidget);
       expect(api.calls, isNot(contains('profile')));
       await tapText(t, 'Cafe');
       await tapText(t, 'Bakery');
-      await tapText(t, 'Continue to business details');
+      await tapText(t, 'Sell on the OneLocal app');
+      await tapText(t, 'Save & continue');
       expect(api.bodies['profile'], {
         'partner_type': 'restaurant', 'business_name': 'Demo Spice', 'owner_name': 'Asha Rao', 'phone': '9876543210',
         'selling_mode': 'physical', 'categories': ['Cafe', 'Bakery'],
@@ -184,7 +191,7 @@ void main() {
       final api = FakeOnb()..failWith = const PartnerApiException(400, 'Enter a 10-digit mobile number.');
       await show(t, MerchantProfileScreen(api: api, type: 'restaurant', app: sample(), phone: '9876543210'));
       await t.pumpAndSettle();
-      await tapText(t, 'Continue to business details');
+      await tapText(t, 'Save & continue');
       expect(toast('Enter a 10-digit mobile number.'), findsOneWidget);
     });
   });
@@ -329,13 +336,13 @@ void main() {
       await t.enterText(find.byType(TextField).at(2), '123456789013');
       await tapText(t, 'Choose'); // bank
       await tapText(t, 'HDFC Bank');
-      await tapText(t, 'Save & verify ownership');
+      await tapText(t, 'Save & continue');
       expect(toast('The account numbers do not match.'), findsOneWidget);
       await tapText(t, 'Save for later');
       expect(api.bodies['bank']!['draft'], true);
       expect(api.bodies['bank']!['bank_name'], 'HDFC Bank');
     });
-    testWidgets('a full valid form is saved and the verification overview opens', (t) async {
+    testWidgets('a full valid form is saved and goes straight on (no verification stop)', (t) async {
       final api = FakeOnb();
       await show(t, BankScreen(api: api, app: sample()));
       await t.pumpAndSettle();
@@ -347,13 +354,12 @@ void main() {
       await tapText(t, 'Choose'); // account type
       await tapText(t, 'Current account');
       await tapIt(t, find.text('I confirm that I am authorized to use this account for this business.'));
-      await tapText(t, 'Save & verify ownership');
+      await tapText(t, 'Save & continue');
       expect(api.bodies['bank'], {
         'holder_name': 'Riya Sharma', 'bank_name': 'HDFC Bank', 'account_number': '123456789012', 'confirm_account_number': '123456789012',
         'ifsc': 'HDFC0001234', 'account_type': 'current', 'authorised': true,
       });
-      expect(find.text('Business verification.'), findsOneWidget);
-      expect(find.text('Not checked yet'), findsWidgets);
+      expect(find.text('Business verification.'), findsNothing);
     });
   });
 
@@ -374,15 +380,21 @@ void main() {
   });
 
   group('Agreement and consent', () {
-    testWidgets('the overview must be acknowledged; then consent opens', (t) async {
+    testWidgets('agreement and terms on one screen: acknowledge once; the terms from sign-up are recorded with it', (t) async {
       final api = FakeOnb();
       await show(t, AgreementScreen(api: api, app: sample(done: 6)));
+      expect(find.text('Send me OneLocal news and marketing updates.'), findsOneWidget);
       await tapText(t, 'Accept & continue');
       expect(toast('Please acknowledge that you have reviewed the agreement.'), findsOneWidget);
       await tapIt(t, find.textContaining('I have reviewed this agreement preview'));
       await tapText(t, 'Accept & continue');
+      expect(api.bodies['consents'], {'service_terms': true, 'privacy_notice': true, 'marketing_updates': false});
       expect(api.calls, contains('agreement $kAgreementVersion'));
-      expect(find.text('Your terms. Your choices.'), findsOneWidget);
+      expect(find.text('Your terms. Your choices.'), findsNothing); // no second screen
+    });
+    testWidgets('as the last step it says Accept & submit application', (t) async {
+      await show(t, AgreementScreen(api: FakeOnb(), app: sample(done: 6), last: true));
+      expect(find.text('Accept & submit application'), findsOneWidget);
     });
     testWidgets('terms and privacy are required, marketing is optional', (t) async {
       final api = FakeOnb();
@@ -435,6 +447,27 @@ void main() {
     });
   });
 
+  group('Shorter flow', () {
+    testWidgets('what is typed is kept on the phone if the app closes, and comes back', (t) async {
+      SharedPreferences.setMockInitialValues({});
+      await show(t, MerchantProfileScreen(api: FakeOnb(), type: 'store'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextField).at(0), 'Half Done Store');
+      await t.pump(const Duration(milliseconds: 600)); // kept a moment after typing stops
+      // the app is closed and opened again: a fresh screen
+      await t.pumpWidget(const SizedBox());
+      await show(t, MerchantProfileScreen(api: FakeOnb(), type: 'store'));
+      await t.pumpAndSettle();
+      expect(find.text('Half Done Store'), findsOneWidget);
+    });
+
+    testWidgets('the checklist opens the next section by itself (one section after another)', (t) async {
+      await show(t, ChecklistScreen(api: FakeOnb(), app: sample(done: 2), autoNext: true));
+      await t.pumpAndSettle();
+      expect(find.text('Let’s finish your setup.'), findsNothing);
+    });
+  });
+
   group('Entry', () {
     Future<void> enter(WidgetTester t, Application a) async {
       await show(t, OnboardingEntry(key: UniqueKey(), api: FakeOnb(initial: a), auth: FakeAuth()));
@@ -448,9 +481,9 @@ void main() {
       await tapText(t, 'Continue as merchant');
       expect(find.text('Register as a Store'), findsOneWidget);
     });
-    testWidgets('draft without a plan: how do you want to sell', (t) async {
+    testWidgets('draft without a plan: the business details, which carry the plan now', (t) async {
       await enter(t, sample(done: 2, plan: null));
-      expect(find.text('How do you want to sell?'), findsOneWidget);
+      expect(find.text('Your OneLocal plan'), findsOneWidget);
     });
     testWidgets('draft with a plan: checklist', (t) async {
       await enter(t, sample());
