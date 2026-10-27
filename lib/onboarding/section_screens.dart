@@ -7,6 +7,7 @@ import '../ui/widgets.dart';
 import 'document_picker.dart';
 import 'onboarding_api.dart';
 import 'india_cities.dart';
+import 'pin_codes.dart';
 import 'onboarding_draft.dart';
 import 'onboarding_widgets.dart';
 
@@ -70,7 +71,8 @@ class _AddressScreenState extends State<AddressScreen> {
     if (_area.text.trim().length < 2) return showToast(context, 'Enter your area or locality.');
     if (_state == null) return showToast(context, 'Choose your state.');
     if (_city.text.trim().length < 2) return showToast(context, _otherCity ? 'Enter your city.' : 'Choose your city.');
-    if (!RegExp(r'^[1-9][0-9]{5}$').hasMatch(_pin.text)) return showToast(context, 'PIN code must be 6 digits.');
+    if (!pinLooksValid(_pin.text)) return showToast(context, 'PIN code must be 6 digits.');
+    if (!pinFitsState(_pin.text, _state)) return showToast(context, 'This PIN code is not in $_state. Check the PIN code or the state.');
     if (!_confirmed) return showToast(context, 'Confirm that the address identifies your business.');
     setState(() => _saving = true);
     final saved = await guarded(
@@ -153,7 +155,15 @@ class _AddressScreenState extends State<AddressScreen> {
           labelWeight: 500,
           maxLength: 6,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (_) => setState(() {}),
         ),
+        // checked as it is typed: 6 digits, and in the chosen state
+        if (_pin.text.length == 6 && (!pinLooksValid(_pin.text) || !pinFitsState(_pin.text, _state)))
+          Text(
+            !pinLooksValid(_pin.text) ? 'A PIN code does not start with 0.' : 'This PIN code is not in $_state.',
+            key: const ValueKey('pin-error'),
+            style: inter(13, 500, color: const Color(0xFFC62828)),
+          ),
         CheckRow(value: _confirmed, onChanged: (v) => setState(() => _confirmed = v), text: 'The address and map pin identify my business location.'),
       ],
       actions: [PrimaryAction(label: _saving ? 'Saving…' : 'Confirm address', onPressed: _saving ? null : _save)],

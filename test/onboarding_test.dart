@@ -273,6 +273,21 @@ void main() {
       await tapIt(t, find.text('Other (type your city)'));
       expect(find.text('Your city or town'), findsOneWidget);
     });
+    testWidgets('a PIN code from another state is flagged as it is typed and refused on save', (t) async {
+      final api = FakeOnb();
+      await show(t, AddressScreen(api: api, app: sample(done: 2))); // Karnataka
+      await t.pumpAndSettle();
+      await tapIt(t, find.text('The address and map pin identify my business location.'));
+      await t.enterText(find.byType(TextField).last, '413512'); // Latur, Maharashtra
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pin-error')), findsOneWidget);
+      await tapText(t, 'Confirm address');
+      expect(toast('This PIN code is not in Karnataka. Check the PIN code or the state.'), findsOneWidget);
+      expect(api.calls, isNot(contains('address')));
+      await t.enterText(find.byType(TextField).last, '560038');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pin-error')), findsNothing);
+    });
     testWidgets('a short PIN code is refused before any call', (t) async {
       final api = FakeOnb();
       await show(t, AddressScreen(api: api, app: sample(done: 2)));

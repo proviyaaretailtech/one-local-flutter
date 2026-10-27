@@ -77,6 +77,25 @@ export function profileArgs(b: z.infer<typeof Profile>) {
 
 export const Plan = z.object({ plan: z.enum(['pos_and_onelocal', 'onelocal_app', 'pos_only'], { message: 'Choose how you want to sell.' }) });
 
+// Which states a PIN code can belong to, by its first three digits (India Post circles); the app checks the same table
+// (lib/onboarding/pin_codes.dart). Shared ranges (UP/Uttarakhand, Punjab/Chandigarh, Maharashtra/Goa) allow either.
+const PIN_RANGES: Record<string, [number, number][]> = {
+  'Delhi': [[110, 110]], 'Haryana': [[121, 136]], 'Punjab': [[140, 160]], 'Chandigarh': [[160, 160]], 'Himachal Pradesh': [[171, 177]],
+  'Jammu and Kashmir': [[180, 194]], 'Ladakh': [[194, 194]], 'Uttar Pradesh': [[201, 285]], 'Uttarakhand': [[244, 249], [262, 263]],
+  'Rajasthan': [[301, 345]], 'Gujarat': [[360, 396]], 'Dadra and Nagar Haveli and Daman and Diu': [[362, 362], [396, 396]],
+  'Maharashtra': [[400, 445]], 'Goa': [[403, 403]], 'Madhya Pradesh': [[450, 488]], 'Chhattisgarh': [[490, 497]], 'Telangana': [[500, 509]],
+  'Andhra Pradesh': [[507, 535]], 'Karnataka': [[560, 591]], 'Tamil Nadu': [[600, 643]], 'Puducherry': [[533, 533], [605, 605], [609, 609], [673, 673]],
+  'Kerala': [[670, 695]], 'Lakshadweep': [[682, 682]], 'West Bengal': [[700, 743]], 'Sikkim': [[737, 737]], 'Andaman and Nicobar Islands': [[744, 744]],
+  'Odisha': [[751, 770]], 'Assam': [[781, 788]], 'Arunachal Pradesh': [[790, 792]], 'Meghalaya': [[793, 794]], 'Manipur': [[795, 795]],
+  'Mizoram': [[796, 796]], 'Nagaland': [[797, 798]], 'Tripura': [[799, 799]], 'Bihar': [[800, 855]], 'Jharkhand': [[813, 835]],
+};
+export const pinFitsState = (pin: string, state: string) => {
+  const ranges = PIN_RANGES[state];
+  if (!ranges || !/^[1-9][0-9]{5}$/.test(pin)) return true;
+  const p = Number(pin.slice(0, 3));
+  return ranges.some(([a, b]) => p >= a && p <= b);
+};
+
 export const Address = z.object({
   address_line: text(200, 'Enter your address line.', 3),
   locality: text(100, 'Enter your area or locality.', 2),
@@ -86,6 +105,8 @@ export const Address = z.object({
   lat: z.number().min(-90).max(90).nullish(),
   lng: z.number().min(-180).max(180).nullish(),
   confirmed: z.literal(true, { message: 'Confirm that the address identifies your business.' }),
+}).superRefine((a, ctx) => {
+  if (!pinFitsState(a.pin_code, a.state)) ctx.addIssue({ code: 'custom', message: `This PIN code is not in ${a.state}. Check the PIN code or the state.`, path: ['pin_code'] });
 });
 
 // Empty or missing PAN means "keep the PAN already saved"; the database refuses it when none was ever saved.
