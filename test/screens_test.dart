@@ -28,9 +28,13 @@ import 'helpers.dart';
 
 void main() {
   group('Splash', () {
+    setUp(() => SharedPreferences.setMockInitialValues({})); // the language step keeps the choice on the phone
     testWidgets('Sign In opens the chooser', (t) async {
       await show(t, const SplashScreen());
       await t.tap(find.text('Sign In'));
+      await t.pumpAndSettle();
+      expect(find.text('Choose your language'), findsOneWidget); // the language first
+      await t.tap(find.byKey(const ValueKey('language-continue')));
       await t.pumpAndSettle();
       expect(find.text('How would you like to sign in?'), findsOneWidget);
     });
@@ -45,6 +49,9 @@ void main() {
       await t.pumpAndSettle(); // the move to the second frame
       expect(find.text('Easy Selling starts here'), findsOneWidget, reason: 'the taglines stay on the sign-up page');
       await t.tap(find.text('Sign In'));
+      await t.pumpAndSettle();
+      expect(find.text('Choose your language'), findsOneWidget); // the language first
+      await t.tap(find.byKey(const ValueKey('language-continue')));
       await t.pumpAndSettle();
       expect(find.text('How would you like to sign in?'), findsOneWidget);
     });

@@ -130,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                                     label: 'Sign In',
                                     color: kMuted,
                                     top: 469,
-                                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SigninChooserScreen())),
+                                    onTap: () => Navigator.push(context, languageThen(const SigninChooserScreen())), // the language, then how to sign in
                                   ),
                                   _primary(
                                     label: 'Become a seller',

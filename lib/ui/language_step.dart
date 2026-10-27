@@ -20,7 +20,7 @@ Future<bool> languageStepNeeded(String? userId) async {
   try {
     final p = await SharedPreferences.getInstance();
     if (p.getBool(_beforeSignUpKey) == true) {
-      // chosen on "Become a seller", before the account existed: it belongs to this new account
+      // chosen on "Sign In" or "Become a seller", before the account was known: it belongs to this one
       await p.remove(_beforeSignUpKey);
       await p.setString(_chosenForKey, userId);
       return false;
@@ -39,8 +39,8 @@ Future<void> _remember(String code, String? userId) async {
   } catch (_) {}
 }
 
-/// "Become a seller" (founder, 27 Oct 2026): the language first, then [next] (name and mobile). The choice is kept for the account
-/// the sign-up makes, so it is not asked again after the code.
+/// "Sign In" and "Become a seller" (founder, 27 Oct 2026): the language first, then [next] (how to sign in, or name and mobile).
+/// The choice is kept for the account that signs in or is made next, so it is not asked again after the code or password.
 Route<void> languageThen(Widget next) => MaterialPageRoute(
       builder: (context) => LanguageStepScreen(onChosen: (code) async {
         try {
