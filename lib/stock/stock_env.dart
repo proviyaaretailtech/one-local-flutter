@@ -42,5 +42,8 @@ abstract final class StockPage {
   static const home = 'home', item = 'item';
   static const prices = 'prices', movements = 'movements', receive = 'receive', adjust = 'adjust';
   static const transfer = 'transfer', low = 'low', reorder = 'reorder', alerts = 'alerts', count = 'count';
-  static const productLabels = 'product_labels';
+  static const productLabels = 'product_labels', shelfLabels = 'shelf_labels', putaway = 'putaway';
+
+  /// Labels for a whole received lot; its itemId is the receipt note's id.
+  static const lotLabels = 'lot_labels';
 }

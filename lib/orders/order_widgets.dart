@@ -6,6 +6,7 @@ import '../ui/app_tab_bar.dart';
 import '../ui/theme.dart';
 import '../outlets/outlet_header.dart';
 import 'orders_api.dart';
+import '../ui/i18n.dart';
 
 // Section E colours, sampled from the exported frames (assets/figma_ref_e). Shared tokens (kBg, kInk, kMuted, kLine) come from ui/theme.dart.
 const kDark = Color(0xFF111827);
@@ -275,7 +276,7 @@ class BillSummary extends StatelessWidget {
           if (roundOff != 0) KeyValue('Round off', rupees(roundOff), size: 13.5, bold: false),
           const Divider(height: 18, color: kLine),
           Row(children: [
-            Expanded(child: Text('Total Amount', style: inter(14.5, 700))),
+            Expanded(child: Text(tr('Total Amount'), style: inter(14.5, 700))),
             Text(rupees(total), style: inter(22, 800, color: kGreenText)),
           ]),
           if (footer != null) ...[const SizedBox(height: 10), footer!],

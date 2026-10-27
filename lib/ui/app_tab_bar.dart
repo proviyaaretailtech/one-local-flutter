@@ -2,6 +2,8 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import 'i18n.dart';
+import 'ol_mascot.dart';
 import 'theme.dart';
 
 /// One tab of the app's bottom bar. [primary] is the centre action (Bill / POS): a lime outline when it is not the
@@ -78,25 +80,13 @@ class _Tab extends StatelessWidget {
   final Key tabKey;
   @override
   Widget build(BuildContext context) {
-    // A tab with no label is a kept slot (founder, 25 Oct 2026: Stock moved into Item; the slot stays, empty, until decided):
-    // a faint empty circle that does nothing.
-    if (tab.label.isEmpty) {
-      return ExcludeSemantics(
-        child: Center(
-          child: Container(
-            key: tabKey,
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0x55FFFFFF), width: 1.5)),
-          ),
-        ),
-      );
-    }
+    // The kept slot (a tab with no label) is Ol's place (founder, 27 Oct 2026): OneLocal's helper, who opens what the vendor asks for.
+    if (tab.label.isEmpty) return Center(child: OlMascot(key: tabKey));
     final outlined = tab.primary && !current;
     return Semantics(
       button: true,
       selected: current,
-      label: tab.label,
+      label: tr(tab.label),
       child: InkWell(
         key: tabKey,
         customBorder: const StadiumBorder(),
@@ -115,7 +105,7 @@ class _Tab extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           ExcludeSemantics(
-            child: Text(tab.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, current ? 700 : 500, color: Colors.white)),
+            child: Text(tr(tab.label), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, current ? 700 : 500, color: Colors.white)),
           ),
         ]),
       ),

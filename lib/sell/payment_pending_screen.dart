@@ -11,6 +11,7 @@ import 'result_screens.dart';
 import 'sell_api.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Founder Correct Flow S5.14 "Payment pending": a UPI or card payment for a held bill that is waiting for confirmation. The bill is
 /// never shown as paid here: the database keeps it unpaid until the person at the counter confirms with the UPI reference or the card
@@ -133,7 +134,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(24, 24, 24, 16), children: [
             if (_error != null)
-              StateCard(icon: LucideIcons.circleAlert, title: 'Could not start the payment', body: _error!, primary: 'Try again', onPrimary: _start, danger: true)
+              StateCard(icon: LucideIcons.circleAlert, title: tr('Could not start the payment'), body: _error!, primary: tr('Try again'), onPrimary: _start, danger: true)
             else if (i == null)
               const SkeletonRows(count: 2)
             else
@@ -148,7 +149,7 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                     child: Icon(widget.method == 'upi' ? LucideIcons.qrCode : LucideIcons.creditCard, size: 30, color: kWarnText),
                   ),
                   const SizedBox(height: 16),
-                  Text('Payment pending', textAlign: TextAlign.center, style: inter(24, 800, color: kWarnText)),
+                  Text(tr('Payment pending'), textAlign: TextAlign.center, style: inter(24, 800, color: kWarnText)),
                   const SizedBox(height: 4),
                   Text('Waiting for the $label payment · ${i.age}', textAlign: TextAlign.center, style: inter(13.5, 400, color: kMuted)),
                   const SizedBox(height: 14),
@@ -170,13 +171,13 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                     decoration: InputDecoration(hintText: widget.method == 'upi' ? 'e.g. 4291 3378 1102' : 'e.g. 812345'),
                   ),
                   const SizedBox(height: 8),
-                  DarkCta(label: 'Payment received', busy: _busy, onPressed: i.pending ? _confirm : null),
+                  DarkCta(label: tr('Payment received'), busy: _busy, onPressed: i.pending ? _confirm : null),
                   const SizedBox(height: 10),
-                  LightCta(label: 'Payment failed', onPressed: _busy || !i.pending ? null : () => _fail(widget.method == 'card' ? 'declined' : 'failed')),
+                  LightCta(label: tr('Payment failed'), onPressed: _busy || !i.pending ? null : () => _fail(widget.method == 'card' ? 'declined' : 'failed')),
                   const SizedBox(height: 4),
                   UnderLink('Cancel and choose another way to pay', onTap: _busy || !i.pending ? null : () => _fail('cancelled')),
                   const SizedBox(height: 8),
-                  Text('Hand over the goods only after you confirm. A second tap never charges twice.', textAlign: TextAlign.center, style: inter(12.5, 400, color: kKicker)),
+                  Text(tr('Hand over the goods only after you confirm. A second tap never charges twice.'), textAlign: TextAlign.center, style: inter(12.5, 400, color: kKicker)),
                 ]),
               ),
           ]),

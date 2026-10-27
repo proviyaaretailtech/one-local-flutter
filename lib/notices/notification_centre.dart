@@ -5,6 +5,7 @@ import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'notices_api.dart';
 import 'notices_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Notification Centre": filter chips, "Mark all as read", rows grouped Today / Earlier. Read state lives in the database, per person.
 class NotificationCentre extends StatefulWidget {
@@ -95,7 +96,7 @@ class _NotificationCentreState extends State<NotificationCentre> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
-              Text('Notification Centre', style: inter(26, 700)),
+              Text(tr('Notification Centre'), style: inter(26, 700)),
               const SizedBox(height: 6),
               Text(
                 'Orders, payments and updates for your store.',
@@ -175,7 +176,7 @@ class _NotificationCentreState extends State<NotificationCentre> {
                 onTap: _markAll,
                 child: Padding(
                   padding: const EdgeInsets.all(4),
-                  child: Text('Mark all as read', style: inter(14, 700)),
+                  child: Text(tr('Mark all as read'), style: inter(14, 700)),
                 ),
               ),
           ],

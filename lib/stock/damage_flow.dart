@@ -6,6 +6,7 @@ import '../inventory/inventory_api.dart';
 import '../ui/theme.dart';
 import 'stock_env.dart';
 import 'stock_kit.dart';
+import '../ui/i18n.dart';
 
 /// Titles the damage screens give their adjustment documents, so each screen finds its own (older ones said "Write-off").
 const damageTitle = 'Damaged stock';
@@ -73,7 +74,7 @@ class PendingCard extends StatelessWidget {
     return InvCard(
       key: ValueKey('pending-${doc.id}'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        InvCardHead(doc.number, subtitle: doc.lines.map(lineWords).join(', '), chip: const StockStatusChip('low', label: 'Waiting')),
+        InvCardHead(doc.number, subtitle: doc.lines.map(lineWords).join(', '), chip: StockStatusChip('low', label: tr('Waiting'))),
         for (final l in doc.lines)
           if (onItem != null)
             Align(
@@ -84,17 +85,17 @@ class PendingCard extends StatelessWidget {
                 child: Text('Open ${l.m('item').s('name')}', style: inter(13, 600, color: kLink)),
               ),
             ),
-        StockRow('Reason', doc.s('reason').isEmpty ? '—' : doc.s('reason')),
-        if (doc.s('note').isNotEmpty) StockRow('Note', doc.s('note')),
-        StockRow('Raised by', raisedBy?.s('name') ?? '—'),
-        if (doc.t('submitted_at') != null) StockRow('Sent', stamp(doc.t('submitted_at')!)),
+        StockRow(tr('Reason'), doc.s('reason').isEmpty ? '—' : doc.s('reason')),
+        if (doc.s('note').isNotEmpty) StockRow(tr('Note'), doc.s('note')),
+        StockRow(tr('Raised by'), raisedBy?.s('name') ?? '—'),
+        if (doc.t('submitted_at') != null) StockRow(tr('Sent'), stamp(doc.t('submitted_at')!)),
         const SizedBox(height: 8),
         if (mine && !doc.can('approve'))
-          Text('You raised this, so someone else with approval rights has to approve it.', style: inter(13, 400, color: kMuted, height: 1.4))
+          Text(tr('You raised this, so someone else with approval rights has to approve it.'), style: inter(13, 400, color: kMuted, height: 1.4))
         else if (!doc.can('approve'))
-          Text('Waiting for an owner or manager to approve it.', style: inter(13, 400, color: kMuted, height: 1.4)),
+          Text(tr('Waiting for an owner or manager to approve it.'), style: inter(13, 400, color: kMuted, height: 1.4)),
         if (doc.can('approve')) InvPrimary(verb, busy: busy, onPressed: busy ? null : onApprove),
-        if (doc.can('reject')) InvSecondary('Send back', onPressed: busy ? null : onSendBack),
+        if (doc.can('reject')) InvSecondary(tr('Send back'), onPressed: busy ? null : onSendBack),
       ]),
     );
   }
@@ -113,12 +114,12 @@ Future<bool> confirmThrowAway(BuildContext context, {required String what, int? 
         style: inter(14, 400, color: kMuted, height: 1.4),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Keep them', style: inter(14, 600))),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Keep them'), style: inter(14, 600))),
         FilledButton(
           key: const ValueKey('confirm-throw-away'),
           style: FilledButton.styleFrom(backgroundColor: kRedText),
           onPressed: () => Navigator.pop(ctx, true),
-          child: Text('Throw away', style: inter(14, 700, color: Colors.white)),
+          child: Text(tr('Throw away'), style: inter(14, 700, color: Colors.white)),
         ),
       ],
     ),
@@ -133,15 +134,15 @@ Future<bool> confirmDamage(BuildContext context, String what) async {
     builder: (ctx) => AlertDialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      title: Text('Approve damage?', style: inter(18, 700)),
+      title: Text(tr('Approve damage?'), style: inter(18, 700)),
       content: Text('$what will be held apart as damaged and can no longer be sold.', style: inter(14, 400, color: kMuted, height: 1.4)),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Not now', style: inter(14, 600))),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Not now'), style: inter(14, 600))),
         FilledButton(
           key: const ValueKey('confirm-damage'),
           style: FilledButton.styleFrom(backgroundColor: kInk),
           onPressed: () => Navigator.pop(ctx, true),
-          child: Text('Approve', style: inter(14, 700, color: kLimeH)),
+          child: Text(tr('Approve'), style: inter(14, 700, color: kLimeH)),
         ),
       ],
     ),

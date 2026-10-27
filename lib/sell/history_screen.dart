@@ -9,6 +9,7 @@ import '../shift/refund_blocked_screen.dart';
 import 'sell_api.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Transaction History": the bills that took money on one day, newest first; "View card" opens the lines and the sum.
 /// A manager can refund from an opened bill (capped to the money taken; the database refuses anyone else and any excess).
@@ -71,7 +72,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('Taken ${rupees(r.paid)}${r.refunded > 0 ? ' · already refunded ${rupees(r.refunded)}' : ''}. A refund can never be more than what is left.', style: inter(13, 400, color: kMuted)),
             const SizedBox(height: 12),
-            TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))], decoration: const InputDecoration(prefixText: '₹ ', hintText: 'Amount to refund')),
+            TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))], decoration: InputDecoration(prefixText: '₹ ', hintText: tr('Amount to refund'))),
             const SizedBox(height: 10),
             Wrap(spacing: 8, children: [for (final m in const ['cash', 'upi', 'card', 'other']) ChoiceChip(label: Text(m == 'upi' ? 'UPI' : '${m[0].toUpperCase()}${m.substring(1)}'), selected: method == m, selectedColor: const Color(0xFFA5FF2D), onSelected: (_) => set(() => method = m))]),
             const SizedBox(height: 10),
@@ -80,9 +81,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ChoiceChip(label: const Text('Cancellation (part-paid bill)'), selected: kind == 'cancel', selectedColor: const Color(0xFFA5FF2D), onSelected: (_) => set(() => kind = 'cancel')),
             ]),
             const SizedBox(height: 10),
-            TextField(controller: reason, decoration: const InputDecoration(hintText: 'Reason')),
+            TextField(controller: reason, decoration: InputDecoration(hintText: tr('Reason'))),
             const SizedBox(height: 16),
-            DarkCta(label: 'Give refund', onPressed: () => Navigator.pop(ctx, true)),
+            DarkCta(label: tr('Give refund'), onPressed: () => Navigator.pop(ctx, true)),
           ]),
         ),
       ),
@@ -122,22 +123,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(title: 'Transaction history', initials: env.initials),
+        SellTopBar(title: tr('Transaction history'), initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
             SellTitle('Transaction History', sub: env.storeLine),
             const SizedBox(height: 10),
             Row(children: [
-              IconButton(tooltip: 'Previous day', onPressed: () => _step(-1), icon: const Icon(LucideIcons.chevronLeft, size: 18)),
+              IconButton(tooltip: tr('Previous day'), onPressed: () => _step(-1), icon: const Icon(LucideIcons.chevronLeft, size: 18)),
               Text('${_isToday ? 'Today · ' : ''}${fmtDay(_day)}', style: inter(15, 700, color: kMuted)),
-              IconButton(tooltip: 'Next day', onPressed: _isToday ? null : () => _step(1), icon: const Icon(LucideIcons.chevronRight, size: 18)),
+              IconButton(tooltip: tr('Next day'), onPressed: _isToday ? null : () => _step(1), icon: const Icon(LucideIcons.chevronRight, size: 18)),
               const Spacer(),
               Text(rows == null ? '' : '${rows.length} ${rows.length == 1 ? 'transaction' : 'transactions'}', style: inter(14, 400, color: kMuted)),
             ]),
             const SizedBox(height: 6),
-            if (_error != null) StateCard(icon: LucideIcons.database, danger: true, title: 'History could not load', body: _error!, primary: 'Retry', onPrimary: _load),
+            if (_error != null) StateCard(icon: LucideIcons.database, danger: true, title: tr('History could not load'), body: _error!, primary: 'Retry', onPrimary: _load),
             if (_error == null && rows == null) const SkeletonRows(),
-            if (rows != null && rows.isEmpty) const StateCard(icon: LucideIcons.history, title: 'No transactions', body: 'No bill took money on this day.'),
+            if (rows != null && rows.isEmpty) StateCard(icon: LucideIcons.history, title: tr('No transactions'), body: tr('No bill took money on this day.')),
             if (rows != null) for (final r in rows) ...[_card(r), const SizedBox(height: 12)],
           ]),
         ),
@@ -178,15 +179,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
           if (r.discount > 0) KeyValue('Discount${r.couponCode == null ? '' : ' · ${r.couponCode}'}', '−${rupees(r.discount)}', valueColor: kGreenText, keyColor: kGreenText, bold: false),
           if (r.refunded > 0) KeyValue('Refunded', '−${rupees(r.refunded)}', valueColor: kBadText, keyColor: kBadText, bold: false),
           const Divider(height: 18, color: kLine),
-          Row(children: [Text('Total Amount', style: inter(17, 800)), const Spacer(), Text(rupees(r.total), style: inter(22, 800, color: const Color(0xFF3DB800)))]),
+          Row(children: [Text(tr('Total Amount'), style: inter(17, 800)), const Spacer(), Text(rupees(r.total), style: inter(22, 800, color: const Color(0xFF3DB800)))]),
           const SizedBox(height: 8),
           Row(children: [
             TextButton(onPressed: () {
               Clipboard.setData(ClipboardData(text: r.receiptText));
               showToast(context, 'Receipt text copied.');
-            }, child: const Text('Copy receipt')),
+            }, child: Text(tr('Copy receipt'))),
             const Spacer(),
-            if (r.paid > r.refunded) TextButton(onPressed: () => _refund(r), child: const Text('Refund this bill')),
+            if (r.paid > r.refunded) TextButton(onPressed: () => _refund(r), child: Text(tr('Refund this bill'))),
           ]),
         ],
       ]),

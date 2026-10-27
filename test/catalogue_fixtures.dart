@@ -58,7 +58,8 @@ Map<String, dynamic> row(String state, {Map<String, dynamic>? invoice, Map<Strin
 Map<String, dynamic> colaRow() => row('rejected',
     invoice: {'name': 'Coca-Cola 500ml', 'qty': 24, 'unit': 'units', 'unit_price_minor': 3000, 'amount_minor': 72000},
     received: {'line_id': 'l1', 'name': 'Coca-Cola 500ml', 'qty': 24, 'rejected_qty': 2, 'unit': 'unit', 'unit_cost_minor': 3000},
-    accepted: 22, shortfall: 2, claim: 6000, acceptedValue: 66000);
+    accepted: 22, shortfall: 2, claim: 6000, acceptedValue: 66000)
+  ..addAll({'item_id': 'i1', 'gst_pct': 18});
 
 Map<String, dynamic> grnView({String status = 'matching', bool valid = false, Map<String, dynamic>? actions, List<String> blockers = const ['Resolve the exceptions first.'], bool hasInvoice = true, List<Map<String, dynamic>>? rows, int version = 4, String? decisionNote}) => {
       'id': 'g1',

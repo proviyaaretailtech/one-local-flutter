@@ -409,7 +409,7 @@ void main() {
     testWidgets('Delivery Settings: rupees are sent as paise; at least one way is required', (t) async {
       final s = Fake();
       await show(t, DeliveryScreen(api: s.api));
-      expect(find.text('Delivery Settings'), findsOneWidget);
+      expect(find.text('Delivery area & charges'), findsOneWidget);
       expect(find.text('Own Delivery'), findsOneWidget);
       expect(find.text('5 km'), findsOneWidget);
       expect(find.text('30–45 minutes'), findsOneWidget);

@@ -8,8 +8,8 @@ const _tintLeft = Color(0xFFE9F2E5);
 const _tintRight = Color(0xFFF6F9F4);
 const _ring = Color(0xFFE1E8DD);
 
-/// The one top banner every screen uses (founder, 22 Oct 2026): a soft green card with the side menu ☰ in the left corner (a back
-/// arrow instead on a page that can go back), a small caps line over a bold name, then the bell and the profile icon on the right.
+/// The one top banner every screen uses (founder, 22 Oct 2026): a soft green card with the side menu ☰ in the left corner (always: a
+/// page that can go back gets one back arrow just under the banner, 26 Oct 2026), a small caps line over a bold name, then the bell and the profile icon on the right.
 /// Main screens pass [kicker] "OneLocal Partner" and the store's name as [title], with the outlet and its status as [subtitle]; inner
 /// pages leave [kicker] to default to the store's name ([HomeNav.storeName]) over the page's own title.
 /// ☰ opens the side menu ([HomeNav.openMenu]) unless the screen passes its own [onMenu]; the profile icon opens Manage account.
@@ -31,7 +31,15 @@ class AppHeader extends StatelessWidget {
     this.profile = true,
     this.trailing,
     this.safeTop = true,
+    this.backKey = const ValueKey('app-header-back'),
+    this.under,
   });
+
+  /// Key of the back arrow under the banner (screens keep the key their tests already use).
+  final Key backKey;
+
+  /// A page's small extras on the back arrow's line (a step count, a status chip, "Start over").
+  final Widget? under;
 
   final String title;
   final String? kicker;
@@ -72,7 +80,29 @@ class AppHeader extends StatelessWidget {
     return Container(
       color: kBg,
       padding: EdgeInsets.fromLTRB(10, (safeTop ? MediaQuery.paddingOf(context).top : 0) + 6, 10, 4),
-      child: Container(
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _card(context, menu, top, name, account),
+        // the one way back, under the banner (founder, 26 Oct 2026): the banner itself always keeps ☰
+        if (showBack || under != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Row(children: [
+              if (showBack)
+                IconButton(
+                  key: backKey,
+                  tooltip: 'Back',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                  icon: const Icon(LucideIcons.arrowLeft, size: 20, color: kInk),
+                ),
+              if (under != null) Expanded(child: under!),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  Widget _card(BuildContext context, VoidCallback? menu, Widget top, Widget name, void Function(BuildContext)? account) => Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
@@ -85,9 +115,7 @@ class AppHeader extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 7, 8, 7), // compact (founder, 22 Oct 2026)
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              if (showBack)
-                _Round(icon: LucideIcons.arrowLeft, label: 'Back', onTap: onBack ?? () => Navigator.of(context).maybePop())
-              else if (menu != null)
+              if (menu != null)
                 _Round(key: menuKey, icon: LucideIcons.menu, label: 'Menu', onTap: menu)
               else
                 const SizedBox(width: 4),
@@ -112,12 +140,10 @@ class AppHeader extends StatelessWidget {
             ]),
           ),
         ]),
-      ),
-    );
-  }
+      );
 }
 
-/// A round white button on the banner (☰, back, bell).
+/// A round white button on the banner (☰, bell).
 class _Round extends StatelessWidget {
   const _Round({super.key, required this.icon, required this.label, required this.onTap});
   final IconData icon;

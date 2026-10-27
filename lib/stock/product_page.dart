@@ -11,6 +11,7 @@ import 'stock_env.dart';
 import 'stock_kit.dart';
 import 'stock_movements_screen.dart' show movementLabel, showMovement;
 import 'update_stock_screen.dart' show UpdateStockScreenTones;
+import '../ui/i18n.dart';
 
 /// One product, everything about it on one page (founder, 25 Oct 2026; replaces the catalogue detail drawer and the stock page):
 /// photo, name, codes and the Store / App switches; prices with the margin rules; its stock; its last movements; and small buttons
@@ -219,13 +220,13 @@ class _ProductPageState extends State<ProductPage> {
         if (_loading && c == null && s == null)
           const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
         else if (_error != null && c == null && s == null)
-          StockEmpty('This product could not load', _error!, icon: LucideIcons.cloudOff, action: 'Try again', onAction: _load)
+          StockEmpty(tr('This product could not load'), _error!, icon: LucideIcons.cloudOff, action: tr('Try again'), onAction: _load)
         else ...[
           _header(),
           const SizedBox(height: 12),
-          if (c != null) _priceCard(c) else const InvNote('Not sold in the shop, so it has no price here.'),
+          if (c != null) _priceCard(c) else InvNote(tr('Not sold in the shop, so it has no price here.')),
           const SizedBox(height: 2),
-          if (_invId == null) const InvNote('No stock record yet: stock, movements and the stock buttons appear once it has one.') else ...[
+          if (_invId == null) InvNote(tr('No stock record yet: stock, movements and the stock buttons appear once it has one.')) else ...[
             _stockCard(),
             _movesCard(),
           ],
@@ -275,15 +276,15 @@ class _ProductPageState extends State<ProductPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _photo(),
         const SizedBox(height: 10),
-        StockRow('Barcode', barcode == null || barcode.isEmpty ? 'None' : barcode),
-        StockRow('Category', category.isEmpty ? '—' : category),
+        StockRow(tr('Barcode'), barcode == null || barcode.isEmpty ? 'None' : barcode),
+        StockRow(tr('Category'), category.isEmpty ? '—' : category),
         if (c != null) ...[
           const Divider(height: 18, color: kCardLine),
           _switchRow('Store', 'Sold in your till', c.available, 'product-store',
               c.status == 'draft' || _switching ? null : _setStore),
           _switchRow('App', _app == null ? 'Could not read the OneLocal app setting' : 'Shown on the OneLocal app', _app ?? false, 'product-app',
               _app == null || _switching ? null : _setApp),
-          if (c.status == 'draft') Text('A draft is not sold. Finish it with Edit details first.', style: inter(12, 400, color: kMuted)),
+          if (c.status == 'draft') Text(tr('A draft is not sold. Finish it with Edit details first.'), style: inter(12, 400, color: kMuted)),
         ],
       ]),
     );
@@ -317,7 +318,7 @@ class _ProductPageState extends State<ProductPage> {
     return InvCard(
       margin: const EdgeInsets.only(top: 12, bottom: 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Price', style: inter(15.5, 700)),
+        Text(tr('Price'), style: inter(15.5, 700)),
         const SizedBox(height: 4),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _money('MRP ₹', _mrp, 'product-mrp'),
@@ -330,7 +331,7 @@ class _ProductPageState extends State<ProductPage> {
           const SizedBox(width: 10),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              const InvLabel('Margin'),
+              InvLabel(tr('Margin')),
               Container(
                 key: const ValueKey('product-margin'),
                 height: 46,
@@ -348,12 +349,12 @@ class _ProductPageState extends State<ProductPage> {
                       style: inter(m == null ? 12.5 : 15, 800, color: m == null ? kMuted : (low ? kRedText : kPostedText))),
                 ),
               ),
-              if (low) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Below 5%', style: inter(11.5, 600, color: kRedText))),
+              if (low) Padding(padding: const EdgeInsets.only(top: 4), child: Text(tr('Below 5%'), style: inter(11.5, 600, color: kRedText))),
             ]),
           ),
         ]),
         const SizedBox(height: 12),
-        InvPrimary('Save prices', key: const ValueKey('product-save-prices'), busy: _savingPrices, onPressed: _pricesChanged && !_savingPrices ? _savePrices : null),
+        InvPrimary(tr('Save prices'), key: const ValueKey('product-save-prices'), busy: _savingPrices, onPressed: _pricesChanged && !_savingPrices ? _savePrices : null),
       ]),
     );
   }
@@ -385,12 +386,12 @@ class _ProductPageState extends State<ProductPage> {
 
   Widget _stockCard() {
     final d = _stock;
-    if (d == null) return const InvNote('Stock could not load. Pull down to try again.');
+    if (d == null) return InvNote(tr('Stock could not load. Pull down to try again.'));
     final unit = d.m('item').s('unit');
     String u(num v) => units(v, unit.isEmpty ? 'unit' : unit);
     return InvCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [Expanded(child: Text('Stock', style: inter(15.5, 700))), StockStatusChip(d.s('status'))]),
+        Row(children: [Expanded(child: Text(tr('Stock'), style: inter(15.5, 700))), StockStatusChip(d.s('status'))]),
         const SizedBox(height: 10),
         StockNumbers([StockNumber(qty(d.n('available')), 'In stock', color: kPostedText), StockNumber(qty(d.n('reserved')), 'On hold')]),
         const SizedBox(height: 10),
@@ -399,9 +400,9 @@ class _ProductPageState extends State<ProductPage> {
           StockNumber(qty(d.n('damaged')), 'Damaged', color: d.n('damaged') > 0 ? kRedText : null),
         ]),
         const SizedBox(height: 8),
-        StockRow('Sells per day', d.n('daily_demand') == 0 ? 'No recent sales' : u(d.n('daily_demand'))),
-        StockRow('Lasts about', d.no('stock_days') == null ? '—' : '${qty(d.n('stock_days'))} days'),
-        StockRow('Kept at', d.l('bins').isEmpty ? '—' : d.l('bins').map((b) => '${b.s('name')} (${qty(b.n('on_hand'))})').join(', ')),
+        StockRow(tr('Sells per day'), d.n('daily_demand') == 0 ? 'No recent sales' : u(d.n('daily_demand'))),
+        StockRow(tr('Lasts about'), d.no('stock_days') == null ? '—' : '${qty(d.n('stock_days'))} days'),
+        StockRow(tr('Kept at'), d.l('bins').isEmpty ? '—' : d.l('bins').map((b) => '${b.s('name')} (${qty(b.n('on_hand'))})').join(', ')),
       ]),
     );
   }
@@ -411,17 +412,17 @@ class _ProductPageState extends State<ProductPage> {
     return InvCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Expanded(child: Text('Last movements', style: inter(15.5, 700))),
+          Expanded(child: Text(tr('Last movements'), style: inter(15.5, 700))),
           TextButton(
             key: const ValueKey('product-moves-all'),
             onPressed: () => env.open(context, StockPage.movements, itemId: _invId),
-            child: Text('See all', style: inter(13.5, 700, color: kLink)),
+            child: Text(tr('See all'), style: inter(13.5, 700, color: kLink)),
           ),
         ]),
         if (moves == null)
           const Padding(padding: EdgeInsets.all(12), child: Center(child: CircularProgressIndicator()))
         else if (moves.isEmpty)
-          Text('No movements yet. Sales, deliveries and corrections show here.', style: inter(13, 400, color: kMuted))
+          Text(tr('No movements yet. Sales, deliveries and corrections show here.'), style: inter(13, 400, color: kMuted))
         else
           for (final m in moves)
             InkWell(

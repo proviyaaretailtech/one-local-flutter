@@ -29,20 +29,14 @@ class StockScaffold extends StatelessWidget {
       onItems: env.inv.onItems ?? () => env.tab(context, 'item'),
       onBell: env.inv.onBell,
       children: [
-        if (Navigator.of(context).canPop())
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              tooltip: 'Back',
-              visualDensity: VisualDensity.compact,
-              onPressed: () => Navigator.of(context).maybePop(),
-              icon: const Icon(LucideIcons.arrowLeft, size: 20, color: kInk),
-            ),
-          ),
-        Text(title, style: inter(24, 800)),
-        if (line != null) ...[const SizedBox(height: 4), Text(line!, style: inter(13.5, 400, color: kMuted, height: 1.35))],
-        if (actions.isNotEmpty) ...[const SizedBox(height: 12), Wrap(spacing: 8, runSpacing: 8, children: actions)],
-        const SizedBox(height: 16),
+        // the back arrow is the banner's, just under it
+        // an empty title: the page draws its own compact heading (Item → Stock)
+        if (title.isNotEmpty) ...[
+          Text(title, style: inter(24, 800)),
+          if (line != null) ...[const SizedBox(height: 4), Text(line!, style: inter(13.5, 400, color: kMuted, height: 1.35))],
+          if (actions.isNotEmpty) ...[const SizedBox(height: 12), Wrap(spacing: 8, runSpacing: 8, children: actions)],
+          const SizedBox(height: 16),
+        ],
         ...children,
       ],
     );

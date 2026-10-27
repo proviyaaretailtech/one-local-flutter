@@ -7,13 +7,17 @@ import '../ui/theme.dart';
 import 'prices_common.dart' show loadAllStock;
 import 'stock_env.dart';
 import 'stock_kit.dart';
+import '../ui/i18n.dart';
 
 /// Alerts (J.106): everything that needs a look, in one list — low stock, expiry, products not selling, and counts or deliveries
 /// that do not match. Each alert says what is wrong and opens the tab that fixes it.
 class StockAlertsScreen extends StatefulWidget {
-  const StockAlertsScreen({super.key, required this.env, this.itemId});
+  const StockAlertsScreen({super.key, required this.env, this.itemId, this.show = 'all'});
   final StockEnv env;
   final String? itemId;
+
+  /// The filter it opens on ('low' for the low stock list: there is no separate Low stock screen, founder 26 Oct 2026).
+  final String show;
   @override
   State<StockAlertsScreen> createState() => _StockAlertsScreenState();
 }
@@ -25,7 +29,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
   StockEnv get env => widget.env;
   List<_Alert>? _alerts;
   String? _error;
-  String _show = 'all';
+  late String _show = widget.show;
 
   @override
   void initState() {
@@ -57,7 +61,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
           kind: 'low',
           title: it.s('name'),
           line: status == 'out' ? 'Out of stock' : 'Only ${u(it, it.n('available'))} left${it.no('stock_days') == null ? '' : ' · lasts about ${qty(it.n('stock_days'))} days'}',
-          action: 'Reorder',
+          action: tr('Reorder'),
           page: StockPage.reorder,
           itemId: id,
           urgent: status != 'low',
@@ -77,7 +81,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
       }
       // in stock but nothing sold lately: no daily demand means no "lasts about" figure
       if (it.n('available') > 0 && it.no('stock_days') == null && status != 'out') {
-        out.add((kind: 'no_sale', title: it.s('name'), line: '${u(it, it.n('available'))} in stock, no sales lately', action: 'See movements', page: StockPage.movements, itemId: id, urgent: false));
+        out.add((kind: 'no_sale', title: it.s('name'), line: '${u(it, it.n('available'))} in stock, no sales lately', action: tr('See movements'), page: StockPage.movements, itemId: id, urgent: false));
       }
     }
     for (final d in dash.m('discrepancies').l('items')) {
@@ -86,7 +90,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
         kind: 'mismatch',
         title: d.s('doc_no'),
         line: audit ? 'Count differs from the app by ${signed(d.n('variance'))}' : '${qty(d.n('rejected'))} units damaged or rejected in a delivery',
-        action: audit ? 'Fix it in Adjust' : 'Open Purchase',
+        action: audit ? 'Fix it in Adjust' : 'Check the delivery',
         page: audit ? StockPage.adjust : StockPage.receive,
         itemId: null,
         urgent: false,
@@ -106,8 +110,8 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
     int n(String k) => all?.where((a) => a.kind == k).length ?? 0;
     return StockScaffold(
       env: env,
-      title: 'Alerts',
-      line: 'Things that need a look. Tap one to fix it.',
+      title: tr('Alerts'),
+      line: tr('Things that need a look. Tap one to fix it.'),
       onRefresh: _load,
       children: [
         InvChips(
@@ -117,11 +121,11 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
         ),
         const SizedBox(height: 14),
         if (_error != null && all == null)
-          StockEmpty('Alerts could not load', _error!, icon: LucideIcons.cloudOff, action: 'Try again', onAction: _load)
+          StockEmpty(tr('Alerts could not load'), _error!, icon: LucideIcons.cloudOff, action: tr('Try again'), onAction: _load)
         else if (all == null)
           const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
         else if (shown.isEmpty)
-          const StockEmpty('All clear', 'Nothing needs a look here right now.', icon: LucideIcons.circleCheck)
+          StockEmpty(tr('All clear'), 'Nothing needs a look here right now.', icon: LucideIcons.circleCheck)
         else
           for (final a in shown) _card(a),
       ],

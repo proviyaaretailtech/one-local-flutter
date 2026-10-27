@@ -6,6 +6,7 @@ import '../ui/theme.dart';
 import 'money_api.dart';
 import 'money_env.dart';
 import 'money_widgets.dart';
+import '../ui/i18n.dart';
 
 // Cashbook, Expenses, Refunds & Adjustments: the money that went out, and the cash in the till. Figma frames "Cashbook", "Expenses", "Money – Refunds & Adjustments".
 
@@ -27,14 +28,14 @@ class CashbookScreen extends StatelessWidget {
   Widget build(BuildContext context) => MoneyScreen(
         env: env,
         screen: 'cashbook',
-        title: 'Cashbook',
+        title: tr('Cashbook'),
         load: env.api.cashbook,
         body: (c, d) {
           final day = d.s('day');
           final bd = d.m('breakdown');
           final entries = d.l('entries');
           Future<void> record(String dir) async {
-            final done = await showMoneyForm(c.context, title: dir == 'in' ? 'Cash In' : 'Cash Out', action: 'Save', fields: [
+            final done = await showMoneyForm(c.context, title: dir == 'in' ? 'Cash In' : 'Cash Out', action: tr('Save'), fields: [
               const FormFieldSpec('title', 'Description'),
               const FormFieldSpec('amount', 'Amount (₹)', kind: FieldKind.amount),
               FormFieldSpec('category', 'Category', optional: true, initial: dir == 'in' ? 'Sales' : ''),
@@ -59,16 +60,16 @@ class CashbookScreen extends StatelessWidget {
                 _Line('Cash paid', money(-(d.no('paid_minor') ?? 0), whole: true), color: kRedText),
                 const Divider(height: 20, color: kCardLine),
                 Row(children: [
-                  Expanded(child: Text('Closing balance', style: inter(15, 700))),
+                  Expanded(child: Text(tr('Closing balance'), style: inter(15, 700))),
                   Text(money(d.no('closing_minor'), whole: true), style: inter(22, 700)),
                 ]),
               ]),
             ),
             if (env.may('record') && d.b('can_record'))
               Row(children: [
-                Expanded(child: InvPrimary('Cash In', onPressed: () => record('in'))),
+                Expanded(child: InvPrimary(tr('Cash In'), onPressed: () => record('in'))),
                 const SizedBox(width: 10),
-                Expanded(child: InvSecondary('Cash Out', onPressed: () => record('out'))),
+                Expanded(child: InvSecondary(tr('Cash Out'), onPressed: () => record('out'))),
               ]),
             if (!d.b('started')) const MoneyEmpty('The cashbook starts with its first entry. Add your opening cash with Cash In.'),
             MoneyHeading('Cash entries', pill: () {
@@ -76,9 +77,9 @@ class CashbookScreen extends StatelessWidget {
               return '$n ${n == 1 ? 'entry' : 'entries'}';
             }()),
             if (bd.n('sales_cash_minor') > 0)
-              MoneyRow(title: 'Counter sales received', amount: money(bd.no('sales_cash_minor'), sign: true), amountColor: kPostedText, sub: 'Sales • Cash In • from payments'),
+              MoneyRow(title: tr('Counter sales received'), amount: money(bd.no('sales_cash_minor'), sign: true), amountColor: kPostedText, sub: 'Sales • Cash In • from payments'),
             if (bd.n('cash_refunds_minor') > 0)
-              MoneyRow(title: 'Cash refunds', amount: money(-bd.n('cash_refunds_minor'), sign: true), amountColor: kRedText, sub: 'Refunds • Cash Out • from refunds'),
+              MoneyRow(title: tr('Cash refunds'), amount: money(-bd.n('cash_refunds_minor'), sign: true), amountColor: kRedText, sub: 'Refunds • Cash Out • from refunds'),
             if (entries.isEmpty && bd.n('sales_cash_minor') == 0 && bd.n('cash_refunds_minor') == 0) const MoneyEmpty('No cash entries on this day.'),
             for (final e in entries)
               MoneyRow(
@@ -89,7 +90,7 @@ class CashbookScreen extends StatelessWidget {
                 status: e.s('status') == 'voided' ? 'voided' : null,
                 trailing: (d.b('can_void') && env.may('approve') && e.s('status') == 'posted' && e.s('source') == 'manual')
                     ? MoneyAction('Void', color: kRedText, onTap: () async {
-                        final done = await askReason(c.context, title: 'Void ${e.s('no')}', action: 'Void entry', run: (n, k) => env.api.voidCash(e.s('id'), n, k));
+                        final done = await askReason(c.context, title: 'Void ${e.s('no')}', action: tr('Void entry'), run: (n, k) => env.api.voidCash(e.s('id'), n, k));
                         if (done) await c.reload();
                       })
                     : null,
@@ -118,7 +119,7 @@ class ExpensesScreen extends StatelessWidget {
   Widget build(BuildContext context) => MoneyScreen(
         env: env,
         screen: 'expenses',
-        title: 'Expenses',
+        title: tr('Expenses'),
         load: env.api.expenses,
         body: (c, d) {
           final day = d.s('day');
@@ -143,10 +144,10 @@ class ExpensesScreen extends StatelessWidget {
               ]),
             ),
             if (env.may('record') && d.b('can_record'))
-              InvPrimary('Add Expense', onPressed: () async {
+              InvPrimary(tr('Add Expense'), onPressed: () async {
                 final opts = await _categories(env, d);
                 if (!c.context.mounted) return;
-                final done = await showMoneyForm(c.context, title: 'Add Expense', action: 'Save expense', fields: [
+                final done = await showMoneyForm(c.context, title: tr('Add Expense'), action: tr('Save expense'), fields: [
                   FormFieldSpec('category', 'Category', kind: FieldKind.pick, options: opts),
                   const FormFieldSpec('title', 'Description'),
                   const FormFieldSpec('amount', 'Amount (₹)', kind: FieldKind.amount),
@@ -166,7 +167,7 @@ class ExpensesScreen extends StatelessWidget {
                 status: e.s('status') == 'voided' ? 'voided' : null,
                 trailing: (d.b('can_void') && env.may('approve') && e.s('status') == 'posted')
                     ? MoneyAction('Void', color: kRedText, onTap: () async {
-                        final done = await askReason(c.context, title: 'Void ${e.s('no')}', action: 'Void expense', run: (n, k) => env.api.voidExpense(e.s('id'), n, k));
+                        final done = await askReason(c.context, title: 'Void ${e.s('no')}', action: tr('Void expense'), run: (n, k) => env.api.voidExpense(e.s('id'), n, k));
                         if (done) await c.reload();
                       })
                     : null,
@@ -194,7 +195,7 @@ class RefundsScreen extends StatelessWidget {
   Widget build(BuildContext context) => MoneyScreen(
         env: env,
         screen: 'refunds',
-        title: 'Refunds & Adjustments',
+        title: tr('Refunds & Adjustments'),
         defaults: const {'period': 'week', 'kind': 'all'},
         load: env.api.refunds,
         body: (c, d) {
@@ -221,13 +222,13 @@ class RefundsScreen extends StatelessWidget {
                 status: r.s('status'),
                 extra: r.b('can_decide')
                     ? Row(children: [
-                        Expanded(child: InvPrimary('Approve', onPressed: () async {
-                          final done = await askReason(c.context, title: 'Approve ${r.s('ref')}', action: 'Approve', hint: 'Note (optional)', run: (n, k) => env.api.decideAdjustment(r.s('id'), 'approve', n, k));
+                        Expanded(child: InvPrimary(tr('Approve'), onPressed: () async {
+                          final done = await askReason(c.context, title: 'Approve ${r.s('ref')}', action: tr('Approve'), hint: tr('Note (optional)'), run: (n, k) => env.api.decideAdjustment(r.s('id'), 'approve', n, k));
                           if (done) await c.reload();
                         })),
                         const SizedBox(width: 10),
-                        Expanded(child: InvSecondary('Reject', onPressed: () async {
-                          final done = await askReason(c.context, title: 'Reject ${r.s('ref')}', action: 'Reject', run: (n, k) => env.api.decideAdjustment(r.s('id'), 'reject', n, k));
+                        Expanded(child: InvSecondary(tr('Reject'), onPressed: () async {
+                          final done = await askReason(c.context, title: 'Reject ${r.s('ref')}', action: tr('Reject'), run: (n, k) => env.api.decideAdjustment(r.s('id'), 'reject', n, k));
                           if (done) await c.reload();
                         })),
                       ])
@@ -235,8 +236,8 @@ class RefundsScreen extends StatelessWidget {
               ),
             MoneyFootnote(const ['Refunds are payments already returned to the customer.', 'An adjustment is a recorded decision: approving it does not change any balance. Rejected and review items are not posted.']),
             if (d.b('can_record') && env.may('record'))
-              InvSecondary('Request adjustment', onPressed: () async {
-                final done = await showMoneyForm(c.context, title: 'Request adjustment', action: 'Send for review', note: 'Another person with approval rights decides it. Use a minus sign to reduce money.', fields: const [
+              InvSecondary(tr('Request adjustment'), onPressed: () async {
+                final done = await showMoneyForm(c.context, title: tr('Request adjustment'), action: tr('Send for review'), note: tr('Another person with approval rights decides it. Use a minus sign to reduce money.'), fields: const [
                   FormFieldSpec('reason', 'Reason'),
                   FormFieldSpec('amount', 'Amount (₹)', kind: FieldKind.signedAmount, hint: '-250 or 80'),
                   FormFieldSpec('kind', 'Kind', kind: FieldKind.pick, options: [('price_correction', 'Price correction'), ('fee_reversal', 'Fee reversal'), ('discount', 'Discount'), ('other', 'Other')], initial: 'other'),

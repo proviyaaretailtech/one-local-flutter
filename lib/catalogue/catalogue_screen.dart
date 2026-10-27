@@ -15,6 +15,7 @@ import 'item_form_screen.dart';
 import 'item_parts.dart';
 import 'item_sheets.dart';
 import 'new_category_sheet.dart';
+import '../ui/i18n.dart';
 
 /// Section G entry (Figma "Catalogue · List" and "Catalogue · Grid"): every item of this business with search, categories, counts and pages.
 /// The control centre (section D) links here through `HomeNav.items`.
@@ -40,7 +41,6 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   CatalogueList? _data;
   String? _error;
   String? _category;
-  String _status = 'all'; // a count card's filter: all | active | out | inactive | combo | draft
   bool _grid = false;
   bool _noteOpen = true;
   int _page = 1;
@@ -63,7 +63,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   Future<void> _load() async {
     final mine = ++_seq;
     try {
-      final d = await _api.list(q: _search.text, status: _status, category: _category, page: _page, pageSize: _pageSize);
+      final d = await _api.list(q: _search.text, category: _category, page: _page, pageSize: _pageSize);
       if (!mounted || mine != _seq) return;
       setState(() {
         _data = d;
@@ -92,22 +92,15 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
     if (saved == true && mounted) _reload();
   }
 
-  Future<void> _add() async {
-    final what = await showCatSheet<String>(context, title: 'Add Item', subtitle: 'Choose how much you want to fill in now', body: (ctx) => Column(children: [
-          _AddChoice(icon: LucideIcons.zap, label: 'Quick Add', detail: 'Name, System Code and price — ready in seconds', primary: true, onTap: () => Navigator.of(ctx).pop('quick')),
-          const SizedBox(height: 10),
-          _AddChoice(icon: LucideIcons.shoppingCart, label: 'Item creation', detail: 'Photo, codes, units, tax and pricing', onTap: () => Navigator.of(ctx).pop('full')),
-        ]));
-    if (!mounted || what == null) return;
-    if (what == 'quick') {
-      final made = await showQuickAdd(context, _api);
-      if (made != null && mounted) {
-        showToast(context, '${made.name} added.');
-        _reload(toFirst: true);
-      }
+  // "+ Quick add" opens the one Quick Add screen straight away (founder, 26 Oct 2026); its "More details" link has the full form
+  Future<void> _add({String? barcode}) async {
+    final made = await showQuickAdd(context, _api, barcode: barcode);
+    if (!mounted) return;
+    if (made != null) {
+      showToast(context, '${made.name} added.');
+      _reload(toFirst: true);
     } else {
-      final saved = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ItemFormScreen(api: _api, onNavigate: widget.onNavigate)));
-      if (saved == true && mounted) _reload(toFirst: true);
+      _reload(); // "More details" may have added it through the full form
     }
   }
 
@@ -116,11 +109,11 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: Colors.white,
-          title: Text('New barcode', style: inter(19, 700)),
+          title: Text(tr('New barcode'), style: inter(19, 700)),
           content: Text('No product has the barcode $code yet. Create one with it?', style: inter(14.5, 400, height: 1.4)),
           actions: [
-            TextButton(key: const ValueKey('unknown-type'), onPressed: () => Navigator.pop(ctx, false), child: const Text('Type a different code')),
-            FilledButton(key: const ValueKey('unknown-create'), onPressed: () => Navigator.pop(ctx, true), child: const Text('Create product')),
+            TextButton(key: const ValueKey('unknown-type'), onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Type a different code'))),
+            FilledButton(key: const ValueKey('unknown-create'), onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Create product'))),
           ],
         ),
       );
@@ -141,11 +134,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
         // Unknown product: make it with this barcode, or type another code
         final make = await _unknown(code);
         if (!mounted || make == null) return;
-        if (make) {
-          final saved = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ItemFormScreen(api: _api, onNavigate: widget.onNavigate, barcode: code)));
-          if (saved == true && mounted) _reload(toFirst: true);
-          return;
-        }
+        if (make) return _add(barcode: code); // Quick Add with the scanned barcode filled in
         found = await showScanSheet(context, _api, initialCode: code);
       }
     }
@@ -171,12 +160,12 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   Future<void> _actions(CatItem item) async {
     final what = await showCatSheet<String>(context, title: item.name, subtitle: '${item.sku} · ${money(item.priceMinor)} · Item actions', body: (ctx) => Column(children: [
           SheetOption('View product details', subtitle: 'Open the catalogue record', onTap: () => Navigator.of(ctx).pop('view')),
-          SheetOption('Quick edit', subtitle: 'Update existing product information', onTap: () => Navigator.of(ctx).pop('edit')),
+          SheetOption('Quick edit', subtitle: tr('Update existing product information'), onTap: () => Navigator.of(ctx).pop('edit')),
           SheetOption('View product image', subtitle: 'Open the image viewer', onTap: () => Navigator.of(ctx).pop('image')),
           const SizedBox(height: 4),
           SheetOption('Copy System Code', trailing: LucideIcons.copy, onTap: () => Navigator.of(ctx).pop('copy')),
           const SizedBox(height: 4),
-          OutlineButton('Cancel', onPressed: () => Navigator.of(ctx).pop()),
+          OutlineButton(tr('Cancel'), onPressed: () => Navigator.of(ctx).pop()),
         ]));
     if (!mounted || what == null) return;
     switch (what) {
@@ -199,42 +188,37 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
       backgroundColor: kBg,
       body: Column(children: [
         // Item is a main tab: the outlet header (specs/outlets-multi); ☰ falls back to Home when the screen has no menu of its own
-        OrdersTopBar(title: 'Catalogue', onMenu: widget.onMenu),
+        OrdersTopBar(title: tr('Catalogue'), onMenu: widget.onMenu),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
             child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 16), children: [
-              const ItemPartSwitcher(),
-              BigTitle('Catalogue', trailing: d == null ? null : _CountPill('${d.count('total')} ${d.count('total') == 1 ? 'item' : 'items'}')),
-              const SizedBox(height: 16),
+              const ItemPartSwitcher(bottom: 10),
+              // One compact header: title and count with the small actions, then search with Add, then the category chips.
               Row(children: [
-                SizedBox(width: 124, child: LimeButton('+ Add Items', onPressed: _add)),
-                const SizedBox(width: 12),
-                Expanded(child: _searchField()),
-              ]),
-              const SizedBox(height: 14),
-              Row(children: [
-                _TextAction(LucideIcons.upload, 'Import', kInk, () => showToast(context, 'Import is not in this release.')),
+                Text(tr('Catalogue'), style: inter(20, 800)),
+                if (d != null) ...[const SizedBox(width: 8), Text('${d.count('total')} ${d.count('total') == 1 ? 'item' : 'items'}', style: inter(13, 500, color: kMuted))],
                 const Spacer(),
-                _TextAction(LucideIcons.download, 'Sample Template', kLink, () => showToast(context, 'The sample template is not in this release.')),
-              ]),
-              const SizedBox(height: 18),
-              Row(children: [
-                Expanded(child: Text('Food products', style: inter(16, 600))),
+                _IconAction(LucideIcons.upload, 'Import', () => showToast(context, 'Import is not in this release.')),
+                _IconAction(LucideIcons.download, 'Sample template', () => showToast(context, 'The sample template is not in this release.')),
+                const SizedBox(width: 4),
                 _ViewToggle(grid: _grid, onChanged: (g) => setState(() => _grid = g)),
               ]),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
+              Row(children: [
+                Expanded(child: _searchField()),
+                const SizedBox(width: 8),
+                _AddButton(onPressed: _add),
+              ]),
+              const SizedBox(height: 10),
               _chips(d),
-              const SizedBox(height: 16),
-              if (d != null) _stats(d),
-              if (_status != 'all') ...[const SizedBox(height: 12), _showing()],
-              if (_noteOpen) ...[const SizedBox(height: 14), _note()],
-              const SizedBox(height: 14),
+              if (_noteOpen) ...[const SizedBox(height: 12), _note()],
+              const SizedBox(height: 12),
               ..._body(d),
               // pager and the POS link scroll with the list: pinned above the bar they left room for about one product
               if (d != null && d.totalMatching > 0) _pager(d),
               const SizedBox(height: 8),
-              DarkButton('POS Items', trailing: LucideIcons.arrowRight, onPressed: () => _tab('bill')),
+              DarkButton(tr('POS Items'), trailing: LucideIcons.arrowRight, onPressed: () => _tab('bill')),
             ]),
           ),
         ),
@@ -244,25 +228,25 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   }
 
   Widget _searchField() => Container(
-        height: 46,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(23), border: Border.all(color: const Color(0xFFD9DCD6))),
+        height: 42,
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(21), border: Border.all(color: const Color(0xFFD9DCD6))),
         child: Row(children: [
-          const SizedBox(width: 14),
-          const Icon(LucideIcons.search, size: 20, color: kMuted),
+          const SizedBox(width: 12),
+          const Icon(LucideIcons.search, size: 18, color: kMuted),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: _search,
               textInputAction: TextInputAction.search,
               style: inter(14, 400),
-              decoration: plainInput.copyWith(hintText: 'Search name, System Code...', hintStyle: inter(14, 400, color: kMuted)),
+              decoration: plainInput.copyWith(hintText: tr('Search items'), hintStyle: inter(14, 400, color: kMuted)),
               onChanged: (_) {
                 _debounce?.cancel();
                 _debounce = Timer(const Duration(milliseconds: 300), () => _reload(toFirst: true));
               },
             ),
           ),
-          IconButton(tooltip: 'Scan a barcode', visualDensity: VisualDensity.compact, onPressed: _scan, icon: const Icon(LucideIcons.scanBarcode, size: 20, color: kInk)),
+          IconButton(tooltip: tr('Scan a barcode'), visualDensity: VisualDensity.compact, onPressed: _scan, icon: const Icon(LucideIcons.scanBarcode, size: 20, color: kInk)),
         ]),
       );
 
@@ -292,8 +276,8 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
             customBorder: const StadiumBorder(),
             onTap: () => _newCategory(names),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              child: Row(children: [const Icon(LucideIcons.plus, size: 16, color: kInk), const SizedBox(width: 6), Text('New category', style: inter(14, 700))]),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              child: Row(children: [const Icon(LucideIcons.plus, size: 15, color: kInk), const SizedBox(width: 5), Text(tr('New category'), style: inter(13, 700))]),
             ),
           ),
         ),
@@ -310,73 +294,8 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
     final made = await showQuickAdd(context, _api, category: category);
     if (made == null || !mounted) return;
     _category = category;
-    _status = 'all';
     _reload(toFirst: true);
     showToast(context, same.isEmpty ? 'Category $name is ready with ${made.name}.' : '${made.name} added to $category.');
-  }
-
-  // The count cards are filters: tap one to list just those items, tap it again (or "Show all") to go back. Categories opens a picker.
-  static const _statusNames = {'active': 'active items', 'out': 'out of stock items', 'inactive': 'inactive items', 'combo': 'combos', 'draft': 'drafts'};
-
-  void _setStatus(String s) {
-    _status = _status == s ? 'all' : s;
-    _reload(toFirst: true);
-  }
-
-  Future<void> _pickCategory(CatalogueList d) async {
-    const makeNew = '\u0000new'; // the "New category" row's answer (no category can be named this)
-    final picked = await showCatSheet<String>(context, title: 'Categories', subtitle: 'Show the items of one category', body: (ctx) => Column(children: [
-      // First, so it is seen before the list: make a category (with its first product).
-      ListTile(
-        key: const ValueKey('cat-sheet-new-category'),
-        contentPadding: EdgeInsets.zero,
-        leading: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(color: kLimeSoft, shape: BoxShape.circle, border: Border.all(color: kLime, width: 1.5)),
-          child: const Icon(LucideIcons.plus, size: 16, color: kInk),
-        ),
-        title: Text('New category', style: inter(15, 700)),
-        subtitle: Text('Name it and add its first product', style: inter(12.5, 400, color: kMuted)),
-        onTap: () => Navigator.of(ctx).pop(makeNew),
-      ),
-      const Divider(height: 8),
-      for (final c in ['', ...d.categories])
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(c.isEmpty ? LucideIcons.layoutGrid : LucideIcons.tag, size: 18, color: kMuted),
-          title: Text(c.isEmpty ? 'All categories' : c, style: inter(15, (c.isEmpty ? _category == null : _category == c) ? 700 : 400)),
-          trailing: (c.isEmpty ? _category == null : _category == c) ? const Icon(LucideIcons.check, size: 18, color: kInk) : null,
-          onTap: () => Navigator.of(ctx).pop(c),
-        ),
-    ]));
-    if (picked == null || !mounted) return;
-    if (picked == makeNew) return _newCategory(d.categories);
-    _category = picked.isEmpty ? null : picked;
-    _reload(toFirst: true);
-  }
-
-  Widget _showing() => Row(children: [
-        const Icon(LucideIcons.listFilter, size: 16, color: kMuted),
-        const SizedBox(width: 8),
-        Expanded(child: Text('Showing ${_statusNames[_status]}', style: inter(13.5, 600))),
-        TextButton(key: const ValueKey('cat-show-all'), onPressed: () => _setStatus(_status), child: Text('Show all', style: inter(13.5, 700, color: kLink))),
-      ]);
-
-  Widget _stats(CatalogueList d) {
-    StatTile tile(String label, int n, String status) => StatTile(label, n, selected: _status == status, onTap: () => _setStatus(status));
-    final tiles = [
-      tile('Active Items', d.count('active'), 'active'), tile('Out of Stock', d.count('out_of_stock'), 'out'), tile('Inactive Items', d.count('inactive'), 'inactive'),
-      tile('Combos', d.count('combos'), 'combo'),
-      StatTile('Categories', d.count('categories'), selected: _category != null, onTap: () => _pickCategory(d)),
-      tile('Drafts', d.count('drafts'), 'draft'),
-    ];
-    return Column(children: [
-      for (var r = 0; r < 2; r++) ...[
-        if (r > 0) const SizedBox(height: 10),
-        Row(children: [for (var c = 0; c < 3; c++) ...[if (c > 0) const SizedBox(width: 10), Expanded(child: tiles[r * 3 + c])]]),
-      ],
-    ]);
   }
 
   Widget _note() => Container(
@@ -387,22 +306,22 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('A simpler receipt preview', style: inter(14, 600)),
+              Text(tr('A simpler receipt preview'), style: inter(14, 600)),
               const SizedBox(height: 4),
-              Text('Item quantities and tax are now easier to review before you print or share.', style: inter(13, 400, color: kMuted, height: 1.35)),
+              Text(tr('Item quantities and tax are now easier to review before you print or share.'), style: inter(13, 400, color: kMuted, height: 1.35)),
             ]),
           ),
-          IconButton(tooltip: 'Dismiss', onPressed: () => setState(() => _noteOpen = false), icon: const Icon(LucideIcons.x, size: 20, color: kInk)),
+          IconButton(tooltip: tr('Dismiss'), onPressed: () => setState(() => _noteOpen = false), icon: const Icon(LucideIcons.x, size: 20, color: kInk)),
         ]),
       );
 
   List<Widget> _body(CatalogueList? d) {
     if (_error != null && d == null) {
-      return [Padding(padding: const EdgeInsets.all(24), child: Center(child: Column(children: [Text(_error!, textAlign: TextAlign.center, style: inter(14, 400, color: kMuted)), const SizedBox(height: 12), OutlineButton('Try again', onPressed: _load, height: 44)])))];
+      return [Padding(padding: const EdgeInsets.all(24), child: Center(child: Column(children: [Text(_error!, textAlign: TextAlign.center, style: inter(14, 400, color: kMuted)), const SizedBox(height: 12), OutlineButton(tr('Try again'), onPressed: _load, height: 44)])))];
     }
     if (d == null) return [const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))];
     if (d.items.isEmpty) {
-      return [Padding(padding: const EdgeInsets.all(24), child: Center(child: Text(_status != 'all' ? 'No ${_statusNames[_status]} right now.' : _search.text.trim().isEmpty && _category == null ? 'No items yet. Tap + Add Items to start.' : 'No item matches.', textAlign: TextAlign.center, style: inter(15, 400, color: kMuted))))];
+      return [Padding(padding: const EdgeInsets.all(24), child: Center(child: Text(_search.text.trim().isEmpty && _category == null ? 'No items yet. Tap + Add Items to start.' : 'No item matches.', textAlign: TextAlign.center, style: inter(15, 400, color: kMuted))))];
     }
     if (_grid) {
       return [
@@ -459,37 +378,38 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
       padding: const EdgeInsets.fromLTRB(0, 4, 0, 0),
       child: Row(children: [
         Expanded(child: Text('Showing $from–$to of $total items', style: inter(13, 400, color: kMuted))),
-        IconButton(tooltip: 'Previous page', visualDensity: VisualDensity.compact, onPressed: d.page > 1 ? () { _page = d.page - 1; _load(); } : null, icon: const Icon(LucideIcons.chevronLeft, size: 20)),
+        IconButton(tooltip: tr('Previous page'), visualDensity: VisualDensity.compact, onPressed: d.page > 1 ? () { _page = d.page - 1; _load(); } : null, icon: const Icon(LucideIcons.chevronLeft, size: 20)),
         for (final p in shown) num(p),
-        IconButton(tooltip: 'Next page', visualDensity: VisualDensity.compact, onPressed: d.page < pages ? () { _page = d.page + 1; _load(); } : null, icon: Icon(LucideIcons.chevronRight, size: 20, color: d.page < pages ? kLink : kMuted)),
+        IconButton(tooltip: tr('Next page'), visualDensity: VisualDensity.compact, onPressed: d.page < pages ? () { _page = d.page + 1; _load(); } : null, icon: Icon(LucideIcons.chevronRight, size: 20, color: d.page < pages ? kLink : kMuted)),
       ]),
     );
   }
 }
 
-class _CountPill extends StatelessWidget {
-  const _CountPill(this.text);
-  final String text;
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFE3E5DF))),
-        child: Text(text, style: inter(13, 500, color: kMuted)),
-      );
-}
-
-class _TextAction extends StatelessWidget {
-  const _TextAction(this.icon, this.label, this.color, this.onTap);
+class _IconAction extends StatelessWidget {
+  const _IconAction(this.icon, this.label, this.onTap);
   final IconData icon;
   final String label;
-  final Color color;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 18, color: color), const SizedBox(width: 6), Text(label, style: inter(14, 600, color: color))]),
+  Widget build(BuildContext context) => IconButton(tooltip: label, visualDensity: VisualDensity.compact, onPressed: onTap, icon: Icon(icon, size: 18, color: kInk));
+}
+
+class _AddButton extends StatelessWidget {
+  const _AddButton({required this.onPressed});
+  final VoidCallback onPressed;
+  @override
+  Widget build(BuildContext context) => Material(
+        color: kLime,
+        shape: const StadiumBorder(),
+        child: InkWell(
+          key: const ValueKey('cat-add'),
+          customBorder: const StadiumBorder(),
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(LucideIcons.plus, size: 18, color: kDark), const SizedBox(width: 4), Text(tr('Quick add'), style: inter(14, 700, color: kDark))]),
+          ),
         ),
       );
 }
@@ -505,17 +425,18 @@ class _ViewToggle extends StatelessWidget {
           selected: on,
           label: '$label view',
           child: InkWell(
+            key: ValueKey('cat-view-${label.toLowerCase()}'),
             borderRadius: BorderRadius.circular(14),
             onTap: () => onChanged(value),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(color: on ? kPrimary : null, borderRadius: BorderRadius.circular(14)),
-              child: Row(children: [Icon(icon, size: 16, color: on ? kLime : kMuted), const SizedBox(width: 6), Text(label, style: inter(13, 600, color: on ? kLime : kMuted))]),
+              child: Icon(icon, size: 16, color: on ? kLime : kMuted),
             ),
           ),
         );
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(color: const Color(0xFFE9ECE7), borderRadius: BorderRadius.circular(18)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [seg('List', LucideIcons.list, !grid, false), seg('Grid', LucideIcons.layoutGrid, grid, true)]),
     );
@@ -535,7 +456,7 @@ class _Chip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(color: on ? kLime : Colors.white, borderRadius: BorderRadius.circular(999)),
             child: Text(label, style: inter(13, on ? 700 : 500, color: on ? kDark : kMuted)),
           ),
@@ -544,39 +465,3 @@ class _Chip extends StatelessWidget {
 }
 
 /// One way to add a product: round icon, name, what it is for, and a chevron (stacked, so both read the same size).
-class _AddChoice extends StatelessWidget {
-  const _AddChoice({required this.icon, required this.label, required this.detail, required this.onTap, this.primary = false});
-  final IconData icon;
-  final String label, detail;
-  final VoidCallback onTap;
-  final bool primary;
-  @override
-  Widget build(BuildContext context) => Material(
-        color: primary ? const Color(0xFFF3FFE4) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: primary ? kLime : const Color(0xFFE3E5DF))),
-        child: InkWell(
-          customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
-            child: Row(children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(color: primary ? kLime : kSoftField, shape: BoxShape.circle),
-                child: Icon(icon, size: 20, color: kDark),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(label, style: inter(15, 700, color: kDark)),
-                  const SizedBox(height: 2),
-                  Text(detail, style: inter(12, 400, color: kMuted)),
-                ]),
-              ),
-              const Icon(LucideIcons.chevronRight, size: 18, color: kMuted),
-            ]),
-          ),
-        ),
-      );
-}

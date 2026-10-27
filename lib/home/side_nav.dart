@@ -3,8 +3,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../ui/theme.dart';
 import 'control_centre_screen.dart' show initials;
+import 'app_actions.dart';
 import 'home_nav.dart';
 import 'home_widgets.dart';
+import '../ui/i18n.dart';
 
 /// One row of the side nav. [open] is null when the screen is not built yet: the row is then
 /// greyed with a "Soon" tag instead of looking live and answering with a toast (control rule).
@@ -55,6 +57,7 @@ Future<void> showStoreSideNav(
         name: name,
         email: email,
         entries: entries,
+        actions: appActions(context, onReports: onReports),
         onAccount: hook(HomeNav.account),
         onSignOut: onSignOut,
       ),
@@ -66,13 +69,34 @@ Future<void> showStoreSideNav(
   );
 }
 
-class _StoreSideNav extends StatelessWidget {
-  const _StoreSideNav({required this.name, required this.email, required this.entries, required this.onSignOut, this.onAccount});
+class _StoreSideNav extends StatefulWidget {
+  const _StoreSideNav({required this.name, required this.email, required this.entries, required this.onSignOut, this.onAccount, this.actions = const []});
   final String name;
   final String? email;
   final List<SideNavEntry> entries;
   final VoidCallback onSignOut;
   final VoidCallback? onAccount;
+
+  /// Everything the search finds ([appActions]).
+  final List<AppAction> actions;
+
+  @override
+  State<_StoreSideNav> createState() => _StoreSideNavState();
+}
+
+class _StoreSideNavState extends State<_StoreSideNav> {
+  final _search = TextEditingController();
+
+  String get name => widget.name;
+  String? get email => widget.email;
+  List<SideNavEntry> get entries => widget.entries;
+  VoidCallback? get onAccount => widget.onAccount;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   // Close the panel first, then open the screen from the page underneath.
   void _go(BuildContext context, VoidCallback open) {
@@ -80,8 +104,83 @@ class _StoreSideNav extends StatelessWidget {
     open();
   }
 
+  /// "Search the app" (founder, 26 Oct 2026): any place or action, by its name or the words people use for it.
+  Widget _searchField() => Container(
+        height: 44,
+        decoration: BoxDecoration(color: const Color(0xFFF4F5F1), borderRadius: BorderRadius.circular(14), border: Border.all(color: kLine)),
+        child: Row(children: [
+          const SizedBox(width: 12),
+          const Icon(LucideIcons.search, size: 18, color: kMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              key: const ValueKey('side-nav-search'),
+              controller: _search,
+              textInputAction: TextInputAction.search,
+              style: inter(14, 400),
+              decoration: InputDecoration.collapsed(hintText: tr('Search the app'), hintStyle: inter(14, 400, color: kMuted)),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (q) {
+                final hits = searchActions(widget.actions, q);
+                if (hits.isNotEmpty) _go(context, hits.first.open);
+              },
+            ),
+          ),
+          if (_search.text.isNotEmpty)
+            IconButton(
+              tooltip: tr('Clear'),
+              visualDensity: VisualDensity.compact,
+              onPressed: () => setState(_search.clear),
+              icon: const Icon(LucideIcons.x, size: 16, color: kMuted),
+            ),
+        ]),
+      );
+
+  Widget _results() {
+    final hits = searchActions(widget.actions, _search.text);
+    if (hits.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text('Nothing matches "${_search.text.trim()}". Try another word, like stock, bill or supplier.', style: inter(13.5, 400, color: kMuted, height: 1.4)),
+      );
+    }
+    return ListView.separated(
+      key: const ValueKey('side-nav-results'),
+      padding: EdgeInsets.zero,
+      itemCount: hits.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 6),
+      itemBuilder: (context, i) {
+        final a = hits[i];
+        return Material(
+          color: const Color(0xFFF4F5F1),
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            key: ValueKey('side-nav-result-${a.title}'),
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => _go(context, a.open),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(children: [
+                Icon(a.icon, size: 19, color: kInk),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(tr(a.title), style: inter(14.5, 600)),
+                    Text(tr(a.where), style: inter(11.5, 400, color: kMuted)),
+                  ]),
+                ),
+                const Icon(LucideIcons.chevronRight, size: 16, color: kMuted),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final searching = _search.text.trim().isNotEmpty;
     final width = (MediaQuery.sizeOf(context).width * 0.78).clamp(260.0, 320.0);
     return Material(
       key: const ValueKey('side-nav'),
@@ -100,7 +199,7 @@ class _StoreSideNav extends StatelessWidget {
               // (founder, 20 Oct 2026: one place for the account, not a separate row at the foot).
               Semantics(
                 button: onAccount != null,
-                label: 'Manage account',
+                label: tr('Manage account'),
                 excludeSemantics: true,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(14),
@@ -119,7 +218,7 @@ class _StoreSideNav extends StatelessWidget {
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           name.trim().isEmpty
-                              ? Text('Add your name', style: inter(15, 700, color: kLink))   // no name on the account yet: Manage account sets it
+                              ? Text(tr('Add your name'), style: inter(15, 700, color: kLink))   // no name on the account yet: Manage account sets it
                               : Text(name, style: inter(15, 700), maxLines: 1, overflow: TextOverflow.ellipsis),
                           if (email != null && email!.isNotEmpty) Text(email!, style: inter(12, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
                         ]),
@@ -128,11 +227,11 @@ class _StoreSideNav extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
-              const Divider(height: 1, color: kLine),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
+              _searchField(),
+              const SizedBox(height: 12),
               Expanded(
-                child: ListView.separated(
+                child: searching ? _results() : ListView.separated(
                   padding: EdgeInsets.zero,
                   itemCount: entries.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
@@ -157,7 +256,7 @@ class _StoreSideNav extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              _NavRow(icon: LucideIcons.logOut, label: 'Sign out', danger: true, onTap: () => _go(context, onSignOut)),
+              _NavRow(icon: LucideIcons.logOut, label: tr('Sign out'), danger: true, onTap: () => _go(context, widget.onSignOut)),
             ]),
           ),
         ),
@@ -197,7 +296,7 @@ class _NavRow extends StatelessWidget {
               child: Row(children: [
                 Icon(icon, size: 17, color: fg),
                 const SizedBox(width: 12),
-                Expanded(child: Text(label, style: inter(12.5, 600, color: fg))),
+                Expanded(child: Text(tr(label), style: inter(12.5, 600, color: fg))),
                 Icon(LucideIcons.chevronRight, size: 15, color: kMuted),
               ]),
             ),
@@ -220,12 +319,12 @@ class _NavRow extends StatelessWidget {
             child: Row(children: [
               Icon(icon, size: 20, color: fg),
               const SizedBox(width: 14),
-              Expanded(child: Text(label, style: inter(13, 600, color: fg))),
+              Expanded(child: Text(tr(label), style: inter(13, 600, color: fg))),
               if (soon)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(color: const Color(0xFFFEF0C7), borderRadius: BorderRadius.circular(10)),
-                  child: Text('Soon', style: inter(10, 700, color: const Color(0xFFB54708))),
+                  child: Text(tr('Soon'), style: inter(10, 700, color: const Color(0xFFB54708))),
                 ),
             ]),
           ),

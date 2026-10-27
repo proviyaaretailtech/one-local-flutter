@@ -13,6 +13,7 @@ import '../ui/theme.dart';
 import 'prices_common.dart';
 import 'stock_env.dart';
 import 'stock_kit.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Stock management": every item's stock, MRP, price and cost in one editable list (or grid), with two switches — "Shop" (sold
 /// in the till) and "App" (shown on the OneLocal page). Changes stay on this screen until "Save changes":
@@ -324,8 +325,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
     final stockSide = _section == 'stock';
     return StockScaffold(
       env: widget.env,
-      title: 'Stock Management',
-      line: stockSide ? 'Change how many you have and what you charge. Tap a product to edit it.' : 'Choose where each product is sold: in your store, on the OneLocal app, or both.',
+      title: '', // the compact heading below, laid out like Item → Products
       onRefresh: _load,
       bottom: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
@@ -335,31 +335,41 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
               child: Text(changed.isEmpty ? 'No changes yet' : '${changed.length} ${changed.length == 1 ? 'product' : 'products'} changed · review before saving',
                   style: inter(12.5, 500, color: kMuted)),
             ),
-            Text('This store only', style: inter(12.5, 700, color: kPostedText)),
+            Text(tr('This store only'), style: inter(12.5, 700, color: kPostedText)),
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(flex: 2, child: InvPrimary('Save changes', key: const ValueKey('stock-save'), busy: _saving, onPressed: changed.isEmpty ? null : _save)),
+            Expanded(flex: 2, child: InvPrimary(tr('Save changes'), key: const ValueKey('stock-save'), busy: _saving, onPressed: changed.isEmpty ? null : _save)),
             const SizedBox(width: 10),
-            Expanded(child: InvSecondary('Reset', key: const ValueKey('stock-reset'), onPressed: changed.isEmpty || _saving ? null : _reset)),
+            Expanded(child: InvSecondary(tr('Reset'), key: const ValueKey('stock-reset'), onPressed: changed.isEmpty || _saving ? null : _reset)),
           ]),
         ]),
       ),
       children: [
-        const ItemPartSwitcher(),
+        const ItemPartSwitcher(bottom: 10),
+        // The same compact head as Products: heading with the view toggle, search, then the numbers, jobs, sections and chips.
+        Row(children: [
+          Text(tr('Stock Management'), style: inter(20, 800)),
+          const Spacer(),
+          _viewToggle(),
+        ]),
+        const SizedBox(height: 10),
+        _searchField(),
+        const SizedBox(height: 10),
         _numbers(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         _tools(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         _sections(),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         InvLoad<CatalogueList>(
           data: _list,
           error: _error,
           onRetry: _load,
           builder: (l) => [
             // categories, for picking products quickly (founder, 25 Oct 2026); All first
-            InvChips(
+            // one line that scrolls sideways, like the chips on Products
+            SingleChildScrollView(scrollDirection: Axis.horizontal, child: InvChips(
               active: _category ?? '',
               onTap: (c) {
                 _category = c.isEmpty ? null : c;
@@ -367,32 +377,8 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
                 _load();
               },
               items: [('', 'All', _category == null ? l.count('total') : null), for (final c in (_categories.isEmpty ? l.categories : _categories)) (c, c, null)],
-            ),
-            const SizedBox(height: 12),
-            InvInput(
-              controller: _search,
-              hint: 'Search name or System Code',
-              prefixIcon: LucideIcons.search,
-              onChanged: _searchChanged,
-              suffix: IconButton(
-                key: const ValueKey('search-scan'),
-                tooltip: 'Scan a barcode to search',
-                onPressed: _scanSearch,
-                icon: const Icon(LucideIcons.scanBarcode, size: 20, color: kInk),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(children: [
-              Icon(stockSide ? LucideIcons.pencil : LucideIcons.toggleRight, size: 14, color: kMuted),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(stockSide ? 'Tap a product to change its stock, price, MRP or cost.' : 'Switch Store or App on or off for each product.',
-                    style: inter(12.5, 400, color: kMuted)),
-              ),
-              const SizedBox(width: 8),
-              _viewToggle(),
-            ]),
-            const SizedBox(height: 10),
+            )),
+            const SizedBox(height: 2),
             if (_results.isNotEmpty) ...[_resultsCard(), const SizedBox(height: 12)],
             if (l.items.isEmpty)
               StockEmpty(
@@ -415,7 +401,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
             const SizedBox(height: 10),
             _pager(l),
             const SizedBox(height: 4),
-            Text('Units: pc · kg · g · l · ml · pack · dozen · box', textAlign: TextAlign.center, style: inter(11.5, 400, color: kMuted)),
+            Text(tr('Units: pc · kg · g · l · ml · pack · dozen · box'), textAlign: TextAlign.center, style: inter(11.5, 400, color: kMuted)),
             const SizedBox(height: 8),
             if (stockSide)
               InvNote('A stock change is sent for approval: the person who sends it cannot approve it, so a manager approves it before the stock changes. '
@@ -427,6 +413,33 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
     );
   }
 
+  /// The search bar, the same as on Products: a barcode scan at its end.
+  Widget _searchField() => Container(
+        height: 42,
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(21), border: Border.all(color: const Color(0xFFD9DCD6))),
+        child: Row(children: [
+          const SizedBox(width: 12),
+          const Icon(LucideIcons.search, size: 18, color: kMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _search,
+              textInputAction: TextInputAction.search,
+              style: inter(14, 400),
+              decoration: InputDecoration.collapsed(hintText: tr('Search items'), hintStyle: inter(14, 400, color: kMuted)),
+              onChanged: _searchChanged,
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('search-scan'),
+            tooltip: tr('Scan a barcode to search'),
+            visualDensity: VisualDensity.compact,
+            onPressed: _scanSearch,
+            icon: const Icon(LucideIcons.scanBarcode, size: 20, color: kInk),
+          ),
+        ]),
+      );
+
   /// Stock value, then low / out / expiring / damaged — each a tap to the alerts that list them (inventory dashboard, J.96).
   Widget _numbers() {
     final c = _dash?.m('counts');
@@ -437,16 +450,16 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
             borderRadius: BorderRadius.circular(12),
             onTap: () => widget.env.open(context, StockPage.alerts),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(children: [
-                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(17, 800, color: color)),
-                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 500, color: kMuted)),
+                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(16, 800, color: color)),
+                Text(tr(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 500, color: kMuted)),
               ]),
             ),
           ),
         );
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: kCardLine)),
       child: Row(children: [
         cell('value', _worth == null ? '…' : _rupeesShort(_worth!), 'Stock value', kInk),
@@ -466,28 +479,36 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
     return '₹${r.round()}';
   }
 
-  /// The stock jobs, one tap each: what needs a look, fix stock, move it, its history, count it.
-  Widget _tools() => Wrap(spacing: 8, runSpacing: 8, children: [
-        for (final (page, label, icon) in [
-          (StockPage.alerts, 'Needs attention', LucideIcons.bellRing),
+  /// The stock jobs, one tap each, in one even row: what needs a look, fix stock, move it, its history, count it.
+  Widget _tools() => Row(children: [
+        for (final (i, (page, label, icon)) in [
+          (StockPage.alerts, 'Alerts', LucideIcons.bellRing),
           (StockPage.adjust, 'Adjust', LucideIcons.slidersHorizontal),
           (StockPage.transfer, 'Transfer', LucideIcons.arrowLeftRight),
-          (StockPage.movements, 'Movements', LucideIcons.history),
-          (StockPage.count, 'Count stock', LucideIcons.clipboardCheck),
-        ])
-          Material(
-            color: page == StockPage.alerts ? kLimeSoftH : Colors.white,
-            shape: StadiumBorder(side: BorderSide(color: page == StockPage.alerts ? kLimeH : kCardLine)),
-            child: InkWell(
-              key: ValueKey('stock-tool-$page'),
-              customBorder: const StadiumBorder(),
-              onTap: () => widget.env.open(context, page),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 15, color: kInk), const SizedBox(width: 6), Text(label, style: inter(13, 700))]),
+          (StockPage.movements, 'History', LucideIcons.history),
+          (StockPage.count, 'Count', LucideIcons.clipboardCheck),
+        ].indexed) ...[
+          if (i > 0) const SizedBox(width: 6),
+          Expanded(
+            child: Material(
+              color: page == StockPage.alerts ? kLimeSoftH : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: page == StockPage.alerts ? kLimeH : kCardLine)),
+              child: InkWell(
+                key: ValueKey('stock-tool-$page'),
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => widget.env.open(context, page),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  child: Column(children: [
+                    Icon(icon, size: 17, color: kInk),
+                    const SizedBox(height: 3),
+                    Text(tr(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11.5, 600)),
+                  ]),
+                ),
               ),
             ),
           ),
+        ],
       ]);
 
   /// The two sections of this page, side by side, always in sight.
@@ -505,11 +526,11 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
                   borderRadius: BorderRadius.circular(10),
                   onTap: () => setState(() => _section = id),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                       Icon(icon, size: 16, color: _section == id ? kLimeH : kMuted),
                       const SizedBox(width: 6),
-                      Text(label, style: inter(14, 700, color: _section == id ? kLimeH : kMuted)),
+                      Text(tr(label), style: inter(13.5, 700, color: _section == id ? kLimeH : kMuted)),
                     ]),
                   ),
                 ),
@@ -522,7 +543,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
         key: const ValueKey('stock-results'),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            Expanded(child: Text('What was saved', style: inter(15, 700))),
+            Expanded(child: Text(tr('What was saved'), style: inter(15, 700))),
             InkWell(onTap: () => setState(() => _results = const []), child: const Icon(LucideIcons.x, size: 18, color: kMuted)),
           ]),
           const SizedBox(height: 6),
@@ -616,7 +637,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
     final e = _edit(item);
     final edited = e.changed(_appShown?[item.id]);
     Widget toggle(String label, bool on, String key, ValueChanged<bool>? onChanged) => Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(label, style: inter(11.5, 600, color: onChanged == null ? kMuted : kInk)),
+          Text(tr(label), style: inter(11.5, 600, color: onChanged == null ? kMuted : kInk)),
           Transform.scale(
             scale: 0.85,
             child: Switch(
@@ -648,21 +669,22 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
 
   // ---------------------------------------------------------------- grid
   /// List / Grid, as two small icon buttons.
+  // List / Grid, the same pill as on Products
   Widget _viewToggle() => Container(
         padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: kCardLine)),
+        decoration: BoxDecoration(color: const Color(0xFFE9ECE7), borderRadius: BorderRadius.circular(18)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           for (final (grid, icon, label) in [(false, LucideIcons.list, 'List'), (true, LucideIcons.layoutGrid, 'Grid')])
             Material(
               color: _grid == grid ? kNavyH : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(14),
               child: InkWell(
                 key: ValueKey('view-${label.toLowerCase()}'),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(14),
                 onTap: () => setState(() => _grid = grid),
                 child: Tooltip(
                   message: '$label view',
-                  child: Padding(padding: const EdgeInsets.all(6), child: Icon(icon, size: 17, color: _grid == grid ? kLimeH : kMuted)),
+                  child: Padding(padding: const EdgeInsets.all(7), child: Icon(icon, size: 16, color: _grid == grid ? kLimeH : kMuted)),
                 ),
               ),
             ),
@@ -707,7 +729,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 7, height: 7, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
       const SizedBox(width: 5),
-      Text(label, style: inter(11.5, 600, color: color)),
+      Text(tr(label), style: inter(11.5, 600, color: color)),
     ]);
   }
 
@@ -753,7 +775,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
   Widget _switchCard(CatItem item) {
     final e = _edit(item);
     Widget toggle(String label, bool on, String key, ValueChanged<bool>? onChanged) => Row(children: [
-          Expanded(child: Text(label, style: inter(12.5, 600, color: onChanged == null ? kMuted : kInk))),
+          Expanded(child: Text(tr(label), style: inter(12.5, 600, color: onChanged == null ? kMuted : kInk))),
           SizedBox(
             height: 30,
             child: FittedBox(
@@ -801,7 +823,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
                     alignment: Alignment.centerLeft,
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(color: kGreyBg, borderRadius: BorderRadius.circular(14)),
-                    child: Text('No stock record', style: inter(13, 400, color: kMuted)),
+                    child: Text(tr('No stock record'), style: inter(13, 400, color: kMuted)),
                   )
                 else
                   SizedBox(
@@ -869,23 +891,23 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
                     border: Border.all(color: m == null ? kCardLine : (low ? kRedText : kPostedText)),
                   ),
                   child: Column(children: [
-                    Text('Margin', style: inter(12.5, 600, color: kMuted)),
+                    Text(tr('Margin'), style: inter(12.5, 600, color: kMuted)),
                     const SizedBox(height: 2),
                     Text(
                       m == null ? 'Enter price and cost' : '${_rupees(m.amount)} · ${m.pct.toStringAsFixed(1)}%',
                       key: const ValueKey('sheet-margin-value'),
                       style: inter(m == null ? 13 : 17, 800, color: m == null ? kMuted : (low ? kRedText : kPostedText)),
                     ),
-                    if (low) Text('Below 5% — check the price or cost', style: inter(11.5, 600, color: kRedText)),
+                    if (low) Text(tr('Below 5% — check the price or cost'), style: inter(11.5, 600, color: kRedText)),
                   ]),
                 ),
               ),
               const SizedBox(height: 10),
-              Text('A stock change goes to a manager for approval. Prices change when you tap Save changes.', style: inter(12.5, 400, color: kMuted, height: 1.35)),
+              Text(tr('A stock change goes to a manager for approval. Prices change when you tap Save changes.'), style: inter(12.5, 400, color: kMuted, height: 1.35)),
               const SizedBox(height: 14),
-              InvPrimary('Done', key: const ValueKey('sheet-done'), onPressed: () => Navigator.of(ctx).pop()),
+              InvPrimary(tr('Done'), key: const ValueKey('sheet-done'), onPressed: () => Navigator.of(ctx).pop()),
               const SizedBox(height: 6),
-              InvSecondary('Open stock details', onPressed: () {
+              InvSecondary(tr('Open stock details'), onPressed: () {
                 Navigator.of(ctx).pop();
                 _openItem(item);
               }),
@@ -914,7 +936,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
       Expanded(child: Text('Showing $from–$to of $total items', style: inter(12.5, 400, color: kMuted))),
       IconButton(
         key: const ValueKey('page-prev'),
-        tooltip: 'Previous page',
+        tooltip: tr('Previous page'),
         onPressed: l.page <= 1 ? null : () => setState(() {
           _page = l.page - 1;
           _load();
@@ -924,7 +946,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
       Text('${l.page} / $last', style: inter(13, 700, color: kPostedText)),
       IconButton(
         key: const ValueKey('page-next'),
-        tooltip: 'Next page',
+        tooltip: tr('Next page'),
         onPressed: l.page >= last ? null : () => setState(() {
           _page = l.page + 1;
           _load();

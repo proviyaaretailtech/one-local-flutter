@@ -55,18 +55,22 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final auth = AuthRepository();
+    // A phone (taller than the 402:874 design) is covered edge to edge; a tablet or a landscape screen is wider than the
+    // design, where covering would cut the buttons off the bottom, so there the whole design fits, centred on white.
+    final size = MediaQuery.sizeOf(context);
+    final wide = size.width / size.height > SplashScreen._w / SplashScreen._h;
     return Scaffold(
       backgroundColor: Colors.white,
       // SizedBox.expand: the Scaffold body is loosely constrained, so without it the FittedBox shrinks to the design's
-      // aspect ratio and sits top-left (white band on the right on any screen wider than 402:874) instead of covering.
+      // aspect ratio and sits top-left instead of filling the screen.
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: _c.value == 0 ? _go : null,
         child: SizedBox.expand(
           child: ClipRect(
             child: FittedBox(
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
+              fit: wide ? BoxFit.contain : BoxFit.cover,
+              alignment: wide ? Alignment.center : Alignment.topCenter,
               child: SizedBox(
                 width: SplashScreen._w,
                 height: SplashScreen._h,

@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:vinii_pos/catalogue/item_parts.dart';
 import 'package:vinii_pos/home/home_widgets.dart';
 import 'package:vinii_pos/ui/app_tab_bar.dart';
+import 'package:vinii_pos/ui/ol_mascot.dart';
 
 Widget _part(String name) => Scaffold(body: Column(children: [const ItemPartSwitcher(), Text('$name screen')]));
 
@@ -38,7 +39,7 @@ void main() {
     expect(find.text('Products'), findsNothing);
   });
 
-  testWidgets('the store bar keeps five slots; the old Stock slot is an empty circle that does nothing', (t) async {
+  testWidgets('the store bar keeps five slots; the old Stock slot is Ol, who opens the helper instead of a tab', (t) async {
     expect(kStoreTabs.map((x) => x.label), ['Home', 'Item', 'Bill', 'Online order', '']);
     final tapped = <String>[];
     await t.pumpWidget(MaterialApp(
@@ -50,8 +51,11 @@ void main() {
       ),
     ));
     expect(find.text('Stock'), findsNothing);
-    await t.tap(find.byKey(const ValueKey('tab-slot')));
+    expect(find.byType(OlMascot), findsOneWidget);
     await t.tap(find.text('Home'));
-    expect(tapped, ['home']);
+    await t.tap(find.byKey(const ValueKey('ol-mascot')));
+    await t.pumpAndSettle();
+    expect(tapped, ['home']); // Ol is not a tab
+    expect(find.byKey(const ValueKey('ol-sheet')), findsOneWidget);
   });
 }

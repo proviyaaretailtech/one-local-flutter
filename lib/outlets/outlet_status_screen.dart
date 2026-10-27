@@ -3,9 +3,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../auth/partner_api.dart';
 import '../home/home_nav.dart';
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
 import 'add_outlet_screen.dart';
-import 'outlet_header.dart' show OutletHeader, outletStatusColor, kOutletSquare, kOutletChipBg, kOutletChipText, kOutletOnline;
+import 'outlet_header.dart' show OutletHeader, outletStatusColor, kOutletChipBg, kOutletChipText, kOutletOnline;
 import 'outlets_api.dart';
 
 /// Restaurant status (Figma `ALL ONLINE`): every outlet the person may see, searchable by name, ID or locality. Each card: name, ID,
@@ -87,34 +88,21 @@ class _OutletStatusScreenState extends State<OutletStatusScreen> {
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-            child: Row(children: [
-              Semantics(
-                button: true,
-                label: 'Back',
-                child: InkWell(
-                  key: const ValueKey('outlets-back'),
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () => Navigator.of(context).maybePop(),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(color: kOutletSquare, borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(LucideIcons.arrowLeft, size: 20, color: kInk),
+          AppHeader(
+            title: '${outletNounTitle()} status',
+            safeTop: false,
+            back: true,
+            backKey: const ValueKey('outlets-back'),
+            under: o == null || o.chip.isEmpty
+                ? null
+                : Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(color: kOutletChipBg, borderRadius: BorderRadius.circular(999)),
+                      child: Text(o.chip, style: inter(11, 600, color: kOutletChipText)),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Text('${outletNounTitle()} status', style: inter(20, 700))),
-              if (o != null && o.chip.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(color: kOutletChipBg, borderRadius: BorderRadius.circular(999)),
-                  child: Text(o.chip, style: inter(11, 600, color: kOutletChipText)),
-                ),
-            ]),
           ),
           Expanded(
             child: RefreshIndicator(

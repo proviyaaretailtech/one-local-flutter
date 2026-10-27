@@ -236,7 +236,7 @@ class _DeliveryFormState extends State<_DeliveryForm> {
     final days = widget.hours.l('days').map((d) => d.raw).toList();
     final summary = days.isEmpty ? 'your opening hours' : hoursSummary(days);
     return SfPage(
-      title: 'Delivery Settings',
+      title: 'Delivery area & charges',
       bottom: SfSave('Save Delivery Settings', busy: busy, onPressed: (home || pickup) ? _save : null),
       children: [
         const SfLabel('How customers get their order', top: 4),

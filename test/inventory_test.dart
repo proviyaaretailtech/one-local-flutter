@@ -182,13 +182,14 @@ void main() {
     testWidgets('shows the open receipt: counts, reconciliation, the four buttons', (t) async {
       final s = Fake(route);
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
-      expect(find.text('Receiving'), findsWidgets);
-      for (final x in ['Purchase', 'Putaway', 'Count and inspect', 'Receipt reconciliation', 'Send to Purchase Review', 'Scan / Enter Items', 'Save Draft', 'Expected shipment', 'Received physical count', 'Accepted / rejected quarantine', 'Quantity still to receive']) {
+      expect(find.text('Receive goods'), findsWidgets);
+      expect(find.byKey(const ValueKey('purchase-steps-2')), findsOneWidget);
+      for (final x in ['Count and inspect', 'Receipt reconciliation', 'Done counting · Match bill', 'Scan / add item', '+ New item', 'Save Draft', 'Expected shipment', 'Received physical count', 'Good / damaged', 'Quantity still to receive', 'Damaged']) {
         expect(find.text(x), findsWidgets, reason: x);
       }
-      expect(find.textContaining('Accepted = received − rejected'), findsOneWidget);
+      expect(find.textContaining('Good = received − damaged'), findsOneWidget);
       expect(find.textContaining('24 − 2 = 22'), findsOneWidget);
-      expect(find.textContaining('Review Discrepancies · 2 rejects'), findsOneWidget);
+      expect(find.textContaining('Differences · '), findsOneWidget);
     });
 
     testWidgets('Send to GRN Review saves the draft, then submits it with the version and a key', (t) async {
@@ -199,15 +200,20 @@ void main() {
         return base;
       });
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
-      await t.tap(find.text('Send to Purchase Review'));
+      final opened = <String>[];
+      final real = openMatchBill;
+      openMatchBill = (_, id) => opened.add(id);
+      addTearDown(() => openMatchBill = real);
+      await t.tap(find.text('Done counting · Match bill'));
       await t.pumpAndSettle();
+      expect(opened, hasLength(1)); // step 3: match the bill
       final posts = s.requests.where(isWrite).toList();
       expect(posts, hasLength(2));
       expect(s.body(posts[0])['version'], (fx['receipt_draft'] as Map)['version']);
       expect(s.body(posts[0])['lines'], isA<List>());
       expect(s.body(posts[1]), allOf(containsPair('action', 'submit'), containsPair('version', 3)));
       expect(posts[1].headers['Idempotency-Key'], startsWith('inv-'));
-      expect(toast('Sent to purchase review. Stock changes when the receipt is posted.'), findsOneWidget);
+      expect(toast('Counted. Now match the supplier bill.'), findsOneWidget);
     });
 
     testWidgets('a stale version shows the server message and reloads the document', (t) async {
@@ -228,19 +234,72 @@ void main() {
         return route(r, status: 'review');
       });
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api), documentId: (fx['receipt_review'] as Map)['id'] as String));
-      expect(find.text('Send to Purchase Review'), findsNothing);
+      expect(find.text('Done counting · Match bill'), findsNothing);
+      final opened = <String>[];
+      HomeNav.stockPage = (c, page, {itemId}) async => opened.add('$page:$itemId');
+      addTearDown(() => HomeNav.stockPage = null);
       await t.tap(find.text('Post Receipt'));
       await t.pumpAndSettle();
       expect(s.body(s.lastPost)['action'], 'post');
-      expect(toast('Receipt posted. The accepted units are now in stock.'), findsOneWidget);
+      // received: asked whether to print; Not now leaves it
+      expect(find.text('Print labels for this lot?'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('labels-offer-no')));
+      await t.pumpAndSettle();
+      expect(opened, isEmpty);
+      expect(toast('Receipt posted. The good units are now in stock.'), findsOneWidget);
     });
 
-    testWidgets('Putaway is honest about not being built', (t) async {
+    testWidgets('no tab strip: Purchase and Putaway are not chips here (they are buttons once a delivery is checked)', (t) async {
       final s = Fake(route);
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
-      await t.tap(find.byKey(const ValueKey('chip-putaway')));
-      await t.pump();
-      expect(toast('Putaway opens in a later release.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('chip-putaway')), findsNothing);
+      expect(find.byKey(const ValueKey('chip-grn')), findsNothing);
+      expect(find.text('Putaway'), findsNothing);
+    });
+
+    testWidgets('+ New item: a product the shop does not have joins the note, flagged as not on the order; damaged units are flagged', (t) async {
+      final real = newItemForReceiving;
+      newItemForReceiving = (_) async => Facts({'id': 'new1', 'name': 'Kurkure Masala', 'sku': 'KURKUR-482'});
+      addTearDown(() => newItemForReceiving = real);
+      final s = Fake((r) {
+        if (isWrite(r)) return ok(doc('receipt_draft', version: 3));
+        return route(r);
+      });
+      await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
+      expect(find.byKey(const ValueKey('receiving-flag-40b00000-0000-0000-0000-000000000001')), findsOneWidget);
+      expect(find.text('2 damaged'), findsOneWidget); // the ordered line matches the order; only its damage shows
+      await t.ensureVisible(find.byKey(const ValueKey('receiving-new-item')));
+      await t.tap(find.byKey(const ValueKey('receiving-new-item')));
+      await t.pumpAndSettle();
+      expect(toast('Kurkure Masala added to the shop and to this receipt note.'), findsOneWidget);
+      expect(find.text('Not on order'), findsOneWidget);
+      expect(find.textContaining('Differences · 2'), findsOneWidget);
+      await t.ensureVisible(find.text('Save Draft'));
+      await t.tap(find.text('Save Draft'));
+      await t.pumpAndSettle();
+      final lines = s.body(s.requests.where(isWrite).last)['lines'] as List;
+      expect(lines.map((l) => (l as Map)['inventory_item_id']), contains('new1'));
+    });
+
+    testWidgets('the damaged sheet offers Damaged first and keeps the reason already chosen', (t) async {
+      final s = Fake(route);
+      await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
+      await t.ensureVisible(find.byKey(const ValueKey('receiving-damaged')));
+      await t.tap(find.byKey(const ValueKey('receiving-damaged')));
+      await t.pumpAndSettle();
+      expect(find.text('Damaged units'), findsOneWidget);
+      expect(find.widgetWithText(ChoiceChip, 'Damaged'), findsOneWidget);
+      expect(t.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, (fx['receipt_draft'] as Map)['lines'][0]['reject_reason'] as String)).selected, isTrue);
+    });
+
+    testWidgets('+ Add Purchase opens a new, empty receipt note even while another is being counted', (t) async {
+      final s = Fake(route);
+      await showTall(t, ReceivingScreen(env: InvEnv(api: s.api), startNew: true));
+      expect(find.text('New receipt note'), findsOneWidget);
+      expect(find.text('Coca-Cola 500ml'), findsNothing);
+      expect(find.byKey(const ValueKey('receiving-supplier')), findsOneWidget);
+      expect(find.byKey(const ValueKey('receiving-new-item')), findsOneWidget);
+      expect(s.requests.where((r) => fnOf(r) == 'inv_document_view'), isEmpty);
     });
 
     testWidgets('no open receipt: say so and offer to start one', (t) async {
@@ -250,7 +309,7 @@ void main() {
         return null;
       });
       await showTall(t, ReceivingScreen(env: InvEnv(api: s.api)));
-      expect(find.textContaining('No receipt is open'), findsOneWidget);
+      expect(find.textContaining('No delivery is open'), findsOneWidget);
     });
   });
 

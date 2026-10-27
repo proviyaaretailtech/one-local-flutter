@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../service/service_widgets.dart' show svcRupees;
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
 import 'dish_screen.dart';
 import 'menu_api.dart';
@@ -43,7 +44,9 @@ class _MenuScreenState extends State<MenuScreen> {
     });
     try {
       await next;
-    } catch (_) {/* drawn by the builder */}
+    } catch (_) {
+      /* drawn by the builder */
+    }
   }
 
   @override
@@ -89,32 +92,6 @@ class _MenuScreenState extends State<MenuScreen> {
       length: 2,
       child: Scaffold(
         backgroundColor: kBg,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-          elevation: 0,
-          toolbarHeight: 72,
-          leading: IconButton(icon: const Icon(LucideIcons.chevronLeft, color: kInk), onPressed: () => Navigator.of(context).maybePop()),
-          titleSpacing: 0,
-          title: MenuOutletPicker(
-            name: _last?.locationName.isNotEmpty == true ? _last!.locationName : 'My outlet',
-            outlets: _last?.outlets ?? const [],
-            selectedId: _location ?? _last?.locationId,
-            onPicked: (id) {
-              _location = id;
-              _reload();
-            },
-          ),
-          bottom: TabBar(
-            labelStyle: inter(15, 600),
-            unselectedLabelStyle: inter(15, 500, color: kMuted),
-            labelColor: kInk,
-            unselectedLabelColor: kMuted,
-            indicatorColor: kInk,
-            indicatorSize: TabBarIndicatorSize.tab,
-            tabs: const [Tab(text: 'All items'), Tab(text: 'Add ons')],
-          ),
-        ),
         floatingActionButton: FloatingActionButton.extended(
           key: const ValueKey('menu-add'),
           backgroundColor: const Color(0xFFE4E4E0),
@@ -124,31 +101,65 @@ class _MenuScreenState extends State<MenuScreen> {
           icon: const Icon(LucideIcons.plus),
           label: Text('ADD', style: inter(15, 600)),
         ),
-        body: TabBarView(children: [
-          FutureBuilder<MenuData>(
-            future: _f,
-            builder: (context, snap) {
-              final m = snap.data ?? _last;
-              if (m == null && snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator(color: kLink));
-              if (m == null || (snap.hasError && snap.connectionState == ConnectionState.done && snap.data == null && _last == null)) {
-                return MenuError(error: snap.error ?? 'Could not load the menu.', onRetry: _reload);
-              }
-              return _AllItems(
-                data: m,
-                filter: _filter,
-                onSearch: _search,
-                onFilter: _setFilter,
-                collapsed: _collapsed,
-                busy: _busy,
-                onToggleCollapse: (k) => setState(() => _collapsed.contains(k) ? _collapsed.remove(k) : _collapsed.add(k)),
-                onStock: _stock,
-                onOpen: _open,
-                onRefresh: _reload,
-              );
-            },
-          ),
-          const _AddOns(),
-        ]),
+        body: Column(
+          children: [
+            // the banner (☰ always), the one back arrow with the outlet picker under it, then the two lists
+            AppHeader(
+              title: 'Menu',
+              back: true,
+              under: MenuOutletPicker(
+                name: _last?.locationName.isNotEmpty == true ? _last!.locationName : 'My outlet',
+                outlets: _last?.outlets ?? const [],
+                selectedId: _location ?? _last?.locationId,
+                onPicked: (id) {
+                  _location = id;
+                  _reload();
+                },
+              ),
+            ),
+            TabBar(
+              labelStyle: inter(15, 600),
+              unselectedLabelStyle: inter(15, 500, color: kMuted),
+              labelColor: kInk,
+              unselectedLabelColor: kMuted,
+              indicatorColor: kInk,
+              indicatorSize: TabBarIndicatorSize.tab,
+              tabs: const [
+                Tab(text: 'All items'),
+                Tab(text: 'Add ons'),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  FutureBuilder<MenuData>(
+                    future: _f,
+                    builder: (context, snap) {
+                      final m = snap.data ?? _last;
+                      if (m == null && snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator(color: kLink));
+                      if (m == null || (snap.hasError && snap.connectionState == ConnectionState.done && snap.data == null && _last == null)) {
+                        return MenuError(error: snap.error ?? 'Could not load the menu.', onRetry: _reload);
+                      }
+                      return _AllItems(
+                        data: m,
+                        filter: _filter,
+                        onSearch: _search,
+                        onFilter: _setFilter,
+                        collapsed: _collapsed,
+                        busy: _busy,
+                        onToggleCollapse: (k) => setState(() => _collapsed.contains(k) ? _collapsed.remove(k) : _collapsed.add(k)),
+                        onStock: _stock,
+                        onOpen: _open,
+                        onRefresh: _reload,
+                      );
+                    },
+                  ),
+                  const _AddOns(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -198,33 +209,69 @@ class _AllItems extends StatelessWidget {
               filled: true,
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kFieldBorder)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kFieldBorder)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: kFieldBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: kFieldBorder),
+              ),
             ),
           ),
           const SizedBox(height: 12),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              _Chip(key: const ValueKey('chip-out_of_stock'), label: 'Out of stock ${data.count('out_of_stock')}', selected: filter == 'out_of_stock', onTap: () => onFilter('out_of_stock')),
-              _Chip(key: const ValueKey('chip-in_stock'), label: 'In stock ${data.count('in_stock')}', selected: filter == 'in_stock', onTap: () => onFilter('in_stock')),
-              _Chip(key: const ValueKey('chip-needs_image'), label: 'Needs image ${data.count('needs_image')}', selected: filter == 'needs_image', onTap: () => onFilter('needs_image')),
-            ]),
+            child: Row(
+              children: [
+                _Chip(
+                  key: const ValueKey('chip-out_of_stock'),
+                  label: 'Out of stock ${data.count('out_of_stock')}',
+                  selected: filter == 'out_of_stock',
+                  onTap: () => onFilter('out_of_stock'),
+                ),
+                _Chip(
+                  key: const ValueKey('chip-in_stock'),
+                  label: 'In stock ${data.count('in_stock')}',
+                  selected: filter == 'in_stock',
+                  onTap: () => onFilter('in_stock'),
+                ),
+                _Chip(
+                  key: const ValueKey('chip-needs_image'),
+                  label: 'Needs image ${data.count('needs_image')}',
+                  selected: filter == 'needs_image',
+                  onTap: () => onFilter('needs_image'),
+                ),
+              ],
+            ),
           ),
           if (total > 0 && (data.count('needs_image') > 0 || data.count('missing_description') > 0)) ...[
             const SizedBox(height: 14),
             Text('RECOMMENDED IMPROVEMENTS', style: inter(12, 600, color: kMuted)),
             const SizedBox(height: 8),
             if (data.count('needs_image') > 0)
-              _Improve(icon: LucideIcons.image, title: 'Add images to items', line: '${data.count('with_image')}/$total items complete', onTap: () => onFilter('needs_image')),
+              _Improve(
+                icon: LucideIcons.image,
+                title: 'Add images to items',
+                line: '${data.count('with_image')}/$total items complete',
+                onTap: () => onFilter('needs_image'),
+              ),
             if (data.count('missing_description') > 0)
-              _Improve(icon: LucideIcons.alignLeft, title: 'Add descriptions', line: 'Missing for ${data.count('missing_description')} items · Write with AI on the dish'),
+              _Improve(
+                icon: LucideIcons.alignLeft,
+                title: 'Add descriptions',
+                line: 'Missing for ${data.count('missing_description')} items · Write with AI on the dish',
+              ),
           ],
           const SizedBox(height: 8),
           if (data.categories.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Text(total == 0 ? 'No dishes on the menu yet.' : 'No dish matches.', textAlign: TextAlign.center, style: inter(14, 500, color: kMuted)),
+              child: Text(
+                total == 0 ? 'No dishes on the menu yet.' : 'No dish matches.',
+                textAlign: TextAlign.center,
+                style: inter(14, 500, color: kMuted),
+              ),
             ),
           for (final c in data.categories) _category(context, c),
         ],
@@ -237,71 +284,130 @@ class _AllItems extends StatelessWidget {
     final open = !collapsed.contains(key);
     return Padding(
       padding: const EdgeInsets.only(top: 14),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(c.name, style: inter(18, 700)),
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-              child: Row(children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${c.name} (${c.count})', key: ValueKey('cat-${c.name}'), style: inter(16, 600)),
-                    Text(c.allInStock ? 'All items in stock' : 'Some items out of stock', style: inter(12, 500, color: c.allInStock ? const Color(0xFF2E7D32) : const Color(0xFFB54708))),
-                  ]),
-                ),
-                if (data.canEdit && c.id != null)
-                  Switch(
-                    key: ValueKey('cat-switch-${c.name}'),
-                    value: c.allInStock,
-                    activeTrackColor: kCheck,
-                    onChanged: busy.contains(c.id) ? null : (v) => onStock(categoryId: c.id, on: v),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(c.name, style: inter(18, 700)),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${c.name} (${c.count})', key: ValueKey('cat-${c.name}'), style: inter(16, 600)),
+                            Text(
+                              c.allInStock ? 'All items in stock' : 'Some items out of stock',
+                              style: inter(12, 500, color: c.allInStock ? const Color(0xFF2E7D32) : const Color(0xFFB54708)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (data.canEdit && c.id != null)
+                        Switch(
+                          key: ValueKey('cat-switch-${c.name}'),
+                          value: c.allInStock,
+                          activeTrackColor: kCheck,
+                          onChanged: busy.contains(c.id) ? null : (v) => onStock(categoryId: c.id, on: v),
+                        ),
+                      IconButton(
+                        icon: Icon(open ? LucideIcons.chevronUp : LucideIcons.chevronDown, color: kInk),
+                        onPressed: () => onToggleCollapse(key),
+                      ),
+                    ],
                   ),
-                IconButton(icon: Icon(open ? LucideIcons.chevronUp : LucideIcons.chevronDown, color: kInk), onPressed: () => onToggleCollapse(key)),
-              ]),
+                ),
+                if (open)
+                  for (final d in c.items) _dish(d),
+              ],
             ),
-            if (open) for (final d in c.items) _dish(d),
-          ]),
-        ),
-      ]),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _dish(MenuDish d) => Container(
-        key: ValueKey('dish-${d.id}'),
-        decoration: const BoxDecoration(border: Border(top: BorderSide(color: kLine))),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    key: ValueKey('dish-${d.id}'),
+    decoration: const BoxDecoration(
+      border: Border(top: BorderSide(color: kLine)),
+    ),
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [FoodTypeMark(d.foodType), const SizedBox(width: 8), Expanded(child: Text(d.name, style: inter(16, 600)))]),
-                const SizedBox(height: 8),
-                Text(svcRupees(d.priceMinor / 100), style: inter(15, 700)),
-                if ((d.description ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(d.description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(13, 400, color: kMuted)),
-                ],
-                if (d.hasWindows)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(d.orderableNow ? 'Serving times set · orderable now' : 'Serving times set · not orderable now', style: inter(11, 500, color: kMuted)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      FoodTypeMark(d.foodType),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(d.name, style: inter(16, 600))),
+                    ],
                   ),
-              ]),
+                  const SizedBox(height: 8),
+                  Text(svcRupees(d.priceMinor / 100), style: inter(15, 700)),
+                  if ((d.description ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      d.description!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: inter(13, 400, color: kMuted),
+                    ),
+                  ],
+                  if (d.hasWindows)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        d.orderableNow ? 'Serving times set · orderable now' : 'Serving times set · not orderable now',
+                        style: inter(11, 500, color: kMuted),
+                      ),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(width: 12),
             DishPhoto(urls: [?d.imageUrl], height: 80, width: 80),
-          ]),
-          if (d.variants > 0) Padding(padding: const EdgeInsets.only(top: 8), child: Text('${d.variants} Variant${d.variants == 1 ? '' : 's'}', style: inter(13, 600))),
-          Row(children: [
-            Expanded(child: Text(d.inStock ? 'Item is in stock' : 'Item is out of stock', style: inter(13, 500, color: d.inStock ? const Color(0xFF2E7D32) : const Color(0xFFB42318)))),
+          ],
+        ),
+        if (d.variants > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('${d.variants} Variant${d.variants == 1 ? '' : 's'}', style: inter(13, 600)),
+          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                d.inStock ? 'Item is in stock' : 'Item is out of stock',
+                style: inter(13, 500, color: d.inStock ? const Color(0xFF2E7D32) : const Color(0xFFB42318)),
+              ),
+            ),
             if (data.canEdit)
-              Switch(key: ValueKey('stock-${d.id}'), value: d.inStock, activeTrackColor: kCheck, onChanged: busy.contains(d.id) ? null : (v) => onStock(dishId: d.id, on: v)),
-          ]),
-          const Divider(height: 1, color: kLine),
-          Row(children: [
+              Switch(
+                key: ValueKey('stock-${d.id}'),
+                value: d.inStock,
+                activeTrackColor: kCheck,
+                onChanged: busy.contains(d.id) ? null : (v) => onStock(dishId: d.id, on: v),
+              ),
+          ],
+        ),
+        const Divider(height: 1, color: kLine),
+        Row(
+          children: [
             Expanded(
               child: TextButton.icon(
                 key: ValueKey('view-${d.id}'),
@@ -319,9 +425,11 @@ class _AllItems extends StatelessWidget {
                   label: Text('Edit', style: inter(13, 500, color: kMuted)),
                 ),
               ),
-          ]),
-        ]),
-      );
+          ],
+        ),
+      ],
+    ),
+  );
 }
 
 class _Chip extends StatelessWidget {
@@ -331,18 +439,18 @@ class _Chip extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: ChoiceChip(
-          label: Text(label, style: inter(13, 500, color: selected ? Colors.white : kInk)),
-          selected: selected,
-          showCheckmark: false,
-          selectedColor: kPrimary,
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: kFieldBorder),
-          shape: const StadiumBorder(),
-          onSelected: (_) => onTap(),
-        ),
-      );
+    padding: const EdgeInsets.only(right: 8),
+    child: ChoiceChip(
+      label: Text(label, style: inter(13, 500, color: selected ? Colors.white : kInk)),
+      selected: selected,
+      showCheckmark: false,
+      selectedColor: kPrimary,
+      backgroundColor: Colors.white,
+      side: const BorderSide(color: kFieldBorder),
+      shape: const StadiumBorder(),
+      onSelected: (_) => onTap(),
+    ),
+  );
 }
 
 class _Improve extends StatelessWidget {
@@ -353,16 +461,24 @@ class _Improve extends StatelessWidget {
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: ListTile(
-          tileColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: kLine)),
-          onTap: onTap,
-          leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: kField, borderRadius: BorderRadius.circular(10)), child: Icon(icon, size: 20, color: kMuted)),
-          title: Text(title, style: inter(14, 600)),
-          subtitle: Text(line, style: inter(12, 400, color: kMuted)),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 8),
+    child: ListTile(
+      tileColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: kLine),
+      ),
+      onTap: onTap,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(color: kField, borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, size: 20, color: kMuted),
+      ),
+      title: Text(title, style: inter(14, 600)),
+      subtitle: Text(line, style: inter(12, 400, color: kMuted)),
+    ),
+  );
 }
 
 /// Figma "Menu – Add ons": no add-on groups exist in the database yet (spec open question 4), so the tab says so plainly.
@@ -370,15 +486,22 @@ class _AddOns extends StatelessWidget {
   const _AddOns();
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(LucideIcons.layers, size: 36, color: kMuted),
-            const SizedBox(height: 12),
-            Text('Add-on groups are not set up in this app yet.', key: const ValueKey('addons-empty'), textAlign: TextAlign.center, style: inter(15, 600)),
-            const SizedBox(height: 6),
-            Text('Combos, extra cheese and similar choices will be managed here.', textAlign: TextAlign.center, style: inter(13, 400, color: kMuted)),
-          ]),
-        ),
-      );
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(LucideIcons.layers, size: 36, color: kMuted),
+          const SizedBox(height: 12),
+          Text('Add-on groups are not set up in this app yet.', key: const ValueKey('addons-empty'), textAlign: TextAlign.center, style: inter(15, 600)),
+          const SizedBox(height: 6),
+          Text(
+            'Combos, extra cheese and similar choices will be managed here.',
+            textAlign: TextAlign.center,
+            style: inter(13, 400, color: kMuted),
+          ),
+        ],
+      ),
+    ),
+  );
 }

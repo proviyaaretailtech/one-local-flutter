@@ -160,6 +160,11 @@ class InventoryApi {
   Future<InvDocument> act(String id, String action, {required int version, String? note, String? key}) async =>
       InvDocument(await _call('inv_document_act', {'id': id, 'action': action, 'version': version, 'note': note}, key: key ?? newKey()));
 
+  /// A new item's first stock (Quick Add's "In stock now"): posted at once for the owner or a manager, as an "Opening stock"
+  /// adjustment. Refused once the item has any stock movement.
+  Future<InvDocument> openingStock(String inventoryItemId, num qty, {String? key}) async =>
+      InvDocument(await _call('inv_opening_stock', {'inventory_item_id': inventoryItemId, 'qty': qty}, key: key ?? newKey()));
+
   /// From an audit in review or completed: one adjustment draft for its variances (the same one again if it exists).
   Future<InvDocument> adjustmentFromAudit(String auditId, {String? key}) async =>
       InvDocument(await _call('inv_audit_to_adjustment', {'id': auditId}, key: key ?? newKey()));

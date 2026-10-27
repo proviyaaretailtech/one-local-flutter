@@ -85,24 +85,35 @@ void main() {
   });
 
   group('OrdersHome (Orders History)', () {
-    testWidgets('lists the server cards and refilters', (t) async {
+    testWidgets('a wallet: orders sit in Pending, Completed and Cancelled piles; a pile fans out; a card opens', (t) async {
       final s = FakeServer((r) => ok({
-            'orders': r.url.queryParameters['filter'] == 'cancelled'
-                ? [card('2', 'cancelled', 'Cancelled')]
-                : [card('1', 'pending', 'Pending'), card('3', 'completed', 'Completed')]
+            'orders': [card('1', 'pending', 'Pending'), card('3', 'completed', 'Completed'), card('2', 'cancelled', 'Cancelled'), card('4', 'pending', 'Pending')]
           }));
       await showTall(t, OrdersHome(api: s.api));
       expect(find.text('Orders History'), findsOneWidget);
-      expect(find.text('Order #P-1'), findsOneWidget);
-      expect(find.text('Order #P-3'), findsOneWidget);
-      expect(find.text('2 orders'), findsOneWidget);
-      expect(find.text('Unpaid · ₹980 due'), findsNWidgets(2));
-      expect(find.text('View details'), findsNWidgets(2));
-      await t.tap(find.text('Cancelled').first);
+      expect(s.requests.last.url.queryParameters['filter'], 'all'); // one list; the piles sort it
+      expect(find.text('4 orders'), findsOneWidget);
+      expect(find.text('Pending · 2'), findsOneWidget);
+      expect(find.text('Completed · 1'), findsOneWidget);
+      expect(find.text('Cancelled · 1'), findsOneWidget);
+      expect(find.text('Order #P-1'), findsNothing); // closed piles
+      await t.tap(find.byKey(const ValueKey('orders-pile-pending')));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['filter'], 'cancelled');
+      expect(find.text('Order #P-1'), findsOneWidget);
+      expect(find.text('Order #P-4'), findsOneWidget);
+      expect(find.text('Order #P-3'), findsNothing);
+      await t.tap(find.text('Order #P-1'));
+      await t.pumpAndSettle();
+      expect(find.text('Unpaid · ₹980 due'), findsOneWidget);
+      expect(find.text('View details'), findsOneWidget);
+      // switch pile from the tabs on top
+      await t.tap(find.byKey(const ValueKey('orders-tab-cancelled')));
+      await t.pumpAndSettle();
       expect(find.text('Order #P-2'), findsOneWidget);
       expect(find.text('Order #P-1'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('orders-all-piles')));
+      await t.pumpAndSettle();
+      expect(find.text('Pending · 2'), findsOneWidget);
     });
 
     testWidgets('search waits for typing to stop', (t) async {
@@ -118,6 +129,10 @@ void main() {
     testWidgets('View details opens the order', (t) async {
       final s = FakeServer((r) => r.url.path.endsWith('/pos-orders') ? ok({'orders': [card(orderId, 'pending', 'Pending')]}) : ok(view('preparing')));
       await showTall(t, OrdersHome(api: s.api));
+      await t.tap(find.byKey(const ValueKey('orders-pile-pending')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Order #P-$orderId'));
+      await t.pumpAndSettle();
       await t.tap(find.text('View details'));
       await t.pumpAndSettle();
       expect(find.text('Order Preparing'), findsOneWidget);

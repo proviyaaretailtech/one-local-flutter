@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../orders/order_widgets.dart';
 import '../ui/app_header.dart';
 import '../ui/theme.dart';
+import '../ui/i18n.dart';
 
 /// Header of the till screens (Figma): menu or back button, the "O" mark, title and the staff initials.
 class SellTopBar extends StatelessWidget {
@@ -31,16 +32,19 @@ class SellTitle extends StatelessWidget {
 
 /// Rounded search field (Figma: white, grey border, magnifier).
 class SellSearchField extends StatelessWidget {
-  const SellSearchField({super.key, required this.controller, required this.hint, this.onChanged, this.onSubmitted, this.leading = LucideIcons.search, this.onClear});
+  const SellSearchField({super.key, required this.controller, required this.hint, this.onChanged, this.onSubmitted, this.leading = LucideIcons.search, this.onClear, this.trailing});
   final TextEditingController controller;
   final String hint;
   final ValueChanged<String>? onChanged, onSubmitted;
   final IconData leading;
   final VoidCallback? onClear;
+
+  /// A button at the right end (the Bill's barcode scanner).
+  final Widget? trailing;
   @override
   Widget build(BuildContext context) => Container(
         height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: EdgeInsets.only(left: 14, right: trailing == null ? 14 : 4),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFDADCD5))),
         child: Row(children: [
           Icon(leading, size: 18, color: kMuted),
@@ -57,6 +61,7 @@ class SellSearchField extends StatelessWidget {
           ),
           if (onClear != null)
             InkWell(onTap: onClear, customBorder: const CircleBorder(), child: const Padding(padding: EdgeInsets.all(4), child: Icon(LucideIcons.x, size: 16, color: kMuted))),
+          ?trailing,
         ]),
       );
 }
@@ -149,7 +154,7 @@ typedef SellNavigate = void Function(String tab);
 /// Menu sheet that leads to the F screens that have no tab of their own.
 Future<String?> showSellMenu(BuildContext context) => showOrderSheet<String>(
       context,
-      title: 'Sell',
+      title: tr('Sell'),
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, children: [
         for (final (id, label, icon) in const [
           ('sell', 'New sale', LucideIcons.shoppingCart),

@@ -278,19 +278,27 @@ class SetupSelect<T> extends StatelessWidget {
   Future<void> _open(BuildContext context) async {
     final picked = await showModalBottomSheet<T>(
       context: context,
+      isScrollControlled: true, // a long list scrolls inside the sheet instead of running off the bottom
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Padding(padding: const EdgeInsets.all(20), child: Text(label.isEmpty ? hint : label, style: inter(16, 700))),
-          for (final o in options)
-            ListTile(
-              title: Text(display(o), style: inter(14, o == value ? 700 : 400)),
-              trailing: o == value ? const Icon(LucideIcons.check, size: 18, color: kDone) : null,
-              onTap: () => Navigator.pop(context, o),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.8),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Padding(padding: const EdgeInsets.all(20), child: Text(label.isEmpty ? hint : label, style: inter(16, 700))),
+            Flexible(
+              child: ListView(shrinkWrap: true, children: [
+                for (final o in options)
+                  ListTile(
+                    title: Text(display(o), style: inter(14, o == value ? 700 : 400)),
+                    trailing: o == value ? const Icon(LucideIcons.check, size: 18, color: kDone) : null,
+                    onTap: () => Navigator.pop(context, o),
+                  ),
+              ]),
             ),
-          const SizedBox(height: 8),
-        ]),
+            const SizedBox(height: 8),
+          ]),
+        ),
       ),
     );
     if (picked != null) onChanged(picked);

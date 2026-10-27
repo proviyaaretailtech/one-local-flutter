@@ -6,6 +6,7 @@ import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'team_screens.dart' show TeamLoader;
 import 'team_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Roles & Permissions". Read only: roles are the same for every business and set by Proviyaa, so the switches show what the role has
 /// (from real permission keys) and cannot be flipped; there is no "Save changes". The server says so in `editable` and `note`.
@@ -38,7 +39,7 @@ class _RolesState extends State<RolesScreen>
   }
 
   Future<void> _choose(List<Facts> roles) async {
-    final v = await pickTeamRole(context, title: 'Choose a role', roles: roles, current: _slug, kind: env.kind, onlyAssignable: false);
+    final v = await pickTeamRole(context, title: tr('Choose a role'), roles: roles, current: _slug, kind: env.kind, onlyAssignable: false);
     if (v != null && v != _slug) _pick(v);
   }
 
@@ -59,8 +60,8 @@ class _RolesState extends State<RolesScreen>
   @override
   Widget build(BuildContext context) => TeamPage(
     env: env,
-    title: 'Roles & permissions',
-    subtitle: 'Choose a role to review access',
+    title: tr('Roles & permissions'),
+    subtitle: tr('Choose a role to review access'),
     onRefresh: load,
     children: [
       TeamLoad<Facts>(
@@ -88,7 +89,7 @@ class _RolesState extends State<RolesScreen>
                       child: Row(children: [
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                            Text('Role', style: inter(12, 500, color: kMuted)),
+                            Text(tr('Role'), style: inter(12, 500, color: kMuted)),
                             const SizedBox(height: 2),
                             Text(name.isEmpty ? 'Choose a role' : name, style: inter(16, 600)),
                           ]),
@@ -157,7 +158,7 @@ class _RolesState extends State<RolesScreen>
       ),
     ),
     const SizedBox(height: 14),
-    Text('Permissions', style: inter(17, 600)),
+    Text(tr('Permissions'), style: inter(17, 600)),
     const SizedBox(height: 10),
     for (final c in r.l('capabilities'))
       Padding(

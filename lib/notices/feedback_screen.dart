@@ -5,6 +5,7 @@ import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'notices_api.dart';
 import 'notices_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Customer feedback: average rating, status chips, each comment with Acknowledge / Resolve and an optional reply.
 class FeedbackScreen extends StatefulWidget {
@@ -56,16 +57,16 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
           controller: reply,
           maxLength: 1000,
           maxLines: 3,
-          decoration: const InputDecoration(hintText: 'Reply (optional)'),
+          decoration: InputDecoration(hintText: tr('Reply (optional)')),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Save'),
+            child: Text(tr('Save')),
           ),
         ],
       ),
@@ -86,7 +87,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         OrdersTopBar(
-          title: 'Customer feedback',
+          title: tr('Customer feedback'),
           onBack: () => Navigator.of(context).maybePop(),
         ),
         Expanded(

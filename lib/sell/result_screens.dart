@@ -9,6 +9,7 @@ import 'pay_screen.dart';
 import 'sell_api.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
+import '../ui/i18n.dart';
 
 void _backToTill(BuildContext context) => Navigator.of(context).popUntil((r) => r.isFirst || r.settings.name == 'sell');
 
@@ -25,7 +26,7 @@ class SuccessScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(title: 'Payment', initials: env.initials),
+        SellTopBar(title: tr('Payment'), initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(24, 24, 24, 16), children: [
             TransactionSuccessCard(
@@ -69,7 +70,7 @@ class TransactionSuccessCard extends StatelessWidget {
         child: Column(children: [
           Container(width: 72, height: 72, decoration: const BoxDecoration(color: kChipGreen, shape: BoxShape.circle), child: const Icon(LucideIcons.check, size: 30, color: Color(0xFF3DB800))),
           const SizedBox(height: 16),
-          Text('Transaction Successful', textAlign: TextAlign.center, style: inter(24, 800, color: const Color(0xFF3DB800))),
+          Text(tr('Transaction Successful'), textAlign: TextAlign.center, style: inter(24, 800, color: const Color(0xFF3DB800))),
           const SizedBox(height: 4),
           Text('Receipt generated and sent to customer queue', textAlign: TextAlign.center, style: inter(13.5, 400, color: kMuted)),
           const Divider(height: 28, color: kLine),
@@ -80,9 +81,9 @@ class TransactionSuccessCard extends StatelessWidget {
           if (branch != null) KeyValue('Terminal Branch', branch!, size: 15),
           KeyValue('Date & Time', when, size: 15),
           const Divider(height: 28, color: kLine),
-          DarkCta(label: 'New Order', onPressed: onNewOrder),
+          DarkCta(label: tr('New Order'), onPressed: onNewOrder),
           const SizedBox(height: 12),
-          LightCta(label: 'Print Receipt', onPressed: onPrintReceipt),
+          LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt),
           if (footnote != null) ...[const SizedBox(height: 14), Text(footnote!, style: inter(12.5, 400, color: kKicker))],
         ]),
       );
@@ -138,10 +139,10 @@ class _FailedScreenState extends State<FailedScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(title: 'Payment', initials: env.initials),
+        SellTopBar(title: tr('Payment'), initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(24, 20, 24, 16), children: [
-            Text('Transaction Failed', style: inter(28, 800)),
+            Text(tr('Transaction Failed'), style: inter(28, 800)),
             const SizedBox(height: 4),
             Text('Order ${f.displayNo}', style: inter(14, 400, color: kMuted)),
             const SizedBox(height: 16),
@@ -174,9 +175,9 @@ class _FailedScreenState extends State<FailedScreen> {
             const SizedBox(height: 14),
             Text('This payment was ${f.status}. Your cart is saved; retry with approval or choose another method.', style: inter(14, 400, color: kMuted, height: 1.4)),
             const SizedBox(height: 40),
-            DarkCta(label: 'Retry Payment', busy: _busy, onPressed: () => _reopen(f.method == 'online' ? 'upi' : f.method)),
+            DarkCta(label: tr('Retry Payment'), busy: _busy, onPressed: () => _reopen(f.method == 'online' ? 'upi' : f.method)),
             const SizedBox(height: 10),
-            LightCta(label: 'Try Another Method', onPressed: _busy ? null : () => _reopen('cash')),
+            LightCta(label: tr('Try Another Method'), onPressed: _busy ? null : () => _reopen('cash')),
             const SizedBox(height: 6),
             UnderLink('Cancel transaction · No payment was collected', onTap: _busy ? null : _cancel),
           ]),

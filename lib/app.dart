@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,14 +15,7 @@ class PosApp extends StatelessWidget {
       title: 'One Local POS',
       debugShowCheckedModeBanner: false,
       theme: posTheme(),
-      // On a wide desktop browser the app sits in a phone-width column, as it would on a phone.
-      builder: (context, child) {
-        if (!kIsWeb || MediaQuery.sizeOf(context).width <= 600) return child!;
-        return ColoredBox(
-          color: const Color(0xFF1B1F1C),
-          child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 430), child: child)),
-        );
-      },
+      // No fixed column: every screen fills the device's own width and height (phone, tablet or browser) and follows rotation.
       home: const AuthGate(),
     );
   }

@@ -6,6 +6,7 @@ import '../auth/auth_repository.dart';
 import '../auth/partner_api.dart';
 import '../orders/order_widgets.dart' show kBadText, kBadBg, kChipGreen, kGreenText, kSoftField, kWarnBg, kWarnText, kLimeSoft;
 import '../ui/theme.dart';
+import '../ui/i18n.dart';
 
 // Section P colours, read from the exported frames (assets/figma_ref_p): the lime Save button is #76EC00 (kCheck) with dark text,
 // the page is the shared cream (kBg), rows sit on white 16-radius cards.
@@ -60,9 +61,9 @@ class SettingRow extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: inter(14.5, 600)),
+                Text(tr(title), style: inter(14.5, 600)),
                 const SizedBox(height: 2),
-                Text(subtitle, style: inter(12, 400, color: kMuted, height: 1.3)),
+                Text(tr(subtitle), style: inter(12, 400, color: kMuted, height: 1.3)),
               ]),
             ),
             ...actions,
@@ -241,7 +242,7 @@ class PickField extends StatelessWidget {
               ),
             ),
           ),
-          if (showNotSet && value == null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Not set', style: inter(12, 400, color: kMuted))),
+          if (showNotSet && value == null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(tr('Not set'), style: inter(12, 400, color: kMuted))),
         ]),
       );
 }
@@ -257,7 +258,7 @@ class EmptyPanel extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: kSoftField, borderRadius: BorderRadius.circular(16), border: Border.all(color: kLine)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: inter(14, 700)),
+          Text(tr(title), style: inter(14, 700)),
           const SizedBox(height: 4),
           Text(body, style: inter(12.5, 400, color: kMuted, height: 1.4)),
           if (child != null) ...[const SizedBox(height: 12), child!],
@@ -304,10 +305,10 @@ Future<T?> showSettingsSheet<T>(BuildContext context, {required String title, St
             Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: const Color(0xFFD1D5DB), borderRadius: BorderRadius.circular(4)))),
             const SizedBox(height: 14),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: Text(title, style: inter(21, 700, height: 1.2))),
-              Semantics(button: true, label: 'Close', child: InkWell(customBorder: const CircleBorder(), onTap: () => Navigator.of(ctx).maybePop(), child: const Padding(padding: EdgeInsets.all(8), child: Icon(LucideIcons.x, size: 20, color: kMuted)))),
+              Expanded(child: Text(tr(title), style: inter(21, 700, height: 1.2))),
+              Semantics(button: true, label: tr('Close'), child: InkWell(customBorder: const CircleBorder(), onTap: () => Navigator.of(ctx).maybePop(), child: const Padding(padding: EdgeInsets.all(8), child: Icon(LucideIcons.x, size: 20, color: kMuted)))),
             ]),
-            if (subtitle != null) Padding(padding: const EdgeInsets.only(top: 2, bottom: 12), child: Text(subtitle, style: inter(13, 400, color: kMuted))),
+            if (subtitle != null) Padding(padding: const EdgeInsets.only(top: 2, bottom: 12), child: Text(tr(subtitle), style: inter(13, 400, color: kMuted))),
             if (subtitle == null) const SizedBox(height: 10),
             body(ctx),
           ]),

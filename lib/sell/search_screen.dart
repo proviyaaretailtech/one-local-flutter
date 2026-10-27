@@ -7,6 +7,7 @@ import '../ui/theme.dart';
 import 'sell_api.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Search" and "Negative and all screening for Product Search": find a product by name, SKU or barcode, with every state the frames
 /// draw: suggestions, recent searches, loading, no result, a failed request that keeps the query, filters (category, price, availability),
@@ -111,13 +112,13 @@ class _SearchScreenState extends State<SearchScreen> {
     final c = TextEditingController();
     final code = await showOrderSheet<String>(
       context,
-      title: 'Scan barcode',
+      title: tr('Scan barcode'),
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text('Scan the barcode, or type the barcode number or System Code.', style: inter(13, 400, color: kMuted)),
         const SizedBox(height: 12),
-        TextField(controller: c, autofocus: true, textInputAction: TextInputAction.search, onSubmitted: (v) => Navigator.pop(ctx, v.trim()), decoration: const InputDecoration(hintText: 'Barcode or System Code')),
+        TextField(controller: c, autofocus: true, textInputAction: TextInputAction.search, onSubmitted: (v) => Navigator.pop(ctx, v.trim()), decoration: InputDecoration(hintText: tr('Barcode or System Code'))),
         const SizedBox(height: 14),
-        DarkCta(label: 'Find', onPressed: () => Navigator.pop(ctx, c.text.trim())),
+        DarkCta(label: tr('Find'), onPressed: () => Navigator.pop(ctx, c.text.trim())),
       ]),
     );
     if (code == null || code.isEmpty) return;
@@ -130,7 +131,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final min = TextEditingController(text: _min?.toString() ?? ''), max = TextEditingController(text: _max?.toString() ?? '');
     final apply = await showOrderSheet<bool>(
       context,
-      title: 'Filter products',
+      title: tr('Filter products'),
       body: (ctx) => StatefulBuilder(
         builder: (ctx, set) => SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -150,14 +151,14 @@ class _SearchScreenState extends State<SearchScreen> {
             const SizedBox(height: 14),
             const Kick('Availability'),
             Row(children: [
-              ChoiceChip(label: const Text('Available'), selected: avail, selectedColor: const Color(0xFFA5FF2D), onSelected: (v) => set(() => avail = v)),
+              ChoiceChip(label: Text(tr('Available')), selected: avail, selectedColor: const Color(0xFFA5FF2D), onSelected: (v) => set(() => avail = v)),
               const SizedBox(width: 8),
               ChoiceChip(label: const Text('Any availability'), selected: !avail, onSelected: (v) => set(() => avail = !v)),
             ]),
             const SizedBox(height: 16),
             DarkCta(label: 'Apply filters', onPressed: () => Navigator.pop(ctx, true)),
             const SizedBox(height: 8),
-            LightCta(label: 'Cancel', onPressed: () => Navigator.pop(ctx, false)),
+            LightCta(label: tr('Cancel'), onPressed: () => Navigator.pop(ctx, false)),
           ]),
         ),
       ),
@@ -174,7 +175,7 @@ class _SearchScreenState extends State<SearchScreen> {
     var chosen = _sort;
     final go = await showOrderSheet<bool>(
       context,
-      title: 'Sort products',
+      title: tr('Sort products'),
       body: (ctx) => StatefulBuilder(
         builder: (ctx, set) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           for (final (id, label, sub) in _sorts)
@@ -210,7 +211,7 @@ class _SearchScreenState extends State<SearchScreen> {
           SellTopBar(title: 'OneLocal', onBack: () => Navigator.maybePop(context), initials: widget.env.initials),
           Expanded(
             child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 16), children: [
-              Row(children: [Expanded(child: Text(_title, style: inter(20, 700))), Text('Catalogue', style: inter(13, 400, color: kMuted))]),
+              Row(children: [Expanded(child: Text(_title, style: inter(20, 700))), Text(tr('Catalogue'), style: inter(13, 400, color: kMuted))]),
               const SizedBox(height: 12),
               SellSearchField(controller: _q, hint: 'Search product name, Options, by category, by brand', onSubmitted: (_) => _run(), onClear: _q.text.isEmpty ? null : _clearAll),
               const SizedBox(height: 14),
@@ -246,7 +247,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   List<Widget> _landing() => [
-        Text('Find a product', style: inter(20, 800)),
+        Text(tr('Find a product'), style: inter(20, 800)),
         const SizedBox(height: 6),
         Text('Search the catalogue by product name or System Code. Or scan a barcode to find an item.', style: inter(14, 400, color: kMuted, height: 1.4)),
         const SizedBox(height: 14),
@@ -254,13 +255,13 @@ class _SearchScreenState extends State<SearchScreen> {
           OrderCardBox(
             radius: 22,
             child: Material(type: MaterialType.transparency, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Recent searches', style: inter(16, 700)),
+              Text(tr('Recent searches'), style: inter(16, 700)),
               for (final r in _recent)
                 ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: const Icon(LucideIcons.history, size: 18), title: Text(r, style: inter(15, 500)), trailing: const Icon(LucideIcons.arrowUpLeft, size: 16), onTap: () {
                   _q.text = r;
                   _run();
                 }),
-              Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: () => setState(_recent.clear), child: Text('Clear recent searches', style: inter(13, 600, color: kMuted)))),
+              Align(alignment: Alignment.centerLeft, child: TextButton(onPressed: () => setState(_recent.clear), child: Text(tr('Clear recent searches'), style: inter(13, 600, color: kMuted)))),
             ])),
           ),
           const SizedBox(height: 14),
@@ -278,7 +279,7 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         if (_categories.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text('Browse categories', style: inter(20, 800)),
+          Text(tr('Browse categories'), style: inter(20, 800)),
           const SizedBox(height: 10),
           Wrap(spacing: 8, runSpacing: 8, children: [for (final c in _categories) ActionChip(label: Text(c), backgroundColor: Colors.white, onPressed: () {
             _category = c;
@@ -286,9 +287,9 @@ class _SearchScreenState extends State<SearchScreen> {
           })]),
         ],
         const SizedBox(height: 18),
-        DarkCta(label: 'Search catalogue', onPressed: _run),
+        DarkCta(label: tr('Search catalogue'), onPressed: _run),
         const SizedBox(height: 10),
-        LightCta(label: 'Scan barcode', onPressed: _scan),
+        LightCta(label: tr('Scan barcode'), onPressed: _scan),
       ];
 
   List<Widget> _results() {
@@ -306,7 +307,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _category = '';
         _run();
       }),
-      if (_availableOnly) InputChip(label: const Text('Available'), onDeleted: () {
+      if (_availableOnly) InputChip(label: Text(tr('Available')), onDeleted: () {
         _availableOnly = false;
         _run();
       }),
@@ -350,7 +351,7 @@ class _SearchScreenState extends State<SearchScreen> {
         if (e.key.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(2, 8, 2, 6), child: Text('${e.key} · ${e.value.length}', style: inter(15, 700))),
         for (final i in e.value) _row(i),
       ],
-      if (_filterCount > 0) ...[const SizedBox(height: 10), LightCta(label: 'Clear filters', onPressed: _clearFilters)],
+      if (_filterCount > 0) ...[const SizedBox(height: 10), LightCta(label: tr('Clear filters'), onPressed: _clearFilters)],
     ];
   }
 

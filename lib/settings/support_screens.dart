@@ -10,6 +10,7 @@ import '../ui/theme.dart';
 import 'settings_api.dart';
 import 'settings_sheets.dart';
 import 'settings_widgets.dart';
+import '../ui/i18n.dart';
 
 String _newKey() => 'sup-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 30)}';
 
@@ -75,19 +76,19 @@ class _SupportScreenState extends State<SupportScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: 'Support & Help', onBack: () => Navigator.of(context).maybePop()),
+        OrdersTopBar(title: tr('Support & Help'), onBack: () => Navigator.of(context).maybePop()),
         Expanded(
           child: help == null
               ? (_error == null
                   ? const Center(child: CircularProgressIndicator(color: kInk))
                   : Padding(
                       padding: const EdgeInsets.all(20),
-                      child: Center(child: StatusCard(icon: _offline ? LucideIcons.wifiOff : LucideIcons.circleAlert, tone: StateTone.warn, title: _offline ? 'You’re offline' : 'Could not open Support', body: _error!, primaryLabel: 'Try again', onPrimary: _load)),
+                      child: Center(child: StatusCard(icon: _offline ? LucideIcons.wifiOff : LucideIcons.circleAlert, tone: StateTone.warn, title: _offline ? 'You’re offline' : 'Could not open Support', body: _error!, primaryLabel: tr('Try again'), onPrimary: _load)),
                     ))
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 32), children: [
-                    Text('We’re here to help you run your store.', style: inter(13.5, 400, color: kMuted)),
+                    Text(tr('We’re here to help you run your store.'), style: inter(13.5, 400, color: kMuted)),
                     const SizedBox(height: 12),
                     Container(
                       height: 46,
@@ -96,18 +97,18 @@ class _SupportScreenState extends State<SupportScreen> {
                       child: Row(children: [
                         const Icon(LucideIcons.search, size: 18, color: kMuted),
                         const SizedBox(width: 10),
-                        Expanded(child: TextField(onChanged: (v) => setState(() => _q = v), style: inter(14, 400), decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: 'Search help articles…', hintStyle: inter(14, 400, color: kMuted)))),
+                        Expanded(child: TextField(onChanged: (v) => setState(() => _q = v), style: inter(14, 400), decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: tr('Search help articles…'), hintStyle: inter(14, 400, color: kMuted)))),
                       ]),
                     ),
                     if (faq.isNotEmpty) ...[
                       const SizedBox(height: 18),
-                      Text('Frequently asked questions', style: inter(15, 700)),
+                      Text(tr('Frequently asked questions'), style: inter(15, 700)),
                       const SizedBox(height: 8),
                       GroupCard(children: [for (final f in faq) _Row(icon: LucideIcons.circleQuestionMark, title: '${f['question']}', onTap: () => _faq(f))]),
                     ],
                     if (cats.isNotEmpty) ...[
                       const SizedBox(height: 18),
-                      Text('Help categories', style: inter(15, 700)),
+                      Text(tr('Help categories'), style: inter(15, 700)),
                       const SizedBox(height: 8),
                       GroupCard(children: [for (final c in cats) _Row(icon: _catIcon('${c['id']}'), title: '${c['title']}', hint: '${c['hint']}', onTap: () => _contact('${c['topic']}'))]),
                     ],
@@ -115,14 +116,14 @@ class _SupportScreenState extends State<SupportScreen> {
                     const SizedBox(height: 14),
                     Text('Need a hand? Our team is here, ${help['hours']}.', style: inter(13, 400, color: kMuted)),
                     const SizedBox(height: 8),
-                    DarkCta(label: 'Contact Support', onPressed: () => _contact()),
+                    DarkCta(label: tr('Contact Support'), onPressed: () => _contact()),
                     const SizedBox(height: 22),
                     Row(children: [
-                      Expanded(child: Text('My Support Requests', style: inter(15, 700))),
+                      Expanded(child: Text(tr('My Support Requests'), style: inter(15, 700))),
                       Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: kLine)), child: Text('${_requests.length} ${_requests.length == 1 ? 'request' : 'requests'}', style: inter(12, 500, color: kMuted))),
                     ]),
                     const SizedBox(height: 10),
-                    if (_requests.isEmpty) OrderCardBox(child: Text('No requests yet.', style: inter(13.5, 400, color: kMuted))),
+                    if (_requests.isEmpty) OrderCardBox(child: Text(tr('No requests yet.'), style: inter(13.5, 400, color: kMuted))),
                     for (final r in _requests) _RequestCard(r),
                   ]),
                 ),
@@ -186,8 +187,8 @@ Future<String?> openContactSheet(BuildContext context, SettingsEnv env, {String?
   const topics = {'orders': 'Orders', 'payments': 'Payments', 'inventory': 'Inventory', 'account': 'Account', 'other': 'Something else'};
   return showSettingsSheet<String>(
     context,
-    title: 'Contact Support',
-    subtitle: 'Tell us what is wrong and we will get back to you.',
+    title: tr('Contact Support'),
+    subtitle: tr('Tell us what is wrong and we will get back to you.'),
     body: (_) => FormSheet<String>(
       button: 'Send',
       initial: const {'msg': ''},
@@ -201,7 +202,7 @@ Future<String?> openContactSheet(BuildContext context, SettingsEnv env, {String?
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Padding(padding: const EdgeInsets.only(bottom: 6), child: Text('Topic', style: inter(13, 700))),
+            Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(tr('Topic'), style: inter(13, 700))),
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final e in topics.entries)
                 ChoiceChip(
@@ -215,7 +216,7 @@ Future<String?> openContactSheet(BuildContext context, SettingsEnv env, {String?
             ]),
           ]),
         ),
-        SheetField(label: 'What happened?', controller: f.ctl('msg'), hint: 'Describe the problem', maxLines: 4, maxLength: 2000),
+        SheetField(label: tr('What happened?'), controller: f.ctl('msg'), hint: tr('Describe the problem'), maxLines: 4, maxLength: 2000),
       ],
     ),
   );
@@ -226,8 +227,8 @@ Future<void> openFeedbackSheet(BuildContext context, SettingsEnv env) async {
   final key = (env.newKey ?? _newKey)();
   final ref = await showSettingsSheet<String>(
     context,
-    title: 'Feedback',
-    subtitle: 'Tell us what you think',
+    title: tr('Feedback'),
+    subtitle: tr('Tell us what you think'),
     body: (_) => FormSheet<String>(
       button: 'Submit',
       initial: const {'msg': ''},
@@ -238,7 +239,7 @@ Future<void> openFeedbackSheet(BuildContext context, SettingsEnv env) async {
         return '${r['reference']}';
       },
       children: (f) => [
-        SheetField(label: '', controller: f.ctl('msg'), hint: 'Share your thought', maxLines: 5, maxLength: 2000),
+        SheetField(label: '', controller: f.ctl('msg'), hint: tr('Share your thought'), maxLines: 5, maxLength: 2000),
         InkWell(
           key: const Key('feedback-attach'),
           borderRadius: BorderRadius.circular(14),

@@ -295,12 +295,14 @@ class OrdersApi {
 
   /// Resume POS: rewrites the held bill's lines (and/or reason) ON THE SAME ORDER; answers the bill's new version (`pos_hold_update`).
   /// The same [key] again is a replay. Pay afterwards with [pay] and that version.
-  Future<String> updateHold(String orderId, {List<CartLine>? lines, String? reason, required Object? version, required String key}) async {
+  Future<String> updateHold(String orderId, {List<CartLine>? lines, String? reason, String? customerName, String? customerPhone, required Object? version, required String key}) async {
     final r = await _rpc('pos_hold_update', {
       'order_id': orderId,
       'expected_updated_at': '$version',
       'lines': ?lines?.map((l) => l.toJson()).toList(),
       'reason': ?reason,
+      'customer_name': ?customerName,
+      'customer_phone': ?customerPhone,
       'idempotency_key': key,
     }, key: key);
     return '${r['updated_at'] ?? version}';

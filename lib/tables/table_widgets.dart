@@ -5,6 +5,7 @@ import '../auth/partner_api.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../outlets/outlet_header.dart';
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
 import 'table_qr_api.dart';
 import 'tables_api.dart';
@@ -107,43 +108,19 @@ class TablesPage extends StatelessWidget {
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          // the floor (first-level) shows the outlet header (specs/outlets-multi); inner screens keep back arrow and title
-          if (!back) OutletHeader(title: title, onMenu: env.onMenu, safeTop: false, initials: env.initials) else Container(
-            color: subtitle == null ? kBg : Colors.white,
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              Semantics(
-                button: true,
-                label: back ? 'Back' : 'Menu',
-                child: InkWell(
-                  key: const ValueKey('tbl-back'),
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: back ? () => Navigator.of(context).maybePop() : env.onMenu,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: back && subtitle != null ? BoxDecoration(color: kGreyBg, borderRadius: BorderRadius.circular(12)) : null,
-                    child: Icon(back ? LucideIcons.arrowLeft : LucideIcons.menu, size: 22, color: kInk),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, style: inter(subtitle == null ? 24 : 20, 700)),
-                  if (subtitle != null) Text(subtitle!, style: inter(13.5, 400, color: kMuted)),
-                ]),
-              ),
-              if (env.initials.isNotEmpty)
-                Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: subtitle == null ? kNote : kLimeBtn, shape: BoxShape.circle, border: subtitle == null ? Border.all(color: const Color(0xFFD5F2BE)) : null),
-                  child: Text(env.initials, style: inter(14, 700, color: subtitle == null ? kLink : kInk)),
-                ),
-            ]),
-          ),
+          // the floor (first-level) shows the outlet header (specs/outlets-multi); inner screens the banner (☰ always) with the one back
+          // arrow and their line under it
+          if (!back)
+            OutletHeader(title: title, onMenu: env.onMenu, safeTop: false, initials: env.initials)
+          else
+            AppHeader(
+              title: title,
+              safeTop: false,
+              back: true,
+              backKey: const ValueKey('tbl-back'),
+              onMenu: env.onMenu,
+              under: subtitle == null ? null : Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, 400, color: kMuted)),
+            ),
           Expanded(child: list),
           ?footer,
         ]),

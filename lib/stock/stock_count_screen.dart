@@ -6,6 +6,7 @@ import '../ui/theme.dart';
 import 'damage_flow.dart' show problem;
 import 'stock_env.dart';
 import 'stock_kit.dart';
+import '../ui/i18n.dart';
 
 /// Count stock (Stock Audit, J.103 / G.64), kept small: count what is on the shelf, see the difference, finish, then "Fix the
 /// difference" sends one correction for approval. A count never changes stock by itself.
@@ -134,19 +135,19 @@ class _StockCountScreenState extends State<StockCountScreen> {
   @override
   Widget build(BuildContext context) => StockScaffold(
         env: env,
-        title: 'Count stock',
-        line: 'Count what is on the shelf. The difference is sent to a manager to fix the stock.',
+        title: tr('Count stock'),
+        line: tr('Count what is on the shelf. The difference is sent to a manager to fix the stock.'),
         onRefresh: _load,
         children: _doc == null ? _list() : _counting(_doc!),
       );
 
   List<Widget> _list() => [
-        InvPrimary('Start a count', key: const ValueKey('count-start'), busy: _busy, onPressed: _busy ? null : _start),
+        InvPrimary(tr('Start a count'), key: const ValueKey('count-start'), busy: _busy, onPressed: _busy ? null : _start),
         const SizedBox(height: 16),
         if (_open == null)
           const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
         else if (_open!.isEmpty)
-          const StockEmpty('No count in progress', 'Start a count when you want to check the shelf against the app.', icon: LucideIcons.clipboardCheck)
+          StockEmpty(tr('No count in progress'), 'Start a count when you want to check the shelf against the app.', icon: LucideIcons.clipboardCheck)
         else
           for (final r in _open!)
             InvCard(
@@ -174,22 +175,22 @@ class _StockCountScreenState extends State<StockCountScreen> {
     return [
       Row(children: [
         Expanded(child: Text(d.number, style: inter(17, 700))),
-        TextButton(onPressed: () => setState(() => _doc = null), child: Text('All counts', style: inter(13.5, 700, color: kLink))),
+        TextButton(onPressed: () => setState(() => _doc = null), child: Text(tr('All counts'), style: inter(13.5, 700, color: kLink))),
       ]),
       const SizedBox(height: 8),
       StockNumbers([StockNumber(qty(system), 'In the app'), StockNumber(qty(counted), 'Counted'), StockNumber(signed(counted - system), 'Difference', color: counted == system ? kPostedText : kRedText)]),
       const SizedBox(height: 12),
       for (final l in d.lines) _line(l, open),
       if (open) ...[
-        InvSecondary('Add product', onPressed: _busy ? null : _addProduct),
+        InvSecondary(tr('Add product'), onPressed: _busy ? null : _addProduct),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: InvSecondary('Save', onPressed: _busy ? null : () => _save())),
+          Expanded(child: InvSecondary(tr('Save'), onPressed: _busy ? null : () => _save())),
           const SizedBox(width: 10),
-          Expanded(child: InvPrimary('Finish count', key: const ValueKey('count-finish'), busy: _busy, onPressed: _busy ? null : () => _save(finish: true))),
+          Expanded(child: InvPrimary(tr('Finish count'), key: const ValueKey('count-finish'), busy: _busy, onPressed: _busy ? null : () => _save(finish: true))),
         ]),
       ] else if (d.b('can_draft_adjustment') || d.status == 'review')
-        InvPrimary('Fix the difference', key: const ValueKey('count-fix'), busy: _busy, onPressed: _busy ? null : _fix),
+        InvPrimary(tr('Fix the difference'), key: const ValueKey('count-fix'), busy: _busy, onPressed: _busy ? null : _fix),
     ];
   }
 
@@ -203,11 +204,11 @@ class _StockCountScreenState extends State<StockCountScreen> {
           Expanded(child: Text(l.m('item').s('name'), style: inter(15, 700))),
           if (diff != null) StockStatusChip(diff == 0 ? 'healthy' : 'critical', label: diff == 0 ? 'Matches' : signed(diff)),
         ]),
-        StockRow('In the app', qty(l.n('system_qty'))),
+        StockRow(tr('In the app'), qty(l.n('system_qty'))),
         if (open)
-          Padding(padding: const EdgeInsets.only(top: 8), child: InvInput(key: ValueKey('count-qty-${l.s('id')}'), controller: c, number: true, hint: 'How many did you count?'))
+          Padding(padding: const EdgeInsets.only(top: 8), child: InvInput(key: ValueKey('count-qty-${l.s('id')}'), controller: c, number: true, hint: tr('How many did you count?')))
         else
-          StockRow('Counted', typed == null ? '—' : qty(typed)),
+          StockRow(tr('Counted'), typed == null ? '—' : qty(typed)),
       ]),
     );
   }

@@ -7,6 +7,7 @@ import '../home/home_widgets.dart' show kLime, rupees;
 import '../ui/theme.dart';
 import 'customer_widgets.dart';
 import 'customers_api.dart';
+import '../ui/i18n.dart';
 
 String _initials(String name) {
   final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
@@ -135,7 +136,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        const CwaTopBar(title: 'Customers'),
+        CwaTopBar(title: tr('Customers')),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
           child: TextField(
@@ -145,7 +146,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             style: inter(15, 500),
             decoration: InputDecoration(
               prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
-              hintText: 'Search by name or mobile number',
+              hintText: tr('Search by name or mobile number'),
               hintStyle: inter(14, 400, color: kMuted),
               filled: true,
               fillColor: Colors.white,
@@ -179,7 +180,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       ),
                     for (final c in _items) CustomerTile(customer: c, onTap: () => _open(c)),
                     if (p?.nextOffset != null)
-                      TextButton(onPressed: _loading ? null : () => _load(more: true), child: Text('Show more', style: inter(14, 600, color: kLink))),
+                      TextButton(onPressed: _loading ? null : () => _load(more: true), child: Text(tr('Show more'), style: inter(14, 600, color: kLink))),
                   ]),
                 ),
         ),
@@ -187,7 +188,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: CwaButton(label: 'Add customer', icon: LucideIcons.userPlus, onPressed: _add),
+            child: CwaButton(label: tr('Add customer'), icon: LucideIcons.userPlus, onPressed: _add),
           ),
         ),
       ]),
@@ -251,9 +252,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       backgroundColor: kBg,
       body: Column(children: [
         CwaTopBar(
-          title: 'Customer details',
+          title: tr('Customer details'),
           trailing: c != null && c.canManage
-              ? TextButton(key: const ValueKey('customer-edit'), onPressed: _edit, child: Text('Edit', style: inter(14, 600, color: kLink)))
+              ? TextButton(key: const ValueKey('customer-edit'), onPressed: _edit, child: Text(tr('Edit'), style: inter(14, 600, color: kLink)))
               : null,
         ),
         Expanded(
@@ -307,7 +308,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                     ]),
                   ),
                   const CwaSection('Recent bills'),
-                  if (c.orders.isEmpty) Text('No bills linked to this customer yet.', style: inter(13, 400, color: kMuted)),
+                  if (c.orders.isEmpty) Text(tr('No bills linked to this customer yet.'), style: inter(13, 400, color: kMuted)),
                   for (final o in c.orders)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -402,18 +403,18 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         CwaTopBar(title: editing ? 'Edit customer' : 'New customer'),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
-            CwaField(label: 'First name *', controller: _first, fieldKey: const ValueKey('cust-first')),
-            CwaField(label: 'Last name', controller: _last, fieldKey: const ValueKey('cust-last')),
-            CwaField(label: 'Mobile number *', controller: _phone, keyboardType: TextInputType.phone, hint: '10-digit mobile', enabled: full, fieldKey: const ValueKey('cust-phone')),
-            CwaField(label: 'Email', controller: _email, keyboardType: TextInputType.emailAddress, enabled: full),
-            CwaField(label: 'GSTIN (for business bills)', controller: _gst, hint: '22AAAAA0000A1Z5', enabled: full),
+            CwaField(label: tr('First name *'), controller: _first, fieldKey: const ValueKey('cust-first')),
+            CwaField(label: tr('Last name'), controller: _last, fieldKey: const ValueKey('cust-last')),
+            CwaField(label: tr('Mobile number *'), controller: _phone, keyboardType: TextInputType.phone, hint: tr('10-digit mobile'), enabled: full, fieldKey: const ValueKey('cust-phone')),
+            CwaField(label: tr('Email'), controller: _email, keyboardType: TextInputType.emailAddress, enabled: full),
+            CwaField(label: tr('GSTIN (for business bills)'), controller: _gst, hint: '22AAAAA0000A1Z5', enabled: full),
             Row(children: [
-              Expanded(child: CwaField(label: 'Birthday', controller: _dob, hint: 'YYYY-MM-DD', enabled: full)),
+              Expanded(child: CwaField(label: tr('Birthday'), controller: _dob, hint: 'YYYY-MM-DD', enabled: full)),
               const SizedBox(width: 10),
-              Expanded(child: CwaField(label: 'Anniversary', controller: _ann, hint: 'YYYY-MM-DD', enabled: full)),
+              Expanded(child: CwaField(label: tr('Anniversary'), controller: _ann, hint: 'YYYY-MM-DD', enabled: full)),
             ]),
-            CwaField(label: 'Address', controller: _address, maxLines: 2, enabled: full),
-            CwaField(label: 'Notes', controller: _notes, maxLines: 2),
+            CwaField(label: tr('Address'), controller: _address, maxLines: 2, enabled: full),
+            CwaField(label: tr('Notes'), controller: _notes, maxLines: 2),
             Text('Marketing messages are off until the customer agrees.', style: inter(11.5, 400, color: kMuted)),
           ]),
         ),

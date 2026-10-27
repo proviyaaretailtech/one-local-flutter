@@ -10,6 +10,8 @@ import 'catalogue_api.dart';
 import 'catalogue_format.dart';
 import 'catalogue_widgets.dart';
 import 'item_photo.dart';
+import 'quick_add_screen.dart';
+import '../ui/i18n.dart';
 
 /// "5" / "5.5" / "₹5.50" typed by a person, as paise. Null when it is not a price. This only reads what was typed; the database checks the value.
 int? parsePriceMinor(String text) {
@@ -33,7 +35,7 @@ Future<void> showAbout(BuildContext context, CatItem item, {required VoidCallbac
       );
   return showCatSheet<void>(
     context,
-    title: 'About this product',
+    title: tr('About this product'),
     body: (ctx) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
         Container(
@@ -68,7 +70,7 @@ Future<void> showAbout(BuildContext context, CatItem item, {required VoidCallbac
         Expanded(child: Text('Check the pack and System Code before selecting.', style: inter(12, 400, color: kMuted))),
       ]),
       const SizedBox(height: 16),
-      DarkButton('View product details', onPressed: () {
+      DarkButton(tr('View product details'), onPressed: () {
         Navigator.of(ctx).pop();
         onOpen();
       }),
@@ -127,9 +129,9 @@ class _DetailDrawerState extends State<_DetailDrawer> {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
-          Text('Stock movements', style: inter(16, 400, color: kMuted)),
+          Text(tr('Stock movements'), style: inter(16, 400, color: kMuted)),
           const SizedBox(width: 16),
-          Expanded(child: Text('View ›', textAlign: TextAlign.right, style: inter(17, 700, color: kLink))),
+          Expanded(child: Text(tr('View ›'), textAlign: TextAlign.right, style: inter(17, 700, color: kLink))),
         ]),
       ),
     );
@@ -161,7 +163,7 @@ class _DetailDrawerState extends State<_DetailDrawer> {
                       Text('${i.sku} · ${i.category.isEmpty ? 'No category' : i.category}', style: inter(16, 400, color: kMuted)),
                     ]),
                   ),
-                  IconButton(tooltip: 'Close', style: IconButton.styleFrom(backgroundColor: kSoftField), onPressed: () => Navigator.of(ctx).pop(), icon: const Icon(LucideIcons.x, size: 22)),
+                  IconButton(tooltip: tr('Close'), style: IconButton.styleFrom(backgroundColor: kSoftField), onPressed: () => Navigator.of(ctx).pop(), icon: const Icon(LucideIcons.x, size: 22)),
                 ]),
                 const Divider(height: 28, color: Color(0xFFE3E5DF)),
                 const Kick('Catalogue record'),
@@ -195,7 +197,7 @@ class _DetailDrawerState extends State<_DetailDrawer> {
                   child: Row(children: [
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Product image', style: inter(19, 700)),
+                        Text(tr('Product image'), style: inter(19, 700)),
                         const SizedBox(height: 3),
                         Text('View the existing catalogue photo', style: inter(15, 400, color: kMuted)),
                       ]),
@@ -206,7 +208,7 @@ class _DetailDrawerState extends State<_DetailDrawer> {
               ),
             ),
             const SizedBox(height: 16),
-            DarkButton('Edit catalogue details', onPressed: () => Navigator.of(ctx).pop(i), height: 60),
+            DarkButton(tr('Edit catalogue details'), onPressed: () => Navigator.of(ctx).pop(i), height: 60),
           ]),
         ),
       ),
@@ -231,7 +233,7 @@ Future<void> showImageViewer(BuildContext context, CatItem item) {
           else
             _noPhoto(),
           const SizedBox(height: 16),
-          OutlineButton('Close', onPressed: () => Navigator.of(ctx).pop(), height: 48),
+          OutlineButton(tr('Close'), onPressed: () => Navigator.of(ctx).pop(), height: 48),
         ]),
       ),
     ),
@@ -242,182 +244,14 @@ Widget _noPhoto() => Container(
       height: 160,
       alignment: Alignment.center,
       decoration: BoxDecoration(color: kSoftField, borderRadius: BorderRadius.circular(16)),
-      child: Text('No photo saved for this item yet.', style: inter(15, 400, color: kMuted)),
+      child: Text(tr('No photo saved for this item yet.'), style: inter(15, 400, color: kMuted)),
     );
 
 // ---------------------------------------------------------------- Quick add product
-/// [category]: the product goes into this category (made with the first product when it is new), shown at the top of the form.
-Future<CatItem?> showQuickAdd(BuildContext context, CatalogueApi api, {ItemPhotoService photos = const DeviceItemPhotos(), String? category}) =>
-    showDialog<CatItem>(context: context, builder: (_) => _QuickAdd(api: api, photos: photos, category: category));
-
-class _QuickAdd extends StatefulWidget {
-  const _QuickAdd({required this.api, required this.photos, this.category});
-  final CatalogueApi api;
-  final ItemPhotoService photos;
-  final String? category;
-  @override
-  State<_QuickAdd> createState() => _QuickAddState();
-}
-
-class _QuickAddState extends State<_QuickAdd> {
-  final _name = TextEditingController(), _sku = TextEditingController(), _price = TextEditingController();
-  final _key = CatalogueApi.newKey(); // one key for this dialog: a retried tap never adds twice
-  bool _busy = false;
-  String? _error;
-  ItemPhoto? _photo; // optional; goes on the item once it exists, like on Item creation
-
-  bool get _ready => _name.text.trim().isNotEmpty && _sku.text.trim().isNotEmpty && parsePriceMinor(_price.text) != null;
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _sku.dispose();
-    _price.dispose();
-    super.dispose();
-  }
-
-  Future<void> _add() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final item = await widget.api.save({'mode': 'quick', 'name': _name.text.trim(), 'sku': _sku.text.trim(), 'price_minor': parsePriceMinor(_price.text), 'category': ?widget.category}, key: _key);
-      // The product is added either way; when the photo cannot be saved the toast says why.
-      if (_photo != null) {
-        try {
-          await widget.photos.attach(item.id, _photo!);
-        } catch (e) {
-          if (mounted) showToast(context, '${item.name} added. ${e is ItemPhotoUnavailable ? e.message : 'The photo could not be saved.'}');
-        }
-      }
-      if (mounted) Navigator.of(context).pop(item);
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = e is CatalogueApiException ? e.message : 'Could not add the product. Try again.';
-        });
-      }
-    }
-  }
-
-  Future<void> _pickPhoto() async {
-    try {
-      final p = await widget.photos.pick();
-      if (p != null && mounted) setState(() => _photo = p);
-    } catch (e) {
-      if (mounted) showToast(context, e is ItemPhotoUnavailable ? e.message : 'That photo could not be opened.');
-    }
-  }
-
-  Widget _photoField() {
-    final p = _photo;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Product photo', style: inter(13, 600)),
-      const SizedBox(height: 6),
-      if (p == null)
-        AddPhotoBox(key: const ValueKey('quick-photo-add'), onTap: _busy ? null : _pickPhoto, height: 110)
-      else
-        Row(children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(color: kSoftField, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFDADCD5))),
-            clipBehavior: Clip.antiAlias,
-            child: Image.memory(p.bytes, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(LucideIcons.imageOff, color: kMuted)),
-          ),
-          const SizedBox(width: 12),
-          TextButton.icon(
-            key: const ValueKey('quick-photo-replace'),
-            onPressed: _busy ? null : _pickPhoto,
-            icon: const Icon(LucideIcons.refreshCw, size: 15, color: kInk),
-            label: Text('Replace', style: inter(13, 600)),
-          ),
-          TextButton.icon(
-            key: const ValueKey('quick-photo-remove'),
-            onPressed: _busy ? null : () => setState(() => _photo = null),
-            icon: const Icon(LucideIcons.trash2, size: 15, color: kError),
-            label: Text('Remove', style: inter(13, 600, color: kError)),
-          ),
-        ]),
-    ]);
-  }
-
-  Widget _field(String label, TextEditingController c, String hint, {TextInputType? type, List<TextInputFormatter>? formatters}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: inter(13, 600)),
-        const SizedBox(height: 6),
-        Container(
-          height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFDADCD5))),
-          alignment: Alignment.centerLeft,
-          child: TextField(
-            controller: c,
-            keyboardType: type,
-            inputFormatters: formatters,
-            onChanged: (_) => setState(() {}),
-            style: inter(14, 400),
-            decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(14, 400, color: kMuted)),
-          ),
-        ),
-      ]);
-
-  @override
-  Widget build(BuildContext context) => Dialog(
-        backgroundColor: Colors.white,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              Expanded(child: Text('Quick add product', style: inter(20, 700))),
-              IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(LucideIcons.x, size: 20, color: kMuted)),
-            ]),
-            Text('Create a catalogue record. Fill in all required fields to continue.', style: inter(13, 400, color: kMuted, height: 1.35)),
-            const SizedBox(height: 14),
-            Row(children: [Text('Record', style: inter(13, 400, color: kMuted)), const Spacer(), Text(widget.category == null ? 'New product' : 'Category: ${widget.category}', style: inter(13, 700))]),
-            const SizedBox(height: 14),
-            _field('Product name *', _name, 'Enter product name'),
-            const SizedBox(height: 14),
-            _field('System Code *', _sku, 'Enter unique System Code'),
-            const SizedBox(height: 14),
-            _field('Selling price (₹) *', _price, 'Enter price', type: const TextInputType.numberWithOptions(decimal: true), formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
-            const SizedBox(height: 14),
-            _photoField(),
-            const SizedBox(height: 14),
-            if (_error != null)
-              Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_error!, style: inter(12, 500, color: kError)))
-            else if (!_ready)
-              Padding(padding: const EdgeInsets.only(bottom: 10), child: Text('Required fields are blank · Not ready to add', style: inter(12, 400, color: kMuted))),
-            // Cancel and Add side by side, the app's usual button height.
-            Row(children: [
-              Expanded(child: OutlineButton('Cancel', onPressed: _busy ? null : () => Navigator.of(context).pop(), height: 48)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Material(
-                  color: _ready ? kPrimary : const Color(0xFFE5E7EB),
-                  borderRadius: BorderRadius.circular(24),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(24),
-                    onTap: _ready && !_busy ? _add : null,
-                    child: SizedBox(
-                      height: 48,
-                      child: Center(
-                        child: _busy
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: kLime))
-                            : Text('Add product', style: inter(14, 700, color: _ready ? kLime : kMuted)),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ]),
-          ]),
-        ),
-      );
-}
+/// Quick Add: the one screen that adds a product with its price, stock and supplier ([QuickAddScreen]). [category]: the product goes
+/// into this category (made with the first product when it is new).
+Future<CatItem?> showQuickAdd(BuildContext context, CatalogueApi api, {ItemPhotoService photos = const DeviceItemPhotos(), String? category, String? barcode}) =>
+    Navigator.of(context).push<CatItem>(MaterialPageRoute(builder: (_) => QuickAddScreen(api: api, photos: photos, category: category, barcode: barcode)));
 
 // ---------------------------------------------------------------- Scan barcode
 /// [initialCode]: a code already read (for example by the camera) that is looked up as the sheet opens, so a miss shows its message here.
@@ -492,14 +326,14 @@ class _ScanSheetState extends State<_ScanSheet> {
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            Expanded(child: Text('Scan barcode', style: inter(20, 700))),
-            IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(LucideIcons.x, size: 20, color: kMuted)),
+            Expanded(child: Text(tr('Scan barcode'), style: inter(20, 700))),
+            IconButton(tooltip: tr('Close'), onPressed: () => Navigator.of(context).pop(), icon: const Icon(LucideIcons.x, size: 20, color: kMuted)),
           ]),
           Text('Point the camera at the product\'s barcode, or type the number below.', style: inter(13, 400, color: kMuted, height: 1.35)),
           const SizedBox(height: 14),
           _BarcodeViewfinder(onTap: _busy ? null : _camera),
           const SizedBox(height: 16),
-          Text('Barcode or System Code', style: inter(13, 600, color: kMuted)),
+          Text(tr('Barcode or System Code'), style: inter(13, 600, color: kMuted)),
           const SizedBox(height: 6),
           Container(
             height: 46,
@@ -533,7 +367,7 @@ class _ScanSheetState extends State<_ScanSheet> {
                 child: Center(
                   child: _busy
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.2, color: kLime))
-                      : Text('Find product', style: inter(14, 700, color: ready ? kLime : kMuted)),
+                      : Text(tr('Find product'), style: inter(14, 700, color: ready ? kLime : kMuted)),
                 ),
               ),
             ),
@@ -577,7 +411,7 @@ class _BarcodeViewfinder extends StatelessWidget {
                   child: Row(children: [
                     const Icon(LucideIcons.camera, size: 14, color: kDark),
                     const SizedBox(width: 6),
-                    Text('Tap to scan with camera', style: inter(12, 700, color: kDark)),
+                    Text(tr('Tap to scan with camera'), style: inter(12, 700, color: kDark)),
                   ]),
                 ),
               ),

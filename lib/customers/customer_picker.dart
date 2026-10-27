@@ -7,6 +7,7 @@ import '../ui/theme.dart';
 import 'customer_widgets.dart';
 import 'customers_api.dart';
 import 'customers_screen.dart';
+import '../ui/i18n.dart';
 
 /// The answer of the S5.5 sheet: walk-in ([customer] null) or a customer of the business.
 class CustomerChoice {
@@ -98,9 +99,9 @@ class _CustomerPickerState extends State<CustomerPicker> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: kLine, borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 14),
-          Text('Customer for this bill', style: inter(18, 700)),
+          Text(tr('Customer for this bill'), style: inter(18, 700)),
           const SizedBox(height: 4),
-          Text('Existing, walk-in or new customer.', style: inter(13, 400, color: kMuted)),
+          Text(tr('Existing, walk-in or new customer.'), style: inter(13, 400, color: kMuted)),
           const SizedBox(height: 14),
           CwaCard(
             key: const ValueKey('pick-walk-in'),
@@ -108,8 +109,8 @@ class _CustomerPickerState extends State<CustomerPicker> {
             child: Row(children: [
               const Icon(LucideIcons.footprints, size: 20, color: kInk),
               const SizedBox(width: 12),
-              Expanded(child: Text('Walk-in customer', style: inter(15, 600))),
-              Text('No details', style: inter(12, 400, color: kMuted)),
+              Expanded(child: Text(tr('Walk-in customer'), style: inter(15, 600))),
+              Text(tr('No details'), style: inter(12, 400, color: kMuted)),
             ]),
           ),
           const SizedBox(height: 12),
@@ -123,7 +124,7 @@ class _CustomerPickerState extends State<CustomerPicker> {
             style: inter(15, 500),
             decoration: InputDecoration(
               prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
-              hintText: 'Mobile number or name',
+              hintText: tr('Mobile number or name'),
               hintStyle: inter(14, 400, color: kMuted),
               filled: true,
               fillColor: Colors.white,
@@ -139,12 +140,12 @@ class _CustomerPickerState extends State<CustomerPicker> {
                 : _loading && _items.isEmpty
                     ? const Center(child: CircularProgressIndicator())
                     : _items.isEmpty
-                        ? Center(child: Text('No customer found. Add them as new.', style: inter(13.5, 500, color: kMuted)))
+                        ? Center(child: Text(tr('No customer found. Add them as new.'), style: inter(13.5, 500, color: kMuted)))
                         : ListView(children: [
                             for (final c in _items) CustomerTile(customer: c, onTap: () => Navigator.of(context).pop(CustomerChoice(c))),
                           ]),
           ),
-          CwaButton(key: const ValueKey('pick-add-new'), label: 'Add new customer', icon: LucideIcons.userPlus, light: true, onPressed: _addNew),
+          CwaButton(key: const ValueKey('pick-add-new'), label: tr('Add new customer'), icon: LucideIcons.userPlus, light: true, onPressed: _addNew),
         ]),
       );
 }

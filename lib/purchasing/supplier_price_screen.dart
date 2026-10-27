@@ -6,6 +6,7 @@ import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Supplier Price Detail" with its three tabs: Overview & Trends (the active supplier selection and contract parameters), Alternative Bids
 /// (the suppliers bidding for the ingredient, "Select supplier") and Quality Audit (the latest audit round, "Re-Audit"). Only what the database holds is
@@ -65,7 +66,7 @@ class _SupplierPriceScreenState extends State<SupplierPriceScreen> {
       builder: (ctx) => AlertDialog(
         title: Text('Select $name?'),
         content: const Text('This supplier becomes the preferred one. The change is kept in the audit trail with your name and the time.'),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Select supplier'))],
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Cancel'))), TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Select supplier')))],
       ),
     );
     if (ok == true) await _run(() => env.api.selectSourcing(bid.s('price_id')));
@@ -88,7 +89,7 @@ class _SupplierPriceScreenState extends State<SupplierPriceScreen> {
 
   @override
   Widget build(BuildContext context) => InvScaffold(env: env.inv, onRefresh: _load, children: [
-        const InvTitle('Suppliers'),
+        InvTitle(tr('Supplier prices')),
         InvLoad<Facts>(data: _d, error: _error, onRetry: _load, builder: _body),
       ]);
 
@@ -105,7 +106,7 @@ class _SupplierPriceScreenState extends State<SupplierPriceScreen> {
       if (src.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Align(alignment: Alignment.centerLeft, child: PoChip(src, bg: kBlueIconBg, fg: kBlueIcon))),
       const SizedBox(height: 12),
       Row(children: [
-        Expanded(child: InvSecondary('Re-Audit', onPressed: actions.contains('re_audit') && !_busy ? () => _audit(d) : null)),
+        Expanded(child: InvSecondary(tr('Re-Audit'), onPressed: actions.contains('re_audit') && !_busy ? () => _audit(d) : null)),
         const SizedBox(width: 10),
         Expanded(child: InvPrimary('Select Sourcing', onPressed: actions.contains('select_sourcing') && !_busy ? () => setState(() => _tab = 'bids') : null)),
       ]),
@@ -157,7 +158,7 @@ class _SupplierPriceScreenState extends State<SupplierPriceScreen> {
     final c = d.m('contract');
     return [
       const InvSection('Active Supplier Selection'),
-      if (bids.isEmpty) InvCard(child: Text('No supplier prices recorded for this ingredient.', style: inter(14.5, 400, color: kMuted))),
+      if (bids.isEmpty) InvCard(child: Text(tr('No supplier prices recorded for this ingredient.'), style: inter(14.5, 400, color: kMuted))),
       for (final b in bids) _bidSummary(b, unit),
       Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -216,10 +217,10 @@ class _SupplierPriceScreenState extends State<SupplierPriceScreen> {
             Text('Payment Terms: ${b.m('supplier').s('payment_terms').isEmpty ? '—' : b.m('supplier').s('payment_terms')}', style: inter(14.5, 400)),
             const SizedBox(height: 4),
             Text('Supply Availability: ${_avail(b.no('availability_pct'))}', style: inter(14.5, 400)),
-            if (b.b('preferred')) ...[const SizedBox(height: 4), Text('Current preferred supplier', style: inter(14.5, 400))],
+            if (b.b('preferred')) ...[const SizedBox(height: 4), Text(tr('Current preferred supplier'), style: inter(14.5, 400))],
           ]),
         ),
-        if (!b.b('preferred') && actions.contains('select_sourcing')) InvSecondary('Select supplier', onPressed: _busy ? null : () => _select(b)),
+        if (!b.b('preferred') && actions.contains('select_sourcing')) InvSecondary(tr('Select supplier'), onPressed: _busy ? null : () => _select(b)),
       ],
     ];
   }
@@ -231,7 +232,7 @@ class _SupplierPriceScreenState extends State<SupplierPriceScreen> {
     return [
       const InvSection('Key Quality Checks'),
       if (a.n('rounds') == 0)
-        InvCard(child: Text('No audit recorded yet.', style: inter(14.5, 400, color: kMuted)))
+        InvCard(child: Text(tr('No audit recorded yet.'), style: inter(14.5, 400, color: kMuted)))
       else ...[
         Container(
           width: double.infinity,
@@ -290,12 +291,12 @@ class _AuditSheetState extends State<_AuditSheet> {
           child: Padding(
             padding: EdgeInsets.fromLTRB(20, 20, 20, 12 + MediaQuery.viewInsetsOf(context).bottom),
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text('Re-Audit', style: inter(18, 700)),
+              Text(tr('Re-Audit'), style: inter(18, 700)),
               const SizedBox(height: 8),
               Flexible(
                 child: ListView(shrinkWrap: true, children: [
                   for (final r in widget.rows) ...[
-                    InvInput(controller: r.name, hint: 'Check name'),
+                    InvInput(controller: r.name, hint: tr('Check name')),
                     const SizedBox(height: 6),
                     Row(children: [
                       for (final (id, label) in const [('pass', 'Pass'), ('warning', 'Warning'), ('fail', 'Fail')])
@@ -304,13 +305,13 @@ class _AuditSheetState extends State<_AuditSheet> {
                           child: ChoiceChip(label: Text(label), selected: r.result == id, onSelected: (_) => setState(() => r.result = id)),
                         ),
                     ]),
-                    InvInput(controller: r.detail, hint: 'Note (optional)'),
+                    InvInput(controller: r.detail, hint: tr('Note (optional)')),
                     const Divider(height: 24, color: kCardLine),
                   ],
-                  InvSecondary('Add check', onPressed: () => setState(() => widget.rows.add(_CheckRow('', 'pass', '')))),
+                  InvSecondary(tr('Add check'), onPressed: () => setState(() => widget.rows.add(_CheckRow('', 'pass', '')))),
                 ]),
               ),
-              InvPrimary('Record audit', onPressed: () {
+              InvPrimary(tr('Record audit'), onPressed: () {
                 final out = <Map<String, String>>[
                   for (final r in widget.rows)
                     if (r.name.text.trim().isNotEmpty) {'name': r.name.text.trim(), 'result': r.result, 'detail': r.detail.text.trim()},

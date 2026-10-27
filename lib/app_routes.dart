@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'account/routes.dart';
 import 'auth/auth_repository.dart';
 import 'auth/partner_api.dart';
+import 'catalogue/catalogue_api.dart' show CatalogueApi;
 import 'catalogue/catalogue_screen.dart';
 import 'catalogue/grn_screens.dart';
 import 'catalogue/item_parts.dart';
+import 'catalogue/item_sheets.dart' show showQuickAdd;
 import 'home/app_shell.dart';
 import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
@@ -36,7 +38,9 @@ import 'sell/sell_env.dart';
 import 'sell/sell_screen.dart';
 import 'service/calendar_screen.dart';
 import 'service/service_widgets.dart' show ServiceRoutes;
+import 'settings/settings_api.dart' show SettingsApi;
 import 'settings/settings_screen.dart';
+import 'ui/i18n.dart';
 import 'settings/support_screens.dart';
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
@@ -81,7 +85,7 @@ void installRoutes() {
       ? Navigator.of(c).push(MaterialPageRoute(
           builder: (_) => GrnQueueScreen(onReceive: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(ctx)))))))
       : _itemPart(c, 'purchase');
-  // "Open Receipt" on a purchase review: that delivery's receipt in Receiving.
+  // "Open Receipt" on Check delivery: that delivery's receipt in Receiving.
   HomeNav.receipt = (c, documentId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(c), documentId: documentId)));
   HomeNav.stock = (c) {
     if (!_restaurant) return _itemPart(c, 'stock');
@@ -90,6 +94,14 @@ void installRoutes() {
   };
   HomeNav.stockItem = (c, itemId) => openStockPage(c, _stockEnv(c), StockPage.item, itemId: itemId);
   HomeNav.stockPage = (c, page, {itemId}) => openStockPage(c, _stockEnv(c), page, itemId: itemId);
+  // the side menu's search: the Bill's own pages, and Quick add (it adds the product, its stock and its supplier in one screen)
+  HomeNav.billPage = (c, page) => SellEnv(onTab: (id) => _tab(c, id)).open(c, page);
+  HomeNav.quickAdd = (c) => showQuickAdd(c, CatalogueApi());
+  HomeNav.loadLanguage = () async {
+    try {
+      setAppLanguage((await SettingsApi().get()).language);
+    } catch (_) {} // English until the settings can be read
+  };
   KitchenEnv kitchenEnv(BuildContext c) => KitchenEnv(onNavigate: (id) => _kitchenTab(c, id));
   HomeNav.kitchenSetup = (c) => Navigator.of(c).push(KitchenSetupScreen.route(kitchenEnv(c)));
   HomeNav.kitchenDisplay = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => KdsScreen(env: kitchenEnv(c))));

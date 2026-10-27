@@ -10,6 +10,7 @@ import '../shift/refund_blocked_screen.dart';
 import 'sell_api.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Returns & Refunds" (All, Customer Returns, Supplier Returns): a customer brings items back, a manager approves or rejects it,
 /// and an approved return is refunded through the counter refund (manager only, capped to the money taken, idempotent). The refund value is
@@ -79,9 +80,9 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
       context,
       title: 'Reject ${r.returnNo}',
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        TextField(controller: note, autofocus: true, decoration: const InputDecoration(hintText: 'Why is it rejected?')),
+        TextField(controller: note, autofocus: true, decoration: InputDecoration(hintText: tr('Why is it rejected?'))),
         const SizedBox(height: 14),
-        DarkCta(label: 'Reject return', onPressed: () => Navigator.pop(ctx, true)),
+        DarkCta(label: tr('Reject return'), onPressed: () => Navigator.pop(ctx, true)),
       ]),
     );
     if (ok == true) await _act(() => env.sell.decideReturn(r.id, approve: false, note: note.text.trim()), '${r.returnNo} rejected.');
@@ -100,7 +101,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
   }
 
   Future<void> _newReturn() async {
-    final done = await showOrderSheet<bool>(context, title: 'New customer return', body: (ctx) => _NewReturn(env: env));
+    final done = await showOrderSheet<bool>(context, title: tr('New customer return'), body: (ctx) => _NewReturn(env: env));
     if (done == true) {
       if (mounted) showToast(context, 'Return recorded. A manager approves it next.');
       _load();
@@ -108,7 +109,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
   }
 
   Future<void> _pickStatus() async {
-    final s = await showOrderSheet<String>(context, title: 'Status', body: (ctx) => Column(mainAxisSize: MainAxisSize.min, children: [for (final (id, l) in _statuses) ListTile(contentPadding: EdgeInsets.zero, title: Text(l, style: inter(15, id == _status ? 800 : 500)), onTap: () => Navigator.pop(ctx, id))]));
+    final s = await showOrderSheet<String>(context, title: tr('Status'), body: (ctx) => Column(mainAxisSize: MainAxisSize.min, children: [for (final (id, l) in _statuses) ListTile(contentPadding: EdgeInsets.zero, title: Text(l, style: inter(15, id == _status ? 800 : 500)), onTap: () => Navigator.pop(ctx, id))]));
     if (s != null) {
       _status = s;
       _load();
@@ -121,12 +122,12 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(title: 'Returns & refunds', initials: env.initials),
+        SellTopBar(title: tr('Returns & refunds'), initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
             Row(children: [
               Expanded(child: SellTitle('Returns & Refunds', sub: env.storeLine)),
-              Material(color: kDark, shape: const StadiumBorder(), child: InkWell(customBorder: const StadiumBorder(), onTap: _newReturn, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), child: Text('+ Return', style: inter(14, 700, color: kLime))))),
+              Material(color: kDark, shape: const StadiumBorder(), child: InkWell(customBorder: const StadiumBorder(), onTap: _newReturn, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), child: Text(tr('+ Return'), style: inter(14, 700, color: kLime))))),
             ]),
             const SizedBox(height: 12),
             SellSearchField(controller: _q, hint: 'Return ID, order/invoice, customer, supplier or product', onChanged: (_) {
@@ -143,9 +144,9 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
             ),
             const SizedBox(height: 12),
             if (_kind == 'supplier') const StateCard(icon: LucideIcons.truck, title: 'Supplier returns come later', body: 'Sending goods back to a supplier is part of goods receiving, a later section of the app.'),
-            if (_kind != 'supplier' && _error != null) StateCard(icon: LucideIcons.database, danger: true, title: 'Returns could not load', body: _error!, primary: 'Retry', onPrimary: _load),
+            if (_kind != 'supplier' && _error != null) StateCard(icon: LucideIcons.database, danger: true, title: tr('Returns could not load'), body: _error!, primary: 'Retry', onPrimary: _load),
             if (_kind != 'supplier' && _error == null && _rows == null) const SkeletonRows(),
-            if (_kind != 'supplier' && _rows != null && rows.isEmpty) const StateCard(icon: LucideIcons.undo2, title: 'No returns', body: 'No customer return matches these filters.'),
+            if (_kind != 'supplier' && _rows != null && rows.isEmpty) StateCard(icon: LucideIcons.undo2, title: tr('No returns'), body: 'No customer return matches these filters.'),
             for (final r in rows) ...[_card(r), const SizedBox(height: 12)],
           ]),
         ),
@@ -179,7 +180,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
         Semantics(
           button: true,
           label: 'View details ${r.returnNo}',
-          child: InkWell(onTap: () => setState(() => open ? _open.remove(r.id) : _open.add(r.id)), child: Row(children: [Text('View details', style: inter(17, 700)), const Spacer(), Icon(open ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18)])),
+          child: InkWell(onTap: () => setState(() => open ? _open.remove(r.id) : _open.add(r.id)), child: Row(children: [Text(tr('View details'), style: inter(17, 700)), const Spacer(), Icon(open ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18)])),
         ),
         if (open) ...[
           const Divider(height: 20, color: kLine),
@@ -187,12 +188,12 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
           KeyValue('Bill', '#${r.orderNo}', bold: false),
           const SizedBox(height: 8),
           if (r.status == 'requested') Row(children: [
-            Expanded(child: LightCta(label: 'Reject', onPressed: _busy ? null : () => _reject(r))),
+            Expanded(child: LightCta(label: tr('Reject'), onPressed: _busy ? null : () => _reject(r))),
             const SizedBox(width: 10),
-            Expanded(child: DarkCta(label: 'Approve', onPressed: _busy ? null : () => _act(() => env.sell.decideReturn(r.id, approve: true), '${r.returnNo} approved.'))),
+            Expanded(child: DarkCta(label: tr('Approve'), onPressed: _busy ? null : () => _act(() => env.sell.decideReturn(r.id, approve: true), '${r.returnNo} approved.'))),
           ]),
           if (r.status == 'approved') DarkCta(label: 'Issue refund ${rupees(r.amount)}', onPressed: _busy ? null : () => _refund(r)),
-          if (r.status == 'requested' || r.status == 'approved') Padding(padding: const EdgeInsets.only(top: 6), child: Text('Approving and refunding is for managers.', style: inter(12, 400, color: kMuted))),
+          if (r.status == 'requested' || r.status == 'approved') Padding(padding: const EdgeInsets.only(top: 6), child: Text(tr('Approving and refunding is for managers.'), style: inter(12, 400, color: kMuted))),
         ],
       ]),
     );
@@ -281,14 +282,14 @@ class _NewReturnState extends State<_NewReturn> {
   Widget build(BuildContext context) {
     if (_bill == null) {
       return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SellSearchField(controller: _q, hint: 'Bill number or customer', onChanged: (_) {
+        SellSearchField(controller: _q, hint: tr('Bill number or customer'), onChanged: (_) {
           _debounce?.cancel();
           _debounce = Timer(const Duration(milliseconds: 300), _find);
         }),
         const SizedBox(height: 8),
         if (_error != null) Text(_error!, style: inter(13, 400, color: kBadText)),
         if (_bills == null && _error == null) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator(color: kGreenText))),
-        if (_bills != null && _bills!.isEmpty) Padding(padding: const EdgeInsets.all(12), child: Text('No paid bill found.', style: inter(13, 400, color: kMuted))),
+        if (_bills != null && _bills!.isEmpty) Padding(padding: const EdgeInsets.all(12), child: Text(tr('No paid bill found.'), style: inter(13, 400, color: kMuted))),
         if (_bills != null)
           ConstrainedBox(
             constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.5),
@@ -308,7 +309,7 @@ class _NewReturnState extends State<_NewReturn> {
             if ((_qty[i['order_item_id']] ?? 0) > 0)
               Padding(
                 padding: const EdgeInsets.only(right: 4),
-                child: FilterChip(label: const Text('Damaged'), selected: _damaged.contains(i['order_item_id']), onSelected: (v) => setState(() => v ? _damaged.add('${i['order_item_id']}') : _damaged.remove('${i['order_item_id']}'))),
+                child: FilterChip(label: Text(tr('Damaged')), selected: _damaged.contains(i['order_item_id']), onSelected: (v) => setState(() => v ? _damaged.add('${i['order_item_id']}') : _damaged.remove('${i['order_item_id']}'))),
               ),
             IconButton(tooltip: 'One less ${i['name']}', onPressed: (_qty[i['order_item_id']] ?? 0) > 0 ? () => setState(() => _qty[i['order_item_id']] = _qty[i['order_item_id']]! - 1) : null, icon: const Icon(LucideIcons.minus, size: 16)),
             Text('${_qty[i['order_item_id']] ?? 0}', style: inter(15, 700)),
@@ -317,11 +318,11 @@ class _NewReturnState extends State<_NewReturn> {
         const SizedBox(height: 8),
         Wrap(spacing: 8, runSpacing: 8, children: [for (final r in _ReturnsScreenState._reasons) ChoiceChip(label: Text(r), selected: _reason == r, selectedColor: const Color(0xFFA5FF2D), onSelected: (_) => setState(() => _reason = r))]),
         const SizedBox(height: 10),
-        TextField(controller: _note, decoration: const InputDecoration(hintText: 'Note (optional)')),
+        TextField(controller: _note, decoration: InputDecoration(hintText: tr('Note (optional)'))),
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: inter(13, 400, color: kBadText))),
         const SizedBox(height: 14),
-        DarkCta(label: 'Record return', busy: _busy, onPressed: _submit),
-        TextButton(onPressed: () => setState(() => _bill = null), child: const Text('Choose another bill')),
+        DarkCta(label: tr('Record return'), busy: _busy, onPressed: _submit),
+        TextButton(onPressed: () => setState(() => _bill = null), child: Text(tr('Choose another bill'))),
       ]),
     );
   }

@@ -103,53 +103,6 @@ void main() {
       expect(find.byType(CartsScreen), findsOneWidget);
     });
 
-    testWidgets('+ New category: name it (or tap one), add its first product, and the category opens', (t) async {
-      final till = Till();
-      final asked = <String>[];
-      final env = till.env(addFirstItem: (_, c) async {
-        asked.add(c);
-        return true;
-      });
-      await tall(t, SellScreen(env: env));
-      // pinned at the top of the category column, above All items, so it is never scrolled out of sight
-      expect(t.getRect(find.byKey(const ValueKey('sell-new-category'))).top, lessThan(t.getRect(find.text('All items').first).top));
-      final loads = till.calls.where((r) => r.url.path.endsWith('/rpc/pos_sell_catalog')).length;
-      await t.tap(find.byKey(const ValueKey('sell-new-category')));
-      await t.pumpAndSettle();
-      expect(find.text('New category'), findsWidgets);
-      expect(find.text('Snacks'), findsWidgets); // already a category: not offered as an idea
-      expect(find.text('Personal care'), findsOneWidget);
-      await t.tap(find.text('Personal care'));
-      await t.pump();
-      await t.tap(find.byKey(const ValueKey('new-category-next')));
-      await t.pumpAndSettle();
-      expect(asked, ['Personal care']);
-      expect(till.calls.where((r) => r.url.path.endsWith('/rpc/pos_sell_catalog')).length, greaterThan(loads));
-      expect(toast('Category Personal care is ready with its first product.'), findsOneWidget);
-    });
-
-    testWidgets('+ New category: an existing name adds to that category; Cancel does nothing', (t) async {
-      final till = Till();
-      final asked = <String>[];
-      await tall(t, SellScreen(env: till.env(addFirstItem: (_, c) async {
-        asked.add(c);
-        return true;
-      })));
-      await t.tap(find.byKey(const ValueKey('sell-new-category')));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Cancel'));
-      await t.pumpAndSettle();
-      expect(asked, isEmpty);
-      await t.tap(find.byKey(const ValueKey('sell-new-category')));
-      await t.pumpAndSettle();
-      await t.enterText(find.byKey(const ValueKey('new-category-name')), 'dairy');
-      await t.pump();
-      await t.tap(find.byKey(const ValueKey('new-category-next')));
-      await t.pumpAndSettle();
-      expect(asked, ['Dairy']);
-      expect(toast('Product added to Dairy.'), findsOneWidget);
-    });
-
     testWidgets('shows the catalogue; an unavailable item cannot be added; ADD fills the cart and PAY shows the server total', (t) async {
       final till = Till();
       final env = till.env();
@@ -194,28 +147,16 @@ void main() {
         expect(env.carts.active.isEmpty, isTrue);
       });
 
-      testWidgets('tabs: In Stock, Fast Moving (most sold per day first) and Low Inventory', (t) async {
+      testWidgets('no All Items / In Stock / Fast Moving / Low Inventory tabs and no New category: every product of the category shows', (t) async {
         final env = stocked().env();
         await tall(t, SellScreen(env: env));
-        for (final l in ['All Items', 'In Stock', 'Fast Moving', 'Low Inventory']) {
-          expect(find.text(l), findsOneWidget, reason: l);
+        for (final l in ['All Items', 'In Stock', 'Fast Moving', 'Low Inventory', 'New\ncategory']) {
+          expect(find.text(l), findsNothing, reason: l);
         }
-        await t.tap(find.text('In Stock'));
-        await t.pumpAndSettle();
-        expect(find.text('Coca-Cola 500ml'), findsOneWidget);
-        expect(find.text('Amul Butter 500g'), findsNothing);
-        await t.tap(find.text('Fast Moving'));
-        await t.pumpAndSettle();
-        // Coca-Cola sells 14/day, the chocolate 2/day; butter has no recent sales
-        expect(t.getTopLeft(find.text('Coca-Cola 500ml')).dy, lessThanOrEqualTo(t.getTopLeft(find.text('Cadbury Dairy Milk')).dy));
-        expect(find.text('Amul Butter 500g'), findsNothing);
-        await t.ensureVisible(find.text('Low Inventory')); // the tab row scrolls sideways on a phone
-        await t.pumpAndSettle();
-        await t.tap(find.text('Low Inventory'));
-        await t.pumpAndSettle();
-        expect(find.text('Amul Butter 500g'), findsOneWidget);
-        expect(find.text('Cadbury Dairy Milk'), findsOneWidget);
-        expect(find.text('Coca-Cola 500ml'), findsNothing);
+        expect(find.byKey(const ValueKey('sell-new-category')), findsNothing);
+        for (final p in ['Coca-Cola 500ml', 'Amul Butter 500g', 'Cadbury Dairy Milk']) {
+          expect(find.text(p), findsOneWidget, reason: p);
+        }
       });
 
       testWidgets('the cart shows what each line saves against MRP', (t) async {
@@ -546,34 +487,175 @@ void main() {
     });
   });
 
+  group('Bill search and scan', () {
+    testWidgets('the scan button reads a barcode with the camera and puts that product in the cart; the cart bar opens the carts', (t) async {
+      final realScan = scanForSale, realLookup = systemCodeForBarcode;
+      addTearDown(() {
+        scanForSale = realScan;
+        systemCodeForBarcode = realLookup;
+      });
+      final scanned = <String>[];
+      scanForSale = (_) async => '8901262150019';
+      systemCodeForBarcode = (code) async {
+        scanned.add(code);
+        return 'AB500';
+      };
+      final env = Till().env();
+      await tall(t, SellScreen(env: env));
+      expect(find.byIcon(LucideIcons.search), findsWidgets); // search on the left
+      await t.tap(find.byKey(const ValueKey('sell-scan'))); // the barcode button on the right
+      await t.pumpAndSettle();
+      expect(scanned, ['8901262150019']);
+      expect(env.carts.active.lines.single.name, 'Amul Butter 500g');
+      expect(find.text('Amul Butter 500g added.'), findsOneWidget);
+      // the wallet bar: this cart, and a tap opens cart management
+      expect(find.byKey(const ValueKey('cart-wallet-bar')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('cart-wallet-bar')));
+      await t.pumpAndSettle();
+      expect(find.byType(CartsScreen), findsOneWidget);
+    });
+
+    testWidgets('a code no product has is left in the search box', (t) async {
+      final realScan = scanForSale, realLookup = systemCodeForBarcode;
+      addTearDown(() {
+        scanForSale = realScan;
+        systemCodeForBarcode = realLookup;
+      });
+      scanForSale = (_) async => '0000000000';
+      systemCodeForBarcode = (_) async => null;
+      final env = Till().env();
+      await tall(t, SellScreen(env: env));
+      await t.tap(find.byKey(const ValueKey('sell-scan')));
+      await t.pumpAndSettle();
+      expect(env.carts.active.isEmpty, isTrue);
+      expect(find.text('No product has the code 0000000000.'), findsOneWidget);
+    });
+  });
+
   group('Carts', () {
-    testWidgets('the active cart shows items and quantities; + / − re-quote; a second cart waits; held bills are listed with Pay', (t) async {
+    testWidgets('a wallet: the green card is the active cart with its items; the held pile fans out; a parked cart can be made active', (t) async {
       final till = Till();
       till.receipts = [receipt('h1', 'P-00090', 'Neha Shah', 420, status: 'unpaid', label: 'Unpaid', paid: 0)];
       final env = till.env();
       cartWith(env.carts);
       await tall(t, CartsScreen(env: env));
       expect(find.text('Cart'), findsOneWidget);
-      expect(find.text('1 open · 1 on hold'), findsOneWidget);
+      expect(find.text('1 active · 1 on hold'), findsOneWidget);
+      expect(find.byKey(const ValueKey('wallet-card-active')), findsOneWidget);
       expect(find.text('Cart #1'), findsWidgets);
       expect(find.text('Amul Butter 500g'), findsWidgets);
       await t.tap(find.bySemanticsLabel('One more Coca-Cola 500ml'), warnIfMissed: false);
       await t.tap(find.byIcon(LucideIcons.plus).first);
-      await t.tap(find.text('+ New cart'));
+      await t.tap(find.byKey(const ValueKey('cart-new')));
       await t.pumpAndSettle();
       expect(env.carts.carts.length, 2);
-      expect(find.text('Cart #1'), findsWidgets);
+      expect(find.text('1 active · 2 on hold'), findsOneWidget);
+      expect(find.text('On hold · 2'), findsOneWidget); // the pile: Cart #1, now parked, and the held bill
+      await t.tap(find.byKey(const ValueKey('wallet-card-hold')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('wallet-hold')), findsOneWidget);
       expect(find.text('P-00090'), findsOneWidget);
-      expect(find.text('On hold'), findsOneWidget);
+      expect(find.text('Neha Shah'), findsOneWidget);
+      // the held bill opens, with its items, Pay and Cancel
+      await t.tap(find.text('P-00090'));
+      await t.pumpAndSettle();
       await t.tap(find.text('Show items').first);
       await t.pumpAndSettle();
       expect(find.text('Hide items'), findsWidgets);
+      // the parked cart opens and becomes the active one again
+      final parked = env.carts.carts.first;
+      await t.tap(find.text('Cart #1').last);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(ValueKey('cart-activate-${parked.id}')));
+      await t.pumpAndSettle();
+      expect(env.carts.active, parked);
+      expect(find.byKey(const ValueKey('wallet-active')), findsOneWidget);
     });
 
-    testWidgets('a held bill can be cancelled', (t) async {
+    testWidgets('the customer on any card is edited from the card: the active cart here, a held bill on the server', (t) async {
+      final till = Till();
+      till.receipts = [receipt('h1', 'P-00090', 'Neha Shah', 420, status: 'unpaid', label: 'Unpaid', paid: 0)];
+      final env = till.env();
+      await tall(t, CartsScreen(env: env));
+      await t.tap(find.byKey(const ValueKey('cart-edit-active')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('cart-customer-name')), 'Ravi Kumar');
+      await t.enterText(find.byKey(const ValueKey('cart-customer-phone')), '98220 01122');
+      await t.tap(find.byKey(const ValueKey('cart-customer-save')));
+      await t.pumpAndSettle();
+      expect(env.carts.active.customerName, 'Ravi Kumar');
+      expect(env.carts.active.customerPhone, '9822001122');
+      expect(find.text('Ravi Kumar'), findsOneWidget);
+      // a held bill
+      await t.tap(find.byKey(const ValueKey('wallet-card-hold')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cart-edit-h1')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('cart-customer-name')), 'Neha S. Shah');
+      await t.enterText(find.byKey(const ValueKey('cart-customer-phone')), '9000000007');
+      await t.tap(find.byKey(const ValueKey('cart-customer-save')));
+      await t.pumpAndSettle();
+      final sent = jsonDecode(till.where('POST', '/rpc/pos_hold_update').single.body) as Map<String, dynamic>;
+      expect([sent['order_id'], sent['customer_name'], sent['customer_phone']], ['h1', 'Neha S. Shah', '9000000007']);
+      expect(sent['idempotency_key'], isNotEmpty);
+    });
+
+    testWidgets('more items go onto a held card: a held bill is re-priced with its old and new lines; a parked cart takes them directly', (t) async {
+      final till = Till();
+      till.receipts = [receipt('h1', 'P-00090', 'Neha Shah', 420, status: 'unpaid', label: 'Unpaid', paid: 0)];
+      final env = till.env();
+      cartWith(env.carts);
+      await tall(t, CartsScreen(env: env));
+      Future<void> pickButter() async {
+        await t.enterText(find.byType(TextField).first, 'butter');
+        await t.testTextInput.receiveAction(TextInputAction.search);
+        await t.pumpAndSettle();
+        await t.tap(find.byIcon(LucideIcons.plus).first);
+        await t.pumpAndSettle();
+        t.state<NavigatorState>(find.byType(Navigator)).pop();
+        await t.pumpAndSettle();
+      }
+
+      // the held bill
+      await t.tap(find.byKey(const ValueKey('wallet-card-hold')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('P-00090'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cart-add-h1')));
+      await t.pumpAndSettle();
+      expect(find.byType(SearchScreen), findsOneWidget);
+      await pickButter();
+      final sent = jsonDecode(till.where('POST', '/rpc/pos_hold_update').single.body) as Map<String, dynamic>;
+      final lines = {for (final l in sent['lines'] as List) (l as Map)['menu_item_id']: l['qty']};
+      expect(lines.keys, containsAll(['m1', 'm2', 'm3', 'm4', 'm5'])); // every line it had
+      expect(lines.values.fold<int>(0, (n, q) => n + (q as int)), 10); // 9 units it had + 1 added
+      expect(find.text('1 item added to P-00090.'), findsOneWidget);
+      // a cart parked on this till
+      await t.tap(find.byKey(const ValueKey('wallet-card-active')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cart-new')));
+      await t.pumpAndSettle();
+      final parked = env.carts.carts.first;
+      final before = parked.units;
+      await t.tap(find.byKey(const ValueKey('wallet-card-hold')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Cart #1').last);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(ValueKey('cart-add-${parked.id}')));
+      await t.pumpAndSettle();
+      await pickButter();
+      expect(parked.units, before + 1);
+      expect(env.carts.active, isNot(parked)); // still on hold
+    });
+
+    testWidgets('a held bill can be cancelled from its card', (t) async {
       final till = Till();
       till.receipts = [receipt('h1', 'P-00090', 'Neha Shah', 420, status: 'unpaid', label: 'Unpaid', paid: 0)];
       await tall(t, CartsScreen(env: till.env()));
+      await t.tap(find.byKey(const ValueKey('wallet-card-hold')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('P-00090'));
+      await t.pumpAndSettle();
       await t.tap(find.text('Cancel this held bill'));
       await t.pumpAndSettle();
       expect(jsonDecode(till.where('POST', '/cancel').single.body)['reason'], 'Held bill cancelled');

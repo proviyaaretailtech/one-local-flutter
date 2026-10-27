@@ -113,7 +113,8 @@ class SettingsEnv {
   final String Function()? newKey;
 }
 
-const kLanguages = <String, String>{'en': 'English', 'hi': 'हिन्दी (Hindi)', 'mr': 'मराठी (Marathi)', 'gu': 'ગુજરાતી (Gujarati)', 'ta': 'தமிழ் (Tamil)', 'te': 'తెలుగు (Telugu)', 'kn': 'ಕನ್ನಡ (Kannada)', 'bn': 'বাংলা (Bengali)'};
+/// The app's three languages (founder, 26 Oct 2026); the database accepts only these codes.
+const kLanguages = <String, String>{'en': 'English', 'hi': 'हिन्दी (Hindi)', 'hi-en': 'Hinglish'};
 
 /// "09:00" -> "9:00 AM".
 String clock12(String? hhmm) {

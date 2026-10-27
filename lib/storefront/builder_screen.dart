@@ -216,7 +216,7 @@ class _StorePageBuilderState extends State<StorePageBuilder> {
       backgroundColor: Colors.white,
       builder: (_) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (final e in const [('profile', 'Business profile', LucideIcons.store), ('offers', 'Offers & promotions', LucideIcons.tag), ('hours', 'Business hours', LucideIcons.clock), ('delivery', 'Delivery settings', LucideIcons.truck), ('ads', 'Ads', LucideIcons.megaphone)])
+          for (final e in const [('profile', 'Business profile', LucideIcons.store), ('offers', 'Offers & promotions', LucideIcons.tag), ('hours', 'Business hours', LucideIcons.clock), ('ads', 'Ads', LucideIcons.megaphone)])
             ListTile(leading: Icon(e.$3), title: Text(e.$2), trailing: const Icon(LucideIcons.chevronRight, size: 18), onTap: () => Navigator.pop(context, e.$1)),
         ]),
       ),
@@ -226,7 +226,6 @@ class _StorePageBuilderState extends State<StorePageBuilder> {
       'profile' => ProfileScreen(api: api),
       'offers' => OffersScreen(api: api),
       'hours' => HoursScreen(api: api),
-      'delivery' => DeliveryScreen(api: api),
       _ => AdsScreen(api: api, categories: c.catalogueCategories),
     };
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));

@@ -13,6 +13,7 @@ import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/home/side_nav.dart';
 import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart';
+import 'package:vinii_pos/inventory/inventory_widgets.dart' show InvChips;
 import 'package:vinii_pos/stock/alerts_screen.dart';
 import 'package:vinii_pos/stock/stock_env.dart';
 import 'package:vinii_pos/stock/stock_home.dart';
@@ -86,7 +87,7 @@ void main() {
       await phone(t, StockHomeScreen(env: f.env));
       expect(find.text('Stock Management'), findsOneWidget);
       expect(find.byWidgetPredicate((w) => w.key is ValueKey<String> && '${(w.key! as ValueKey<String>).value}'.startsWith('stock-tab-')), findsNothing);
-      for (final b in ['Needs attention', 'Adjust', 'Transfer', 'Movements', 'Count stock']) {
+      for (final b in ['Alerts', 'Adjust', 'Transfer', 'History', 'Count']) {
         expect(find.text(b), findsOneWidget, reason: b);
       }
     });
@@ -129,7 +130,7 @@ void main() {
       expect(find.text('Coca-Cola 500ml'), findsOneWidget);
       expect(find.text('₹40'), findsOneWidget);
       expect(find.text('Cost ₹30'), findsOneWidget);
-      expect(find.byWidgetPredicate((w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal && w.child is! Row), findsNothing);
+      expect(find.byWidgetPredicate((w) => w is SingleChildScrollView && w.scrollDirection == Axis.horizontal && w.child is! Row && w.child is! InvChips), findsNothing); // chip lines may scroll
       await t.tap(find.byKey(const ValueKey('section-availability')));
       await t.pumpAndSettle();
       expect(find.byType(Switch), findsNWidgets(4)); // Store and App for both products

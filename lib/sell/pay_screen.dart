@@ -12,6 +12,7 @@ import 'result_screens.dart';
 import 'sell_carts.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "446 Payment": the bill, how it is paid (Cash, Card, UPI / QR, Split Pay), the totals the server worked out, a coupon, the cash
 /// received and the change. Pays a new [cart] through section E's checkout, or a held bill ([held]) through its pay; a split pays one
@@ -105,11 +106,11 @@ class _PayScreenState extends State<PayScreen> {
     final c = TextEditingController(text: cart.couponCode ?? '');
     final code = await showOrderSheet<String>(
       context,
-      title: 'Apply coupon',
+      title: tr('Apply coupon'),
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        TextField(controller: c, autofocus: true, textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(hintText: 'Coupon code')),
+        TextField(controller: c, autofocus: true, textCapitalization: TextCapitalization.characters, decoration: InputDecoration(hintText: tr('Coupon code'))),
         const SizedBox(height: 16),
-        DarkCta(label: 'Apply', onPressed: () => Navigator.pop(ctx, c.text.trim())),
+        DarkCta(label: tr('Apply'), onPressed: () => Navigator.pop(ctx, c.text.trim())),
       ]),
     );
     if (code == null || !mounted) return;
@@ -130,13 +131,13 @@ class _PayScreenState extends State<PayScreen> {
     final name = TextEditingController(text: cart.customerName), phone = TextEditingController(text: cart.customerPhone);
     final ok = await showOrderSheet<bool>(
       context,
-      title: 'Customer',
+      title: tr('Customer'),
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        TextField(controller: name, decoration: const InputDecoration(hintText: 'Name')),
+        TextField(controller: name, decoration: InputDecoration(hintText: tr('Name'))),
         const SizedBox(height: 10),
-        TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: 'Mobile number')),
+        TextField(controller: phone, keyboardType: TextInputType.phone, decoration: InputDecoration(hintText: tr('Mobile number'))),
         const SizedBox(height: 16),
-        DarkCta(label: 'Save', onPressed: () => Navigator.pop(ctx, true)),
+        DarkCta(label: tr('Save'), onPressed: () => Navigator.pop(ctx, true)),
       ]),
     );
     if (ok == true && mounted) {
@@ -276,9 +277,9 @@ class _PayScreenState extends State<PayScreen> {
             DarkCta(label: 'Pay ${rupees(_total)}', busy: _busy, onPressed: (order == null && q == null && _method != 'split') ? null : _pay),
             const SizedBox(height: 10),
             Row(children: [
-              Expanded(child: LightCta(label: 'Send by WhatsApp', onPressed: _whatsapp)),
+              Expanded(child: LightCta(label: tr('Send by WhatsApp'), onPressed: _whatsapp)),
               const SizedBox(width: 10),
-              Expanded(child: LightCta(label: 'Save & Hold', onPressed: _busy ? null : _hold)),
+              Expanded(child: LightCta(label: tr('Save & Hold'), onPressed: _busy ? null : _hold)),
             ]),
             if (_method == 'card' || _method == 'upi') ...[
               const SizedBox(height: 4),
@@ -384,17 +385,17 @@ class _PayScreenState extends State<PayScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 2.5),
             child: Row(children: [
-              Text('Discount', style: inter(15, 500, color: kGreenText)),
+              Text(tr('Discount'), style: inter(15, 500, color: kGreenText)),
               if (code != null) ...[const SizedBox(width: 8), TagChip(code)],
               const Spacer(),
               Text('−${rupees(disc)}', style: inter(15, 700, color: kGreenText)),
             ]),
           ),
         const Divider(height: 22, color: kLine),
-        Row(children: [Text('Total Amount', style: inter(17, 800)), const Spacer(), Text(rupees(total), style: inter(26, 800, color: kGreenText))]),
+        Row(children: [Text(tr('Total Amount'), style: inter(17, 800)), const Spacer(), Text(rupees(total), style: inter(26, 800, color: kGreenText))]),
         if (_method == 'cash') ...[
           const SizedBox(height: 12),
-          Text('Amount Received', style: inter(13, 600, color: kMuted)),
+          Text(tr('Amount Received'), style: inter(13, 600, color: kMuted)),
           const SizedBox(height: 6),
           Container(
             height: 52,
@@ -434,7 +435,7 @@ class _PayScreenState extends State<PayScreen> {
           ]),
           const Divider(height: 22, color: kLine),
           Row(children: [
-            Text('Change Due', style: inter(15, 500, color: kMuted)),
+            Text(tr('Change Due'), style: inter(15, 500, color: kMuted)),
             const Spacer(),
             if (change > 0) ...[TagChip('+${rupees(change)}'), const SizedBox(width: 8)],
             Text(rupees(change > 0 ? change : 0), style: inter(24, 800, color: kGreenText)),
@@ -462,8 +463,8 @@ class _PayScreenState extends State<PayScreen> {
             child: Row(children: [
               DropdownButton<String>(
                 value: _parts[i].method,
-                underline: const SizedBox.shrink(),
-                items: const [DropdownMenuItem(value: 'cash', child: Text('Cash')), DropdownMenuItem(value: 'card', child: Text('Card')), DropdownMenuItem(value: 'upi', child: Text('UPI'))],
+                underline: SizedBox.shrink(),
+                items: [DropdownMenuItem(value: 'cash', child: Text(tr('Cash'))), DropdownMenuItem(value: 'card', child: Text(tr('Card'))), DropdownMenuItem(value: 'upi', child: Text('UPI'))],
                 onChanged: (v) {
                   _parts[i].method = v!;
                   _intentChanged();
@@ -476,7 +477,7 @@ class _PayScreenState extends State<PayScreen> {
                   controller: _parts[i].amount,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-                  decoration: InputDecoration(prefixText: '₹ ', hintText: 'Amount', suffixIcon: _parts.length > 2 ? IconButton(icon: const Icon(LucideIcons.x, size: 16), tooltip: 'Remove part', onPressed: () {
+                  decoration: InputDecoration(prefixText: '₹ ', hintText: tr('Amount'), suffixIcon: _parts.length > 2 ? IconButton(icon: const Icon(LucideIcons.x, size: 16), tooltip: 'Remove part', onPressed: () {
                     _parts.removeAt(i);
                     _intentChanged();
                   }) : null),

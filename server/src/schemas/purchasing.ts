@@ -48,3 +48,9 @@ export const AuditRecord = obj({
     result: z.enum(['pass', 'warning', 'fail'], { message: 'Each check is pass, warning or fail.' }),
   }).loose()).min(1, 'Record at least one check.').max(20, 'At most 20 checks.'),
 });
+/** Quick Add's supplier: an item's usual supplier, with its buying price (paise) when known. */
+export const ItemSupplier = obj({
+  inventory_item_id: id.optional(), sku: z.string().trim().max(40).optional(),
+  supplier_id: z.string({ message: 'Choose a supplier.' }).trim().min(1, 'Choose a supplier.').max(100),
+  price_minor: z.number().int().min(0).max(100_000_000).optional(), ...key,
+});

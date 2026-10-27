@@ -129,6 +129,7 @@ class Till {
       return ok(intentRow(status: st == 'cancelled' ? 'cancelled' : 'failed', attempt: {'status': st, 'code': '', 'message': 'Not received'}));
     }
     if (p.endsWith('/rpc/pos_refund_check')) return ok({'allowed': true, 'purpose': body()['purpose'] ?? 'refund', 'reasons': [], 'display_no': 'P-00087', 'total': 630, 'taken': 630, 'refunded': 0, 'refundable_left': 630, 'return_days': 7, 'days_since_paid': 0});
+    if (p.endsWith('/rpc/pos_hold_update')) return ok({'order_id': orderId, 'updated_at': '2026-10-27T10:00:00Z', 'changed': false, 'replayed': false});
     if (p.contains('/pos-orders/') && m == 'GET') return ok(view('checkout'));
     return err(404, 'unexpected ${r.method} $p');
   });

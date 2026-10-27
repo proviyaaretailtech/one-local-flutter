@@ -139,6 +139,7 @@ export const MANIFEST: Entry[] = [
   db('inv_forecast', { args: inv.Forecast, map: P, rate: 'read', roles: 'staff with inventory:read' }),
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
+  db('inv_opening_stock', { args: inv.OpeningStock, map: P, rate: 'write', idem: true, roles: 'owner or manager (inventory:approve)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   // ---- kitchen stations and the kitchen display, section H (0480, 0481). Body = the function's `p` object; the database checks organisation,
   //      location and role (kitchen:view / kitchen:configure; order.update_status to act on a ticket). Writes carry the Idempotency-Key header.
@@ -245,6 +246,7 @@ export const MANIFEST: Entry[] = [
   // Item → Purchase → Suppliers (C:\onelocal\hosted_add_supplier.sql): the list with contact details, and add / change one.
   db('pur_supplier_list', { args: pur.Options, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
   db('pur_supplier_save', { args: pur.SupplierSave, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
+  db('pur_item_supplier_set', { args: pur.ItemSupplier, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
   db('pur_po_act', { args: pur.PoAct, map: P, rate: 'write', roles: 'purchasing:record (submit, cancel a draft or pending order); purchasing:approve_po (approve, reject, cancel an approved order)' }),
   db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
   db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),

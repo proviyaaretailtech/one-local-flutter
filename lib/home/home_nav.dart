@@ -51,6 +51,11 @@ class HomeNav {
   static ItemRoute? stockItem;
   // Stock management: one stock page by its id (lib/stock/stock_env.dart StockPage), for one stock item when [itemId] is given.
   static void Function(BuildContext context, String page, {String? itemId})? stockPage;
+  // The Bill's own pages by id ('carts', 'history', 'returns', 'receipts', 'shift'), and Quick add (the side menu's search opens them).
+  static void Function(BuildContext context, String page)? billPage;
+  static HomeRoute? quickAdd;
+  // Reads the store's language when the app opens (the app sets it; tests leave it unset).
+  static Future<void> Function()? loadLanguage;
   // Section H kitchen: stations setup and the Kitchen Display System.
   static HomeRoute? kitchenSetup;
   static HomeRoute? kitchenDisplay;
@@ -103,6 +108,9 @@ class HomeNav {
   static void reset() {
     stockItem = null;
     stockPage = null;
+    billPage = null;
+    quickAdd = null;
+    loadLanguage = null;
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
     home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = customers = wallet = account = menu = null;

@@ -36,7 +36,7 @@ class PurchasingApi {
     }
   }
 
-  /// Suppliers, stock items, known supplier prices and the open order count: what "Restaurant Purchase" picks from.
+  /// Suppliers, stock items, known supplier prices and the open order count: what a new purchase order picks from.
   Future<Facts> options() async => Facts(await _call('pur_options', {}));
 
   /// Purchase History: [status] all / open / pending / received, [due] all / open / overdue.
@@ -64,6 +64,13 @@ class PurchasingApi {
 
   /// This business's suppliers with their contact details (`suppliers`: id, name, phone, gstin, city, contact_person, payment_terms).
   Future<List<Facts>> suppliers() async => Facts(await _call('pur_supplier_list', {})).l('suppliers');
+
+  /// An item's usual supplier and its buying price (Quick Add): New order then suggests them.
+  Future<Facts> setItemSupplier(String inventoryItemId, String supplierId, {int? priceMinor, String? key}) async => Facts(await _call('pur_item_supplier_set', {
+        'inventory_item_id': inventoryItemId,
+        'supplier_id': supplierId,
+        'price_minor': ?priceMinor,
+      }, key: key ?? newKey()));
 
   /// Adds a supplier ([id] null) or changes one. Only [name] is required; the database checks phone, GSTIN and duplicates.
   Future<Facts> saveSupplier({String? id, required String name, String? phone, String? gstin, String? city, String? key}) async => Facts(await _call('pur_supplier_save', {

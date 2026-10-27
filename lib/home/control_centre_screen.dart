@@ -17,6 +17,7 @@ import '../service/service_dashboard.dart';
 import '../restaurant/restaurant_api.dart';
 import '../restaurant/restaurant_dashboard.dart';
 import '../restaurant/restaurant_more_screen.dart';
+import '../ui/i18n.dart';
 
 /// Figma section D "Seller Admin Dashboard / POS control center". Every figure comes from
 /// `GET /api/partner/home`; a tile without a data source says so instead of showing a number.
@@ -90,9 +91,9 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(kPadX, 24, kPadX, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Show data for', style: inter(15, 600)),
+            Text(tr('Show data for'), style: inter(15, 600)),
             const SizedBox(height: 8),
-            _OutletOption(label: 'All my outlets', selected: _location == null, onTap: () => Navigator.pop(ctx, '')),
+            _OutletOption(label: tr('All my outlets'), selected: _location == null, onTap: () => Navigator.pop(ctx, '')),
             for (final o in s.outlets)
               _OutletOption(label: (o['name'] ?? '') as String, selected: _location == o['id'], onTap: () => Navigator.pop(ctx, o['id'] as String)),
           ]),
@@ -135,15 +136,15 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(kPadX, 16, kPadX, 8),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            _MenuRow(icon: LucideIcons.chartColumn, label: 'Sales feed', onTap: () {
+            _MenuRow(icon: LucideIcons.chartColumn, label: tr('Sales feed'), onTap: () {
               Navigator.pop(ctx);
               _openHub(c);
             }),
-            _MenuRow(icon: LucideIcons.settings, label: 'Settings', onTap: () {
+            _MenuRow(icon: LucideIcons.settings, label: tr('Settings'), onTap: () {
               Navigator.pop(ctx);
               HomeNav.go(c, HomeNav.settings ?? HomeNav.setup, 'Settings');
             }),
-            _MenuRow(icon: LucideIcons.logOut, label: 'Sign out', onTap: () {
+            _MenuRow(icon: LucideIcons.logOut, label: tr('Sign out'), onTap: () {
               Navigator.pop(ctx);
               _signOut();
             }),
@@ -289,16 +290,16 @@ class _Body extends StatelessWidget {
                 ]),
                 const SizedBox(height: 12),
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: _StatTile(label: 'Sales', value: s.salesTotal == null ? '—' : rupees(s.salesTotal!.round()))),
+                  Expanded(child: _StatTile(label: tr('Sales'), value: s.salesTotal == null ? '—' : rupees(s.salesTotal!.round()))),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: _StatTile(label: 'Orders', value: s.ordersCount == null ? '—' : count(s.ordersCount!), note: '${s.activeCount ?? 0} active now'),
+                    child: _StatTile(label: tr('Orders'), value: s.ordersCount == null ? '—' : count(s.ordersCount!), note: '${s.activeCount ?? 0} active now'),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: (s.ordersCount ?? 0) == 0 || s.unitsSold == null
-                        ? const _StatTile(label: 'Items sold', value: '—', note: 'Not reported')
-                        : _StatTile(label: 'Items sold', value: count(s.unitsSold!)),
+                        ? _StatTile(label: tr('Items sold'), value: '—', note: tr('Not reported'))
+                        : _StatTile(label: tr('Items sold'), value: count(s.unitsSold!)),
                   ),
                 ]),
                 const SizedBox(height: 10),
@@ -315,7 +316,7 @@ class _Body extends StatelessWidget {
                           style: inter(11.5, 400, color: kMuted),
                         ),
                       ),
-                      Text('Today’s report', style: inter(11.5, 600, color: kLink)),
+                      Text(tr('Today’s report'), style: inter(11.5, 600, color: kLink)),
                       const Icon(LucideIcons.chevronRight, size: 14, color: kLink),
                     ]),
                   ),
@@ -330,7 +331,7 @@ class _Body extends StatelessWidget {
             SectionHeader(
               'Active orders',
               badge: GreyTag('${s.activeCount ?? 0} active', dot: (s.activeCount ?? 0) > 0 ? kRed : kMuted),
-              action: 'View all',
+              action: tr('View all'),
               onAction: () => HomeNav.go(context, HomeNav.orders, 'Orders'),
             ),
             const SizedBox(height: 12),
@@ -340,15 +341,15 @@ class _Body extends StatelessWidget {
               for (final o in s.activeOrders) ...[_OrderCard(o), const SizedBox(height: 8)],
             const SizedBox(height: 12),
             // "Full report" is the stock alerts (low stock, expiry, not selling, mismatch) (founder, 25 Oct 2026)
-            SectionHeader('Stock health', action: 'Full report', onAction: () => HomeNav.go(context, HomeNav.stockPage == null ? null : (c) => HomeNav.stockPage!(c, 'alerts'), 'Stock alerts')),
+            SectionHeader('Stock health', action: tr('Full report'), onAction: () => HomeNav.go(context, HomeNav.stockPage == null ? null : (c) => HomeNav.stockPage!(c, 'alerts'), 'Stock alerts')),
             const SizedBox(height: 12),
             _StockCard(s),
             if (s.stock.isNotEmpty) ...[
               const SizedBox(height: 8),
-              LimeOnDarkButton(label: 'Restock critical items', onPressed: () => HomeNav.go(context, HomeNav.lowStock, 'Restocking')),
+              LimeOnDarkButton(label: tr('Restock critical items'), onPressed: () => HomeNav.go(context, HomeNav.lowStock, 'Restocking')),
             ],
             const SizedBox(height: 20),
-            SectionHeader('Business insights', badge: GreyTag(day), action: 'See all', onAction: onInsights),
+            SectionHeader('Business insights', badge: GreyTag(day), action: tr('See all'), onAction: onInsights),
             const SizedBox(height: 12),
             _RevenueCard(s),
             const SizedBox(height: 8),
@@ -368,7 +369,7 @@ class _Body extends StatelessWidget {
             Center(
               child: InkWell(
                 onTap: () => HomeNav.go(context, HomeNav.support, 'Support'),
-                child: Padding(padding: const EdgeInsets.all(4), child: Text('Need help? Contact support', style: inter(11, 600))),
+                child: Padding(padding: const EdgeInsets.all(4), child: Text(tr('Need help? Contact support'), style: inter(11, 600))),
               ),
             ),
           ]),
@@ -433,7 +434,7 @@ class _AttentionCard extends StatelessWidget {
                       child: Text('${gaps[i].$2} ${gaps[i].$2 == 1 ? 'item' : 'items'} missing ${gaps[i].$2 == 1 ? 'a ${gaps[i].$1}' : '${gaps[i].$1}s'}',
                           style: inter(12.5, 500)),
                     ),
-                    Text('Fix', style: inter(12.5, 700, color: kLink)),
+                    Text(tr('Fix'), style: inter(12.5, 700, color: kLink)),
                   ]),
                 ),
               ),
@@ -574,12 +575,12 @@ class _RevenueCard extends StatelessWidget {
         Text('REVENUE & OPERATIONS', style: inter(10, 700, color: kMuted)),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: _SoftTile(label: 'Revenue', value: s.salesTotal == null ? '—' : rupees(s.salesTotal!.round()), foot: '${s.ordersCount ?? 0} orders')),
+          Expanded(child: _SoftTile(label: tr('Revenue'), value: s.salesTotal == null ? '—' : rupees(s.salesTotal!.round()), foot: '${s.ordersCount ?? 0} orders')),
           const SizedBox(width: 8),
           Expanded(
             child: s.expenses == null
-                ? const _SoftTile(label: 'Expenses', value: '—', foot: 'Not tracked yet')
-                : _SoftTile(label: 'Expenses', value: rupees(s.expenses!.round()), foot: dayLabel(s.day, caps: false)),
+                ? _SoftTile(label: tr('Expenses'), value: '—', foot: 'Not tracked yet')
+                : _SoftTile(label: tr('Expenses'), value: rupees(s.expenses!.round()), foot: dayLabel(s.day, caps: false)),
           ),
         ]),
         const SizedBox(height: 10),
@@ -594,7 +595,7 @@ class _RevenueCard extends StatelessWidget {
         const SizedBox(height: 4),
         _InsightRow(
           dot: kGreenDot,
-          label: 'Purchase received',
+          label: tr('Purchase received'),
           value: grnBills == null ? 'Not reported' : grnBills == 0 ? 'None today' : '$grnBills bill${grnBills == 1 ? '' : 's'} · ${s.grnAmount == null ? 'cost not entered' : rupees(s.grnAmount!)}',
           valueColor: kInk,
         ),
@@ -706,7 +707,7 @@ class _ErrorState extends StatelessWidget {
           const SizedBox(height: 8),
           Text(offline ? 'Check your internet connection and try again.' : error.toString(), textAlign: TextAlign.center, style: inter(10.5, 400, color: kMuted, height: 1.5)),
           const SizedBox(height: 20),
-          SizedBox(width: 200, child: PrimaryAction(label: 'Try again', onPressed: onRetry)),
+          SizedBox(width: 200, child: PrimaryAction(label: tr('Try again'), onPressed: onRetry)),
         ]),
       ),
     );

@@ -128,11 +128,11 @@ void main() {
     });
   });
 
-  group('Goods Receipt Note', () {
+  group('Purchase order page', () {
     testWidgets('a received order: the Figma discrepancy lines, tax and total as the server computed them; no receive button', (t) async {
       final s = Fake();
       await showTall(t, PoGrnScreen(env: s.env, orderId: (fx['po_received'] as Map)['id'] as String));
-      expect(find.text('Goods Receipt Note'), findsOneWidget);
+      expect(find.text('Purchase order'), findsOneWidget);
       expect(find.text('SPO-0007 · ABC Foods'), findsOneWidget);
       expect(find.text('Received'), findsWidgets);
       expect(find.text('Discrepancy'), findsWidgets);
@@ -143,7 +143,7 @@ void main() {
       expect(find.text('₹239.90'), findsOneWidget);
       expect(find.text('Purchase total'), findsOneWidget);
       expect(find.text('₹3,872.40'), findsOneWidget);
-      expect(find.text('Confirm Receipt & Update Stock'), findsNothing);
+      expect(find.text('Receive goods'), findsNothing);
     });
 
     testWidgets('a partly received order: In progress, what arrived so far, and the confirm button', (t) async {
@@ -152,7 +152,7 @@ void main() {
       await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
       expect(find.text('In progress'), findsOneWidget);
       expect(find.text('5.0 kg accepted'), findsOneWidget);
-      expect(find.text('Confirm Receipt & Update Stock'), findsOneWidget);
+      expect(find.text('Receive goods'), findsOneWidget);
     });
 
     testWidgets('a pending order: waiting for approval, no confirm button, Cancel order asks the server', (t) async {
@@ -161,7 +161,7 @@ void main() {
       await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
       expect(find.text('Pending approval'), findsOneWidget);
       expect(find.textContaining('Waiting for approval'), findsOneWidget);
-      expect(find.text('Confirm Receipt & Update Stock'), findsNothing);
+      expect(find.text('Receive goods'), findsNothing);
       expect(find.text('Approve order'), findsNothing);
       await t.tap(find.text('Cancel order'));
       await t.pumpAndSettle();
@@ -175,12 +175,12 @@ void main() {
       final po = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['approve', 'reject', 'cancel']};
       final s = Fake((r) => fnOf(r) == 'pur_po_view' ? ok(po) : (fnOf(r) == 'pur_po_act' ? ok({...po, 'status': 'Approved', 'allowed_actions': ['receive']}) : null));
       await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
-      expect(find.text('Reject'), findsOneWidget);
+      expect(find.text("Don't approve"), findsOneWidget);
       await t.tap(find.text('Approve order'));
       await t.pumpAndSettle();
       expect(argsOf(s.requests.lastWhere((r) => fnOf(r) == 'pur_po_act'))['action'], 'approve');
       expect(find.text('Approved'), findsWidgets);
-      expect(find.text('Confirm Receipt & Update Stock'), findsOneWidget);
+      expect(find.text('Receive goods'), findsOneWidget);
     });
 
     testWidgets('a refused action shows the server sentence, not a crash', (t) async {
@@ -197,7 +197,7 @@ void main() {
       final po = Map<String, dynamic>.from(fx['po_partial'] as Map);
       final s = Fake((r) => fnOf(r) == 'pur_po_receive' ? ok({'document_id': 'doc-1', 'doc_no': 'RCV-001', 'status': 'draft', 'version': 1, 'created': true, 'po': po}) : null);
       await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
-      await t.tap(find.text('Confirm Receipt & Update Stock'));
+      await t.tap(find.text('Receive goods'));
       await t.pump();
       final call = s.requests.lastWhere((r) => fnOf(r) == 'pur_po_receive');
       expect(argsOf(call)['id'], po['id']);
@@ -205,15 +205,15 @@ void main() {
     });
   });
 
-  group('Restaurant Purchase', () {
+  group('New purchase order', () {
     testWidgets('supplier, items, estimated total and create; the server gets paise and one key', (t) async {
       final s = Fake((r) => fnOf(r) == 'pur_po_create' ? ok(fx['po_partial']) : null);
       await showTall(t, PoCreateScreen(env: s.env));
-      expect(find.text('Restaurant Purchase'), findsOneWidget);
-      expect(find.text('Open 0 orders'), findsOneWidget);
+      expect(find.text('New purchase order'), findsOneWidget);
+      expect(find.text('0 open orders already'), findsOneWidget);
       expect(find.text('Estimated total'), findsOneWidget);
       expect(find.text('₹0'), findsOneWidget);
-      expect(tester(t, 'Create purchase order'), isNull); // disabled until a supplier and an item exist
+      expect(tester(t, 'Place order'), isNull); // disabled until a supplier and an item exist
       await t.tap(find.textContaining('Choose a supplier'));
       await t.pumpAndSettle();
       await t.tap(find.text('ABC Foods').last);
@@ -225,20 +225,83 @@ void main() {
       final fields = find.byType(TextField);
       await t.enterText(fields.at(0), '10');
       await t.enterText(fields.at(1), '360');
-      await t.enterText(fields.at(2), '5');
+      expect(find.text('GST (%)'), findsNothing); // no GST while ordering: it comes from the bill
       await t.tap(find.text('Add to order'));
       await t.pumpAndSettle();
       expect(find.text('10 kg · ₹360/kg'), findsOneWidget);
       expect(find.text('₹3,600'), findsWidgets);
-      await t.tap(find.text('Create purchase order'));
+      await t.tap(find.text('Place order'));
       await t.pumpAndSettle();
       final call = s.requests.lastWhere((r) => fnOf(r) == 'pur_po_create');
       final a = argsOf(call);
       expect(a['supplier_id'], isNotEmpty);
       expect(a['submit'], true);
       final line = (a['lines'] as List).single as Map;
-      expect([line['qty'], line['unit_cost_minor'], line['gst_pct']], [10, 36000, 5]);
+      expect([line['qty'], line['unit_cost_minor'], line['gst_pct']], [10, 36000, 0]);
+      expect(find.byKey(const ValueKey('purchase-steps-1')), findsNothing); // gone to the order page
       expect(call.headers['Idempotency-Key'], startsWith('pur-'));
+    });
+
+    Future<void> createOne(WidgetTester t, Fake s) async {
+      await showTall(t, PoCreateScreen(env: s.env));
+      await t.tap(find.textContaining('Choose a supplier'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('ABC Foods').last);
+      await t.pumpAndSettle();
+      await t.tap(find.text('Add item'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Paneer').last);
+      await t.pumpAndSettle();
+      final fields = find.byType(TextField);
+      await t.enterText(fields.at(0), '10');
+      await t.enterText(fields.at(1), '360');
+      expect(find.text('GST (%)'), findsNothing); // no GST while ordering: it comes from the bill
+      await t.tap(find.text('Add to order'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Place order'));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('an approver (the owner) does not approve their own order by hand: it is approved straight away', (t) async {
+      final pending = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['approve', 'reject', 'cancel']};
+      final s = Fake((r) => switch (fnOf(r)) {
+            'pur_po_create' => ok(pending),
+            'pur_po_act' => ok({...pending, 'status': 'Approved', 'allowed_actions': ['receive', 'cancel']}),
+            'pur_po_view' => ok({...pending, 'status': 'Approved', 'allowed_actions': ['receive', 'cancel']}),
+            _ => null,
+          });
+      await createOne(t, s);
+      expect(argsOf(s.requests.lastWhere((r) => fnOf(r) == 'pur_po_act'))['action'], 'approve');
+      expect(toast('${pending['number']} placed. Receive it when the goods come.'), findsOneWidget);
+      expect(find.text('Approve order'), findsNothing);
+    });
+
+    testWidgets('anyone else\'s order is left waiting for an approver', (t) async {
+      final pending = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['cancel']};
+      final s = Fake((r) => fnOf(r) == 'pur_po_create' || fnOf(r) == 'pur_po_view' ? ok(pending) : null);
+      await createOne(t, s);
+      expect(s.requests.where((r) => fnOf(r) == 'pur_po_act'), isEmpty);
+      expect(toast("${pending['number']} placed. It waits for the owner's approval."), findsOneWidget);
+      expect(find.text('Approve order'), findsNothing);
+    });
+  });
+
+  group('Send to supplier', () {
+    testWidgets('the small send icon opens WhatsApp to the supplier\'s saved number with the order written out', (t) async {
+      final po = fx['po_partial'] as Map<String, dynamic>;
+      final supplierId = (po['supplier'] as Map)['id'];
+      final s = Fake((r) => fnOf(r) == 'pur_supplier_list' ? ok({'suppliers': [{'id': supplierId, 'name': 'ABC Foods', 'phone': '98765 43210'}]}) : null);
+      final opened = <Uri>[];
+      await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String, openUrl: (u) async { opened.add(u); return true; }));
+      await t.tap(find.byKey(const ValueKey('po-send')));
+      await t.pumpAndSettle();
+      final u = opened.single;
+      expect('${u.host}${u.path}', 'wa.me/919876543210');
+      final text = u.queryParameters['text']!;
+      expect(text, startsWith('Purchase order ${po['number']}'));
+      for (final l in po['lines'] as List) {
+        expect(text, contains((l as Map)['name']));
+      }
     });
   });
 
@@ -246,7 +309,7 @@ void main() {
     testWidgets('overview: active selection, audit-trail banner and contract parameters; unknown figures are dashes', (t) async {
       final s = Fake();
       await showTall(t, SupplierPriceScreen(env: s.env, priceId: 'p-1'));
-      expect(find.text('Suppliers'), findsOneWidget);
+      expect(find.text('Supplier prices'), findsOneWidget);
       expect(find.textContaining('Fresh Malai Paneer'), findsOneWidget);
       expect(find.textContaining('Supplier: ABC Foods · UOM: Per KG · System Code: INGR-042'), findsOneWidget);
       expect(find.text('AI Inferred'), findsOneWidget);

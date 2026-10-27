@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../orders/order_widgets.dart';
 import '../states/state_kit.dart';
 import '../ui/theme.dart';
+import '../ui/i18n.dart';
 
 /// Loading / error (with retry) / content, shared by the section N tabs. Errors show the server's sentence.
 class NoticeLoad<T> extends StatelessWidget {
@@ -28,9 +29,9 @@ class NoticeLoad<T> extends StatelessWidget {
         child: StatusCard(
           icon: LucideIcons.cloudOff,
           tone: StateTone.warn,
-          title: 'Could not load this',
+          title: tr('Could not load this'),
           body: error!,
-          primaryLabel: 'Try again',
+          primaryLabel: tr('Try again'),
           onPrimary: onRetry,
         ),
       );

@@ -9,6 +9,8 @@ import 'po_grn_screen.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
 import 'supplier_price_screen.dart';
+import '../ui/i18n.dart';
+import '../ui/purchase_steps.dart';
 
 /// One item on the order being built. Only ids, quantities and prices in paise go to the server, which checks every one again.
 class PoDraftLine {
@@ -23,7 +25,7 @@ class PoDraftLine {
   Map<String, Object?> toJson() => {'inventory_item_id': itemId, 'qty': qty, 'unit_cost_minor': unitCostMinor, 'gst_pct': gstPct};
 }
 
-/// Figma "Restaurant Purchase": supplier, the items to buy with their prices, the estimated total (before GST) and "Create purchase order".
+/// A new purchase order (Figma "Restaurant Purchase", used by every business): supplier, the items to buy with their prices, the estimated total (before GST) and "Create purchase order".
 class PoCreateScreen extends StatefulWidget {
   const PoCreateScreen({super.key, required this.env});
   final PurEnv env;
@@ -95,7 +97,6 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
   Future<PoDraftLine?> _lineSheet(Facts item, int priceMinor, String? priceId) {
     final qtyC = TextEditingController();
     final priceC = TextEditingController(text: priceMinor > 0 ? (priceMinor / 100).toString().replaceFirst(RegExp(r'\.0$'), '') : '');
-    final gstC = TextEditingController(text: '0');
     return showModalBottomSheet<PoDraftLine>(
       context: context,
       isScrollControlled: true,
@@ -109,16 +110,15 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
           InvInput(controller: qtyC, number: true, hint: '0'),
           InvLabel('Price per ${item.s('unit')} (₹)'),
           InvInput(controller: priceC, number: true, hint: '0'),
-          InvLabel('GST (%)'),
-          InvInput(controller: gstC, number: true, hint: '0'),
+          // no GST here (founder, 26 Oct 2026): the tax is taken from the supplier's bill and the product when goods are matched
           const SizedBox(height: 12),
-          InvPrimary('Add to order', onPressed: () {
-            final q = num.tryParse(qtyC.text.trim()), p = num.tryParse(priceC.text.trim()), g = num.tryParse(gstC.text.trim()) ?? 0;
-            if (q == null || q <= 0 || p == null || p < 0 || g < 0 || g > 100) {
-              showToast(ctx, 'Enter a quantity above zero, a price and a GST rate from 0 to 100.');
+          InvPrimary(tr('Add to order'), onPressed: () {
+            final q = num.tryParse(qtyC.text.trim()), p = num.tryParse(priceC.text.trim());
+            if (q == null || q <= 0 || p == null || p < 0) {
+              showToast(ctx, 'Enter a quantity above zero and a price.');
               return;
             }
-            Navigator.pop(ctx, PoDraftLine(itemId: item.s('id'), name: item.s('name'), unit: item.s('unit'), qty: q, unitCostMinor: (p * 100).round(), gstPct: g, priceId: priceId));
+            Navigator.pop(ctx, PoDraftLine(itemId: item.s('id'), name: item.s('name'), unit: item.s('unit'), qty: q, unitCostMinor: (p * 100).round(), priceId: priceId));
           }),
         ]),
       ),
@@ -128,10 +128,19 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
   Future<void> _create() async {
     setState(() => _busy = true);
     try {
-      final po = await env.api.create(supplierId: _supplierId!, lines: _lines.map((l) => l.toJson()).toList(), key: _key);
+      var po = await env.api.create(supplierId: _supplierId!, lines: _lines.map((l) => l.toJson()).toList(), key: _key);
       _key = PurchasingApi.newKey();
+      // Someone who may approve it (the owner, a business manager) does not ask themselves: it is approved straight away. Anyone
+      // else's order, or one above the owner's own limit, waits for an approver (the server decides who may).
+      var approved = false;
+      if (po.can('approve')) {
+        try {
+          po = await env.api.act(po.id, 'approve');
+          approved = true;
+        } catch (_) {}
+      }
       if (!mounted) return;
-      showToast(context, '${po.number} created.');
+      showToast(context, approved ? '${po.number} placed. Receive it when the goods come.' : '${po.number} placed. It waits for the owner\'s approval.');
       await Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => PoGrnScreen(env: env, orderId: po.id)));
     } catch (e) {
       if (mounted) showToast(context, e.toString());
@@ -142,7 +151,8 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
 
   @override
   Widget build(BuildContext context) => InvScaffold(env: env.inv, onRefresh: _load, children: [
-        const InvTitle('Restaurant Purchase'),
+        const PurchaseSteps(1),
+        InvTitle(tr('New purchase order')),
         InvLoad<Facts>(data: _o, error: _error, onRetry: _load, builder: _body),
       ]);
 
@@ -151,20 +161,20 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
     final name = _supplierName(o);
     final canRecord = o.b('can_record');
     return [
-      Padding(padding: const EdgeInsets.only(bottom: 10), child: Align(alignment: Alignment.centerLeft, child: PoChip('Open $open ${open == 1 ? 'order' : 'orders'}', bg: kMintBg, fg: kPostedText))),
-      const InvLabel('SUPPLIER'),
+      Padding(padding: const EdgeInsets.only(bottom: 10), child: Align(alignment: Alignment.centerLeft, child: PoChip('$open open ${open == 1 ? 'order' : 'orders'} already', bg: kMintBg, fg: kPostedText))),
+      InvLabel(tr('SUPPLIER')),
       InvPickBox(value: name ?? 'Choose a supplier', semantic: 'Supplier', onTap: canRecord ? () => _pickSupplier(o) : null),
       const SizedBox(height: 10),
       InvCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Purchase items', style: inter(20, 700)),
+          Text(tr('Purchase items'), style: inter(20, 700)),
           const SizedBox(height: 8),
-          if (_lines.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text('No items yet.', style: inter(14.5, 400, color: kMuted))),
+          if (_lines.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(tr('No items yet.'), style: inter(14.5, 400, color: kMuted))),
           for (var i = 0; i < _lines.length; i++) ...[
             if (i > 0) const Divider(height: 18, color: kCardLine),
             _lineRow(_lines[i], i),
           ],
-          if (canRecord) Padding(padding: const EdgeInsets.only(top: 8), child: InvSecondary('Add item', onPressed: _supplierId == null ? () => showToast(context, 'Choose a supplier first.') : () => _addItem(o))),
+          if (canRecord) Padding(padding: const EdgeInsets.only(top: 8), child: InvSecondary(tr('Add item'), onPressed: _supplierId == null ? () => showToast(context, 'Choose a supplier first.') : () => _addItem(o))),
         ]),
       ),
       Container(
@@ -172,12 +182,12 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
         padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
         decoration: BoxDecoration(color: const Color(0xFFE8F5DC), borderRadius: BorderRadius.circular(22)),
         child: Row(children: [
-          Expanded(child: Text('Estimated total', style: inter(17, 600))),
+          Expanded(child: Text(tr('Estimated total'), style: inter(17, 600))),
           Text(money(_estimate), style: inter(28, 700, color: kPostedText)),
         ]),
       ),
-      InvPrimary('Create purchase order', busy: _busy, onPressed: (!canRecord || _supplierId == null || _lines.isEmpty) ? null : _create),
-      if (!canRecord) const InvNote('Your role can look at purchase orders but not create them.'),
+      InvPrimary(tr('Place order'), key: const ValueKey('po-place'), busy: _busy, onPressed: (!canRecord || _supplierId == null || _lines.isEmpty) ? null : _create),
+      if (!canRecord) InvNote(tr('Your role can look at purchase orders but not create them.')),
     ];
   }
 
