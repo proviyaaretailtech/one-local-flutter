@@ -75,7 +75,7 @@ export function profileArgs(b: z.infer<typeof Profile>) {
     selling_mode: b.selling_mode, category_family: family, category, subcategories: subs, specialty: b.specialty || '' };
 }
 
-export const Plan = z.object({ plan: z.enum(['pos_and_onelocal', 'onelocal_app'], { message: 'Choose how you want to sell.' }) });
+export const Plan = z.object({ plan: z.enum(['pos_and_onelocal', 'onelocal_app', 'pos_only'], { message: 'Choose how you want to sell.' }) });
 
 export const Address = z.object({
   address_line: text(200, 'Enter your address line.', 3),

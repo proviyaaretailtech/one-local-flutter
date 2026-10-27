@@ -140,13 +140,13 @@ void main() {
       await tapText(t, 'Online or both');
       await tapText(t, 'Save & continue');
       expect(toast('Choose your OneLocal plan.'), findsOneWidget); // the plan is on this screen now
-      await tapText(t, 'Sell on the OneLocal app');
+      await tapText(t, 'Purchase POS');
       await tapText(t, 'Save & continue');
       expect(api.bodies['profile'], {
         'partner_type': 'store', 'business_name': 'Sharma General Store', 'owner_name': 'Riya Sharma', 'phone': '9876543210',
         'selling_mode': 'online_or_both', 'category': 'Grocery & essentials', 'subcategory': 'General store',
       });
-      expect(api.calls, contains('plan onelocal_app'));
+      expect(api.calls, contains('plan pos_only'));
       expect(find.text('How do you want to sell?'), findsNothing); // no separate plan screen
       expect(find.text('Let’s finish your setup.'), findsNothing); // straight on to the next section, not the checklist
     });
@@ -179,7 +179,7 @@ void main() {
       expect(api.calls, isNot(contains('profile')));
       await tapText(t, 'Cafe');
       await tapText(t, 'Bakery');
-      await tapText(t, 'Sell on the OneLocal app');
+      await tapText(t, 'Purchase POS');
       await tapText(t, 'Save & continue');
       expect(api.bodies['profile'], {
         'partner_type': 'restaurant', 'business_name': 'Demo Spice', 'owner_name': 'Asha Rao', 'phone': '9876543210',

@@ -7,7 +7,8 @@ import 'setup_flow.dart';
 import 'setup_widgets.dart';
 
 String _sellPlanName(String? p) => switch (p) {
-      'pos_and_onelocal' => 'POS + OneLocal',
+      'pos_and_onelocal' => 'Sell on OneLocal and Purchase POS',
+      'pos_only' => 'Purchase POS',
       'onelocal_app' => 'OneLocal app',
       _ => 'Your plan',
     };
@@ -78,7 +79,7 @@ class _PlanScreenState extends State<PlanScreen> with TourHost {
   Widget build(BuildContext context) {
     final p = _plan;
     final sell = widget.state.plan['sell_plan'] as String?;
-    final modules = p != null ? _modules(p['modules']) : ['POS billing', 'Catalogue', 'OneLocal listing'].where((m) => sell == 'pos_and_onelocal' || m != 'POS billing').toList();
+    final modules = p != null ? _modules(p['modules']) : ['POS billing', 'Catalogue', 'OneLocal listing'].where((m) => (sell == 'pos_and_onelocal' || m != 'POS billing') && (sell != 'pos_only' || m != 'OneLocal listing')).toList();
     final users = p?['users_limit'];
     final locations = p?['locations_limit'];
     return SetupDialog(

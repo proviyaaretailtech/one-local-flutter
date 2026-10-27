@@ -255,7 +255,7 @@ void main() {
     testWidgets('with no published plan it shows the selling choice and sends no code', (t) async {
       final api = FakeSetup(initial: sampleSetup(extra: {'plan': {'selected_code': null, 'available': [], 'sell_plan': 'pos_and_onelocal'}}));
       await show(t, PlanScreen(api: api, state: api.state));
-      expect(find.text('Current plan · POS + OneLocal'), findsOneWidget);
+      expect(find.text('Current plan · Sell on OneLocal and Purchase POS'), findsOneWidget);
       expect(find.text('Not set yet'), findsOneWidget);
       await tap(t, 'Continue');
       expect(api.calls, ['plan null']);

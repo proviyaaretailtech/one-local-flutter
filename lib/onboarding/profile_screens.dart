@@ -31,7 +31,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
   late final _owner = TextEditingController(text: (widget.app?.ownerName ?? '').isNotEmpty ? widget.app!.ownerName : (widget.name ?? ''));
   late final _phone = TextEditingController(text: _tenDigits(widget.app?.phone ?? widget.phone ?? ''));
   String? _category, _sub, _mode;
-  late String? _plan = widget.app?.sellPlan; // onelocal_app | pos_and_onelocal
+  late String? _plan = widget.app?.sellPlan; // pos_and_onelocal | pos_only (onelocal_app: older applications)
   final _draft = OnbDraft('profile');
   List<String> _cuisines = []; // restaurant: every cuisine it serves, first = main
   bool _saving = false;
@@ -211,9 +211,10 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Your OneLocal plan', style: inter(17, 600)),
               const SizedBox(height: 14),
-              _planCard('onelocal_app', 'Sell on the OneLocal app', 'Customers order from you on OneLocal. No POS to buy.', Icons.phone_iphone),
+              // the two plans (founder, 27 Oct 2026)
+              _planCard('pos_and_onelocal', 'Sell on OneLocal and Purchase POS', 'Customers order from you on OneLocal, and the POS runs your counter: billing, stock and reports, in sync.', Icons.storefront_outlined),
               const SizedBox(height: 12),
-              _planCard('pos_and_onelocal', 'Also get the OneLocal POS', 'Billing, stock, prices and reports for your counter, synced with OneLocal.', Icons.point_of_sale_outlined),
+              _planCard('pos_only', 'Purchase POS', 'The POS for your counter only: billing, stock, prices and reports. Not listed on the OneLocal app.', Icons.point_of_sale_outlined),
             ]),
           ],
           actions: [
