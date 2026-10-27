@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'i18n.dart';
 import 'theme.dart';
 
-const _langKey = 'app_lang', _chosenForKey = 'lang_chosen_for';
+const _langKey = 'app_lang', _chosenForKey = 'lang_chosen_for', _beforeSignUpKey = 'lang_chosen_before_sign_up';
 
 /// The language this phone last chose, applied as the app opens (before any screen), so it starts in it.
 Future<void> restoreAppLanguage() async {
@@ -18,7 +18,14 @@ Future<void> restoreAppLanguage() async {
 Future<bool> languageStepNeeded(String? userId) async {
   if (userId == null) return false;
   try {
-    return (await SharedPreferences.getInstance()).getString(_chosenForKey) != userId;
+    final p = await SharedPreferences.getInstance();
+    if (p.getBool(_beforeSignUpKey) == true) {
+      // chosen on "Become a seller", before the account existed: it belongs to this new account
+      await p.remove(_beforeSignUpKey);
+      await p.setString(_chosenForKey, userId);
+      return false;
+    }
+    return p.getString(_chosenForKey) != userId;
   } catch (_) {
     return false;
   }
@@ -31,6 +38,19 @@ Future<void> _remember(String code, String? userId) async {
     if (userId != null) await p.setString(_chosenForKey, userId);
   } catch (_) {}
 }
+
+/// "Become a seller" (founder, 27 Oct 2026): the language first, then [next] (name and mobile). The choice is kept for the account
+/// the sign-up makes, so it is not asked again after the code.
+Route<void> languageThen(Widget next) => MaterialPageRoute(
+      builder: (context) => LanguageStepScreen(onChosen: (code) async {
+        try {
+          final p = await SharedPreferences.getInstance();
+          await p.setString(_langKey, code);
+          await p.setBool(_beforeSignUpKey, true);
+        } catch (_) {}
+        if (context.mounted) await Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => next));
+      }),
+    );
 
 /// First thing after signing in (founder, 27 Oct 2026): choose English, हिन्दी or Hinglish, once per account on each phone. Then
 /// [child] (the welcome screen, or the application for a new partner). [saveToStore] also keeps it for the store, when there is one.

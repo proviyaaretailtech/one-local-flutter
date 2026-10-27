@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_repository.dart';
 import '../ui/splash_backdrop.dart';
+import '../ui/language_step.dart';
 import '../ui/theme.dart';
 import 'register_personal_screen.dart';
 import 'signin_chooser_screen.dart';
@@ -135,7 +136,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                                     label: 'Become a seller',
                                     color: const Color(0xFFA1FE2F),
                                     top: 539,
-                                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterPersonalScreen())),
+                                    onTap: () => Navigator.push(context, languageThen(const RegisterPersonalScreen())), // the language, then name and mobile
                                   ),
                                   // Google and Apple pills: the Figma columns (34 and 208, 161 wide), but one height, one text style and the
                                   // icon + label centred together, so the pair reads as a matched set.

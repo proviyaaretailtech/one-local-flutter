@@ -55,16 +55,24 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Become a seller'));
       await t.pumpAndSettle();
-      expect(find.text('Create your account.'), findsOneWidget);
+      expect(find.text('Choose your language'), findsOneWidget);
     });
 
-    testWidgets('Become a seller opens registration', (t) async {
+    testWidgets('Become a seller: the language first, then name and mobile; not asked again for the new account', (t) async {
+      addTearDown(() => setAppLanguage('en'));
+      SharedPreferences.setMockInitialValues({});
       await show(t, const SplashScreen());
       // dark text on the lime button, so it is not washed out
       expect(t.widget<Text>(find.text('Become a seller')).style?.color, const Color(0xFF0C1F15));
       await t.tap(find.text('Become a seller'));
       await t.pumpAndSettle();
+      expect(find.text('Choose your language'), findsOneWidget);
+      expect(find.text('Create your account.'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('language-continue')));
+      await t.pumpAndSettle();
       expect(find.text('Create your account.'), findsOneWidget);
+      expect(await languageStepNeeded('new-user'), isFalse); // after the code: straight into the application
+      expect(await languageStepNeeded('someone-else'), isTrue);
     });
   });
 
