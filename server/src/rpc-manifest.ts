@@ -81,6 +81,7 @@ export const MANIFEST: Entry[] = [
   sec('partner_app_document_slot', { args: ob.UploadAsk, rate: 'secure', roles: ANY }),
   sec('partner_app_document_attach', { args: ob.Attach, rate: 'secure', roles: ANY }),
   sec('partner_app_document_preview', { args: ob.PreviewAsk, rate: 'secure', roles: ANY }),
+  sec('partner_app_document_remove', { args: ob.PreviewAsk, rate: 'secure', roles: ANY }),
 
   // ---- workspace setup after approval — database: 0350 via 0360. Results carry storage paths for listing images: post turns them into links.
   db('partner_setup_get', { fn: 'gw_partner_setup_get', ...empty, map: () => ({}), post: links, roles: OWNER }),

@@ -54,6 +54,16 @@ export async function documentPreview({ userId, args }: SecureCtx) {
   return { url: signed.data.signedUrl, expires_in: 300 };
 }
 
+/** Takes an uploaded document off the application and deletes the stored file (only while it is a draft). */
+export async function documentRemove({ userId, args }: SecureCtx) {
+  const b = parse(PreviewAsk, args);
+  const res = await rpc<Record<string, unknown>>('partner_app_remove_document', { p_user_id: userId, p_kind: b.kind });
+  const removed = res.removed_path as string | null | undefined;
+  if (removed) await db().storage.from(DOCS).remove([removed]);
+  delete res.removed_path;
+  return res;
+}
+
 // ---------- setup listing images ----------
 
 type Setup = Record<string, unknown> & { listing?: Record<string, unknown> };

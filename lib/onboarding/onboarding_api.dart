@@ -103,5 +103,8 @@ class OnboardingApi {
     return _state('partner_app_document_attach', {'kind': kind, 'path': slot['path'], 'content_type': contentType, 'size': bytes.length, 'file_name': fileName});
   }
 
+  /// Takes an uploaded document off the application (the stored file is deleted too).
+  Future<Application> removeDocument(String kind) => _state('partner_app_document_remove', {'kind': kind});
+
   Future<String> previewUrl(String kind) async => (await _rpc.callMap('partner_app_document_preview', {'kind': kind}))['url'] as String;
 }

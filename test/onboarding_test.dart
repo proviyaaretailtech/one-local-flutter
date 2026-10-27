@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/auth/partner_api.dart';
 import 'package:vinii_pos/onboarding/agreement_screens.dart';
+import 'package:vinii_pos/onboarding/pan_scan.dart';
 import 'package:vinii_pos/onboarding/checklist_screen.dart';
 import 'package:vinii_pos/onboarding/document_picker.dart';
 import 'package:vinii_pos/onboarding/onboarding_api.dart';
@@ -91,7 +92,21 @@ class FakeOnb extends OnboardingApi {
   @override
   Future<Application> uploadDocument({required String kind, required Uint8List bytes, required String fileName, required String contentType}) =>
       _do('upload $kind $fileName $contentType');
+  @override
+  Future<Application> removeDocument(String kind) => _do('remove $kind');
 }
+
+class FakeScanner extends PanScanner {
+  FakeScanner(this.result);
+  final PanScan? result;
+  @override
+  bool get available => true;
+  @override
+  Future<PanScan?> scan() async => result;
+}
+
+PanScan panScan({String? pan = 'ABCDE0123F', bool looks = true}) =>
+    PanScan(file: PickedDocument(name: 'pan_card_scan.jpg', bytes: Uint8List(10), contentType: 'image/jpeg'), panNumber: pan, looksLikePan: looks);
 
 class FakePicker extends DocumentPicker {
   FakePicker(this.file);
@@ -356,11 +371,49 @@ void main() {
         {'kind': 'business_proof', 'file_name': 'shop.jpg', 'mime_type': 'image/jpeg', 'size_bytes': 2048, 'status': 'uploaded'},
       ];
       await show(t, DocumentsScreen(api: FakeOnb(), app: sample(extra: {'documents': docs})));
-      expect(find.text('PAN copy uploaded'), findsOneWidget);
+      expect(find.text('PAN card'), findsOneWidget);
       expect(find.textContaining('1.2 MB'), findsWidgets);
-      expect(find.text('Preview PAN copy'), findsOneWidget);
+      for (final k in ['pan-view', 'pan-replace', 'pan-remove']) {
+        expect(find.byKey(ValueKey(k)), findsOneWidget);
+      }
       await tapText(t, 'Save & continue');
       expect(toast('Add your PAN copy and business proof to continue.'), findsNothing);
+    });
+  });
+
+  group('PAN card scan', () {
+    test('reads the PAN and knows a PAN card', () {
+      expect(readPanText('INCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number\nABCDE1234F'), (pan: 'ABCDE1234F', looksLikePan: true));
+      expect(readPanText('Electricity bill 12345'), (pan: null, looksLikePan: false));
+    });
+    testWidgets('the camera scan is uploaded as a JPG', (t) async {
+      final api = FakeOnb();
+      await show(t, DocumentsScreen(api: api, app: sample(), scanner: FakeScanner(panScan())));
+      await tapIt(t, find.byKey(const ValueKey('pan-scan')));
+      expect(api.calls, contains('upload pan_copy pan_card_scan.jpg image/jpeg'));
+    });
+    testWidgets('a photo that is not a PAN card is questioned before upload', (t) async {
+      final api = FakeOnb();
+      await show(t, DocumentsScreen(api: api, app: sample(), scanner: FakeScanner(panScan(pan: null, looks: false))));
+      await tapIt(t, find.byKey(const ValueKey('pan-scan')));
+      expect(find.textContaining('This does not look like a PAN card'), findsOneWidget);
+      await tapText(t, 'Use it anyway');
+      expect(api.calls, contains('upload pan_copy pan_card_scan.jpg image/jpeg'));
+    });
+    testWidgets('a card with a different PAN from tax details is questioned', (t) async {
+      final api = FakeOnb();
+      await show(t, DocumentsScreen(api: api, app: sample(extra: {'tax': {'pan_masked': '••••••999Z'}}), scanner: FakeScanner(panScan())));
+      await tapIt(t, find.byKey(const ValueKey('pan-scan')));
+      expect(find.textContaining('is not the one in your tax details'), findsOneWidget);
+    });
+    testWidgets('remove asks first, then takes the PAN copy off', (t) async {
+      final api = FakeOnb();
+      final docs = [{'kind': 'pan_copy', 'file_name': 'pan.pdf', 'mime_type': 'application/pdf', 'size_bytes': 2048, 'status': 'uploaded'}];
+      await show(t, DocumentsScreen(api: api, app: sample(extra: {'documents': docs})));
+      await tapIt(t, find.byKey(const ValueKey('pan-remove')));
+      expect(api.calls, isNot(contains('remove pan_copy')));
+      await tapIt(t, find.byKey(const ValueKey('confirm-remove')));
+      expect(api.calls, contains('remove pan_copy'));
     });
   });
 

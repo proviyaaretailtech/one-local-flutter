@@ -24,6 +24,7 @@ export const secureHandlers = {
   partner_app_document_slot: storage.documentSlot,
   partner_app_document_attach: storage.documentAttach,
   partner_app_document_preview: storage.documentPreview,
+  partner_app_document_remove: storage.documentRemove,
   partner_setup_image_slot: storage.imageSlot,
   partner_setup_image_attach: storage.imageAttach,
   storefront_image_slot: storefront.imageSlot,

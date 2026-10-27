@@ -7,6 +7,7 @@ import '../ui/widgets.dart';
 import 'document_picker.dart';
 import 'onboarding_api.dart';
 import 'india_cities.dart';
+import 'pan_scan.dart';
 import 'pin_codes.dart';
 import 'onboarding_draft.dart';
 import 'onboarding_widgets.dart';
@@ -355,10 +356,11 @@ class _IdentityScreenState extends State<IdentityScreen> {
 // Section 5b: documents. Figma "Document Upload". PDF, JPG or PNG up to 5 MB.
 // ---------------------------------------------------------------------------------------------------------------------
 class DocumentsScreen extends StatefulWidget {
-  const DocumentsScreen({super.key, required this.api, required this.app, this.picker = const DevicePicker()});
+  const DocumentsScreen({super.key, required this.api, required this.app, this.picker = const DevicePicker(), this.scanner = const MlKitPanScanner()});
   final OnboardingApi api;
   final Application app;
   final DocumentPicker picker;
+  final PanScanner scanner;
   @override
   State<DocumentsScreen> createState() => _DocumentsScreenState();
 }
@@ -369,9 +371,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
   static const _max = 5 * 1024 * 1024;
 
-  Future<void> _upload(String kind) async {
+  Future<void> _upload(String kind, [PickedDocument? given]) async {
     if (_busy != null) return;
-    final f = await widget.picker.pick();
+    final f = given ?? await widget.picker.pick();
     if (f == null || !mounted) return;
     if (f.bytes.isEmpty) return showToast(context, 'That file is empty.');
     if (f.bytes.length > _max) return showToast(context, 'Each file can be up to 5 MB.');
@@ -382,6 +384,140 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       _busy = null;
       if (saved != null) _app = saved;
     });
+  }
+
+  /// The camera with the built-in document scanner: it finds the card's edges and straightens it, then the text is read to make
+  /// sure it is a PAN card (and the same PAN as in tax details).
+  Future<void> _scanPan() async {
+    if (_busy != null) return;
+    final s = await widget.scanner.scan();
+    if (s == null || !mounted) return;
+    final masked = _app.tax['pan_masked'] as String? ?? _app.identity['pan_masked'] as String?;
+    final tail = masked == null ? null : masked.replaceAll('•', '');
+    String? problem;
+    if (!s.looksLikePan) {
+      problem = 'This does not look like a PAN card. Make sure the whole card is in the photo and the text is sharp.';
+    } else if (s.panNumber != null && tail != null && tail.isNotEmpty && !s.panNumber!.endsWith(tail)) {
+      problem = 'The PAN on this card (${s.panNumber}) is not the one in your tax details ($masked).';
+    }
+    if (problem != null) {
+      final use = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text('Check the photo', style: inter(18, 700)),
+          content: Text(problem!, style: inter(14, 400, color: kMuted, height: 1.4)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: Text('Scan again', style: inter(14, 600))),
+            TextButton(onPressed: () => Navigator.pop(c, true), child: Text('Use it anyway', style: inter(14, 600, color: kMuted))),
+          ],
+        ),
+      );
+      if (use != true || !mounted) {
+        if (use == false && mounted) return _scanPan();
+        return;
+      }
+    }
+    await _upload('pan_copy', s.file);
+    if (mounted && s.panNumber != null && problem == null) showToast(context, 'PAN card scanned · ${s.panNumber}');
+  }
+
+  Future<void> _remove(String kind, String what) async {
+    if (_busy != null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Remove $what?', style: inter(18, 700)),
+        content: Text('The file is deleted. You can add it again.', style: inter(14, 400, color: kMuted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text('Keep', style: inter(14, 600))),
+          TextButton(key: const ValueKey('confirm-remove'), onPressed: () => Navigator.pop(c, true), child: Text('Remove', style: inter(14, 600, color: const Color(0xFFC62828)))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _busy = kind);
+    final saved = await guarded(context, () => widget.api.removeDocument(kind));
+    if (!mounted) return;
+    setState(() {
+      _busy = null;
+      if (saved != null) _app = saved;
+    });
+  }
+
+  /// The PAN card, compact (founder, 27 Oct 2026): scan with the camera or upload a file; once added, view, replace or remove.
+  Widget _panCard() {
+    final pan = _app.document('pan_copy');
+    final busy = _busy == 'pan_copy';
+    final camera = widget.scanner.available;
+    Widget small(String label, IconData icon, VoidCallback? onTap, {Key? key, Color color = kInk}) => Expanded(
+          child: OutlinedButton.icon(
+            key: key,
+            onPressed: busy ? null : onTap,
+            icon: Icon(icon, size: 18, color: color),
+            label: Text(label, style: inter(13.5, 600, color: color)),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              side: const BorderSide(color: kLine),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        );
+    return WhiteCard(
+      padding: 16,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: pan == null ? const Color(0xFFF1F2F4) : kNote, borderRadius: BorderRadius.circular(12)),
+            child: Icon(pan == null ? Icons.badge_outlined : Icons.check_circle_outline, size: 24, color: pan == null ? kMuted : const Color(0xFF15803D)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('PAN card', style: inter(16, 700)),
+              const SizedBox(height: 2),
+              Text(
+                busy ? 'Working…' : pan == null ? 'Scan the card with your camera, or upload a copy.' : '${pan['file_name']} · ${_sizeLabel(pan).replaceAll(' · Upload complete', '')}',
+                style: inter(12.5, 400, color: kMuted),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ]),
+          ),
+          if (pan != null) const StatusChip('Not yet reviewed', Tone.neutral) else const StatusChip('To do', Tone.warn),
+        ]),
+        const SizedBox(height: 14),
+        if (pan == null)
+          Row(children: [
+            if (camera) ...[
+              Expanded(
+                child: FilledButton.icon(
+                  key: const ValueKey('pan-scan'),
+                  onPressed: busy ? null : _scanPan,
+                  icon: const Icon(Icons.document_scanner_outlined, size: 18),
+                  label: Text('Scan with camera', style: inter(13.5, 600, color: Colors.white)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            small(camera ? 'Upload file' : 'Upload PAN copy', Icons.upload_file_outlined, () => _upload('pan_copy'), key: const ValueKey('pan-upload')),
+          ])
+        else
+          Row(children: [
+            small('View', Icons.visibility_outlined, () => _preview('pan_copy'), key: const ValueKey('pan-view')),
+            const SizedBox(width: 8),
+            small('Replace', camera ? Icons.document_scanner_outlined : Icons.upload_file_outlined, camera ? _scanPan : () => _upload('pan_copy'), key: const ValueKey('pan-replace')),
+            const SizedBox(width: 8),
+            small('Remove', Icons.delete_outline, () => _remove('pan_copy', 'the PAN copy'), key: const ValueKey('pan-remove'), color: const Color(0xFFC62828)),
+          ]),
+      ]),
+    );
   }
 
   Future<void> _preview(String kind) async {
@@ -410,7 +546,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pan = _app.document('pan_copy');
     return OnbPage(
       kicker: 'Business setup',
       title: 'Add your documents.',
@@ -418,32 +553,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       subtitle: 'Add clear, readable copies of applicable documents.',
       onBack: () => Navigator.of(context).pop(_app),
       children: [
-        WhiteCard(
-          padding: 24,
-          child: Column(children: [
-            Container(width: 64, height: 64, decoration: BoxDecoration(color: pan == null ? const Color(0xFFF1F2F4) : kNote, shape: BoxShape.circle), child: Icon(pan == null ? Icons.upload_file_outlined : Icons.check_circle_outline, size: 30, color: pan == null ? kMuted : const Color(0xFF15803D))),
-            const SizedBox(height: 16),
-            Text(pan == null ? 'Add your PAN copy' : 'PAN copy uploaded', textAlign: TextAlign.center, style: inter(22, 700)),
-            const SizedBox(height: 8),
-            Text(pan == null ? 'Use a masked copy where supported.' : '${pan['file_name']}\n${_sizeLabel(pan)}', textAlign: TextAlign.center, style: inter(14, 400, color: kMuted, height: 1.5)),
-            if (pan != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: kBg, borderRadius: BorderRadius.circular(16)),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Uploaded · Not yet reviewed', style: inter(13, 600)),
-                  const SizedBox(height: 8),
-                  Text('Review your masked document before submitting. A completed upload does not mean verification is approved.', style: inter(14, 400, color: kMuted, height: 1.5)),
-                ]),
-              ),
-            ],
-            const SizedBox(height: 16),
-            if (pan != null) ...[PrimaryAction(label: 'Preview PAN copy', onPressed: () => _preview('pan_copy')), const SizedBox(height: 12)],
-            pan == null ? PrimaryAction(label: _busy == 'pan_copy' ? 'Uploading…' : 'Upload PAN copy', onPressed: _busy == null ? () => _upload('pan_copy') : null) : SecondaryAction(label: _busy == 'pan_copy' ? 'Uploading…' : 'Replace document', onPressed: _busy == null ? () => _upload('pan_copy') : null),
-          ]),
-        ),
+        _panCard(),
         _small('Business proof', 'business_proof', 'Shop Act certificate or applicable alternative', 'Pending · No file added', actionIdle: 'Upload'),
         _small('Food License · if applicable', 'food_license', 'Add for applicable food activities only.', 'Applicability has not been confirmed.', actionIdle: 'Review', optional: true),
         const NoteCard(green: true, title: 'Protect your identity', body: 'Use masked identity copies where supported. Do not upload a full Aadhaar number.'),
