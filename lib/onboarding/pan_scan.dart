@@ -1,10 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'document_picker.dart';
+import 'pan_camera_screen.dart';
 
 /// A scanned PAN card: the cropped photo, and what was read off it.
 class PanScan {
@@ -30,21 +32,23 @@ class PanScan {
 abstract class PanScanner {
   const PanScanner();
 
-  /// The built-in document scanner is there (Android): it finds the card's edges, crops and straightens it.
-  bool get available;
-  Future<PanScan?> scan();
+  /// A camera can be offered here.
+  bool get available => true;
+  Future<PanScan?> scan(BuildContext context);
 }
 
-/// Google's ML Kit document scanner (Android): the camera finds the card, then the text on it is read on the phone, so nothing
-/// leaves the phone until it is uploaded.
+/// Android: Google's ML Kit document scanner finds the card's edges, crops and straightens it, then the text on it is read on the
+/// phone (nothing leaves the phone until it is uploaded). Browsers and iPhones: the camera with a card frame, cropped to the frame.
 class MlKitPanScanner extends PanScanner {
   const MlKitPanScanner();
 
   @override
-  bool get available => !kIsWeb && Platform.isAndroid;
-
-  @override
-  Future<PanScan?> scan() async {
+  Future<PanScan?> scan(BuildContext context) async {
+    if (kIsWeb || !Platform.isAndroid) {
+      final shot = await Navigator.of(context).push<PickedDocument>(MaterialPageRoute(builder: (_) => const PanCameraScreen()));
+      // no text reading here: the photo is taken as a PAN card, and someone reviews it
+      return shot == null ? null : PanScan(file: shot, panNumber: null, looksLikePan: true);
+    }
     final scanner = DocumentScanner(
       options: DocumentScannerOptions(documentFormats: {DocumentFormat.jpeg}, mode: ScannerMode.filter, pageLimit: 1, isGalleryImport: false),
     );

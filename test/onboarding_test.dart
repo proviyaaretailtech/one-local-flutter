@@ -8,6 +8,8 @@ import 'package:http/testing.dart';
 import 'package:vinii_pos/auth/partner_api.dart';
 import 'package:vinii_pos/onboarding/agreement_screens.dart';
 import 'package:vinii_pos/onboarding/pan_scan.dart';
+import 'package:vinii_pos/onboarding/pan_camera_screen.dart' show cropToCard, kCardAspect;
+import 'package:image/image.dart' as img;
 import 'package:vinii_pos/onboarding/checklist_screen.dart';
 import 'package:vinii_pos/onboarding/document_picker.dart';
 import 'package:vinii_pos/onboarding/onboarding_api.dart';
@@ -100,9 +102,7 @@ class FakeScanner extends PanScanner {
   FakeScanner(this.result);
   final PanScan? result;
   @override
-  bool get available => true;
-  @override
-  Future<PanScan?> scan() async => result;
+  Future<PanScan?> scan(BuildContext context) async => result;
 }
 
 PanScan panScan({String? pan = 'ABCDE0123F', bool looks = true}) =>
@@ -357,7 +357,7 @@ void main() {
     testWidgets('upload sends kind, name and type; an oversize file never leaves the phone', (t) async {
       final api = FakeOnb();
       await show(t, DocumentsScreen(api: api, app: sample(), picker: FakePicker(PickedDocument(name: 'pan.pdf', bytes: Uint8List(10), contentType: 'application/pdf'))));
-      await tapText(t, 'Upload PAN copy');
+      await tapText(t, 'Upload file');
       expect(api.calls, contains('upload pan_copy pan.pdf application/pdf'));
       final api2 = FakeOnb();
       await show(t, DocumentsScreen(api: api2, app: sample(), picker: FakePicker(PickedDocument(name: 'big.png', bytes: Uint8List(5 * 1024 * 1024 + 1), contentType: 'image/png'))));
@@ -385,6 +385,12 @@ void main() {
     test('reads the PAN and knows a PAN card', () {
       expect(readPanText('INCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number\nABCDE1234F'), (pan: 'ABCDE1234F', looksLikePan: true));
       expect(readPanText('Electricity bill 12345'), (pan: null, looksLikePan: false));
+    });
+    test('the camera photo is cropped to the card frame (card shaped, centred)', () {
+      final photo = img.Image(width: 1000, height: 1500);
+      final out = img.decodeJpg(cropToCard(Uint8List.fromList(img.encodeJpg(photo))))!;
+      expect(out.width / out.height, closeTo(kCardAspect, 0.15));
+      expect(out.width, lessThan(1000));
     });
     testWidgets('the camera scan is uploaded as a JPG', (t) async {
       final api = FakeOnb();

@@ -390,7 +390,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   /// sure it is a PAN card (and the same PAN as in tax details).
   Future<void> _scanPan() async {
     if (_busy != null) return;
-    final s = await widget.scanner.scan();
+    final s = await widget.scanner.scan(context);
     if (s == null || !mounted) return;
     final masked = _app.tax['pan_masked'] as String? ?? _app.identity['pan_masked'] as String?;
     final tail = masked == null ? null : masked.replaceAll('•', '');
