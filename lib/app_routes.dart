@@ -29,6 +29,7 @@ import 'purchasing/purchase_hub_screen.dart';
 import 'purchasing/purchasing_api.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_board_screen.dart';
+import 'orders/online_locked.dart';
 import 'orders/orders_home.dart';
 import 'stock/product_page.dart';
 import 'stock/stock_env.dart';
@@ -67,7 +68,7 @@ void installRoutes() {
     if (_inShell('Online order') || _inShell('Orders')) return;
     final restaurant = HomeNav.shell?.kind == 'restaurant';
     Navigator.of(c).push(MaterialPageRoute(
-        builder: (_) => restaurant ? OrdersBoardScreen(onNavigate: (id) => _tab(c, id)) : OrdersHome(onNavigate: (id) => _tab(c, id))));
+        builder: (_) => OnlineOrdersGate(child: restaurant ? OrdersBoardScreen(onNavigate: (id) => _tab(c, id)) : OrdersHome(onNavigate: (id) => _tab(c, id)))));
   };
   HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
   // Section F: the till (sell, search, carts, payment, history, returns, receipts). Section E's cart screen stays reachable from the orders list.
@@ -192,7 +193,8 @@ Widget? shellTabRoot(String kind, String label, {AuthRepository? auth}) => switc
           ),
         // A store's Online order tab is section E (Orders History, each order opening its stage screen). The Live | Hold board with
         // dine-in / takeaway / delivery is the restaurant's Orders tab (section H), so a store never sees it.
-        'Online order' => Builder(builder: (c) => OrdersHome(onNavigate: (id) => _tab(c, id))),
+        // POS only: the tab offers the OneLocal subscription instead (founder, 28 Oct 2026)
+        'Online order' => Builder(builder: (c) => OnlineOrdersGate(child: OrdersHome(onNavigate: (id) => _tab(c, id)))),
         'Orders' => Builder(builder: (c) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))),
         'Stock' => Builder(builder: (c) => StockHomeScreen(env: _stockEnv(c))),
         _ => null,

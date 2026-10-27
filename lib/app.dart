@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/email_verify_pending_screen.dart';
 import 'screens/login_success_screen.dart';
 import 'screens/splash_screen.dart';
+import 'orders/online_locked.dart';
 import 'settings/settings_api.dart';
 import 'ui/language_step.dart';
 import 'ui/theme.dart';
@@ -38,6 +39,9 @@ class _AuthGateState extends State<AuthGate> {
   /// The login that signed in while the app was open (not one kept from last time): only then is the language asked.
   String? _signedInNow;
 
+  /// Whose plan is known: a different login (or none) reads it again.
+  String? _planFor;
+
   @override
   Widget build(BuildContext context) {
     final auth = Supabase.instance.client.auth;
@@ -45,6 +49,10 @@ class _AuthGateState extends State<AuthGate> {
       stream: auth.onAuthStateChange,
       builder: (context, snap) {
         final user = auth.currentSession?.user;
+        if (user?.id != _planFor) {
+          _planFor = user?.id;
+          StorePlan.reset();
+        }
         if (snap.data?.event == AuthChangeEvent.signedIn && user != null) _signedInNow = user.id;
         final Widget page;
         if (user == null) {
