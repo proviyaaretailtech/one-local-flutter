@@ -11,6 +11,7 @@ import 'package:vinii_pos/catalogue/item_parts.dart';
 import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart';
 import 'package:vinii_pos/purchasing/purchase_hub_screen.dart';
+import 'package:vinii_pos/purchasing/simple_purchase.dart';
 import 'package:vinii_pos/purchasing/purchasing_api.dart';
 import 'package:vinii_pos/purchasing/add_supplier_sheet.dart' show pickPhoneContact;
 import 'package:vinii_pos/stock/stock_env.dart';
@@ -50,6 +51,17 @@ class Fake {
     switch (fnOf(r)) {
       case 'inv_dashboard':
         return ok({'replenishment': [{'id': 'i1', 'name': 'Tata Salt'}, {'id': 'i2', 'name': 'Parle-G'}], 'counts': {}});
+      case 'pur_po_open':
+        return ok({
+          'orders': [
+            {...po('p3', 'PO-1003', 'Approved'), 'days_waiting': 8},
+            {...po('p1', 'PO-1001', 'Approved'), 'days_waiting': 1},
+          ],
+        });
+      case 'pur_po_act':
+        return ok({...po(b['id'] as String, 'PO-1001', 'Cancelled')});
+      case 'pur_history':
+        return ok({'purchases': <Map<String, dynamic>>[]});
       case 'pur_po_list':
         if (b['due'] == 'overdue') return ok({'orders': [po('p3', 'PO-1003', 'Approved', overdue: true)], 'open_count': 1});
         return ok({
@@ -188,24 +200,42 @@ void main() {
     expect(find.text('To check'), findsNWidgets(2));
   });
 
-  testWidgets('Purchase orders: open orders and suppliers; Buy again opens Reorder; Due and Waiting chips ask the server', (t) async {
+  testWidgets('Purchase orders: one list of open orders (no tabs), each with its day counter, Received and Cancel PO; suppliers; Buy again', (t) async {
     final f = Fake();
     await phone(t, hub(f));
     await tap(t, find.byKey(const ValueKey('part-orders')));
-    expect(find.text('PO-1001'), findsOneWidget);
-    expect(find.text('To receive'), findsOneWidget);
-    expect(find.text('Due 27 Oct'), findsOneWidget);
-    expect(find.text('₹1,250'), findsOneWidget);
+    expect(find.byKey(const ValueKey('chip-due')), findsNothing);
+    expect(find.byKey(const ValueKey('chip-pending')), findsNothing);
+    expect(find.textContaining('PO-1001'), findsOneWidget);
+    expect(find.text('Ordered 8 days ago · not received yet'), findsOneWidget);
+    expect(find.text('Late'), findsOneWidget); // 7 days or more
+    expect(find.text('Ordered yesterday · not received yet'), findsOneWidget);
+    expect(find.text('On time'), findsOneWidget);
+    expect(find.text('₹1,250'), findsNWidgets(2));
     expect(find.text('Latur · 9876543210'), findsOneWidget);
     expect(find.text('Buy again · 2'), findsOneWidget);
     await tap(t, find.byKey(const ValueKey('po-buy-again')));
     expect(f.opened, ['reorder']);
-    await tap(t, find.byKey(const ValueKey('chip-due')));
-    expect(f.body(f.calls('pur_po_list').last)['due'], 'overdue');
-    expect(find.text('PO-1003'), findsOneWidget);
-    await tap(t, find.byKey(const ValueKey('chip-pending')));
-    expect(f.body(f.calls('pur_po_list').last)['status'], 'pending');
-    expect(find.text('Waiting approval'), findsOneWidget);
+    // Cancel asks first
+    await tap(t, find.byKey(const ValueKey('po-cancel-p1')));
+    expect(f.calls('pur_po_act'), isEmpty);
+    await tap(t, find.byKey(const ValueKey('confirm-cancel-po')));
+    expect(f.body(f.calls('pur_po_act').single), containsPair('action', 'cancel'));
+    // Received opens the receive screen with the order
+    await tap(t, find.byKey(const ValueKey('po-received-p3')));
+    expect(find.byType(ReceiveGoodsScreen), findsOneWidget);
+  });
+
+  testWidgets('the wait tone: under 3 days on time, 3 to 6 needs attention, 7 or more late', (t) async {
+    expect([for (final d in [0, 2, 3, 6, 7, 30]) waitTone(d).word], ['On time', 'On time', 'Needs attention', 'Needs attention', 'Late', 'Late']);
+  });
+
+  testWidgets('Past purchases opens from the Purchase page', (t) async {
+    final f = Fake();
+    await phone(t, hub(f));
+    await tap(t, find.byKey(const ValueKey('past-purchases')));
+    expect(find.byType(PastPurchasesScreen), findsOneWidget);
+    expect(f.calls('pur_history'), isNotEmpty);
   });
 
   testWidgets('a supplier opens its details and prices; New order is there', (t) async {
@@ -257,7 +287,7 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('part-orders')), findsNothing);
     expect(find.textContaining('RCV-000 · '), findsOneWidget);
-    expect(find.text('PO-1001'), findsOneWidget);
+    expect(find.byKey(const ValueKey('po-p1')), findsOneWidget);
   });
 
   testWidgets('inside the Item tab it shows the Products · Stock · Purchase switcher first', (t) async {

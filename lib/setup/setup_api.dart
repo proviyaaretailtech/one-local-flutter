@@ -37,6 +37,9 @@ class SetupState {
   bool get canComplete => progress['can_complete'] == true;
   bool get completed => progress['completed'] == true;
   bool get posRequired => pos['required'] != false;
+
+  /// Listed on the OneLocal app: every plan but Purchase POS (pos_only), which has no listing and no delivery.
+  bool get sellsOnline => plan['sell_plan'] != 'pos_only';
   Set<int> get tourSeen => ((raw['tour_seen'] as List?) ?? const []).map((e) => (e as num).toInt()).toSet();
 
   /// The checklist row for [key], or an empty map.

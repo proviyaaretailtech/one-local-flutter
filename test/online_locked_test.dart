@@ -34,14 +34,17 @@ void main() {
     }
   });
 
-  testWidgets('Get this subscription sends a request to the OneLocal team and says so', (t) async {
+  testWidgets('the ₹799 plan: pick 12 months, Continue sends the request with the price', (t) async {
     final api = _Support();
     await show(t, OnlineLockedScreen(api: api));
-    await t.ensureVisible(find.byKey(const ValueKey('online-upgrade')));
-    await t.tap(find.byKey(const ValueKey('online-upgrade')));
+    expect(find.text('Continue with 6 months · ₹4,794'), findsOneWidget);
+    await t.ensureVisible(find.byKey(const ValueKey('cycle-12')));
+    await t.tap(find.byKey(const ValueKey('cycle-12')));
     await t.pumpAndSettle();
-    expect(api.sent.single, startsWith('account: Upgrade request'));
-    expect(find.byKey(const ValueKey('online-upgrade-sent')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('continue-pos_and_onelocal')));
+    await t.pumpAndSettle();
+    expect(api.sent.single, startsWith('account: Subscription request: Sell on OneLocal and Purchase POS, 12 months, ₹7,990 (2 months free). Moving from Purchase POS.'));
+    expect(find.byKey(const ValueKey('plan-request-sent')), findsOneWidget);
     expect(find.textContaining('SR-1042'), findsOneWidget);
   });
 }

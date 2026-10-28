@@ -212,9 +212,9 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
               Text('Your OneLocal plan', style: inter(17, 600)),
               const SizedBox(height: 14),
               // the two plans (founder, 27 Oct 2026)
-              _planCard('pos_and_onelocal', 'Sell on OneLocal and Purchase POS', 'Customers order from you on OneLocal, and the POS runs your counter: billing, stock and reports, in sync.', Icons.storefront_outlined),
+              _planCard('pos_and_onelocal', 'Sell on OneLocal and Purchase POS', '₹799/month, paid for 6 or 12 months (12 months: 2 months free). Customers order from you on OneLocal, and the POS runs your counter.', Icons.storefront_outlined),
               const SizedBox(height: 12),
-              _planCard('pos_only', 'Purchase POS', 'The POS for your counter only: billing, stock, prices and reports. Not listed on the OneLocal app.', Icons.point_of_sale_outlined),
+              _planCard('pos_only', 'Purchase POS', '₹599/month, paid for 6 or 12 months (12 months: 2 months free). The POS for your counter: billing, stock and reports. Not on the OneLocal app.', Icons.point_of_sale_outlined),
             ]),
           ],
           actions: [

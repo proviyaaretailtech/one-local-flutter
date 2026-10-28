@@ -45,6 +45,8 @@ Future<void> showStoreSideNav(
     SideNavEntry(LucideIcons.settings, 'Settings', hook(HomeNav.settings ?? HomeNav.setup)),
     SideNavEntry(LucideIcons.wallet, 'One Local Wallet', hook(HomeNav.wallet)),
     SideNavEntry(LucideIcons.circleQuestionMark, 'Help & support', hook(HomeNav.support)),
+    // the OneLocal plans and prices (founder, 28 Oct 2026), last
+    SideNavEntry(LucideIcons.crown, 'Subscription plans', hook(HomeNav.plans)),
   ];
   return showGeneralDialog<void>(
     context: context,

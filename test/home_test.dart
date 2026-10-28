@@ -447,13 +447,10 @@ void main() {
       expect(api.calls.last, 'feed 7 compare l3');
     });
 
-    testWidgets('Funnel and Service Quality have no source and say so', (t) async {
+    testWidgets('only My Feed and Sales: no Funnel or Service Quality', (t) async {
       await showHub(t);
-      await tapText(t, 'Funnel');
-      expect(find.textContaining('no funnel to show'), findsOneWidget);
-      expect(find.text('Today so far'), findsNothing);
-      await tapText(t, 'Service Quality');
-      expect(find.textContaining('no service score to show'), findsOneWidget);
+      expect(find.text('Funnel'), findsNothing);
+      expect(find.text('Service Quality'), findsNothing);
       await tapText(t, 'Sales');
       expect(find.text('Sales Analytics'), findsOneWidget);
       expect(find.text('Today so far'), findsNothing);

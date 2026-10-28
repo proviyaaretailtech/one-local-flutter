@@ -227,6 +227,23 @@ class _StaffScreenState extends State<StaffScreen> with TourHost {
   }
 }
 
+/// A line that shows whether part of the catalogue is ready: a green tick when it is, a grey dot until then. Nothing to tap.
+class _Progress extends StatelessWidget {
+  const _Progress({required this.done, required this.title});
+  final bool done;
+  final String title;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(children: [
+          Icon(done ? Icons.check_circle : Icons.radio_button_unchecked, size: 20, color: done ? const Color(0xFF15803D) : const Color(0xFFB8BCC4)),
+          const SizedBox(width: 10),
+          Expanded(child: Text(title, style: inter(13.5, 500, color: done ? kInk : kMuted))),
+          Text(done ? 'Done' : 'Not yet', style: inter(12, 600, color: done ? const Color(0xFF15803D) : kMuted)),
+        ]),
+      );
+}
+
 /// Figma 23 "Catalogue Setup": first items for billing. Items are added one at a time here.
 class CatalogueScreen extends StatefulWidget {
   const CatalogueScreen({super.key, required this.api, required this.state});
@@ -286,15 +303,17 @@ class _CatalogueScreenState extends State<CatalogueScreen> with TourHost {
         const SizedBox(height: 16),
         const SetupHeading('Before your first sale'),
         const SizedBox(height: 8),
-        SetupBox(children: [
-          SetupCheck(value: c['names_done'] == true, title: food ? 'Add dish names & categories' : 'Add product names & categories'),
-          SetupCheck(value: c['prices_done'] == true, title: 'Set selling price & tax'),
+        // progress, not something to tap (founder, 28 Oct 2026: they looked like checkboxes): each line turns green by itself
+        SetupBox(key: const ValueKey('catalogue-progress'), children: [
+          _Progress(done: c['names_done'] == true, title: food ? 'Dish names & categories' : 'Product names & categories'),
+          _Progress(done: c['prices_done'] == true, title: 'Selling price & tax on every item'),
         ]),
         const SizedBox(height: 12),
-        const SetupNote('Add items one at a time now. You can edit them and add more later in your catalogue.'),
+        const SetupNote('Add items one at a time now, or add them later from Items. You can edit them any time.'),
       ],
       actions: items == 0
-          ? [add]
+          // Add later (founder, 28 Oct 2026): setup goes on; the catalogue stays on the checklist
+          ? [add, const SizedBox(height: 8), PillSecondary(key: const ValueKey('catalogue-later'), label: 'Add later', onPressed: () => popWith(context, _s))]
           : [add, const SizedBox(height: 8), PillPrimary(label: 'Continue', onPressed: () => popWith(context, _s))],
     );
   }

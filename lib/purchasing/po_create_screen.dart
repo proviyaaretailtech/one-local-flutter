@@ -5,7 +5,6 @@ import '../inventory/inventory_api.dart';
 import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
-import 'po_grn_screen.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
 import 'supplier_price_screen.dart';
@@ -25,7 +24,7 @@ class PoDraftLine {
   Map<String, Object?> toJson() => {'inventory_item_id': itemId, 'qty': qty, 'unit_cost_minor': unitCostMinor, 'gst_pct': gstPct};
 }
 
-/// A new purchase order (Figma "Restaurant Purchase", used by every business): supplier, the items to buy with their prices, the estimated total (before GST) and "Create purchase order".
+/// A new purchase order (Figma "Restaurant Purchase", used by every business): supplier, the items to buy with their prices, the estimated total (before GST) and "Generate PO" (live at once, no approval).
 class PoCreateScreen extends StatefulWidget {
   const PoCreateScreen({super.key, required this.env});
   final PurEnv env;
@@ -128,20 +127,12 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
   Future<void> _create() async {
     setState(() => _busy = true);
     try {
-      var po = await env.api.create(supplierId: _supplierId!, lines: _lines.map((l) => l.toJson()).toList(), key: _key);
+      // one step (founder, 28 Oct 2026): the order is live at once, no approval; back to the list, where it waits with its day counter
+      final po = await env.api.create(supplierId: _supplierId!, lines: _lines.map((l) => l.toJson()).toList(), key: _key);
       _key = PurchasingApi.newKey();
-      // Someone who may approve it (the owner, a business manager) does not ask themselves: it is approved straight away. Anyone
-      // else's order, or one above the owner's own limit, waits for an approver (the server decides who may).
-      var approved = false;
-      if (po.can('approve')) {
-        try {
-          po = await env.api.act(po.id, 'approve');
-          approved = true;
-        } catch (_) {}
-      }
       if (!mounted) return;
-      showToast(context, approved ? '${po.number} placed. Receive it when the goods come.' : '${po.number} placed. It waits for the owner\'s approval.');
-      await Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => PoGrnScreen(env: env, orderId: po.id)));
+      showToast(context, '${po.number} ${tr('generated')}. ${tr('Mark it Received when the goods come.')}');
+      Navigator.of(context).maybePop(po);
     } catch (e) {
       if (mounted) showToast(context, e.toString());
     } finally {
@@ -186,7 +177,7 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
           Text(money(_estimate), style: inter(28, 700, color: kPostedText)),
         ]),
       ),
-      InvPrimary(tr('Place order'), key: const ValueKey('po-place'), busy: _busy, onPressed: (!canRecord || _supplierId == null || _lines.isEmpty) ? null : _create),
+      InvPrimary(tr('Generate PO'), key: const ValueKey('po-place'), busy: _busy, onPressed: (!canRecord || _supplierId == null || _lines.isEmpty) ? null : _create),
       if (!canRecord) InvNote(tr('Your role can look at purchase orders but not create them.')),
     ];
   }

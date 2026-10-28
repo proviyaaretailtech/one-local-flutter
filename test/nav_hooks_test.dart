@@ -113,7 +113,7 @@ void main() {
       await openSideNav(t);
       expect(soonOn('One Local Wallet'), findsOneWidget);
       expect(soonOn('Customer'), findsOneWidget);
-      expect(find.text('Soon'), findsNWidgets(2)); // wallet, customer
+      expect(find.text('Soon'), findsNWidgets(3)); // wallet, customer, subscription plans (not plugged in this test)
       expect(find.bySemanticsLabel('Manage account'), findsOneWidget); // the profile block now
       await t.tap(find.text('One Local Wallet'));
       await t.pumpAndSettle();

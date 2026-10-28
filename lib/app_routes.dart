@@ -29,8 +29,11 @@ import 'purchasing/purchase_hub_screen.dart';
 import 'purchasing/purchasing_api.dart';
 import 'orders/order_screen.dart';
 import 'orders/orders_board_screen.dart';
+import 'money/store_money.dart';
+import 'team/staff_screen.dart';
 import 'orders/online_locked.dart';
 import 'orders/orders_home.dart';
+import 'plans/subscription_plans.dart';
 import 'stock/product_page.dart';
 import 'stock/stock_env.dart';
 import 'stock/stock_home.dart';
@@ -120,9 +123,18 @@ void installRoutes() {
     Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
   };
   // Section K: money. The server says which screens this person may open; the bottom bar's other tabs go back through _tab.
-  HomeNav.money = (c) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
-  HomeNav.moneyScreen = (c, screen) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id)), start: screen));
-  HomeNav.team = (c) => Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id), kind: HomeNav.shell?.kind)));
+  // A store has its own minimal Money (founder, 28 Oct 2026): accounts, Record transaction, cash register, dues. Restaurants keep section K.
+  HomeNav.money = (c) => _isStore
+      ? Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: '/money'), builder: (_) => const StoreMoneyScreen()))
+      : Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
+  HomeNav.moneyScreen = (c, screen) => _isStore
+      ? HomeNav.money!(c)
+      : Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id)), start: screen));
+  // A store's Team is its staff (founder, 28 Oct 2026): staff, attendance, salary, advances; app logins and roles one tap away.
+  HomeNav.team = (c) => _isStore
+      ? Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'staff'), builder: (ctx) => StaffScreen(
+            onAppUsers: () => Navigator.of(ctx).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(ctx, id), kind: HomeNav.shell?.kind))))))
+      : Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id), kind: HomeNav.shell?.kind)));
   // Section M: the storefront page builder (profile, hours, delivery, offers, ads and publishing hang off it).
   HomeNav.storefront = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'storefront'), builder: (_) => StorePageBuilder(api: StorefrontApi())));
   HomeNav.businessProfile = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'business-profile'), builder: (_) => ProfileScreen(api: StorefrontApi())));
@@ -136,6 +148,7 @@ void installRoutes() {
   // Setup covers the whole screen, bar included.
   HomeNav.setup = (c) => Navigator.of(c, rootNavigator: true).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
   installAccountRoutes(); // side nav: Customer, One Local Wallet, Manage account
+  HomeNav.plans = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const SubscriptionPlansScreen()));
 }
 
 InvEnv _inventoryEnv(BuildContext c) => InvEnv(
@@ -177,6 +190,9 @@ Widget _floor(BuildContext c) => FloorScreen(env: TablesEnv(onNavigate: (id) => 
 
 /// The signed-in app: one bottom bar over a back stack per tab. Each tab's first screen depends on the kind of
 /// business: Bill is the till for a store, the tables floor for a restaurant, the calendar for a service partner.
+/// A store (not a restaurant or a service partner): the business kind the shell knows, a store until it knows.
+bool get _isStore => (HomeNav.shell?.kind ?? 'store') == 'store';
+
 Widget appShell({AuthRepository? auth}) => AppShell(rootFor: (kind, label) => shellTabRoot(kind, label, auth: auth));
 
 /// The first screen of the bar tab [label] for a business of [kind] ('store', 'restaurant', 'service'); null when the tab has none.

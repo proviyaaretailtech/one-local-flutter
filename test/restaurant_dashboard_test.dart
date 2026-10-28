@@ -80,7 +80,7 @@ void main() {
       expect(r.calls.first.$2['location_id'], 'all');
       for (final text in [
         // tabs, title
-        'My Feed', 'Sales', 'Funnel', 'Service Quality', 'Restaurant Dashboard', 'Today · Restaurant operations', 'LIVE',
+        'My Feed', 'Sales', 'Restaurant Dashboard', 'Today · Restaurant operations', 'LIVE',
         // orders and KOTs
         'Live orders', '1 new', '3 in progress', 'Pending', '2 critical', 'Kitchen queue',
         // kitchen, tables, sales today
@@ -112,7 +112,7 @@ void main() {
       expect(find.text('100.0%'), findsNothing);
     });
 
-    testWidgets('Sales tab shows real sales; Funnel and Service Quality say Coming soon, no invented numbers', (t) async {
+    testWidgets('Sales tab shows real sales; there is no Funnel or Service Quality tab', (t) async {
       await showRst(t);
       await t.tap(find.byKey(const ValueKey('rst-tab-Sales')));
       await t.pumpAndSettle();
@@ -120,12 +120,7 @@ void main() {
       expect(find.byKey(const ValueKey('rst-sales-today')), findsOneWidget);
       expect(find.text('Kitchen status'), findsNothing);
       for (final tab in ['Funnel', 'Service Quality']) {
-        await t.ensureVisible(find.byKey(ValueKey('rst-tab-$tab')));
-        await t.tap(find.byKey(ValueKey('rst-tab-$tab')));
-        await t.pumpAndSettle();
-        expect(find.byKey(ValueKey('rst-soon-$tab')), findsOneWidget);
-        expect(find.text('Coming soon'), findsOneWidget);
-        expect(find.textContaining('₹'), findsNothing);
+        expect(find.byKey(ValueKey('rst-tab-$tab')), findsNothing);
       }
     });
 

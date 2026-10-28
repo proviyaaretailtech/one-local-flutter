@@ -128,7 +128,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
     padding: const EdgeInsets.symmetric(horizontal: 16),
     child: Row(
       children: [
-        for (final (i, t) in const ['My Feed', 'Sales', 'Funnel', 'Service Quality'].indexed)
+        for (final (i, t) in const ['My Feed', 'Sales'].indexed) // Funnel and Service Quality removed (founder, 28 Oct 2026)
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: InkWell(
@@ -164,27 +164,11 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: switch (_tab) {
             0 => _feed(d),
-            1 => _salesTab(d),
-            2 => [_comingSoon('Funnel', 'How many guests saw the menu, ordered and paid is not recorded yet.')],
-            _ => [_comingSoon('Service Quality', 'Complaints, reviews and ratings are not recorded yet, so there is nothing to show.')],
+            _ => _salesTab(d),
           },
         ),
       ),
     ],
-  );
-
-  Widget _comingSoon(String title, String why) => HomeCard(
-    key: ValueKey('rst-soon-$title'),
-    padding: const EdgeInsets.all(20),
-    child: Column(
-      children: [
-        const Icon(LucideIcons.hourglass, size: 26, color: kMuted),
-        const SizedBox(height: 10),
-        Text('Coming soon', style: inter(15, 700)),
-        const SizedBox(height: 6),
-        Text(why, textAlign: TextAlign.center, style: inter(11.5, 400, color: kMuted, height: 1.4)),
-      ],
-    ),
   );
 
   List<Widget> _salesTab(RestaurantDashboardData d) => [

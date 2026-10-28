@@ -81,7 +81,8 @@ class _Tab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // The kept slot (a tab with no label) is Ol's place (founder, 27 Oct 2026): OneLocal's helper, who opens what the vendor asks for.
-    if (tab.label.isEmpty) return Center(child: OlMascot(key: tabKey));
+    // as tall as a tab's button and name together, so it sits level with the other icons (founder, 28 Oct 2026)
+    if (tab.label.isEmpty) return Center(child: OlMascot(key: tabKey, size: 58));
     final outlined = tab.primary && !current;
     return Semantics(
       button: true,

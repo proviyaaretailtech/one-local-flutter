@@ -27,6 +27,7 @@ import * as svc from './schemas/service.ts';
 import * as rst from './schemas/restaurant.ts';
 import * as sell from './schemas/sell.ts';
 import * as pur from './schemas/purchasing.ts';
+import * as staff from './schemas/staff.ts';
 import * as mo from './schemas/money.ts';
 import * as team from './schemas/team.ts';
 import * as sf from './schemas/storefront.ts';
@@ -251,11 +252,37 @@ export const MANIFEST: Entry[] = [
   db('pur_item_supplier_set', { args: pur.ItemSupplier, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
   db('pur_po_act', { args: pur.PoAct, map: P, rate: 'write', roles: 'purchasing:record (submit, cancel a draft or pending order); purchasing:approve_po (approve, reject, cancel an approved order)' }),
   db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
+  // one-step purchase (founder, 28 Oct 2026): open orders with days waiting, Received (stock with MRP), the bill, past purchases
+  db('pur_po_open', { args: pur.Options, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('pur_item_find', { args: pur.ItemFind, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('pur_receive_post', { args: pur.ReceivePost, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  db('pur_bill_get', { args: pur.BillGet, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('pur_bill_save', { args: pur.BillSave, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('pur_history', { args: pur.History, map: P, rate: 'read', roles: 'staff of the business' }),
   db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),
   db('pur_audit_record', { args: pur.AuditRecord, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
   // ---- money, section K (0435). Body = the function's `p` object; the database checks organisation, location and permission (money:read / record /
   //      approve; settlements, payouts and reports need the organisation-level settlements:read / payouts:read). Writes carry the Idempotency-Key header.
   db('money_options', { args: mo.Options, map: P, rate: 'read', roles: ANY }),
+  // the store's Money tab (founder, 28 Oct 2026): accounts fed by sales, Record transaction, cash register with Close day, dues
+  // store staff (founder, 28 Oct 2026): staff, attendance, salary, advances on the web POS's pos_staff tables; owner or manager only (the database checks)
+  db('staff_home', { args: staff.Empty, map: P, rate: 'read', roles: 'owner or manager' }),
+  db('staff_save', { args: staff.Save, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('staff_attendance', { args: staff.Day, map: P, rate: 'read', roles: 'owner or manager' }),
+  db('staff_attendance_save', { args: staff.Mark, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('staff_salary', { args: staff.Month, map: P, rate: 'read', roles: 'owner or manager' }),
+  db('staff_salary_generate', { args: staff.Month, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('staff_salary_adjust', { args: staff.Adjust, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('staff_salary_pay', { args: staff.Pay, map: P, rate: 'money', idem: true, roles: 'owner or manager' }),
+  db('staff_advances', { args: staff.Empty, map: P, rate: 'read', roles: 'owner or manager' }),
+  db('staff_advance_give', { args: staff.Advance, map: P, rate: 'money', idem: true, roles: 'owner or manager' }),
+  db('smoney_home', { args: mo.Options, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('smoney_entries', { args: mo.StoreEntries, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('smoney_record', { args: mo.StoreRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('smoney_void', { args: mo.StoreVoid, map: P, rate: 'money', roles: 'staff with money:approve' }),
+  db('smoney_register', { args: mo.StoreRegister, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('smoney_close_day', { args: mo.StoreClose, map: P, rate: 'money', roles: 'staff with money:record' }),
+  db('smoney_dues', { args: mo.Options, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('money_overview', { args: mo.Window, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('money_payments_list', { args: mo.Payments, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('money_transactions_list', { args: mo.Transactions, map: P, rate: 'read', roles: 'staff with money:read' }),

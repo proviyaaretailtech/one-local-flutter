@@ -16,8 +16,7 @@ import 'theme.dart';
 bool olAnimates = kIsWeb || !Platform.environment.containsKey('FLUTTER_TEST');
 bool olGreets = kIsWeb || !Platform.environment.containsKey('FLUTTER_TEST');
 
-const _olLime = Color(0xFF8BF22F);
-const _olInk = Color(0xFF1F2937);
+const _olInk = Color(0xFF0E1116);
 const _seenKey = 'ol_hello_seen';
 
 /// Ol (founder, 27 Oct 2026): OneLocal's helper, in the bottom bar's empty circle. Vendors will tell Ol what they want to do in the app;
@@ -114,11 +113,17 @@ class _OlMascotState extends State<OlMascot> with SingleTickerProviderStateMixin
       );
 }
 
-/// Ol's face at a moment [t] (0..1) of its loop: it bobs, looks left, looks right, and blinks twice.
+/// Ol at a moment [t] (0..1) of its loop: the founder's neon shop character (assets/ol/ol_shop.png, 28 Oct 2026), drawn without eyes
+/// so the eyes here can move. It bobs with a soft squash, looks left, looks right, glances up and blinks twice; the glow breathes.
 class OlFace extends StatelessWidget {
   const OlFace({super.key, required this.size, this.t = 0});
   final double size;
   final double t;
+
+  // the picture is 204 × 160; its eyes sat at x 81.5 and 124.5, y 106 (11 × 19 each)
+  static const _aspect = 204 / 160;
+  static const _eyes = [81.5 / 204, 124.5 / 204];
+  static const _eyeY = 106 / 160, _eyeW = 11 / 204, _eyeH = 19 / 160;
 
   // a smooth bump between [a] and [b] (0 outside), peaking at 1 in the middle
   static double _bump(double t, double a, double b) {
@@ -129,32 +134,60 @@ class OlFace extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final look = -_bump(t, 0.08, 0.32) + _bump(t, 0.42, 0.66); // left, then right
-    final up = _bump(t, 0.72, 0.84) * -0.6;
-    final blink = 1 - 0.9 * (_bump(t, 0.88, 0.91) + _bump(t, 0.93, 0.96));
-    final bob = math.sin(t * math.pi * 4) * size * 0.04;
-    final eyeW = size * 0.13, eyeH = size * 0.26;
-    return Transform.translate(
-      offset: Offset(0, bob),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: _olLime,
-          shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: _olLime.withValues(alpha: 0.45), blurRadius: 12, spreadRadius: 1)],
-        ),
-        child: Stack(children: [
-          for (final dx in [0.30, 0.56])
-            Positioned(
-              left: size * (dx + 0.06 * look),
-              top: size * (0.24 + 0.06 * up),
-              child: Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.diagonal3Values(1, blink.clamp(0.1, 1), 1)..rotateZ(-0.12),
-                child: Container(width: eyeW, height: eyeH, decoration: BoxDecoration(color: _olInk, borderRadius: BorderRadius.circular(eyeW))),
-              ),
+    final up = _bump(t, 0.72, 0.84);
+    final blink = (1 - 0.9 * (_bump(t, 0.88, 0.91) + _bump(t, 0.93, 0.96))).clamp(0.1, 1.0);
+    final wave = math.sin(t * math.pi * 4);
+    final squash = 1 + wave * 0.025;
+    final glow = 0.5 + 0.5 * math.sin(t * math.pi * 2);
+    final w = size * 1.12, h = w / _aspect; // a touch wider than the old circle: the awning carries it
+    final ew = w * _eyeW, eh = h * _eyeH;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: OverflowBox(
+        minWidth: w,
+        maxWidth: w,
+        minHeight: h,
+        maxHeight: h,
+        child: Transform.translate(
+          offset: Offset(0, wave * size * 0.04),
+          child: Transform(
+            alignment: Alignment.bottomCenter,
+            transform: Matrix4.diagonal3Values(squash, 2 - squash, 1),
+            child: SizedBox(
+              width: w,
+              height: h,
+              child: Stack(clipBehavior: Clip.none, children: [
+                // the glow breathing behind the picture's own glow
+                Positioned(
+                  left: w * 0.16,
+                  right: w * 0.16,
+                  top: h * 0.12,
+                  bottom: h * 0.08,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(w * 0.18),
+                      boxShadow: [BoxShadow(color: const Color(0xFF8BF22F).withValues(alpha: 0.18 + 0.22 * glow), blurRadius: w * 0.16, spreadRadius: w * 0.01)],
+                    ),
+                  ),
+                ),
+                Positioned.fill(child: Image.asset('assets/ol/ol_shop.png', fit: BoxFit.fill, filterQuality: FilterQuality.medium)),
+                for (final ex in _eyes)
+                  Positioned(
+                    left: w * ex - ew / 2 + look * w * 0.035,
+                    top: h * _eyeY - eh / 2 - up * h * 0.03 + eh * (1 - blink) / 2,
+                    child: Container(
+                      width: ew,
+                      height: eh * blink,
+                      decoration: BoxDecoration(color: _olInk, borderRadius: BorderRadius.circular(ew)),
+                      alignment: const Alignment(-0.3, -0.5),
+                      child: blink > 0.6 ? Container(width: ew * 0.32, height: ew * 0.32, decoration: const BoxDecoration(color: Color(0xCCFFFFFF), shape: BoxShape.circle)) : null,
+                    ),
+                  ),
+              ]),
             ),
-        ]),
+          ),
+        ),
       ),
     );
   }

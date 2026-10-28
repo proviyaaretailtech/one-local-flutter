@@ -96,6 +96,9 @@ class HomeNav {
   // Side nav: customers, the One Local Wallet and Manage account (plugged by lib/account/routes.dart).
   static HomeRoute? customers;
   static HomeRoute? wallet;
+
+  /// Side menu → Subscription plans (founder, 28 Oct 2026).
+  static HomeRoute? plans;
   static HomeRoute? account;
 
   /// Opens [route], or tells the person that [what] is not available yet.
@@ -116,7 +119,7 @@ class HomeNav {
     loadLanguage = null;
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
-    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = businessProfile = settings = customers = wallet = account = menu = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = businessProfile = settings = customers = wallet = account = menu = plans = null;
     tableQr = menuLink = null;
     shell = null;
     openMenu = null;

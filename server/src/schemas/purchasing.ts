@@ -38,6 +38,24 @@ export const SupplierSave = obj({
 });
 export const PoAct = obj({ id, action: z.enum(['submit', 'approve', 'reject', 'cancel'], { message: 'Unknown action.' }), note: z.string().max(200).nullish() });
 export const PoReceive = obj({ id, ...key });
+
+// One-step purchase (founder, 28 Oct 2026; C:onelocalhosted_purchase_simple_2026-10-28.sql): Received with quantities and MRP, the bill, past purchases.
+const money = z.number({ message: 'Enter an amount.' }).min(0).max(10_000_000);
+export const ReceivePost = obj({
+  po_id: id.nullish(), supplier_name: z.string().trim().max(80).optional(), invoice_no: z.string().trim().max(40).optional(), ...key,
+  lines: z.array(z.object({ inventory_item_id: id, qty: z.number().positive('Enter the quantity that came.').max(1_000_000), mrp: money.nullish(), cost: money.nullish(),
+    ordered_qty: z.number().min(0).nullish() }).loose()).min(1, 'Add the items that came.').max(200),
+});
+export const BillGet = obj({ receipt_document_id: id });
+export const ItemFind = obj({ q: z.string().trim().max(100) });
+export const BillSave = obj({
+  receipt_document_id: id, invoice_no: z.string().trim().min(1, 'Enter the invoice number.').max(40), invoice_date: z.string().min(8, 'Enter the invoice date.').max(10),
+  supplier_name: z.string().trim().max(80).optional(), supplier_gstin: z.string().trim().max(15).optional(),
+  payment_status: z.enum(['unpaid', 'partly_paid', 'paid'], { message: 'Unknown payment status.' }).optional(), paid: money.nullish(), note: z.string().max(500).optional(),
+  lines: z.array(z.object({ qty: z.number().positive(), rate: money, discount_pct: z.number().min(0).max(100).nullish(), gst_pct: z.number().min(0).max(40).nullish() }).loose()).min(1).max(200),
+  credit_lines: z.array(z.object({ amount: money.nullish(), reason: z.string().max(20).nullish() }).loose()).max(50).optional(),
+});
+export const History = obj({ from: z.string().max(10).nullish(), to: z.string().max(10).nullish(), q: z.string().max(100).optional(), sort: z.enum(['newest', 'oldest', 'amount']).optional() });
 export const PriceView = obj({ price_id: id });
 export const SourcingSelect = obj({ price_id: id, note: z.string().max(200).nullish(), ...key });
 export const AuditRecord = obj({

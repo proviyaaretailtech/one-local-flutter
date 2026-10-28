@@ -4,12 +4,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
-import '../inventory/receiving_screen.dart';
 import '../ui/theme.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
+import 'simple_purchase.dart';
 import '../ui/i18n.dart';
-import '../ui/purchase_steps.dart';
 
 /// Figma "Goods Receipt Note": one purchase order with what was ordered, received, accepted and rejected per line, tax and the GRN total.
 /// "Confirm Receipt & Update Stock" starts (or reopens) the receipt draft for the order and hands over to section H's receiving screen, which
@@ -30,7 +29,6 @@ class _PoGrnScreenState extends State<PoGrnScreen> {
   PurchaseOrder? _po;
   String? _error;
   bool _busy = false;
-  late String _key = PurchasingApi.newKey();
 
   @override
   void initState() {
@@ -55,10 +53,10 @@ class _PoGrnScreenState extends State<PoGrnScreen> {
   Future<void> _confirm() async {
     setState(() => _busy = true);
     try {
-      final r = await env.api.receive(widget.orderId, key: _key);
-      _key = PurchasingApi.newKey();
-      if (!mounted) return;
-      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: env.inv, documentId: r.s('document_id'))));
+      // Received, in one step (founder, 28 Oct 2026): the quantities that came and their MRP; the bill follows
+      final po = _po;
+      if (po == null) return;
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReceiveGoodsScreen(api: env.api, po: po)));
       await _load();
     } catch (e) {
       if (mounted) showToast(context, e.toString());
@@ -117,21 +115,16 @@ class _PoGrnScreenState extends State<PoGrnScreen> {
 
   List<Widget> _body(PurchaseOrder po) {
     final discrepancy = po.lines.any((l) => l.so('tag') == 'discrepancy');
-    final draft = po.openReceipt;
     return [
-      PurchaseSteps(po.status == 'Received' ? 3 : (po.canReceive || draft != null ? 2 : 1)),
       if (discrepancy) const Padding(padding: EdgeInsets.only(bottom: 10), child: Align(alignment: Alignment.centerLeft, child: PoChip('Discrepancy', bg: kRedBgH, fg: kRedText))),
       PoHeaderCard(po),
       for (final l in po.lines) PoLineCard(l, supplier: po.supplierName),
       PoTotalsCard(po),
-      if (draft != null) InvNote('A receipt (${draft.s('doc_no')}) is waiting ${draft.s('status') == 'review' ? 'to be checked' : 'as a draft'}. Stock changes only when it is posted.'),
-      if (po.canReceive) InvPrimary(tr(draft == null ? 'Receive goods' : 'Continue receiving'), key: const ValueKey('po-receive'), busy: _busy, onPressed: _confirm),
-      if (po.status == 'Pending' && !po.can('approve') && po.can('reject')) InvNote('You raised this order and it is above ${money(po.n('self_approval_limit_minor'))}: someone else approves it.'),
-      if (po.status == 'Draft' || po.status == 'Pending') InvNote(po.status == 'Draft' ? 'A draft is not sent for approval yet.' : 'Waiting for approval. Goods can be received once it is approved.'),
-      if (po.can('submit')) InvSecondary(tr('Submit for approval'), onPressed: _busy ? null : () => _act('submit', 'Submitted for approval.')),
-      if (po.can('approve')) InvPrimary(tr('Approve order'), busy: _busy, onPressed: () => _act('approve', 'Approved.')),
-      if (po.can('reject')) InvSecondary("Don't approve", onPressed: _busy ? null : () => _act('reject', 'Not approved.')),
-      if (po.can('cancel')) InvSecondary(tr('Cancel order'), onPressed: _busy ? null : () => _act('cancel', 'Order cancelled.')),
+      // two outcomes only (founder, 28 Oct 2026): Received, or Cancel; no approval
+      if (const ['Draft', 'Pending', 'Approved', 'Partially Received'].contains(po.status)) ...[
+        InvPrimary(tr('Received'), key: const ValueKey('po-receive'), busy: _busy, onPressed: _confirm),
+        InvSecondary(tr('Cancel PO'), onPressed: _busy ? null : () => _act('cancel', 'Order cancelled.')),
+      ],
     ];
   }
 }

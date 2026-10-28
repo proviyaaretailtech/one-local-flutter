@@ -15,13 +15,15 @@ import 'po_create_screen.dart';
 import 'po_grn_screen.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
+import 'simple_purchase.dart';
 import '../ui/i18n.dart';
 
 /// Opens a receipt note: [id] an existing one, or a new one when null. Tests replace it with [PurchaseHubScreen.openReceipt].
 typedef ReceiptOpener = Future<void> Function(BuildContext context, String? id);
 
-/// Item → Purchase (founder's sketch, 26 Oct 2026): one big "+ Add Purchase" (goods came in, with or without an order: a new receipt
-/// note), then two sections, Receipt notes and Purchase orders, each a list of cards. A receipt note opens its count while it is being
+/// Item → Purchase (founder's sketch, 26 Oct 2026; simplified 28 Oct 2026): one big "+ Add Purchase" (goods bought without an order) and
+/// Past purchases, then two sections, Receipt notes and Purchase orders. An open order shows how long it has waited and has two outcomes,
+/// Received (the quantities that came and their MRP; stock goes up) or Cancel; it then leaves the list. A receipt note opens its count while it is being
 /// counted, its check once it is sent, and its labels and putaway once received; an order opens its page. Suppliers sit under the
 /// orders.
 class PurchaseHubScreen extends StatefulWidget {
@@ -46,8 +48,7 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
   String? _receiptsError;
   bool _receiptsDone = false; // the Received chip
 
-  // purchase orders
-  String _chip = 'open';
+  // purchase orders: the open ones only (founder, 28 Oct 2026: no Due / Waiting / Received tabs)
   List<PurchaseOrder>? _orders;
   String? _ordersError;
   int? _buyAgain;
@@ -90,14 +91,12 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
     } catch (_) {}
   }
 
-  static const _chips = [('open', 'Open'), ('due', 'Due'), ('pending', 'Waiting'), ('received', 'Received')];
-
   Future<void> _loadOrders() async {
     try {
-      final d = _chip == 'due' ? await env.api.orders(due: 'overdue') : await env.api.orders(status: _chip);
+      final orders = await env.api.openOrders();
       if (!mounted) return;
       setState(() {
-        _orders = d.l('orders').map((f) => PurchaseOrder(f.raw)).toList();
+        _orders = orders;
         _ordersError = null;
       });
     } catch (e) {
@@ -123,14 +122,6 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
     }
   }
 
-  void _setChip(String c) {
-    setState(() {
-      _chip = c;
-      _orders = null;
-    });
-    _loadOrders();
-  }
-
   Future<void> _push(Widget screen) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
     if (mounted) _load();
@@ -147,13 +138,17 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
   Future<void> _openOrder(PurchaseOrder po) => _push(PoGrnScreen(env: env, orderId: po.id));
   Future<void> _newOrder() => _push(PoCreateScreen(env: env));
 
-  Future<void> _receiveOrder(PurchaseOrder po) async {
-    try {
-      final r = await env.api.receive(po.id);
-      if (mounted) await _receipt(r.s('document_id'));
-    } catch (e) {
-      if (mounted) showToast(context, e is PartnerApiException ? e.message : 'Could not start receiving. Try again.');
-    }
+  /// Received: the order's items, the quantities that came and their MRP (one step; the bill follows).
+  Future<void> _receiveOrder(PurchaseOrder po) => _push(ReceiveGoodsScreen(api: env.api, po: po));
+
+  /// + Add Purchase: goods bought without an order.
+  Future<void> _addPurchase() async {
+    if (widget.openReceipt != null) return _receipt(null);
+    await _push(ReceiveGoodsScreen(api: env.api));
+  }
+
+  Future<void> _cancelOrder(PurchaseOrder po) async {
+    if (await cancelOrder(context, env.api, po) && mounted) _loadOrders();
   }
 
   // ---------------------------------------------------------------- receipt notes
@@ -168,6 +163,8 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
   void _openReceiptNote(Facts d) {
     if (d.s('status') == 'draft') {
       _receipt(d.s('id'));
+    } else if (d.s('status') == 'posted') {
+      _push(PurchaseBillScreen(api: env.api, receiptId: d.s('id'))); // received: its bill
     } else {
       _push(GrnDashboardScreen(receiptId: d.s('id'), api: _grn));
     }
@@ -245,51 +242,11 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
   }
 
   // ---------------------------------------------------------------- orders
-  Widget _orderRow(PurchaseOrder po) {
-    // what was received once goods are in; until then the order's value with GST
-    final got = po.totals.no('total_minor') ?? 0;
-    final total = got > 0 ? got : po.totals.no('ordered_total_minor') ?? po.totals.no('estimated_minor');
-    final expected = po.t('expected_delivery');
-    final lines = po.l('lines').length;
-    return PurchaseListCard(
-      key: ValueKey('po-${po.id}'),
-      onTap: () => _openOrder(po),
-      date: expected == null ? '' : '${tr(po.overdue ? 'Overdue' : 'Due')} ${dayMonth(expected)}',
-      dateColor: po.overdue ? kRedText : null,
-      status: StockStatusChip(_tone(po.status), label: tr(_statusWord(po.status))),
-      title: po.supplierName,
-      amount: total == null ? '—' : money(total),
-      details: [po.number, if (lines > 0) '$lines ${tr(lines == 1 ? 'item' : 'items')}'].join(' · '),
-      // step 2 straight from the list: the goods came, count them against this order
-      footer: po.canReceive ? Align(alignment: Alignment.centerLeft, child: _smallAction('po-receive-${po.id}', LucideIcons.packageCheck, 'Receive', () => _receiveOrder(po))) : null,
-    );
-  }
-
-  static String _tone(String s) => switch (s) {
-        'Received' => 'healthy',
-        'Pending' || 'Draft' || 'Partially Received' => 'low',
-        'Cancelled' => '',
-        _ => 'near_expiry',
-      };
-
-  static String _statusWord(String s) => switch (s) {
-        'Pending' => 'Waiting approval',
-        'Approved' => 'To receive',
-        'Partially Received' => 'Part received',
-        _ => s,
-      };
+  Widget _orderRow(PurchaseOrder po) => OpenOrderCard(po: po, onOpen: () => _openOrder(po), onReceived: () => _receiveOrder(po), onCancel: () => _cancelOrder(po));
 
   List<Widget> _ordersList() {
     final orders = _orders, suppliers = _suppliers;
     return [
-      Row(children: [
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: InvChips(items: [for (final (id, label) in _chips) (id, label, null)], active: _chip, onTap: _setChip),
-          ),
-        ),
-      ]),
       Wrap(spacing: 8, runSpacing: 6, children: [
         _smallAction('po-new', LucideIcons.plus, 'New order', _newOrder),
         // what is running low, ready to order again
@@ -302,7 +259,7 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
       else if (orders == null)
         const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
       else if (orders.isEmpty)
-        StockEmpty(tr('No orders here'), tr(_chip == 'open' ? 'Orders you place show here until they arrive.' : 'Nothing in this list right now.'), icon: LucideIcons.clipboardList)
+        StockEmpty(tr('No open orders'), tr('Orders you place show here until they arrive.'), icon: LucideIcons.clipboardList)
       else
         for (final po in orders) _orderRow(po),
       const SizedBox(height: 14),
@@ -391,7 +348,7 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
   // ---------------------------------------------------------------- build
   /// The two sections side by side, as in the sketch: tap one to show its cards.
   Widget _parts() {
-    final open = _orders == null || _chip != 'open' ? null : _orders!.length;
+    final open = _orders?.length;
     final parts = [
       ('receipts', LucideIcons.fileCheck, 'Receipt notes', _receipts == null ? null : _openReceipts),
       ('orders', LucideIcons.clipboardList, 'Purchase orders', open),
@@ -438,8 +395,14 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
       children: [
         const ItemPartSwitcher(bottom: 10),
         // goods came in, with or without a purchase order: a new receipt note
-        _AddPurchaseButton(onPressed: () => _receipt(null)),
-        const SizedBox(height: 12),
+        _AddPurchaseButton(onPressed: _addPurchase),
+        const SizedBox(height: 8),
+        // every received delivery, by week, month or any dates (founder, 28 Oct 2026)
+        Align(
+          alignment: Alignment.centerRight,
+          child: _smallAction('past-purchases', LucideIcons.history, 'Past purchases', () => _push(PastPurchasesScreen(api: env.api))),
+        ),
+        const SizedBox(height: 10),
         if (wide)
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [_heading('Receipt notes'), ..._receiptsList()])),
@@ -483,7 +446,7 @@ class _AddPurchaseButton extends StatelessWidget {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tr('Add Purchase'), style: inter(18, 800)),
-                  Text(tr('Goods came in? Count them, with or without an order.'), style: inter(12.5, 500, color: kInk.withValues(alpha: 0.75))),
+                  Text(tr('Goods bought without an order? Add them here.'), style: inter(12.5, 500, color: kInk.withValues(alpha: 0.75))),
                 ]),
               ),
               const Icon(LucideIcons.chevronRight, size: 20, color: kInk),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../auth/partner_api.dart';
+import '../plans/subscription_plans.dart';
 import '../settings/settings_api.dart';
 import '../ui/i18n.dart';
 import '../ui/theme.dart';
@@ -47,18 +48,16 @@ class _OnlineLockedScreenState extends State<OnlineLockedScreen> {
   final _key = 'upgrade-${DateTime.now().microsecondsSinceEpoch}';
   bool _busy = false;
   String? _sent;
+  var _cycle = BillingCycle.sixMonths;
+  static final _upgrade = planByCode('pos_and_onelocal')!;
 
   Future<void> _request() async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
       // no payment in the app yet: the request reaches the OneLocal team, who start the subscription
-      final r = await _api.supportCreate(
-        message: 'Upgrade request: I want to start selling on OneLocal. Please move my store from "Purchase POS" to "Sell on OneLocal and Purchase POS".',
-        topic: 'account',
-        idempotencyKey: _key,
-      );
-      if (mounted) setState(() => _sent = '${r['reference']}');
+      final ref = await requestSubscription(_api, _upgrade, _cycle, key: '$_key-${_cycle.months}', current: 'pos_only');
+      if (mounted) setState(() => _sent = ref);
     } catch (e) {
       if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not reach the server. Check your connection and try again.'));
     } finally {
@@ -113,42 +112,19 @@ class _OnlineLockedScreenState extends State<OnlineLockedScreen> {
               _perk(Icons.delivery_dining_outlined, 'Delivery or pickup', 'Delivery partners or customer pickup, your choice per order.'),
               _perk(Icons.sync_outlined, 'One stock for both', 'Online and counter sales come off the same stock, so nothing is sold twice.'),
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: kLine)),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tr('Plan'), style: inter(12, 600, color: kMuted)),
-                  const SizedBox(height: 4),
-                  Text(tr('Sell on OneLocal and Purchase POS'), style: inter(16, 700)),
-                  const SizedBox(height: 4),
-                  Text(tr('Everything in your POS, plus online orders.'), style: inter(13, 400, color: kMuted)),
-                ]),
-              ),
-              const SizedBox(height: 18),
-              if (_sent == null)
-                FilledButton(
-                  key: const ValueKey('online-upgrade'),
-                  onPressed: _busy ? null : _request,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: kPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: Text(_busy ? '…' : tr('Get this subscription'), style: inter(16, 700, color: Colors.white)),
-                )
-              else
-                Container(
-                  key: const ValueKey('online-upgrade-sent'),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: kNote, borderRadius: BorderRadius.circular(14)),
-                  child: Row(children: [
-                    const Icon(Icons.check_circle, color: Color(0xFF15803D)),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text('${tr('Request sent')} · $_sent. ${tr('The OneLocal team will call you to start your subscription.')}', style: inter(14, 500, height: 1.35))),
-                  ]),
+              const SizedBox(height: 4),
+              PlanDetail(plan: _upgrade, cycle: _cycle, onCycle: (c) => setState(() => _cycle = c), recommended: true),
+              const SizedBox(height: 4),
+              Center(
+                child: TextButton(
+                  key: const ValueKey('online-all-plans'),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SubscriptionPlansScreen(current: 'pos_only'))),
+                  child: Text(tr('Compare all plans'), style: inter(14, 600, color: kLink)),
                 ),
+              ),
             ]),
           ),
+          PlanContinueBar(plan: _upgrade, cycle: _cycle, busy: _busy, sent: _sent, onContinue: _request),
         ]),
       );
 }

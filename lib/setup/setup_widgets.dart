@@ -337,6 +337,9 @@ class SetupCheck extends StatelessWidget {
   final String title;
   final String? sub;
   final ValueChanged<bool>? onChanged;
+  /// Not open to this business (KOT printer in a store): greyed out (founder, 28 Oct 2026).
+  bool get _off => onChanged == null && !value;
+
   @override
   Widget build(BuildContext context) => Semantics(
         checked: value,
@@ -357,8 +360,8 @@ class SetupCheck extends StatelessWidget {
                 height: 20,
                 margin: EdgeInsets.only(top: sub == null ? 0 : 1),
                 decoration: BoxDecoration(
-                  color: value ? kLime : Colors.white,
-                  border: value ? null : Border.all(color: kBoxBorder),
+                  color: value ? kLime : _off ? const Color(0xFFE6E7EA) : Colors.white,
+                  border: value ? null : Border.all(color: _off ? const Color(0xFFD5D7DC) : kBoxBorder),
                   borderRadius: BorderRadius.circular(5),
                 ),
                 child: value ? const Icon(LucideIcons.check, size: 14, color: kInk) : null,
@@ -366,8 +369,8 @@ class SetupCheck extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, style: inter(12.5, 600, height: 1.3)),
-                  if (sub != null) ...[const SizedBox(height: 3), Text(sub!, style: inter(11.5, 400, color: kMuted, height: 1.3))],
+                  Text(title, style: inter(12.5, 600, height: 1.3, color: _off ? const Color(0xFFA3A7AF) : kInk)),
+                  if (sub != null) ...[const SizedBox(height: 3), Text(sub!, style: inter(11.5, 400, color: _off ? const Color(0xFFB4B8BF) : kMuted, height: 1.3))],
                 ]),
               ),
             ]),

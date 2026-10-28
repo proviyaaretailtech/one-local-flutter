@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/purchasing/po_create_screen.dart';
+import 'package:vinii_pos/purchasing/simple_purchase.dart';
 import 'package:vinii_pos/purchasing/po_grn_screen.dart';
 import 'package:vinii_pos/purchasing/purchasing_api.dart';
 import 'package:vinii_pos/purchasing/purchasing_widgets.dart';
@@ -143,27 +144,27 @@ void main() {
       expect(find.text('₹239.90'), findsOneWidget);
       expect(find.text('Purchase total'), findsOneWidget);
       expect(find.text('₹3,872.40'), findsOneWidget);
-      expect(find.text('Receive goods'), findsNothing);
+      expect(find.byKey(const ValueKey('po-receive')), findsNothing);
     });
 
-    testWidgets('a partly received order: In progress, what arrived so far, and the confirm button', (t) async {
+    testWidgets('a partly received order: In progress, what arrived so far, and Received', (t) async {
       final po = Map<String, dynamic>.from(fx['po_partial'] as Map);
       final s = Fake();
       await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
       expect(find.text('In progress'), findsOneWidget);
       expect(find.text('5.0 kg accepted'), findsOneWidget);
-      expect(find.text('Receive goods'), findsOneWidget);
+      expect(find.byKey(const ValueKey('po-receive')), findsOneWidget);
     });
 
-    testWidgets('a pending order: waiting for approval, no confirm button, Cancel order asks the server', (t) async {
+    testWidgets('an open order has two outcomes only, Received or Cancel PO (no approval); Cancel asks the server', (t) async {
       final po = Map<String, dynamic>.from(fx['po_pending'] as Map);
       final s = Fake((r) => fnOf(r) == 'pur_po_act' ? ok({...po, 'status': 'Cancelled', 'allowed_actions': <String>[]}) : null);
       await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
-      expect(find.text('Pending approval'), findsOneWidget);
-      expect(find.textContaining('Waiting for approval'), findsOneWidget);
-      expect(find.text('Receive goods'), findsNothing);
+      expect(find.textContaining('Waiting for approval'), findsNothing);
+      expect(find.byKey(const ValueKey('po-receive')), findsOneWidget);
       expect(find.text('Approve order'), findsNothing);
-      await t.tap(find.text('Cancel order'));
+      expect(find.text("Don't approve"), findsNothing);
+      await t.tap(find.text('Cancel PO'));
       await t.pumpAndSettle();
       final call = s.requests.lastWhere((r) => fnOf(r) == 'pur_po_act');
       expect(argsOf(call)['action'], 'cancel');
@@ -171,37 +172,23 @@ void main() {
       expect(find.text('Cancelled'), findsOneWidget);
     });
 
-    testWidgets('an approver sees Approve order and Reject; approving sends the action', (t) async {
-      final po = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['approve', 'reject', 'cancel']};
-      final s = Fake((r) => fnOf(r) == 'pur_po_view' ? ok(po) : (fnOf(r) == 'pur_po_act' ? ok({...po, 'status': 'Approved', 'allowed_actions': ['receive']}) : null));
+    testWidgets('a refused cancel shows the server sentence, not a crash', (t) async {
+      final po = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['cancel']};
+      final s = Fake((r) => fnOf(r) == 'pur_po_view' ? ok(po) : (fnOf(r) == 'pur_po_act' ? err(403, 'Your role cannot cancel this order.', 'forbidden') : null));
       await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
-      expect(find.text("Don't approve"), findsOneWidget);
-      await t.tap(find.text('Approve order'));
+      await t.tap(find.text('Cancel PO'));
       await t.pumpAndSettle();
-      expect(argsOf(s.requests.lastWhere((r) => fnOf(r) == 'pur_po_act'))['action'], 'approve');
-      expect(find.text('Approved'), findsWidgets);
-      expect(find.text('Receive goods'), findsOneWidget);
+      expect(find.textContaining('Your role cannot cancel this order.'), findsOneWidget);
     });
 
-    testWidgets('a refused action shows the server sentence, not a crash', (t) async {
-      final po = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['approve']};
-      final s = Fake((r) => fnOf(r) == 'pur_po_view' ? ok(po) : (fnOf(r) == 'pur_po_act' ? err(403, 'An order above 1000000 paise is approved by someone other than the person who raised it.', 'forbidden') : null));
-      await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
-      await t.tap(find.text('Approve order'));
-      await t.pumpAndSettle();
-      expect(find.textContaining('someone other than the person who raised it'), findsOneWidget);
-      expect(find.text('Pending approval'), findsOneWidget);
-    });
-
-    testWidgets('confirming starts the receipt and opens section H receiving with that document', (t) async {
+    testWidgets('Received opens the one-step receive screen with this order (no receipt draft is started)', (t) async {
       final po = Map<String, dynamic>.from(fx['po_partial'] as Map);
-      final s = Fake((r) => fnOf(r) == 'pur_po_receive' ? ok({'document_id': 'doc-1', 'doc_no': 'RCV-001', 'status': 'draft', 'version': 1, 'created': true, 'po': po}) : null);
+      final s = Fake();
       await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String));
-      await t.tap(find.text('Receive goods'));
-      await t.pump();
-      final call = s.requests.lastWhere((r) => fnOf(r) == 'pur_po_receive');
-      expect(argsOf(call)['id'], po['id']);
-      expect(call.headers['Idempotency-Key'], startsWith('pur-'));
+      await t.tap(find.byKey(const ValueKey('po-receive')));
+      await t.pumpAndSettle();
+      expect(find.byType(ReceiveGoodsScreen), findsOneWidget);
+      expect(s.requests.where((r) => fnOf(r) == 'pur_po_receive'), isEmpty);
     });
   });
 
@@ -230,7 +217,7 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('10 kg · ₹360/kg'), findsOneWidget);
       expect(find.text('₹3,600'), findsWidgets);
-      await t.tap(find.text('Place order'));
+      await t.tap(find.text('Generate PO'));
       await t.pumpAndSettle();
       final call = s.requests.lastWhere((r) => fnOf(r) == 'pur_po_create');
       final a = argsOf(call);
@@ -238,7 +225,6 @@ void main() {
       expect(a['submit'], true);
       final line = (a['lines'] as List).single as Map;
       expect([line['qty'], line['unit_cost_minor'], line['gst_pct']], [10, 36000, 0]);
-      expect(find.byKey(const ValueKey('purchase-steps-1')), findsNothing); // gone to the order page
       expect(call.headers['Idempotency-Key'], startsWith('pur-'));
     });
 
@@ -258,31 +244,16 @@ void main() {
       expect(find.text('GST (%)'), findsNothing); // no GST while ordering: it comes from the bill
       await t.tap(find.text('Add to order'));
       await t.pumpAndSettle();
-      await t.tap(find.text('Place order'));
+      await t.tap(find.text('Generate PO'));
       await t.pumpAndSettle();
     }
 
-    testWidgets('an approver (the owner) does not approve their own order by hand: it is approved straight away', (t) async {
-      final pending = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['approve', 'reject', 'cancel']};
-      final s = Fake((r) => switch (fnOf(r)) {
-            'pur_po_create' => ok(pending),
-            'pur_po_act' => ok({...pending, 'status': 'Approved', 'allowed_actions': ['receive', 'cancel']}),
-            'pur_po_view' => ok({...pending, 'status': 'Approved', 'allowed_actions': ['receive', 'cancel']}),
-            _ => null,
-          });
+    testWidgets('Generate PO is one step: the order is live at once, nobody approves it, and the screen goes back to the list', (t) async {
+      final live = {...(fx['po_pending'] as Map<String, dynamic>), 'status': 'Approved', 'allowed_actions': ['receive', 'cancel']};
+      final s = Fake((r) => fnOf(r) == 'pur_po_create' ? ok(live) : null);
       await createOne(t, s);
-      expect(argsOf(s.requests.lastWhere((r) => fnOf(r) == 'pur_po_act'))['action'], 'approve');
-      expect(toast('${pending['number']} placed. Receive it when the goods come.'), findsOneWidget);
-      expect(find.text('Approve order'), findsNothing);
-    });
-
-    testWidgets('anyone else\'s order is left waiting for an approver', (t) async {
-      final pending = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['cancel']};
-      final s = Fake((r) => fnOf(r) == 'pur_po_create' || fnOf(r) == 'pur_po_view' ? ok(pending) : null);
-      await createOne(t, s);
-      expect(s.requests.where((r) => fnOf(r) == 'pur_po_act'), isEmpty);
-      expect(toast("${pending['number']} placed. It waits for the owner's approval."), findsOneWidget);
-      expect(find.text('Approve order'), findsNothing);
+      expect(s.requests.where((r) => fnOf(r) == 'pur_po_act'), isEmpty); // no approve call
+      expect(toast('${live['number']} generated. Mark it Received when the goods come.'), findsOneWidget);
     });
   });
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../plans/subscription_plans.dart';
 import '../ui/theme.dart';
 import 'setup_api.dart';
 import 'setup_flow.dart';
@@ -104,7 +105,11 @@ class _PlanScreenState extends State<PlanScreen> with TourHost {
             const SizedBox(height: 6),
             Text('Your selection only. No subscription or charge starts here.', style: inter(12, 400, color: kMuted, height: 1.4)),
             const SizedBox(height: 6),
-            SetupKeyValue('Billing cycle', _cadence(p?['cadence'] as String?)),
+            if (p == null && planByCode(sell) != null) ...[
+              SetupKeyValue('Price', '${rupees(planByCode(sell)!.perMonth)}/month'),
+              SetupKeyValue('Billing', '6 months ${rupees(planByCode(sell)!.price(BillingCycle.sixMonths))} · 12 months ${rupees(planByCode(sell)!.price(BillingCycle.twelveMonths))}'),
+            ] else
+              SetupKeyValue('Billing cycle', _cadence(p?['cadence'] as String?)),
           ]),
         ),
         const SizedBox(height: 16),

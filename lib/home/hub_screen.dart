@@ -25,7 +25,7 @@ class HubScreen extends StatefulWidget {
 }
 
 const _ranges = [(1, 'Today'), (7, 'Last 7 days'), (30, 'Last 30 days')];
-const _pills = ['My Feed', 'Sales', 'Funnel', 'Service Quality'];
+const _pills = ['My Feed', 'Sales']; // Funnel and Service Quality removed (founder, 28 Oct 2026)
 
 class _HubScreenState extends State<HubScreen> {
   late final HomeApi _api = widget.api ?? HomeApi();
@@ -158,19 +158,7 @@ class _HubScreenState extends State<HubScreen> {
                   ]),
                 ),
                 const SizedBox(height: 18),
-                if (_pill == 'Funnel' || _pill == 'Service Quality')
-                  HomeCard(
-                    padding: const EdgeInsets.all(20),
-                    radius: 20,
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_pill, style: inter(15, 700)),
-                      const SizedBox(height: 6),
-                      EmptyNote(_pill == 'Funnel'
-                          ? 'Store visits and menu views are not recorded yet, so there is no funnel to show.'
-                          : 'Ratings, complaints and preparation times are not collected yet, so there is no service score to show.'),
-                    ]),
-                  )
-                else ...[
+                ...[
                   Row(children: [
                     InkWell(
                       key: const ValueKey('hub-range'),
