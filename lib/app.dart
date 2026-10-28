@@ -15,7 +15,7 @@ class PosApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'One Local POS',
+      title: 'OneLocal Partner',
       debugShowCheckedModeBanner: false,
       theme: posTheme(),
       // No fixed column: every screen fills the device's own width and height (phone, tablet or browser) and follows rotation.
