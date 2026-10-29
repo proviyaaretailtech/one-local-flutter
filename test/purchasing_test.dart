@@ -39,6 +39,8 @@ class Fake {
       if (custom != null) return custom;
       return switch (fnOf(r)) {
         'pur_options' => ok(fx['options']),
+        'pur_supplier_list' => ok({'suppliers': (fx['options'] as Map)['suppliers']}),
+        'pur_item_find' => ok({'items': [if (argsOf(r)['q'] == '8901234567890') {'id': '43b00000-0000-0000-0000-000000000001', 'name': 'Paneer', 'sku': 'PANEER', 'unit': 'kg', 'barcode': '8901234567890'}]}),
         'pur_po_list' => ok(fx['list']),
         'pur_po_view' => ok(switch (argsOf(r)['id']) { final i when i == (fx['po_received'] as Map)['id'] => fx['po_received'], final i when i == (fx['po_pending'] as Map)['id'] => fx['po_pending'], _ => fx['po_partial'] }),
         'pur_price_view' => ok(fx['price']),
@@ -214,6 +216,69 @@ void main() {
   });
 
   group('New purchase order', () {
+    Future<void> pickAbcAndPaneer(WidgetTester t) async {
+      await t.tap(find.textContaining('Choose a supplier'));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('supplier-from-phone')), findsOneWidget); // phone contacts, as on Received
+      expect(find.text('Who are you ordering from?'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('supplier-sup-abc')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('po-add-items')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('po-pick-43b00000-0000-0000-0000-000000000001')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('po-pick-add')));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('the item list: search, tick several, Add N items; each comes in at 1 with its price', (t) async {
+      final s = Fake();
+      await showTall(t, PoCreateScreen(env: s.env));
+      await t.tap(find.textContaining('Choose a supplier'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('supplier-sup-abc')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('po-add-items')));
+      await t.pumpAndSettle();
+      expect(find.text('Basmati rice'), findsOneWidget);
+      expect(find.text('Tick the items to order'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('po-item-search')), 'pan');
+      await t.pumpAndSettle();
+      expect(find.text('Basmati rice'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('po-pick-43b00000-0000-0000-0000-000000000001')));
+      await t.enterText(find.byKey(const ValueKey('po-item-search')), '');
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('po-pick-43b00000-0000-0000-0000-000000000004')));
+      await t.pumpAndSettle();
+      expect(find.text('Add 2 items'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('po-pick-add')));
+      await t.pumpAndSettle();
+      expect(find.text('1 kg · ₹410/kg'), findsOneWidget);
+      expect(find.text('1 kg · tap to add the price'), findsOneWidget);
+    });
+
+    testWidgets('Scan barcode adds the scanned item; scanning it again adds one more', (t) async {
+      final s = Fake();
+      final before = scanForPurchase;
+      scanForPurchase = (_) async => '8901234567890';
+      addTearDown(() => scanForPurchase = before);
+      await showTall(t, PoCreateScreen(env: s.env));
+      await t.tap(find.textContaining('Choose a supplier'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('supplier-sup-abc')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('po-scan')));
+      await t.pumpAndSettle();
+      expect(find.text('1 kg · ₹410/kg'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('po-scan')));
+      await t.pumpAndSettle();
+      expect(find.text('2 kg · ₹410/kg'), findsOneWidget);
+      scanForPurchase = (_) async => '0000';
+      await t.tap(find.byKey(const ValueKey('po-scan')));
+      await t.pumpAndSettle();
+      expect(find.textContaining('No item has barcode 0000'), findsOneWidget);
+    });
+
     testWidgets('supplier, items, estimated total and create; the server gets paise and one key', (t) async {
       final s = Fake((r) => fnOf(r) == 'pur_po_create' ? ok(fx['po_partial']) : null);
       await showTall(t, PoCreateScreen(env: s.env));
@@ -222,19 +287,15 @@ void main() {
       expect(find.text('Estimated total'), findsOneWidget);
       expect(find.text('₹0'), findsOneWidget);
       expect(tester(t, 'Place order'), isNull); // disabled until a supplier and an item exist
-      await t.tap(find.textContaining('Choose a supplier'));
-      await t.pumpAndSettle();
-      await t.tap(find.text('ABC Foods').last);
-      await t.pumpAndSettle();
-      await t.tap(find.text('Add item'));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Paneer').last);
+      await pickAbcAndPaneer(t);
+      expect(find.text('1 kg · ₹410/kg'), findsOneWidget); // ticked items come in at 1, at the supplier's price
+      await t.tap(find.byKey(const ValueKey('po-line-43b00000-0000-0000-0000-000000000001')));
       await t.pumpAndSettle();
       final fields = find.byType(TextField);
       await t.enterText(fields.at(0), '10');
       await t.enterText(fields.at(1), '360');
       expect(find.text('GST (%)'), findsNothing); // no GST while ordering: it comes from the bill
-      await t.tap(find.text('Add to order'));
+      await t.tap(find.byKey(const ValueKey('po-line-save')));
       await t.pumpAndSettle();
       expect(find.text('10 kg · ₹360/kg'), findsOneWidget);
       expect(find.text('₹3,600'), findsWidgets);
@@ -251,19 +312,15 @@ void main() {
 
     Future<void> createOne(WidgetTester t, Fake s) async {
       await showTall(t, PoCreateScreen(env: s.env));
-      await t.tap(find.textContaining('Choose a supplier'));
-      await t.pumpAndSettle();
-      await t.tap(find.text('ABC Foods').last);
-      await t.pumpAndSettle();
-      await t.tap(find.text('Add item'));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Paneer').last);
+      await pickAbcAndPaneer(t);
+      expect(find.text('1 kg · ₹410/kg'), findsOneWidget); // ticked items come in at 1, at the supplier's price
+      await t.tap(find.byKey(const ValueKey('po-line-43b00000-0000-0000-0000-000000000001')));
       await t.pumpAndSettle();
       final fields = find.byType(TextField);
       await t.enterText(fields.at(0), '10');
       await t.enterText(fields.at(1), '360');
       expect(find.text('GST (%)'), findsNothing); // no GST while ordering: it comes from the bill
-      await t.tap(find.text('Add to order'));
+      await t.tap(find.byKey(const ValueKey('po-line-save')));
       await t.pumpAndSettle();
       await t.tap(find.text('Generate PO'));
       await t.pumpAndSettle();

@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../auth/auth_repository.dart';
 import '../ui/forgot_password_sheet.dart' show isEmail;
 import '../ui/mask.dart';
+import '../ui/name_input.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'otp_verify_screen.dart';
@@ -42,17 +43,16 @@ class _RegisterPersonalScreenState extends State<RegisterPersonalScreen> {
   String get _digits => _phone.text.replaceAll(RegExp(r'\D'), '');
 
   Future<void> _create() async {
-    final problem = !_name.text.trim().isNotEmpty
-        ? 'Please enter your full name.'
-        : _digits.length != 10
+    final problem = nameProblem(_name.text)
+        ?? (_digits.length != 10
             ? 'Please enter a 10-digit mobile number.'
-            : !isEmail(_email.text)
-                ? 'Please enter a valid email address.'
+            : _email.text.trim().isNotEmpty && !isEmail(_email.text) // optional (founder, 29 Oct 2026): the mobile is enough
+                ? 'Please enter a valid email address, or leave it empty.'
                 : !_ageOk
                     ? 'Please confirm the age eligibility to continue.'
                     : !_termsOk
                         ? 'Please agree to the service terms to continue.'
-                        : null;
+                        : null);
     if (problem != null) {
       if (mounted) showToast(context, problem);
       return;
@@ -63,10 +63,10 @@ class _RegisterPersonalScreenState extends State<RegisterPersonalScreen> {
     });
     final e164 = '+91$_digits';
     try {
-      await _auth.registerWithPhone(e164: e164, fullName: _name.text.trim(), email: _email.text.trim().toLowerCase());
+      await _auth.registerWithPhone(e164: e164, fullName: cleanName(_name.text), email: _email.text.trim().toLowerCase());
       if (!mounted) return;
       showToast(context, 'Code sent to ${maskPhone(e164)}');
-      Navigator.push(context, MaterialPageRoute(builder: (_) => OtpVerifyScreen(phone: e164, registering: true, auth: _auth, name: _name.text.trim())));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => OtpVerifyScreen(phone: e164, registering: true, auth: _auth, name: cleanName(_name.text))));
     } catch (e) {
       if (mounted) showToast(context, friendlyAuthError(e, fallback: 'Could not create the account. Check the details and try again.'));
     } finally {
@@ -140,6 +140,7 @@ class _RegisterPersonalScreenState extends State<RegisterPersonalScreen> {
                 labelSize: 13,
                 labelWeight: 500,
                 controller: _name,
+                inputFormatters: nameFormatters,
                 textInputAction: TextInputAction.next,
                 onSubmitted: (_) => _phoneFocus.requestFocus(),
                 autofillHints: const [AutofillHints.name],
@@ -165,7 +166,7 @@ class _RegisterPersonalScreenState extends State<RegisterPersonalScreen> {
               ),
               const SizedBox(height: 16),
               LabeledField(
-                label: 'Email address',
+                label: 'Email address (optional)',
                 labelSize: 14,
                 labelWeight: 600,
                 labelGap: 7,

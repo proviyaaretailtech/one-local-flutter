@@ -528,8 +528,8 @@ void main() {
       await tap(t, 'open');
       expect(find.text('Review your setup'), findsOneWidget);
       expect(find.text('Done'), findsOneWidget);                  // plan
-      expect(find.text('Skipped · optional'), findsNWidgets(2));  // staff, delivery
-      expect(find.text('To do'), findsNWidgets(5));               // payment, tax, catalogue, pos, listing
+      expect(find.text('Skipped · optional'), findsNWidgets(3));  // payment (bank: add later), staff, delivery
+      expect(find.text('To do'), findsNWidgets(4));               // tax, catalogue, pos, listing
       expect(t.widget<PillPrimary>(find.byType(PillPrimary)).onPressed, isNull);   // required left: no Finish
     });
   });

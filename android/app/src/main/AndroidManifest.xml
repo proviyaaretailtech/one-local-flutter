@@ -38,6 +38,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Google Maps key for the map pin, from GOOGLE_MAPS_KEY (android/app/build.gradle.kts) -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${googleMapsKey}" />
         <!-- Google Play fetches the on-phone background remover when the app is installed, so the first cut-out does not wait -->
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"

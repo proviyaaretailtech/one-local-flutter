@@ -8,6 +8,7 @@ import '../ui/i18n.dart';
 import '../ui/theme.dart';
 import 'money_flow.dart';
 import 'store_money.dart';
+import '../ui/motion.dart';
 
 // Transfer (founder's sketch, 28 Oct 2026): select a contact, then UPI or card. UPI opens GPay or PhonePe with the contact's UPI ID and the
 // amount filled in; the owner pays there, says it went through, and it is recorded in Money out. The app never moves money itself; card is
@@ -126,7 +127,7 @@ class _MoneyTransferScreenState extends State<MoneyTransferScreen> {
       return;
     }
     final utr = TextEditingController();
-    final paid = await showDialog<bool>(
+    final paid = await showOlDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text('${tr('Did the payment of')} ${rs(_amountMinor)} ${tr('to')} ${_to!.name} ${tr('go through?')}', style: inter(17, 700)),

@@ -15,6 +15,7 @@ import '../ui/theme.dart';
 import 'add_supplier_sheet.dart' show pickPhoneContact, showAddSupplier, PickedContact;
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
+import '../ui/motion.dart';
 
 // The purchase flow, simplified (founder, 28 Oct 2026):
 //   Generate PO (live at once) → it waits, with a day counter (3 days: needs attention, 7 days: late)
@@ -121,7 +122,7 @@ class OpenOrderCard extends StatelessWidget {
 
 /// Cancel an order, after asking. Answers true when it was cancelled.
 Future<bool> cancelOrder(BuildContext context, PurchasingApi api, PurchaseOrder po) async {
-  final ok = await showDialog<bool>(
+  final ok = await showOlDialog<bool>(
     context: context,
     builder: (c) => AlertDialog(
       title: Text('${tr('Cancel')} ${po.number}?', style: inter(18, 700)),
@@ -145,18 +146,19 @@ Future<bool> cancelOrder(BuildContext context, PurchasingApi api, PurchaseOrder 
 
 /// Who the goods came from: the shop's saved suppliers (search by name, phone, GSTIN or city), the phone's contact list in the app,
 /// or a new name typed in. The supplier picked (name, phone, gstin), or null.
-Future<Facts?> chooseSupplier(BuildContext context, PurchasingApi api) => showModalBottomSheet<Facts>(
+Future<Facts?> chooseSupplier(BuildContext context, PurchasingApi api, {String subtitle = 'Who did the goods come from?'}) => showModalBottomSheet<Facts>(
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: kBg,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => _SupplierSheet(api: api),
+      builder: (_) => _SupplierSheet(api: api, subtitle: subtitle),
     );
 
 class _SupplierSheet extends StatefulWidget {
-  const _SupplierSheet({required this.api});
+  const _SupplierSheet({required this.api, required this.subtitle});
   final PurchasingApi api;
+  final String subtitle;
   @override
   State<_SupplierSheet> createState() => _SupplierSheetState();
 }
@@ -248,7 +250,7 @@ class _SupplierSheetState extends State<_SupplierSheet> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: Text(tr('Who did the goods come from?'), style: inter(13, 500, color: kMuted)),
+            child: Text(tr(widget.subtitle), style: inter(13, 500, color: kMuted)),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -494,10 +496,93 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
   final _key = PurchasingApi.newKey();
   List<Facts> _hits = const [];
 
+  // Pick items by category (founder's sketch, 29 Oct 2026): choose a category, tick its items, add them all at once.
+  List<Facts>? _cats;
+  Facts? _cat;
+  List<Facts> _catItems = const [];
+  final _ticked = <String>{};
+  bool _catLoading = false;
+
   @override
   void initState() {
     super.initState();
     if (widget.replaces != null) _fromOldNote(widget.replaces!);
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final b = await widget.api.browseItems();
+      if (mounted) setState(() => _cats = b.l('categories'));
+    } catch (_) {
+      if (mounted) setState(() => _cats = const []); // search and scan still work
+    }
+  }
+
+  Future<void> _chooseCategory() async {
+    final cats = _cats ?? const <Facts>[];
+    if (cats.isEmpty) return showToast(context, tr('No categories yet. Search or scan the items instead.'));
+    final picked = await showModalBottomSheet<Facts>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: kBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (c) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(c).height * 0.7),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Center(child: Container(margin: const EdgeInsets.only(top: 10), width: 40, height: 4, decoration: BoxDecoration(color: kCardLine, borderRadius: BorderRadius.circular(99)))),
+            Padding(padding: const EdgeInsets.fromLTRB(20, 14, 20, 8), child: Text(tr('Choose a category'), style: inter(18, 800))),
+            Flexible(
+              child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(12, 0, 12, 12), children: [
+                for (final cat in cats)
+                  ListTile(
+                    key: ValueKey('recv-cat-${cat.s('id')}'),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    tileColor: cat.s('id') == _cat?.s('id') ? const Color(0xFFE8F5DC) : null,
+                    leading: Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: const Color(0xFFEFF3E6), borderRadius: BorderRadius.circular(10)),
+                      child: Icon(cat.s('id') == 'none' ? LucideIcons.package : LucideIcons.layoutGrid, size: 17, color: kPostedText),
+                    ),
+                    title: Text(cat.s('name'), style: inter(15, 600)),
+                    trailing: Text('${cat.n('count').toInt()} ${tr(cat.n('count') == 1 ? 'item' : 'items')}', style: inter(12.5, 500, color: kMuted)),
+                    onTap: () => Navigator.pop(c, cat),
+                  ),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _cat = picked;
+      _catItems = const [];
+      _ticked.clear();
+      _catLoading = true;
+    });
+    try {
+      final b = await widget.api.browseItems(picked.s('id'));
+      if (mounted && _cat?.s('id') == picked.s('id')) setState(() => _catItems = b.l('items'));
+    } catch (e) {
+      if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not load the items. Try again.'));
+    } finally {
+      if (mounted) setState(() => _catLoading = false);
+    }
+  }
+
+  /// Every ticked item onto the bill (one each; an item already there gets one more).
+  void _addTicked() {
+    final picked = _catItems.where((i) => _ticked.contains(i.s('id'))).toList();
+    for (final i in picked) {
+      _add(i);
+    }
+    setState(_ticked.clear);
+    showToast(context, '${picked.length} ${tr(picked.length == 1 ? 'item added' : 'items added')}. ${tr('Fill in the quantities below.')}');
   }
 
   /// The old note's supplier and items, with each item's MRP, price, HSN and GST as the catalogue has them.
@@ -549,7 +634,7 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
 
   Future<void> _search(String q) async {
     final mine = ++_seq;
-    if (q.trim().length < 2) return setState(() => _hits = const []);
+    if (q.trim().isEmpty) return setState(() => _hits = const []); // from the first letter (founder, 29 Oct 2026)
     setState(() => _searching = true);
     try {
       final r = await widget.api.findItems(q);
@@ -777,9 +862,11 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
         labelText: tr(label),
         labelStyle: inter(12.5, 500, color: kMuted),
         filled: true,
-        fillColor: kBg,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kCardLine)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kCardLine)),
+        fillColor: const Color(0xFFF7F8F4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kCardLine)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kCardLine)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kPostedText, width: 1.5)),
       );
 
   /// Under each line: its taxable value, GST and total, like the columns of the supplier's invoice.
@@ -808,12 +895,8 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
     return InvCard(
       key: const ValueKey('recv-invoice-card'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          const Icon(LucideIcons.receiptText, size: 18, color: kMuted),
-          const SizedBox(width: 8),
-          Expanded(child: Text(tr('Supplier invoice'), style: inter(15.5, 800))),
-        ]),
-        const SizedBox(height: 10),
+        _SectionHead(icon: LucideIcons.receiptText, title: tr('Supplier invoice'), subtitle: tr('As printed on the supplier’s bill')),
+        const SizedBox(height: 14),
         if (po != null)
           Text('${po.number} · ${po.supplierName}', style: inter(14.5, 700))
         else
@@ -826,10 +909,10 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
             decoration: _dec('Supplier').copyWith(
               hintText: tr('Tap to choose a supplier'),
               helperText: _supplierPhone.isEmpty ? null : _supplierPhone,
-              suffixIcon: const Icon(LucideIcons.bookUser, size: 18),
+              suffixIcon: const Icon(LucideIcons.userPlus, size: 18, color: kPostedText),
             ),
           ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Row(children: [
           Expanded(child: TextField(key: const ValueKey('recv-invoice'), controller: _invoice, style: inter(14.5, 600), decoration: _dec('Invoice number'))),
           const SizedBox(width: 8),
@@ -848,7 +931,7 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
             ),
           ),
         ]),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         TextField(
           key: const ValueKey('recv-gstin'),
           controller: _gstin,
@@ -861,10 +944,174 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
     );
   }
 
+  /// The matches as a dropdown under the box (founder, 29 Oct 2026): one line each, a small photo, the name and the MRP; a tap adds it.
+  Widget _dropdown() => Container(
+        key: const ValueKey('recv-dropdown'),
+        margin: const EdgeInsets.only(top: 6),
+        constraints: const BoxConstraints(maxHeight: 6 * 48.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kCardLine),
+          boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 14, offset: Offset(0, 6))],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ListView.separated(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            itemCount: _hits.length,
+            separatorBuilder: (_, _) => const Divider(height: 1, color: kCardLine),
+            itemBuilder: (_, i) {
+              final h = _hits[i];
+              return Material(
+                color: Colors.white,
+                child: InkWell(
+                  key: ValueKey('recv-hit-${h.s('id')}'),
+                  onTap: () => _add(h),
+                  child: SizedBox(
+                    height: 48,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Row(children: [
+                        _Thumb(url: h.s('image_url'), name: h.s('name')),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(h.s('name'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(14, 600))),
+                        const SizedBox(width: 8),
+                        Text(
+                          h.no('mrp_minor') == null ? tr('No MRP') : '${tr('MRP')} ${money(h.n('mrp_minor'))}',
+                          key: ValueKey('recv-hit-mrp-${h.s('id')}'),
+                          style: inter(13, h.no('mrp_minor') == null ? 500 : 700, color: h.no('mrp_minor') == null ? kMuted : kInk),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+  /// The category picker: a box with the chosen category and ▾.
+  Widget _categoryBox() => Material(
+        color: const Color(0xFFF7F8F4),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          key: const ValueKey('recv-category'),
+          borderRadius: BorderRadius.circular(14),
+          onTap: _chooseCategory,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: _cat == null ? kCardLine : kPostedText)),
+            child: Row(children: [
+              Icon(LucideIcons.layoutGrid, size: 18, color: _cat == null ? kMuted : kPostedText),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _cat?.s('name') ?? tr('Category'),
+                  style: inter(14.5, _cat == null ? 500 : 700, color: _cat == null ? kMuted : kInk),
+                ),
+              ),
+              if (_cat != null) Text('${_cat!.n('count').toInt()} ${tr('items')}', style: inter(12.5, 500, color: kMuted)),
+              const SizedBox(width: 6),
+              const Icon(LucideIcons.chevronDown, size: 18, color: kMuted),
+            ]),
+          ),
+        ),
+      );
+
+  /// The chosen category's items to tick (several at once), then "Add N items".
+  Widget _categoryItems() {
+    if (_catLoading) return const Padding(padding: EdgeInsets.all(14), child: LinearProgressIndicator(minHeight: 2));
+    if (_catItems.isEmpty) return Padding(padding: const EdgeInsets.all(14), child: Text(tr('No items in this category.'), style: inter(13, 500, color: kMuted)));
+    final all = _catItems.every((i) => _ticked.contains(i.s('id')));
+    final onBill = {for (final l in _lines) l.itemId};
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const SizedBox(height: 8),
+      Container(
+        key: const ValueKey('recv-cat-items'),
+        constraints: const BoxConstraints(maxHeight: 7 * 48.0 + 44),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: kCardLine)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: ListView(shrinkWrap: true, padding: EdgeInsets.zero, children: [
+            InkWell(
+              key: const ValueKey('recv-cat-all'),
+              onTap: () => setState(() => all ? _ticked.clear() : _ticked.addAll(_catItems.map((i) => i.s('id')))),
+              child: Container(
+                height: 44,
+                color: const Color(0xFFF7F8F4),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(children: [
+                  Icon(all ? LucideIcons.squareCheck : LucideIcons.square, size: 20, color: all ? kPostedText : kMuted),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(tr('Select all'), style: inter(13.5, 700))),
+                  Text('${_ticked.length}/${_catItems.length}', style: inter(12.5, 600, color: kMuted)),
+                ]),
+              ),
+            ),
+            for (final h in _catItems) ...[
+              const Divider(height: 1, color: kCardLine),
+              InkWell(
+                key: ValueKey('recv-cat-item-${h.s('id')}'),
+                onTap: () => setState(() => _ticked.contains(h.s('id')) ? _ticked.remove(h.s('id')) : _ticked.add(h.s('id'))),
+                child: Container(
+                  height: 48,
+                  color: _ticked.contains(h.s('id')) ? const Color(0xFFF1FAE8) : Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(children: [
+                    Icon(_ticked.contains(h.s('id')) ? LucideIcons.squareCheck : LucideIcons.square, size: 20, color: _ticked.contains(h.s('id')) ? kPostedText : kMuted),
+                    const SizedBox(width: 10),
+                    _Thumb(url: h.s('image_url'), name: h.s('name')),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        onBill.contains(h.s('id')) ? '${h.s('name')} · ${tr('on the bill')}' : h.s('name'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: inter(14, 600),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(h.no('mrp_minor') == null ? tr('No MRP') : '${tr('MRP')} ${money(h.n('mrp_minor'))}', style: inter(12.5, 700, color: h.no('mrp_minor') == null ? kMuted : kInk)),
+                  ]),
+                ),
+              ),
+            ],
+          ]),
+        ),
+      ),
+      const SizedBox(height: 10),
+      SizedBox(
+        height: 48,
+        child: FilledButton.icon(
+          key: const ValueKey('recv-cat-add'),
+          onPressed: _ticked.isEmpty ? null : _addTicked,
+          icon: const Icon(LucideIcons.plus, size: 18),
+          label: Text(_ticked.isEmpty ? tr('Tick the items that came') : '${tr('Add')} ${_ticked.length} ${tr(_ticked.length == 1 ? 'item' : 'items')}', style: inter(15, 700)),
+          style: FilledButton.styleFrom(backgroundColor: kPrimary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+        ),
+      ),
+    ]);
+  }
+
   /// The empty line at the end: type a name, scan, or make a new product.
   Widget _addLine() => InvCard(
         key: const ValueKey('recv-add-line'),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _SectionHead(icon: LucideIcons.packagePlus, title: tr('Add items'), subtitle: tr('Pick from a category, search or scan')),
+          const SizedBox(height: 14),
+          _categoryBox(),
+          if (_cat != null) _categoryItems(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(children: [
+              const Expanded(child: Divider(color: kCardLine)),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text(tr('or search'), style: inter(12, 600, color: kMuted))),
+              const Expanded(child: Divider(color: kCardLine)),
+            ]),
+          ),
           Row(children: [
             Expanded(
               child: TextField(
@@ -892,27 +1139,7 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
             ),
           ]),
           if (_searching) const Padding(padding: EdgeInsets.all(8), child: LinearProgressIndicator(minHeight: 2)),
-          for (final h in _hits)
-            Material(
-              type: MaterialType.transparency,
-              child: InkWell(
-                key: ValueKey('recv-hit-${h.s('id')}'),
-                borderRadius: BorderRadius.circular(10),
-                onTap: () => _add(h),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                  child: Row(children: [
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(h.s('name'), style: inter(14, 600)),
-                        Text([h.s('sku'), if (h.no('mrp_minor') != null) '${tr('MRP')} ${money(h.n('mrp_minor'))}'].where((s) => s.isNotEmpty).join(' · '), style: inter(12, 400, color: kMuted)),
-                      ]),
-                    ),
-                    const Icon(LucideIcons.plus, size: 18, color: kLink),
-                  ]),
-                ),
-              ),
-            ),
+          if (_hits.isNotEmpty) _dropdown(),
           if (_find.text.trim().length >= 2 && !_searching)
             TextButton.icon(
               key: const ValueKey('recv-new-product'),
@@ -960,9 +1187,15 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
                 ]),
               ),
             _invoiceCard(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-              child: Text(tr('Enter what actually came, as on the bill. Stock goes up for every line with an MRP.'), style: inter(13, 400, color: kMuted)),
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(color: const Color(0xFFEFF7E6), borderRadius: BorderRadius.circular(14)),
+              child: Row(children: [
+                const Icon(LucideIcons.info, size: 16, color: kPostedText),
+                const SizedBox(width: 8),
+                Expanded(child: Text(tr('Enter what actually came, as on the bill. Stock goes up for every line with an MRP.'), style: inter(12.5, 500, color: kPostedText, height: 1.35))),
+              ]),
             ),
             for (final (i, l) in _lines.indexed) _lineCard(i, l),
             _addLine(),
@@ -1568,4 +1801,52 @@ class _PastPurchasesScreenState extends State<PastPurchasesScreen> {
       ]),
     );
   }
+}
+
+/// A product's photo, 32 px with rounded corners; its first letter when there is no photo or it does not load.
+class _Thumb extends StatelessWidget {
+  const _Thumb({required this.url, required this.name});
+  final String url, name;
+  @override
+  Widget build(BuildContext context) {
+    final letter = Container(
+      color: const Color(0xFFEFF3E6),
+      alignment: Alignment.center,
+      child: Text(name.isEmpty ? '?' : name.characters.first.toUpperCase(), style: inter(13, 800, color: kPostedText)),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 32,
+        height: 32,
+        child: url.isEmpty ? letter : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, _, _) => letter),
+      ),
+    );
+  }
+}
+
+/// A card's heading on Add purchase: an icon in a soft green box, the title and one line under it.
+class _SectionHead extends StatelessWidget {
+  const _SectionHead({required this.icon, required this.title, required this.subtitle});
+  final IconData icon;
+  final String title, subtitle;
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFE6F7D2), Color(0xFFD2F0B4)]),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 20, color: kPostedText),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: inter(16.5, 800)),
+            Text(subtitle, style: inter(12.5, 500, color: kMuted)),
+          ]),
+        ),
+      ]);
 }

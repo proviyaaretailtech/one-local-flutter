@@ -94,7 +94,10 @@ class SettingsApi {
   }
 
   /// A short-lived link to the store QR or one document.
-  Future<String> fileLink(String kind, {String? id}) async => (await _rpc.callMap('pos_settings_file_link', {'kind': kind, 'id': ?id}))['url'] as String;
+  Future<String> fileLink(String kind, {String? id}) async => (await fileLinkInfo(kind, id: id))['url'] as String;
+
+  /// The link and its content type (a PDF opens; a photo shows).
+  Future<Map<String, dynamic>> fileLinkInfo(String kind, {String? id}) => _rpc.callMap('pos_settings_file_link', {'kind': kind, 'id': ?id});
 
   /// The Activity log (0614): every order's timeline, newest first. [before] (an entry's 'at') pages back to older entries.
   Future<Map<String, dynamic>> activityLog({String? before, int limit = 50}) => _rpc.callMap('rst_activity_log', {'before': ?before, 'limit': limit});

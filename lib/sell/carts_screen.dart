@@ -4,8 +4,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
-import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
+import 'cart_customer.dart';
 import 'pay_screen.dart';
 import 'search_screen.dart';
 import 'sell_api.dart';
@@ -131,23 +131,8 @@ class _CartsScreenState extends State<CartsScreen> {
     }
   }
 
-  /// Name and mobile, for any card. Answers the trimmed name and the digits of the mobile, or null when closed.
-  Future<(String, String)?> _askCustomer(String name, String phone) async {
-    final n = TextEditingController(text: name == 'Guest' ? '' : name), p = TextEditingController(text: phone);
-    final ok = await showOrderSheet<bool>(
-      context,
-      title: tr('Customer'),
-      body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        TextField(key: const ValueKey('cart-customer-name'), controller: n, textCapitalization: TextCapitalization.words, decoration: InputDecoration(hintText: tr('Name'))),
-        const SizedBox(height: 10),
-        TextField(key: const ValueKey('cart-customer-phone'), controller: p, keyboardType: TextInputType.phone, inputFormatters: mobileFormatters, decoration: InputDecoration(hintText: tr('Mobile number'), prefixText: kMobilePrefix)),
-        const SizedBox(height: 16),
-        DarkCta(key: const ValueKey('cart-customer-save'), label: tr('Save'), onPressed: () => Navigator.pop(ctx, true)),
-      ]),
-    );
-    if (ok != true) return null;
-    return (n.text.trim(), p.text.replaceAll(RegExp(r'\D'), ''));
-  }
+  /// Name and mobile, for any card: the mobile is required (founder, 29 Oct 2026). Null when closed.
+  Future<(String, String)?> _askCustomer(String name, String phone) => askCartCustomer(context, name: name, phone: phone);
 
   Future<void> _editCart(SellCart c) async {
     final r = await _askCustomer(c.customerName, c.customerPhone);
@@ -169,14 +154,6 @@ class _CartsScreenState extends State<CartsScreen> {
     } catch (e) {
       if (mounted) showToast(context, sellErrorText(e));
     }
-  }
-
-  Future<void> _addItems() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SearchScreen(env: env, onAdd: (i) {
-      cart.add(i);
-      env.carts.changed();
-    })));
-    if (mounted) _requote();
   }
 
   /// More items on a cart parked on this till: they go straight into that cart.
@@ -313,8 +290,6 @@ class _CartsScreenState extends State<CartsScreen> {
                   _loadHeld();
                 }
               })),
-              const SizedBox(width: 10),
-              Expanded(flex: 2, child: LightCta(label: tr('+ Items'), onPressed: _addItems)),
             ]),
           ]),
         ),
@@ -395,7 +370,7 @@ class _CartsScreenState extends State<CartsScreen> {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               _onCard(cart.customerName.isEmpty ? 'Guest' : cart.customerName, size: 17, weight: 700, alpha: 1),
-              _onCard(cart.customerPhone.isEmpty ? tr('Add a mobile number') : cart.customerPhone),
+              _onCard(cart.customerPhone.isEmpty ? tr('Add a mobile number') : showMobile(cart.customerPhone)),
             ]),
           ),
           _editButton(const ValueKey('cart-edit-active'), () => _editCart(cart)),

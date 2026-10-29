@@ -7,6 +7,7 @@ import 'dish_options_sheet.dart';
 import 'table_order_screen.dart';
 import 'table_widgets.dart';
 import 'tables_api.dart';
+import '../ui/motion.dart';
 
 // "Take an order at a table" (founder-approved 2026-10-20; Figma BEP6SKzfNy1lH0D6pHwGFv, Journey 3): Add dishes (18:403), Sent to kitchen (18:467),
 // Ready to serve (18:556). The database (migration 0485) places or extends the table's order, works out the bill, makes the KOT and decides who may do
@@ -115,7 +116,7 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
 
   Future<void> _editNote(Facts i) async {
     final c = TextEditingController(text: _note[i.s('id')] ?? '');
-    final v = await showDialog<String>(
+    final v = await showOlDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Note for ${i.s('name')}', style: inter(17, 700)),
@@ -485,7 +486,7 @@ class _ReadyToServeScreenState extends State<ReadyToServeScreen> {
       showToast(context, served == 0 ? 'Already served.' : '$served ${served == 1 ? 'dish' : 'dishes'} served.');
       if (done.length == 1) {
         final tableId = ready.firstWhere((i) => i.s('order_id') == done.first.s('order_id'), orElse: () => ready.first).s('table_id');
-        final open = await showDialog<bool>(
+        final open = await showOlDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text('${done.first.s('table_label')}: everything served', style: inter(17, 700)),

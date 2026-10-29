@@ -12,6 +12,7 @@ import '../inventory/inventory_widgets.dart' show dayMonth;
 import '../ui/i18n.dart';
 import '../stock/lot_labels_screen.dart' show offerLotLabels;
 import '../ui/purchase_steps.dart';
+import '../ui/motion.dart';
 
 String _m(num minor) => money(minor, fixed: true);
 
@@ -155,7 +156,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
     if (v.status == 'approved') offerLotLabels(context, v.receiptId);
   }
 
-  Future<String?> _askNote(String title, String hint) => showDialog<String>(context: context, builder: (_) => _NoteDialog(title: title, hint: hint));
+  Future<String?> _askNote(String title, String hint) => showOlDialog<String>(context: context, builder: (_) => _NoteDialog(title: title, hint: hint));
 
   // ---------------------------------------------------------------- pieces
   // Long values (24 × ₹30.00 = ₹720.00) wrap onto a second line instead of shrinking to an unreadable size.

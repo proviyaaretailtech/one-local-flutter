@@ -8,6 +8,7 @@ import '../ui/theme.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 /// Figma "Supplier Price Detail" with its three tabs: Overview & Trends (the active supplier selection and contract parameters), Alternative Bids
 /// (the suppliers bidding for the ingredient, "Select supplier") and Quality Audit (the latest audit round, "Re-Audit"). Only what the database holds is
@@ -62,7 +63,7 @@ class _SupplierPriceScreenState extends State<SupplierPriceScreen> {
 
   Future<void> _select(Facts bid) async {
     final name = bid.m('supplier').s('name');
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Select $name?'),

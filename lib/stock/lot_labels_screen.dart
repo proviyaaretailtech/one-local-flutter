@@ -14,11 +14,12 @@ import 'labels_screens.dart' show printLabelPdf, shareLabelPdf;
 import 'stock_env.dart';
 import 'stock_kit.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 /// After a receipt note is matched and received (founder, 26 Oct 2026): a small question first, not the labels screen straight away.
 /// "Print labels" opens [LotLabelsScreen] for that lot; "Not now" leaves it (Labels on the receipt note's card opens it later).
 Future<void> offerLotLabels(BuildContext context, String receiptId) async {
-  final yes = await showDialog<bool>(
+  final yes = await showOlDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: Colors.white,

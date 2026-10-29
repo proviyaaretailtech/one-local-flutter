@@ -6,6 +6,8 @@ import '../ui/theme.dart';
 import 'setup_api.dart';
 import 'setup_flow.dart';
 import 'setup_widgets.dart';
+import '../settings/store_qr.dart';
+import '../ui/i18n.dart';
 
 String _sellPlanName(String? p) => switch (p) {
       'pos_and_onelocal' => 'Sell on OneLocal and Purchase POS',
@@ -225,6 +227,13 @@ class _PaymentScreenState extends State<PaymentScreen> with TourHost {
       children: [
         SetupStatusPill(_p['saved'] == true ? 'Setup complete' : 'Setup incomplete', done: _p['saved'] == true),
         const SizedBox(height: 14),
+        // the shop's own UPI QR (founder, 29 Oct 2026): saved at once, shown on the Bill screen when a customer pays by UPI
+        const SetupHeading('Payment QR'),
+        const SizedBox(height: 4),
+        Text(tr('A photo of your shop’s UPI QR. Customers scan it when they pay by UPI. You can change it later in Settings.'), style: inter(12.5, 400, color: kMuted, height: 1.4)),
+        const SizedBox(height: 12),
+        const StoreQrCard(key: ValueKey('setup-store-qr'), canEdit: true),
+        const SizedBox(height: 20),
         const SetupHeading('Settlement bank account'),
         const SizedBox(height: 10),
         SetupField(label: 'Account holder name', controller: _holder, hint: 'Name as on bank account'),

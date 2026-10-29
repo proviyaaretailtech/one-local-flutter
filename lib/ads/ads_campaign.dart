@@ -12,6 +12,7 @@ import '../ui/i18n.dart';
 import '../ui/theme.dart';
 import 'ads_api.dart';
 import 'ads_screens.dart';
+import '../ui/motion.dart';
 
 /// One campaign (the spec's request lifecycle): where it is (sent → ad checked → price → accepted → coins held → live → done), its price
 /// and the terms accepted, its coins held and spent, its numbers, and what the shop can do at this stage: edit and send, accept a price,
@@ -79,7 +80,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
   }
 
   Future<void> _cancel() async {
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(tr(_stage == 'draft' ? 'Delete this draft?' : 'Cancel this campaign?'), style: inter(18, 800)),

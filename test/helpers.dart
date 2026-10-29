@@ -50,7 +50,7 @@ class FakeAuth extends AuthRepository {
   @override
   Future<void> sendPasswordReset(String email) => _do('sendPasswordReset $email');
   @override
-  Future<void> registerWithPhone({required String e164, required String fullName, required String email}) =>
+  Future<void> registerWithPhone({required String e164, required String fullName, String? email}) =>
       _do('registerWithPhone $e164 $fullName $email');
   @override
   Future<bool> signInWithGoogle() async {

@@ -1,5 +1,5 @@
 // The secret-bearing handlers. The gateway calls one of these instead of a database function ONLY when the work needs a secret
-// (PARTNER_PII_KEY, ANTHROPIC_API_KEY, REMOVE_BG_API_KEY), the storage service or a third party. Each receives the user id from the verified token and the checked body;
+// (PARTNER_PII_KEY, ANTHROPIC_API_KEY, REMOVE_BG_API_KEY, GOOGLE_MAPS_API_KEY), the storage service or a third party. Each receives the user id from the verified token and the checked body;
 // it must never trust the client for who the user is. They may use the service-role key; nothing else on the gateway does.
 import type { Handler } from '../../http.ts';
 import * as pii from './pii.ts';
@@ -15,6 +15,7 @@ import { webhook } from './payments.ts';
 import { describeDish } from './menuAi.ts';
 import { removeBackground } from './removeBg.ts';
 import { smsHook } from './smsHook.ts';
+import { mapsPlace, mapsReverse, mapsSearch } from './maps.ts';
 
 export type SecureCtx = { request: Request; userId: string; args: Record<string, unknown> };
 export type SecureHandler = (ctx: SecureCtx) => Promise<unknown>;
@@ -46,6 +47,9 @@ export const secureHandlers = {
   ads_media_link: adMedia.mediaLink,
   pos_packed_photo_slot: packedPhotos.photoSlot,
   pos_packed_photo_link: packedPhotos.photoLink,
+  maps_search: ctx => mapsSearch(ctx),
+  maps_place: ctx => mapsPlace(ctx),
+  maps_reverse: ctx => mapsReverse(ctx),
 } satisfies Record<string, SecureHandler>;
 
 /** Real HTTP endpoints (no user token): provider webhooks. */

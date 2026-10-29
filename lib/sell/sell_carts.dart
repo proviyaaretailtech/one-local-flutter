@@ -10,6 +10,9 @@ class SellCart {
   final String id;
   final int number;
   String customerName = '', customerPhone = '';
+
+  /// The person at the counter was in a hurry and skipped the customer's number: the cart goes on as a walk-in and is not asked again.
+  bool customerSkipped = false;
   String? couponCode;
   final List<CartLine> lines = [];
   final Map<String, num> unitPrice = {}; // shown beside a line before the server quotes; the quote is what is charged

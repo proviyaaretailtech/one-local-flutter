@@ -16,6 +16,7 @@ import 'item_parts.dart';
 import 'item_sheets.dart';
 import 'new_category_sheet.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 /// Section G entry (Figma "Catalogue · List" and "Catalogue · Grid"): every item of this business with search, categories, counts and pages.
 /// The control centre (section D) links here through `HomeNav.items`.
@@ -105,7 +106,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   }
 
   /// "No product has this barcode": true to create one with it, false to type another code, null when closed.
-  Future<bool?> _unknown(String code) => showDialog<bool>(
+  Future<bool?> _unknown(String code) => showOlDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: Colors.white,
@@ -192,7 +193,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 16), children: [
+            child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 16), children: staggered([
               const ItemPartSwitcher(bottom: 10),
               // One compact header: title and count with the small actions, then search with Add, then the category chips.
               Row(children: [
@@ -219,7 +220,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
               if (d != null && d.totalMatching > 0) _pager(d),
               const SizedBox(height: 8),
               DarkButton(tr('POS Items'), trailing: LucideIcons.arrowRight, onPressed: () => _tab('bill')),
-            ]),
+            ])),
           ),
         ),
         PosBottomNav(active: 'item', onTap: _tab),

@@ -54,6 +54,7 @@ export const ReceivePost = obj({
 });
 export const BillGet = obj({ receipt_document_id: id });
 export const ItemFind = obj({ q: z.string().trim().max(100) });
+export const ItemBrowse = obj({ category_id: z.string().trim().regex(/^(none|[0-9a-f-]{36})$/i, 'Choose the category again.').optional() }); // pick items by category (29 Oct 2026)
 export const BillSave = obj({
   receipt_document_id: id, invoice_no: z.string().trim().min(1, 'Enter the invoice number.').max(40), invoice_date: z.string().min(8, 'Enter the invoice date.').max(10),
   supplier_name: z.string().trim().max(80).optional(), supplier_gstin: z.string().trim().max(15).optional(),

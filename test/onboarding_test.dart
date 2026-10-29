@@ -11,6 +11,8 @@ import 'package:vinii_pos/onboarding/pan_scan.dart';
 import 'package:vinii_pos/onboarding/pan_camera_screen.dart' show cropToCard, kCardAspect;
 import 'package:image/image.dart' as img;
 import 'package:vinii_pos/onboarding/checklist_screen.dart';
+import 'package:vinii_pos/onboarding/current_location.dart';
+import 'package:vinii_pos/ui/name_input.dart';
 import 'package:vinii_pos/onboarding/document_picker.dart';
 import 'package:vinii_pos/onboarding/onboarding_api.dart';
 import 'package:vinii_pos/onboarding/profile_screens.dart';
@@ -268,7 +270,46 @@ void main() {
     });
   });
 
+  group('Names', () {
+    test("letters in any script, spaces and . ' - are a name; digits are not", () {
+      expect(nameProblem('Riya Sharma'), isNull);
+      expect(nameProblem('रिया शर्मा'), isNull);
+      expect(nameProblem("D'Souza-Rao Jr."), isNull);
+      expect(nameProblem('Riya 2'), 'A name can have letters only, no numbers.');
+      expect(nameProblem('  '), 'Please enter your full name.');
+      expect(cleanName('  Riya   Sharma '), 'Riya Sharma');
+    });
+  });
+
   group('Address', () {
+    testWidgets('Use my current location fills the address and saves the pin with it', (t) async {
+      final before = locateBusiness;
+      locateBusiness = () async => (lat: 12.9716, lng: 77.6412, line: '45, 100 Feet Road', area: 'Indiranagar', city: 'Bengaluru', state: 'Karnataka', pin: '560038');
+      addTearDown(() => locateBusiness = before);
+      SharedPreferences.setMockInitialValues({});
+      final api = FakeOnb();
+      await show(t, AddressScreen(api: api, app: sample(done: 1, extra: {'address': <String, dynamic>{}})));
+      await t.pumpAndSettle();
+      expect(find.text('Use my current location'), findsOneWidget);
+      await tapIt(t, find.byKey(const ValueKey('address-locate')));
+      expect(find.text('Pin set from your location'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('address-city')), matching: find.text('Bengaluru')), findsOneWidget);
+      await tapIt(t, find.text('The address and map pin identify my business location.'));
+      await tapText(t, 'Confirm address');
+      expect(api.bodies['address'], {'address_line': '45, 100 Feet Road', 'locality': 'Indiranagar', 'city': 'Bengaluru', 'state': 'Karnataka', 'pin_code': '560038', 'confirmed': true, 'lat': 12.9716, 'lng': 77.6412});
+    });
+    testWidgets('location refused: the reason shows and the address can still be typed', (t) async {
+      final before = locateBusiness;
+      locateBusiness = () async => throw const PartnerApiException(0, 'Allow location for OneLocal to find your address, or type it below.');
+      addTearDown(() => locateBusiness = before);
+      final api = FakeOnb();
+      await show(t, AddressScreen(api: api, app: sample(done: 2)));
+      await t.pumpAndSettle();
+      await tapIt(t, find.byKey(const ValueKey('address-locate')));
+      expect(toast('Allow location for OneLocal to find your address, or type it below.'), findsOneWidget);
+      expect(find.text('Illustrative map'), findsOneWidget);
+    });
+
     testWidgets('needs the confirmation, then saves every part', (t) async {
       final api = FakeOnb();
       await show(t, AddressScreen(api: api, app: sample(done: 2)));
@@ -456,6 +497,30 @@ void main() {
   });
 
   group('Bank', () {
+    testWidgets('bank details are optional: Skip for now closes without saving', (t) async {
+      final api = FakeOnb();
+      await show(t, BankScreen(api: api, app: sample()));
+      await t.pumpAndSettle();
+      expect(find.text('Optional · Bank details'), findsOneWidget);
+      await tapIt(t, find.byKey(const ValueKey('bank-skip')));
+      expect(api.bodies['bank'], isNull);
+      expect(find.byType(BankScreen), findsNothing);
+    });
+    testWidgets('the checklist never sends a partner to the optional bank step', (t) async {
+      final app = sample(done: 5, extra: {
+        'sections': [
+          for (final (k, title) in const [('business', 'Business details'), ('contact', 'Contact details'), ('address', 'Address'), ('tax', 'Tax details'), ('documents', 'Identity & documents')])
+            {'key': k, 'title': title, 'done': true, 'summary': 'ok'},
+          {'key': 'bank', 'title': 'Bank details', 'done': false, 'optional': true, 'summary': 'Add it later in Settings'},
+          {'key': 'agreement', 'title': 'Agreement & consent', 'done': false, 'summary': 'Review and acknowledge'},
+        ],
+        'progress': {'done': 5, 'total': 6, 'percent': 83, 'next': 'agreement', 'can_submit': false},
+      });
+      await show(t, ChecklistScreen(api: FakeOnb(), app: app));
+      await t.pumpAndSettle();
+      expect(find.text('Optional · Add it later in Settings'), findsOneWidget);
+      expect(find.text('Resume agreement & consent'), findsOneWidget);
+    });
     testWidgets('refuses mismatching numbers; Save for later sends draft', (t) async {
       final api = FakeOnb();
       await show(t, BankScreen(api: api, app: sample()));

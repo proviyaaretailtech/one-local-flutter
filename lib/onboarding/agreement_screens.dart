@@ -98,7 +98,7 @@ class _AgreementScreenState extends State<AgreementScreen> {
     return OnbPage(
       kicker: 'Business setup',
       title: 'Review your agreement.',
-      caption: 'Section 7 of 7 · Agreement',
+      caption: 'Section 6 of 6 · Agreement',
       subtitle: 'Read the agreement overview and open the full document before acknowledging it.',
       children: [
         SectionCard(title: 'Merchant agreement', lines: ['Preview · Version ${kAgreementVersion.replaceFirst('partner-agreement-', '')}', '${widget.app.businessName} · ${widget.app.ownerName}'], chip: const StatusChip('Ready to review', Tone.neutral)),
@@ -158,7 +158,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
     return OnbPage(
       kicker: 'Business setup',
       title: 'Your terms. Your choices.',
-      caption: 'Section 7 of 7 · Consent',
+      caption: 'Section 6 of 6 · Consent',
       subtitle: 'Review the service and privacy information. Marketing updates are optional and do not affect registration.',
       children: [
         Text('Required acknowledgements', style: inter(19, 600)),

@@ -7,6 +7,7 @@ import '../ui/theme.dart';
 import 'stock_env.dart';
 import 'stock_kit.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 /// Titles the damage screens give their adjustment documents, so each screen finds its own (older ones said "Write-off").
 const damageTitle = 'Damaged stock';
@@ -103,7 +104,7 @@ class PendingCard extends StatelessWidget {
 
 /// "Throw away 2 units?" — says it cannot be undone, and the money lost when the product's cost is known. True when confirmed.
 Future<bool> confirmThrowAway(BuildContext context, {required String what, int? lossMinor}) async {
-  final r = await showDialog<bool>(
+  final r = await showOlDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: Colors.white,
@@ -129,7 +130,7 @@ Future<bool> confirmThrowAway(BuildContext context, {required String what, int? 
 
 /// "Move 2 units off the shelf?" before approving a damage record. True when confirmed.
 Future<bool> confirmDamage(BuildContext context, String what) async {
-  final r = await showDialog<bool>(
+  final r = await showOlDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: Colors.white,

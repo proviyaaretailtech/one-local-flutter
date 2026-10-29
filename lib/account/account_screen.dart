@@ -8,6 +8,7 @@ import '../settings/settings_widgets.dart' show GroupCard, GroupTitle, RowAction
 import '../ui/theme.dart';
 import '../auth/partner_api.dart' show PartnerApiException;
 import 'account_api.dart';
+import '../ui/motion.dart';
 
 /// Side nav "Manage account": the signed-in person's name, email and mobile, how they can sign in, where they are signed in, and
 /// "Sign out of all devices". Email and mobile change through Supabase's own confirmation; the name is saved on their memberships.
@@ -165,7 +166,7 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
   }
 
   Future<void> _signOutEverywhere() async {
-    final yes = await showDialog<bool>(
+    final yes = await showOlDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Sign out of all devices?', style: inter(17, 700)),

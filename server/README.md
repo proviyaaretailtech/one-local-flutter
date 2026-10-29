@@ -27,6 +27,7 @@ Local Supabase only: the server refuses a non-local `SUPABASE_URL` unless `ALLOW
 | `SUPABASE_ANON_KEY` (or `SUPABASE_PUBLISHABLE_KEY`) | yes | verifies tokens and runs every call as the caller (their token on this key) so row-level security applies |
 | `PARTNER_PII_KEY` | production | 16+ characters; encrypts PAN and bank numbers in the database. Local dev uses a fixed dev-only key; production without it answers 503 on tax/bank saves |
 | `ANTHROPIC_API_KEY` | optional | Claude API key for "Write with AI" (dish descriptions). Unset: `menu_ai_describe` answers 503 `ai_not_configured`. Never print or commit it |
+| `GOOGLE_MAPS_API_KEY` | optional | Google Maps Platform key for the map pin (`maps_search`, `maps_place`, `maps_reverse`): Places API (New), and the Geocoding API for a street line at a dragged pin (without it the nearest place names the area). Unset: 503 `maps_not_configured`. Never print or commit it |
 | `REMOVE_BG_API_KEY` | optional | remove.bg key for "Remove background (AI)" on the item form (`cat_image_remove_bg`). Unset: 503 `bg_not_configured`. `REMOVE_BG_SIZE` picks the output size (default `auto`). Never print or commit it |
 | `PORT` | no | default 8090 |
 | `ALLOW_REMOTE` | no | `1` only on the host meant to use a hosted project |
@@ -46,7 +47,7 @@ src/rpc.ts          the gateway: allowlist lookup, token check, args check, call
 src/rpc-manifest.ts THE ALLOWLIST (one entry per function; kind db | secure | local)
 src/rpc-manifest.pending.md  functions of unmerged sections, ready to be listed
 src/schemas/        zod shapes for onboarding and setup arguments
-src/modules/secure/ secret-bearing handlers: pii.ts, storage.ts, me.ts, payments.ts (webhook hook, not connected), smsHook.ts (Supabase Send SMS hook → apitxt.com)
+src/modules/secure/ secret-bearing handlers: pii.ts, storage.ts, me.ts, payments.ts (webhook hook, not connected), smsHook.ts (Supabase Send SMS hook → apitxt.com), maps.ts (map pin: Google address search and pin → address)
 src/modules/        home.ts, orders.ts (presentation: formatting of database facts, runs as the caller)
 src/http.ts         {detail, code} errors, body cap, rate limit, log redaction
 src/auth.ts         verifies the Bearer token with Supabase Auth (public key, cached 60 s)
