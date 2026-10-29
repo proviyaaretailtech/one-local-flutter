@@ -276,7 +276,8 @@ class _AddressScreenState extends State<AddressScreen> {
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Section 4: tax. Figma "Tax Details". PAN is encrypted on the server; only the masked form comes back, so it is typed
-// again whenever the section is saved again.
+// again whenever the section is saved again. On save the server checks the PAN and GSTIN with the Income Tax and GST records
+// (founder, 30 Oct 2026); a refused one comes back as the server's sentence and nothing is saved.
 // ---------------------------------------------------------------------------------------------------------------------
 class TaxScreen extends StatefulWidget {
   const TaxScreen({super.key, required this.api, required this.app});
@@ -326,7 +327,10 @@ class _TaxScreenState extends State<TaxScreen> {
     setState(() => _saving = false);
     if (saved == null) return;
     await _draft.clear();
-    if (mounted) Navigator.of(context).pop(saved);
+    if (!mounted) return;
+    final confirmed = verifiedLine(saved.raw['verification']);
+    if (confirmed != null) showToast(context, confirmed);
+    Navigator.of(context).pop(saved);
   }
 
   @override
@@ -362,12 +366,27 @@ class _TaxScreenState extends State<TaxScreen> {
         const NoteCard(title: 'Only applicable information', body: 'GST registration is not assumed for every merchant. Review your own tax situation; this screen is not tax advice.'),
       ],
       actions: [
-        PrimaryAction(label: _saving ? 'Saving…' : 'Save & continue', onPressed: _saving ? null : _save),
+        PrimaryAction(label: _saving ? 'Checking and saving…' : 'Save & continue', onPressed: _saving ? null : _save),
         const SizedBox(height: 12),
-        const FooterNote('Tax applicability depends on your business circumstances.'),
+        const FooterNote('Your PAN and GSTIN are checked with the Income Tax and GST records when you save.'),
       ],
     );
   }
+}
+
+/// What the server confirmed on a tax save, as one line ("PAN verified · RAVI SHARMA · GSTIN active · SHARMA KIRANA"); null when
+/// nothing was checked (PAN kept, not GST-registered, or the checks could not run).
+@visibleForTesting
+String? verifiedLine(Object? verification) {
+  final v = verification is Map ? verification : const {};
+  final pan = v['pan'] is Map ? v['pan'] as Map : const {};
+  final gst = v['gstin'] is Map ? v['gstin'] as Map : const {};
+  final parts = [
+    if (pan['status'] == 'verified') ['PAN verified', pan['name']].whereType<String>().where((s) => s.isNotEmpty).join(' · '),
+    if (gst['status'] == 'active')
+      ['GSTIN active', [gst['trade_name'], gst['legal_name']].whereType<String>().firstWhere((s) => s.isNotEmpty, orElse: () => '')].where((s) => s.isNotEmpty).join(' · '),
+  ];
+  return parts.isEmpty ? null : parts.join('  ·  ');
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
