@@ -25,7 +25,8 @@ begin;
 EOF
     for f in migrations/06*.sql; do
       n=$(basename "$f" | cut -c1-4)
-      [[ "$n" < "$2" || "$n" > "$3" ]] && continue
+      # $5: migrations added at the end of this part: 0629 merges pos_order_view right after A replaced it, 0630 fixes stock coming in
+      [[ " ${5:-} " != *" $n "* && ( "$n" < "$2" || "$n" > "$3" ) ]] && continue
       printf '\n-- ----------------------------------------------------------------------------------------------------------------------------\n-- %s\n-- ----------------------------------------------------------------------------------------------------------------------------\n' "$(basename "$f")"
       grep -viE '^\s*(begin|commit)\s*;\s*$' "$f"
     done
@@ -37,7 +38,7 @@ commit;
 EOF
   } > "$OUT/$1"
 }
-logic_part 01a_logic_0600_0613.sql 0600 0613 '1a of 3'
+logic_part 01a_logic_0600_0613.sql 0600 0613 '1a of 3' "0629 0630"
 logic_part 01b_logic_0614_0628.sql 0614 0628 '1b of 3'
 rm -f "$OUT/01_logic_0600_0628.sql"
 

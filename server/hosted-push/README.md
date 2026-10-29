@@ -1,17 +1,25 @@
 # One-time push to the hosted DB (29 Oct 2026)
 
-Brings the hosted project `ywylhzcxuoeilygzdonx` up to the local test DB: migrations 0600-0628 (all the logic since the 26 Oct copy of
-hosted) and Niks Cafe's set-up. Both SQL files are one transaction each: if one stops with an error, nothing in it has changed.
+Brings the hosted project `ywylhzcxuoeilygzdonx` up to the local test DB: migrations 0600-0630 and Niks Cafe's set-up, in three SQL
+files. Each file is one transaction: if one stops with an error, nothing in it has changed.
 
-Checked before handing over, on a copy of the hosted DB (its 26 Oct dump) inside the local Docker:
-- `01a` then `01b` apply without errors as the `postgres` role (the role the SQL editor uses) and leaves the same tables, columns, functions,
-  triggers, indexes and policies as the local test DB.
-- `02` applies without errors, and a second run changes nothing (no duplicate stock or events).
-- Every function the server allows (267) was called as Niks Cafe's hosted owner: no "permission denied" or missing table.
-- A full kitchen day (table orders, KDS start / item done / ready, takeaway, delivery), recipes, money and tables work as that owner.
+## Checked against today's hosted (read-only dump of 29 Oct 2026, 23:16), on a copy inside the local Docker
+- Since 26 Oct the store team changed 24 functions on hosted and added 136. My files replace 15 functions; 13 of those are unchanged on
+  hosted since 26 Oct, so nothing of theirs is lost. The other two were changed by both sides and are merged:
+  - `pos_order_view` (0629): keeps their packed-bag photo fields and adds the dish size and takeaway flag.
+  - `stock_movement_allocate` (0630): their negative-stock version fails on **every** movement that adds stock ("record "s" is not
+    assigned yet": a loop variable `s` clashes with a table alias `s`). Live on hosted now: receiving goods, opening stock and stock
+    coming back from a cancelled order all fail. 0630 renames the variable; nothing else changes.
+- `01a`, `01b`, `02` apply in order without errors as the `postgres` role (the role the SQL editor uses). Afterwards every table,
+  column, trigger, index, policy, constraint and grant of today's hosted is still there unchanged, apart from the two merges above.
+- Every function the merged server allows (353) was called as a Niks Cafe owner: no "permission denied", no missing table or column.
+  A full kitchen day, the order page, recipes, money, tables and stock coming in all work.
+- **Niks Cafe has no members on hosted today** (its owner's login was deleted since 26 Oct). The data goes in, but nobody can sign in
+  to it until an account is attached as its owner.
 
 ## Order
-1. **SQL editor → run `01a_logic_0600_0613.sql`, then `01b_logic_0614_0628.sql`** (each whole file, in its own run: the editor refuses one 370 KB script). Expect "Success. No rows returned" each time.
+1. **SQL editor → run `01a_logic_0600_0613.sql`**, then **`01b_logic_0614_0628.sql`** (each whole file, in its own run; the editor
+   refuses one 370 KB script). Expect "Success. No rows returned" each time. `01a` also carries 0629 and 0630.
 2. **SQL editor → run `02_niks_cafe_data.sql`** (whole file).
 3. **Storage → `item-images` bucket → upload the folder `item-images/bd4d8ee9-5885-41e4-b6a1-ba2b9cb873dd`** (drag the whole folder in,
    so each photo lands at `bd4d8ee9-…/items/<dish id>/<photo>.jpg`). 11 photos, 1.4 MB. The dishes already point at these paths.
@@ -21,9 +29,8 @@ Checked before handing over, on a copy of the hosted DB (its 26 Oct dump) inside
 The server must not be deployed before step 1: the new server code calls functions that step 1 creates.
 
 ## Rebuild
-`bash hosted-push/build.sh` (Git Bash, in `server/`) rebuilds both SQL files from `migrations/` and the local DB. The photos come from the
-local storage: `item-images/` was filled with one `curl` per object of the local `item-images` bucket.
+`bash hosted-push/build.sh` (Git Bash, in `server/`) rebuilds the three SQL files from `migrations/` and the local DB. The photos come
+from the local storage: `item-images/` was filled with one `curl` per object of the local `item-images` bucket.
 
 ## Not copied on purpose
 Orders, KOTs, payments, bills, the test login, closing-stock test counts, notifications, outlet settings and counters.
-
