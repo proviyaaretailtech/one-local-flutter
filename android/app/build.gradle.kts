@@ -14,6 +14,15 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
+// GOOGLE_MAPS_KEY from --dart-define / --dart-define-from-file=.env.local (Flutter hands them to Gradle base64-encoded): the
+// Maps SDK reads the key from the manifest. Empty: the app shows no live map (lib/ui/maps/maps_setup.dart).
+val dartDefines: Map<String, String> = (project.findProperty("dart-defines") as String?)
+    ?.split(",")
+    ?.mapNotNull { runCatching { String(java.util.Base64.getDecoder().decode(it)) }.getOrNull() }
+    ?.mapNotNull { it.split("=", limit = 2).takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] } }
+    ?.toMap()
+    ?: emptyMap()
+
 android {
     namespace = "com.onelocal.vinii_pos"
     compileSdk = flutter.compileSdkVersion
@@ -37,6 +46,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["googleMapsKey"] = dartDefines["GOOGLE_MAPS_KEY"] ?: ""
     }
 
     signingConfigs {

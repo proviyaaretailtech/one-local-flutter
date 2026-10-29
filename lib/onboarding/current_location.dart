@@ -16,12 +16,18 @@ Future<FoundAddress> _locate() async {
   if (!await Geolocator.isLocationServiceEnabled()) {
     throw const PartnerApiException(0, 'Turn on location on your phone, then try again.');
   }
-  var p = await Geolocator.checkPermission();
-  if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
-  if (p == LocationPermission.denied || p == LocationPermission.deniedForever) {
-    throw const PartnerApiException(0, 'Allow location for OneLocal to find your address, or type it below.');
+  const refused = PartnerApiException(0, 'Allow location for OneLocal to find your address, or type it below.');
+  final Position pos;
+  try {
+    var p = await Geolocator.checkPermission();
+    if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
+    if (p == LocationPermission.denied || p == LocationPermission.deniedForever) throw refused;
+    pos = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 20)));
+  } on PermissionDeniedException {
+    throw refused; // a browser that blocks location says so here, not through the permission check
+  } on LocationServiceDisabledException {
+    throw const PartnerApiException(0, 'Turn on location on your phone, then try again.');
   }
-  final pos = await Geolocator.getCurrentPosition(locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 20)));
   var line = '', area = '', city = '', state = '', pin = '';
   if (!kIsWeb) {
     // the browser has no geocoder: there only the pin is found

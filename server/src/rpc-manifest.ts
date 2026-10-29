@@ -42,6 +42,7 @@ import * as cu from './schemas/customers.ts';
 import * as sh from './schemas/shift.ts';
 import * as ord from './schemas/orders.ts';
 import * as gst from './schemas/guest.ts';
+import * as mp from './schemas/maps.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -86,6 +87,10 @@ export const MANIFEST: Entry[] = [
   sec('partner_app_document_attach', { args: ob.Attach, rate: 'secure', roles: ANY }),
   sec('partner_app_document_preview', { args: ob.PreviewAsk, rate: 'secure', roles: ANY }),
   sec('partner_app_document_remove', { args: ob.PreviewAsk, rate: 'secure', roles: ANY }),
+  // the map pin (business address, a new outlet): address search and pin -> address through Google Maps; the key stays here, nothing is saved
+  sec('maps_search', { args: mp.Search, rate: 'secure', roles: ANY }),
+  sec('maps_place', { args: mp.PlaceAsk, rate: 'secure', roles: ANY }),
+  sec('maps_reverse', { args: mp.Point, rate: 'secure', roles: ANY }),
 
   // ---- workspace setup after approval — database: 0350 via 0360. Results carry storage paths for listing images: post turns them into links.
   db('partner_setup_get', { fn: 'gw_partner_setup_get', ...empty, map: () => ({}), post: links, roles: OWNER }),

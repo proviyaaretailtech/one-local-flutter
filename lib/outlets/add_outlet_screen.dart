@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../api/maps_api.dart';
 import '../auth/partner_api.dart';
 import '../ui/app_header.dart';
+import '../ui/maps/location_picker.dart';
 import '../ui/theme.dart';
 import 'outlet_header.dart' show kOutletOnline;
 import 'outlets_api.dart';
@@ -35,8 +37,11 @@ const _stepTitles = {
 /// outlet's own GSTIN and a contact who becomes the outlet's admin. Sending creates the outlet as pending until One Local approves it.
 /// Every rule is checked again by the server (migration 0523); this screen only guides.
 class AddOutletScreen extends StatefulWidget {
-  const AddOutletScreen({super.key, required this.api, required this.needsFssai, this.locate, this.draftId});
+  const AddOutletScreen({super.key, required this.api, required this.needsFssai, this.locate, this.draftId, this.maps});
   final OutletsApi api;
+
+  /// Address search and pin -> address for the map; tests replace it.
+  final MapsApi? maps;
   final bool needsFssai;
   final Locate? locate;
 
@@ -272,6 +277,21 @@ class _AddOutletScreenState extends State<AddOutletScreen> {
     }
   }
 
+  /// A search result or a moved pin on the map: the pin's numbers, and the address fields from what Google found. A moved pin
+  /// only names the area, so it leaves a typed address line alone. The state was chosen in step 1 and stays.
+  void _picked(MapsPick p) {
+    setState(() {
+      _lat.text = p.lat.toStringAsFixed(6);
+      _lng.text = p.lng.toStringAsFixed(6);
+      final g = p.place;
+      if (g == null) return;
+      if (g.line.isNotEmpty && (p.searched || _line.text.trim().isEmpty)) _line.text = g.line;
+      if (g.locality.isNotEmpty) _locality.text = g.locality;
+      if (g.city.isNotEmpty) _city.text = g.city;
+      if (g.pinCode.isNotEmpty) _pin.text = g.pinCode;
+    });
+  }
+
   Widget _field(String label, TextEditingController c, {String? hint, TextInputType? type, required String key}) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: TextField(
@@ -338,6 +358,15 @@ class _AddOutletScreenState extends State<AddOutletScreen> {
           _field('PIN code', _pin, type: TextInputType.number, key: 'outlet-pin'),
           Text('Map pin', style: inter(14, 600)),
           const SizedBox(height: 8),
+          LocationPicker(
+            key: const ValueKey('outlet-map'),
+            lat: double.tryParse(_lat.text.trim()),
+            lng: double.tryParse(_lng.text.trim()),
+            onPicked: _picked,
+            api: widget.maps,
+            fallback: const SizedBox.shrink(), // no map key: the numbers below, as before
+          ),
+          const SizedBox(height: 12),
           Row(children: [
             Expanded(child: _field('Latitude', _lat, type: const TextInputType.numberWithOptions(decimal: true, signed: true), key: 'outlet-lat')),
             const SizedBox(width: 10),

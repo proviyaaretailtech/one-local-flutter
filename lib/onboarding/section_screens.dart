@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../api/maps_api.dart';
 import '../auth/partner_api.dart';
+import '../ui/maps/location_picker.dart';
+import '../ui/maps/maps_setup.dart';
 import '../ui/theme.dart';
 import '../ui/name_input.dart';
 import '../ui/widgets.dart';
@@ -19,12 +22,16 @@ import '../ui/motion.dart';
 // ---------------------------------------------------------------------------------------------------------------------
 // Section 3: address. Figma "Address".
 // "Use my current location" (founder, 29 Oct 2026) finds the phone's position and fills the address from it; the person checks
-// it and can still type everything. The position is saved with the address.
+// it and can still type everything. The position is saved with the address. With a map key the pin sits on a Google map: search
+// for the shop or drag the pin, and the address fields fill from what Google finds there.
 // ---------------------------------------------------------------------------------------------------------------------
 class AddressScreen extends StatefulWidget {
-  const AddressScreen({super.key, required this.api, required this.app});
+  const AddressScreen({super.key, required this.api, required this.app, this.maps});
   final OnboardingApi api;
   final Application app;
+
+  /// Address search and pin -> address; tests replace it.
+  final MapsApi? maps;
   @override
   State<AddressScreen> createState() => _AddressScreenState();
 }
@@ -43,38 +50,70 @@ class _AddressScreenState extends State<AddressScreen> {
   bool _saving = false;
   final _draft = OnbDraft('address');
 
-  /// The pin from "Use my current location"; null until it is used.
+  /// The pin from "Use my current location" or the map; null until one is used.
   late double? _lat = (widget.app.address['lat'] as num?)?.toDouble();
   late double? _lng = (widget.app.address['lng'] as num?)?.toDouble();
   bool _locating = false;
+
+  /// Fills the address fields from a found address. [line] replaces a typed address line only when [replaceLine]; the rest
+  /// replaces what is there whenever something was found. The state and city are matched to the lists.
+  Future<void> _fill({required String line, required String area, required String city, required String state, required String pin, bool replaceLine = true}) async {
+    final states = (await _tax).states;
+    if (!mounted) return;
+    final st = states.where((s) => s.toLowerCase() == state.toLowerCase()).firstOrNull;
+    setState(() {
+      if (line.isNotEmpty && (replaceLine || _line.text.trim().isEmpty)) _line.text = line;
+      if (area.isNotEmpty) _area.text = area;
+      if (st != null) _state = st;
+      if (city.isNotEmpty) {
+        final c = citiesOf(_state).where((c) => c.toLowerCase() == city.toLowerCase()).firstOrNull;
+        _otherCity = c == null;
+        _city.text = c ?? city;
+      }
+      if (pin.length == 6) _pin.text = pin;
+    });
+  }
 
   Future<void> _locate() async {
     if (_locating) return;
     setState(() => _locating = true);
     try {
-      final f = await locateBusiness();
-      final states = (await _tax).states;
+      var f = await locateBusiness();
+      // no address from the phone (always so in a browser): ask Google through the server
+      if (f.city.isEmpty && mapsEnabled) {
+        try {
+          final g = await (widget.maps ?? MapsApi()).reverse(f.lat, f.lng);
+          f = (lat: f.lat, lng: f.lng, line: g.line, area: g.locality, city: g.city, state: g.state, pin: g.pinCode);
+        } catch (_) {
+          // the pin is still kept
+        }
+      }
       if (!mounted) return;
-      final state = states.where((s) => s.toLowerCase() == f.state.toLowerCase()).firstOrNull;
       setState(() {
         _lat = f.lat;
         _lng = f.lng;
-        if (f.line.isNotEmpty) _line.text = f.line;
-        if (f.area.isNotEmpty) _area.text = f.area;
-        if (state != null) _state = state;
-        if (f.city.isNotEmpty) {
-          final city = citiesOf(_state).where((c) => c.toLowerCase() == f.city.toLowerCase()).firstOrNull;
-          _otherCity = city == null;
-          _city.text = city ?? f.city;
-        }
-        if (f.pin.length == 6) _pin.text = f.pin;
       });
+      await _fill(line: f.line, area: f.area, city: f.city, state: f.state, pin: f.pin);
+      if (!mounted) return;
       showToast(context, f.line.isEmpty && f.city.isEmpty ? 'Location found. Type the address below.' : 'Address filled from your location. Check it and correct anything.');
     } catch (e) {
       if (mounted) showToast(context, e is PartnerApiException ? e.message : 'Could not find your location. Type the address below.');
     } finally {
       if (mounted) setState(() => _locating = false);
     }
+  }
+
+  /// A search result or a moved pin on the map. A search result is the person's chosen address; a moved pin only says the area,
+  /// so it does not overwrite an address line they typed.
+  Future<void> _picked(MapsPick p) async {
+    setState(() {
+      _lat = p.lat;
+      _lng = p.lng;
+    });
+    final g = p.place;
+    if (g == null || (g.city.isEmpty && g.pinCode.isEmpty && g.line.isEmpty)) return;
+    await _fill(line: g.line, area: g.locality, city: g.city, state: g.state, pin: g.pinCode, replaceLine: p.searched);
+    if (mounted) showToast(context, 'Address filled from the map. Check it and correct anything.');
   }
 
   // what was typed before the app closed, where the server has nothing yet
@@ -143,24 +182,32 @@ class _AddressScreenState extends State<AddressScreen> {
       caption: 'Section 3 of 6',
       subtitle: 'Confirm your business address and map pin. You can always enter the address manually.',
       children: [
-        Container(
-          height: 160,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: const Color(0xFFE8ECDA), borderRadius: BorderRadius.circular(16)),
-          child: Stack(children: [
-            Align(
-              alignment: Alignment.center,
-              child: Container(width: 44, height: 44, decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle), child: const Icon(Icons.location_on_outlined, color: kCheck, size: 24)),
-            ),
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: Text([_area.text, _city.text].where((s) => s.trim().isNotEmpty).join(' · '), style: inter(13, 600)),
-            ),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Text(_lat == null ? 'Illustrative map' : 'Pin set from your location', key: const ValueKey('address-pin-state'), style: inter(11, 400, color: kMuted)),
-            ),
-          ]),
+        LocationPicker(
+          key: const ValueKey('address-map'),
+          lat: _lat,
+          lng: _lng,
+          onPicked: _picked,
+          api: widget.maps,
+          // no map key: the illustrative map, as before
+          fallback: Container(
+            height: 160,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFFE8ECDA), borderRadius: BorderRadius.circular(16)),
+            child: Stack(children: [
+              Align(
+                alignment: Alignment.center,
+                child: Container(width: 44, height: 44, decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle), child: const Icon(Icons.location_on_outlined, color: kCheck, size: 24)),
+              ),
+              Align(
+                alignment: Alignment.bottomLeft,
+                child: Text([_area.text, _city.text].where((s) => s.trim().isNotEmpty).join(' · '), style: inter(13, 600)),
+              ),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Text(_lat == null ? 'Illustrative map' : 'Pin set from your location', key: const ValueKey('address-pin-state'), style: inter(11, 400, color: kMuted)),
+              ),
+            ]),
+          ),
         ),
         SizedBox(
           height: 52,
