@@ -18,6 +18,7 @@ import '../restaurant/restaurant_api.dart';
 import '../restaurant/restaurant_dashboard.dart';
 import '../restaurant/restaurant_more_screen.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 /// Figma section D "Seller Admin Dashboard / POS control center". Every figure comes from
 /// `GET /api/partner/home`; a tile without a data source says so instead of showing a number.
@@ -263,7 +264,7 @@ class _Body extends StatelessWidget {
     final open = s.isOpen;
     return ListView(
       padding: const EdgeInsets.only(bottom: 132),
-      children: [
+      children: staggered([ // the dashboard builds in, section by section (lib/ui/motion.dart)
         // Top bar: the outlet header (outlet name, live status, all-outlets chip, initials) — specs/outlets-multi.
         OutletHeader(title: s.outletName, onMenu: onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), dashboard: true),
         Padding(
@@ -374,7 +375,7 @@ class _Body extends StatelessWidget {
             ),
           ]),
         ),
-      ],
+      ]),
     );
   }
 }

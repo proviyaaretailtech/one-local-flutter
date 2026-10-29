@@ -12,6 +12,7 @@ import 'catalogue_widgets.dart';
 import 'item_photo.dart';
 import 'quick_add_screen.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 /// "5" / "5.5" / "₹5.50" typed by a person, as paise. Null when it is not a price. This only reads what was typed; the database checks the value.
 int? parsePriceMinor(String text) {
@@ -218,7 +219,7 @@ class _DetailDrawerState extends State<_DetailDrawer> {
 
 // ---------------------------------------------------------------- image viewer
 Future<void> showImageViewer(BuildContext context, CatItem item) {
-  return showDialog<void>(
+  return showOlDialog<void>(
     context: context,
     builder: (ctx) => Dialog(
       backgroundColor: Colors.white,
@@ -256,7 +257,7 @@ Future<CatItem?> showQuickAdd(BuildContext context, CatalogueApi api, {ItemPhoto
 // ---------------------------------------------------------------- Scan barcode
 /// [initialCode]: a code already read (for example by the camera) that is looked up as the sheet opens, so a miss shows its message here.
 Future<CatItem?> showScanSheet(BuildContext context, CatalogueApi api, {Future<String?> Function(BuildContext) scan = scanBarcode, String? initialCode}) =>
-    showDialog<CatItem>(context: context, barrierColor: Colors.black54, builder: (_) => _ScanSheet(api: api, scan: scan, initialCode: initialCode));
+    showOlDialog<CatItem>(context: context, builder: (_) => _ScanSheet(api: api, scan: scan, initialCode: initialCode));
 
 class _ScanSheet extends StatefulWidget {
   const _ScanSheet({required this.api, required this.scan, this.initialCode});

@@ -8,6 +8,7 @@ import '../orders/order_widgets.dart';
 import '../ui/barcode_scanner.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
+import 'cart_customer.dart';
 import 'carts_screen.dart';
 import '../shift/shift_api.dart';
 import '../shift/shift_screens.dart';
@@ -184,8 +185,9 @@ class _SellScreenState extends State<SellScreen> {
       final hit = c.items.where((i) => i.sku.toLowerCase() == sku.toLowerCase()).firstOrNull;
       if (!mounted) return;
       if (hit != null) {
-        _add(hit);
-        showToast(context, '${hit.name} added.');
+        if (!await _haveCustomer() || !mounted) return;
+        await _add(hit);
+        if (mounted) showToast(context, '${hit.name} added.');
         return;
       }
       _search.text = code;
@@ -196,7 +198,29 @@ class _SellScreenState extends State<SellScreen> {
     }
   }
 
-  void _add(SellItem item) {
+  /// A cart starts with its customer (founder, 29 Oct 2026): the mobile number first; the name is optional. A vendor in a hurry may skip it,
+  /// and that cart is then a walk-in and not asked again. True when the cart may go on (asked now if needed).
+  Future<bool> _haveCustomer() async {
+    if (cart.customerPhone.isNotEmpty || cart.customerSkipped) return true;
+    final r = await askCartCustomer(context, title: tr('Who is this cart for?'), canSkip: true);
+    if (r == null || !mounted) return false;
+    cart.customerName = r.$1;
+    cart.customerPhone = r.$2;
+    cart.customerSkipped = r.$2.isEmpty;
+    env.carts.changed();
+    return true;
+  }
+
+  Future<void> _editCustomer() async {
+    final r = await askCartCustomer(context, name: cart.customerName, phone: cart.customerPhone);
+    if (r == null || !mounted) return;
+    cart.customerName = r.$1;
+    cart.customerPhone = r.$2;
+    env.carts.changed();
+  }
+
+  Future<void> _add(SellItem item) async {
+    if (!await _haveCustomer()) return;
     cart.add(item);
     env.carts.changed();
     _quote = null;
@@ -204,12 +228,13 @@ class _SellScreenState extends State<SellScreen> {
   }
 
   Future<void> _openSearch() async {
+    if (!await _haveCustomer() || !mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SearchScreen(env: env, onAdd: (i) => _add(i))));
     if (mounted) _requote();
   }
 
   Future<void> _pay() async {
-    if (cart.isEmpty) return;
+    if (cart.isEmpty || !await _haveCustomer() || !mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => PayScreen(env: env, cart: cart)));
     if (mounted) {
       setState(() {});
@@ -219,7 +244,7 @@ class _SellScreenState extends State<SellScreen> {
   }
 
   Future<void> _hold() async {
-    if (cart.isEmpty || _busy) return;
+    if (cart.isEmpty || _busy || !await _haveCustomer() || !mounted) return;
     setState(() => _busy = true);
     try {
       await env.orders.hold(lines: cart.lines, key: OrdersApi.newKey(), customerName: cart.customerName, customerPhone: cart.customerPhone, couponCode: cart.couponCode);
@@ -458,15 +483,27 @@ class _SellScreenState extends State<SellScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(tr('Current Cart'), style: inter(11, 600, color: Colors.white70)),
+                    Text([tr('Current Cart'), cart.label, if (units > 0) rupees(worth)].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 600, color: Colors.white70)),
                     Text(
-                      [cart.label, if (cart.customerName.isNotEmpty) cart.customerName, if (units > 0) rupees(worth)].join(' · '),
+                      cart.customerPhone.isEmpty
+                          ? tr(cart.customerSkipped ? 'Walk-in · add number' : 'Add customer number')
+                          : [if (cart.customerName.isNotEmpty) cart.customerName, showMobile(cart.customerPhone)].join(' · '),
+                      key: const ValueKey('cart-wallet-customer'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: inter(15, 800, color: Colors.white),
+                      style: inter(15, 800, color: cart.customerPhone.isEmpty ? kLime : Colors.white),
                     ),
                   ]),
                 ),
+                IconButton(
+                  key: const ValueKey('cart-wallet-edit-customer'),
+                  tooltip: tr(cart.customerPhone.isEmpty ? 'Add customer' : 'Change customer'),
+                  onPressed: _editCustomer,
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.18)),
+                  icon: Icon(cart.customerPhone.isEmpty ? LucideIcons.userPlus : LucideIcons.userPen, size: 17, color: Colors.white),
+                ),
+                const SizedBox(width: 6),
                 if (onHold > 0)
                   Container(
                     key: const ValueKey('cart-wallet-held'),

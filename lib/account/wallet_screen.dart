@@ -9,6 +9,7 @@ import '../auth/partner_api.dart';
 import '../settings/settings_api.dart';
 import '../money/money_style.dart';
 import 'wallet_api.dart';
+import '../ui/motion.dart';
 
 String _status(WalletMovement m) {
   if (m.noTransferRecord) return 'Paid · no transfer record';
@@ -90,7 +91,7 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _requestWithdrawal(WalletOverview o) async {
     final available = o.unsettledDue + o.onTheWay;
     final note = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text('Request withdrawal', style: inter(18, 800)),

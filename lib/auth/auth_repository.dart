@@ -36,8 +36,9 @@ class AuthRepository {
   Future<void> sendPasswordReset(String email) => _auth.resetPasswordForEmail(email);
 
   // Registration is OTP-based (Figma "Create account" -> verify contact). No password is set here.
-  Future<void> registerWithPhone({required String e164, required String fullName, required String email}) =>
-      _auth.signInWithOtp(phone: e164, shouldCreateUser: true, data: {'full_name': fullName, 'email': email});
+  /// [email] is optional (founder, 29 Oct 2026): the mobile number is enough to register.
+  Future<void> registerWithPhone({required String e164, required String fullName, String? email}) =>
+      _auth.signInWithOtp(phone: e164, shouldCreateUser: true, data: {'full_name': fullName, if (email != null && email.isNotEmpty) 'email': email});
 
   // Google and Apple (external providers configured in Supabase).
   Future<bool> signInWithGoogle() => _auth.signInWithOAuth(OAuthProvider.google, redirectTo: kOAuthRedirect);

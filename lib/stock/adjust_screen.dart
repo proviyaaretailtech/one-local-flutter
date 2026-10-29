@@ -8,6 +8,7 @@ import 'damage_screens.dart' show AdjustForm, AdjustKind;
 import 'stock_env.dart';
 import 'stock_kit.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 /// Adjust (J.101): correct stock in four plain ways — add stock, remove stock, mark damaged, throw away. Each one is sent for
 /// approval (the person who raised it cannot approve it); below the form, everything waiting for approval, with Approve and
@@ -151,7 +152,7 @@ class _AdjustStockScreenState extends State<AdjustStockScreen> {
   }
 
   Future<void> _approve(InvDocument d) async {
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Approve ${d.number}?', style: inter(18, 700)),

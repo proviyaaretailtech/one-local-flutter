@@ -7,6 +7,7 @@ import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
 import 'table_widgets.dart';
+import '../ui/motion.dart';
 
 /// Guest orders sent from a table's QR code wait here until a member of staff accepts or declines them (spec D2). Accepting places the real
 /// order as the signed-in person (`guest_request_decide` -> `pos_place_order`, placed by guest), so it then shows in Orders and the kitchen
@@ -133,7 +134,7 @@ Future<String?> _askReason(BuildContext context) => askText(
 /// A small dialog that asks for one line of text; the confirm button works only when [valid] says so. Answers the trimmed text, or null.
 Future<String?> askText(BuildContext context,
         {required Key dialogKey, required Key fieldKey, required Key confirmKey, required String title, required String body, String? hint, required String confirm, int? maxLength, required bool Function(String) valid}) =>
-    showDialog<String>(
+    showOlDialog<String>(
       context: context,
       builder: (_) => _AskText(dialogKey: dialogKey, fieldKey: fieldKey, confirmKey: confirmKey, title: title, body: body, hint: hint, confirm: confirm, maxLength: maxLength, valid: valid),
     );

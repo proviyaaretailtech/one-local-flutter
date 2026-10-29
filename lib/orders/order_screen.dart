@@ -10,6 +10,7 @@ import 'order_widgets.dart';
 import 'orders_api.dart';
 import 'pack_order_screen.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 /// Every placed order state from Figma section E: Checkout (held bill), Order Confirmation, Preparing, Picked, Ready, In Transit,
 /// Exception, Cancelled, and Completed. What the screen says and which buttons it shows come from the server's view of the order.
@@ -178,7 +179,7 @@ class _OrderScreenState extends State<OrderScreen> {
       if (secondary != null) ...[const SizedBox(height: 10), _button(secondary, dark: false)],
       for (final l in links) ...[const SizedBox(height: 8), UnderLink('${l['label']}', onTap: _busy ? null : () => _onAction('${l['id']}'))],
     ];
-    return ListView(padding: const EdgeInsets.fromLTRB(12, 14, 12, 16), children: [
+    return ListView(padding: const EdgeInsets.fromLTRB(12, 14, 12, 16), children: staggered([
       OrderHeaderCard(
         number: 'Order #${v.displayNo}${v.placeLabel != null ? ' - ${v.placeLabel}' : ''}',
         channel: v.channelLabel,
@@ -244,7 +245,7 @@ class _OrderScreenState extends State<OrderScreen> {
         ),
       ),
       if (!upTop) ...[const SizedBox(height: 16), ...buttons],
-    ]);
+    ]));
   }
 
   Widget _button(Map<String, dynamic> a, {required bool dark}) {

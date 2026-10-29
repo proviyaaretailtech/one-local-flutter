@@ -8,6 +8,7 @@ import '../ui/whatsapp.dart';
 import 'bill_api.dart';
 import 'bill_widgets.dart';
 import 'table_widgets.dart';
+import '../ui/motion.dart';
 
 /// Figma Journey 5 "Send receipt" (node 18:811), step 5: Print (the store's counter receipt printer), WhatsApp, SMS, Email, Back to tables.
 /// The receipt is the paid bill as the database keeps it (`rst_receipt_view`); each print or send is recorded on the order with the number or
@@ -54,7 +55,7 @@ class _BillReceiptScreenState extends State<BillReceiptScreen> {
 
   Future<String?> _ask(String title, String hint, TextInputType type, String initial) {
     final c = TextEditingController(text: initial);
-    return showDialog<String>(
+    return showOlDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
         title: Text(title, style: inter(18, 700)),

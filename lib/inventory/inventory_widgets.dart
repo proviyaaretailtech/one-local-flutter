@@ -8,6 +8,7 @@ import '../ui/app_header.dart';
 import '../ui/theme.dart';
 import '../outlets/outlet_header.dart';
 import 'inventory_api.dart';
+import '../ui/motion.dart';
 
 // Section H tokens, sampled from the exported frames (assets/figma_ref_h, 2x PNG). Shared tokens (kBg, kInk, kMuted, kLine, kPrimary) come from ui/theme.dart.
 const kNavyH = Color(0xFF111827); // dark buttons, bottom bar
@@ -151,7 +152,7 @@ class InvPage extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget list = ListView(
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 24),
-      children: children,
+      children: staggered(children), // sections build in one after another (lib/ui/motion.dart)
     );
     if (onRefresh != null) list = RefreshIndicator(onRefresh: onRefresh!, child: list);
     return Scaffold(

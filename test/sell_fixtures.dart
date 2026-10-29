@@ -146,7 +146,7 @@ class Till {
         sell: SellApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
         orders: OrdersApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
         shift: ShiftApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
-        carts: carts ?? SellCarts(),
+        carts: carts ?? (SellCarts()..active.customerPhone = walkInPhone), // a cart starts with its customer's number
         onTab: onTab,
         branchName: 'Latur Main Branch',
         addFirstItem: addFirstItem,
@@ -156,6 +156,9 @@ class Till {
         },
       );
 }
+
+/// The number the tills' carts start with in tests (the Bill asks for it before a cart starts).
+const walkInPhone = '9876500001';
 
 SellCart cartWith(SellCarts carts, {int butter = 2, int cola = 1}) {
   final c = carts.active;

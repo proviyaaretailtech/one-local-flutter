@@ -64,6 +64,10 @@ class PurchasingApi {
   /// An item by name, code or barcode, with its MRP and price: the extra line on Received.
   Future<List<Facts>> findItems(String q) async => Facts(await _call('pur_item_find', {'q': q.trim()})).l('items');
 
+  /// The store's categories with how many items each has, and with [categoryId] that category's items ('none': items in no category),
+  /// to tick several at once on Add purchase. {categories: [{id, name, count}], items: [...as findItems]}
+  Future<Facts> browseItems([String? categoryId]) async => Facts(await _call('pur_item_browse', {'category_id': ?categoryId}));
+
   /// Received, in one step: [lines] {inventory_item_id, qty, mrp, cost, ordered_qty}, money in rupees. Stock goes up, the MRP and price are saved on the
   /// items, the order ([poId]) is closed, and the bill is started. Without an order, [supplierName] says who it came from.
   Future<Facts> receivePost({String? poId, String? supplierName, String? invoiceNo, String? replaces, required List<Map<String, Object?>> lines, required String key}) async =>

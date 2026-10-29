@@ -19,6 +19,7 @@ import 'package:vinii_pos/sell/search_screen.dart';
 import 'package:vinii_pos/sell/sell_api.dart';
 import 'package:vinii_pos/sell/sell_carts.dart';
 import 'package:vinii_pos/sell/sell_screen.dart';
+import 'package:vinii_pos/settings/store_qr.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
 import 'helpers.dart';
@@ -228,6 +229,72 @@ void main() {
       expect(find.text('Coca-Cola 500ml'), findsNothing);
     });
 
+    testWidgets('a cart starts with the customer: the mobile number is required, the name optional, and both show on the Current Cart card', (t) async {
+      final till = Till();
+      final env = till.env(carts: SellCarts());
+      await tall(t, SellScreen(env: env));
+      expect(find.text('Add customer number'), findsOneWidget);
+      // closing the sheet adds nothing
+      await t.tap(find.byKey(const ValueKey('product-m1')));
+      await t.pumpAndSettle();
+      expect(find.text('Who is this cart for?'), findsOneWidget);
+      await t.tapAt(const Offset(10, 10));
+      await t.pumpAndSettle();
+      expect(env.carts.active.isEmpty, isTrue);
+      // the number cannot be skipped, and must be a real mobile
+      await t.tap(find.byKey(const ValueKey('product-m1')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cart-customer-save')));
+      await t.pumpAndSettle();
+      expect(find.text("Enter the customer's mobile number."), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('cart-customer-phone')), '12345');
+      await t.tap(find.byKey(const ValueKey('cart-customer-save')));
+      await t.pumpAndSettle();
+      expect(find.text('Enter a 10-digit mobile number.'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('cart-customer-phone')), '+91 98220 01122');
+      await t.enterText(find.byKey(const ValueKey('cart-customer-name')), 'Ravi2 Kumar'); // the digit cannot be typed
+      await t.tap(find.byKey(const ValueKey('cart-customer-save')));
+      await t.pumpAndSettle();
+      expect(env.carts.active.customerPhone, '9822001122');
+      expect(env.carts.active.customerName, 'Ravi Kumar');
+      expect(env.carts.active.units, 1); // the item that was tapped went in
+      expect(find.text('Ravi Kumar · 98220 01122'), findsOneWidget);
+      // the next item does not ask again
+      await t.tap(find.byKey(const ValueKey('product-m1')));
+      await t.pumpAndSettle();
+      expect(find.text('Who is this cart for?'), findsNothing);
+      expect(env.carts.active.units, 2);
+      // the number is changed from the card
+      await t.tap(find.byKey(const ValueKey('cart-wallet-edit-customer')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('cart-customer-name')), '');
+      await t.enterText(find.byKey(const ValueKey('cart-customer-phone')), '9000000007');
+      await t.tap(find.byKey(const ValueKey('cart-customer-save')));
+      await t.pumpAndSettle();
+      expect(find.text('90000 00007'), findsOneWidget);
+    });
+
+    testWidgets('a vendor in a hurry skips the number: the cart goes on as a walk-in and is not asked again', (t) async {
+      final till = Till();
+      final env = till.env(carts: SellCarts());
+      await tall(t, SellScreen(env: env));
+      await t.tap(find.byKey(const ValueKey('product-m1')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cart-customer-skip')));
+      await t.pumpAndSettle();
+      expect(env.carts.active.units, 1);
+      expect(env.carts.active.customerPhone, '');
+      expect(find.text('Walk-in · add number'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('product-m1')));
+      await t.pumpAndSettle();
+      expect(find.text('Who is this cart for?'), findsNothing);
+      expect(env.carts.active.units, 2);
+      // changing it from the card has no skip: it is there to add the number
+      await t.tap(find.byKey(const ValueKey('cart-wallet-edit-customer')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('cart-customer-skip')), findsNothing);
+    });
+
     testWidgets('Hold saves the bill and empties the cart', (t) async {
       final till = Till();
       final env = till.env();
@@ -388,6 +455,33 @@ void main() {
       expect(cart.couponCode, 'WELCOME10'); // the code that worked stays
     });
 
+    testWidgets('UPI shows the store QR on the bill, and again while the payment waits', (t) async {
+      final before = loadStoreQr;
+      loadStoreQr = () async => (url: 'https://qr.test/shop.png', pdf: false);
+      addTearDown(() => loadStoreQr = before);
+      final till = Till();
+      final env = till.env();
+      await tall(t, PayScreen(env: env, cart: cartWith(env.carts)));
+      expect(find.byKey(const ValueKey('pay-store-qr')), findsNothing); // cash first: no QR
+      await t.tap(find.text('UPI / QR'));
+      await t.pumpAndSettle();
+      expect(find.descendant(of: find.byKey(const ValueKey('pay-store-qr')), matching: find.byKey(const ValueKey('store-qr-image'))), findsOneWidget);
+      await t.tap(find.text('Pay ₹630'));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pending-store-qr')), findsOneWidget);
+    });
+
+    testWidgets('UPI with no QR saved says where to add it', (t) async {
+      final before = loadStoreQr;
+      loadStoreQr = () async => null;
+      addTearDown(() => loadStoreQr = before);
+      final env = Till().env();
+      await tall(t, PayScreen(env: env, cart: cartWith(env.carts)));
+      await t.tap(find.text('UPI / QR'));
+      await t.pumpAndSettle();
+      expect(find.text('No payment QR yet. Add it in Settings → Store → Payment QR.'), findsOneWidget);
+    });
+
     testWidgets('UPI is never paid on the tap: the bill is held unpaid and waits for confirmation (S5.14)', (t) async {
       final till = Till();
       final env = till.env();
@@ -490,21 +584,39 @@ void main() {
       expect(jsonDecode(till.where('POST', '/cancel').single.body)['reason'], 'Payment not collected');
     });
 
-    testWidgets('WhatsApp needs a mobile number; with one it opens WhatsApp', (t) async {
+    testWidgets('the bill shows the customer big; WhatsApp asks for the number if missing, then sends the whole bill to it', (t) async {
       final till = Till();
       final opened = <Uri>[];
       final env = till.env(opened: opened);
-      final cart = cartWith(env.carts);
+      final cart = cartWith(env.carts)..customerPhone = ''; // a walk-in who skipped the number
       await tall(t, PayScreen(env: env, cart: cart));
+      expect(find.text('Walk-in customer'), findsOneWidget);
+      expect(find.textContaining('Razorpay'), findsNothing);
       await t.tap(find.text('Send by WhatsApp'));
       await t.pumpAndSettle();
-      expect(find.text('Ask for a mobile number before sharing.'), findsWidgets);
       expect(opened, isEmpty);
-      cart.customerPhone = '9876543210';
-      await t.tap(find.text('Send by WhatsApp'));
+      await t.enterText(find.byKey(const ValueKey('cart-customer-phone')), '9876543210');
+      await t.enterText(find.byKey(const ValueKey('cart-customer-name')), 'Asha Rao');
+      await t.tap(find.byKey(const ValueKey('cart-customer-save')));
       await t.pumpAndSettle();
+      expect(t.widget<Text>(find.byKey(const ValueKey('pay-customer-name'))).data, 'Asha Rao');
+      expect(t.widget<Text>(find.byKey(const ValueKey('pay-customer-phone'))).data, '+91 98765 43210');
       expect(opened.single.host, 'api.whatsapp.com');
       expect(opened.single.queryParameters['phone'], '919876543210');
+      final text = opened.single.queryParameters['text']!;
+      expect(text, contains('*OneLocal*'));
+      expect(text, contains('Latur Main Branch'));
+      expect(text, contains('Hello *Asha Rao*'));
+      expect(text, contains('📅 '));
+      expect(text, contains('1. '));
+      expect(text, contains('*Total: '));
+      expect(text, contains('Payment: '));
+      expect(text, contains('Thank you'));
+    });
+
+    test('the bill date names the day', () {
+      expect(billDate(DateTime(2026, 10, 29, 19, 8)), 'Thursday, 29 Oct 2026 · 7:08 PM');
+      expect(billDate(DateTime(2026, 10, 25, 0, 30)), 'Sunday, 25 Oct 2026 · 12:30 AM');
     });
 
     testWidgets('Razorpay checkout: the server says no provider is set up, the attempt is logged and the failure screen opens', (t) async {
@@ -951,6 +1063,6 @@ void main() {
     await t.pumpWidget(MaterialApp(theme: posTheme(), home: Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SellScreen(env: till.env()))), child: const Text('go'))))));
     await t.tap(find.text('go'));
     await t.pumpAndSettle();
-    expect(find.text('Current Cart'), findsOneWidget);
+    expect(find.textContaining('Current Cart'), findsOneWidget);
   });
 }

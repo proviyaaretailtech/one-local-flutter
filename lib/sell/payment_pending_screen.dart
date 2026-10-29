@@ -12,6 +12,7 @@ import 'sell_api.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
 import '../ui/i18n.dart';
+import '../settings/store_qr.dart';
 
 /// Founder Correct Flow S5.14 "Payment pending": a UPI or card payment for a held bill that is waiting for confirmation. The bill is
 /// never shown as paid here: the database keeps it unpaid until the person at the counter confirms with the UPI reference or the card
@@ -156,6 +157,11 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
                   Text(rupees(i.amount), style: inter(34, 800)),
                   const SizedBox(height: 4),
                   DotChip('Not paid yet · ${i.displayNo}', bg: kWarnBg, fg: kWarnText),
+                  // the store's QR to scan while the bill waits (founder, 29 Oct 2026)
+                  if (widget.method == 'upi') ...[
+                    const SizedBox(height: 16),
+                    const StoreQrCard(key: ValueKey('pending-store-qr'), big: true),
+                  ],
                   const Divider(height: 28, color: kLine),
                   if (i.stale) ...[
                     const StateNote(tone: 'warn', title: 'Still waiting after 15 minutes', body: 'Check the customer\'s UPI app or the card machine before you confirm or mark it failed.'),

@@ -10,6 +10,8 @@ import 'bill_split_screen.dart';
 import 'bill_widgets.dart';
 import 'table_widgets.dart';
 import 'tables_api.dart';
+import '../ui/motion.dart';
+import '../settings/store_qr.dart';
 
 /// Figma "Checkout" (screen-payment.png), step 3 of the restaurant "Bill and pay" journey: the current items of the table, a note for the
 /// kitchen, the bill summary, a discount code, the payment method (Cash / Card / UPI-QR / Split Pay), the amount received with the change,
@@ -133,7 +135,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
   }
 
   Future<bool> _confirmed(String what) async =>
-      await showDialog<bool>(
+      await showOlDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
           title: Text('Has the $what payment gone through?', style: inter(18, 700)),
@@ -292,6 +294,11 @@ class _BillPayScreenState extends State<BillPayScreen> {
               const SizedBox(height: 8),
               BillField(fieldKey: const ValueKey('bill-received'), controller: _received, hint: money(_due), keyboard: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => setState(() => _payError = null)),
               if (change > 0) Padding(padding: const EdgeInsets.only(top: 8), child: BillLine('Change to return', money(change), valueKey: const ValueKey('bill-change'))),
+            ],
+            // UPI (founder, 29 Oct 2026): the store's own QR for the guest to scan
+            if (_method == 'upi') ...[
+              const SizedBox(height: 14),
+              const StoreQrCard(key: ValueKey('bill-store-qr'), big: true),
             ],
           ]),
           if (_payError != null)

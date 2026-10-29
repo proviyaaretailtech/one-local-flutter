@@ -5,11 +5,12 @@ import 'catalogue_widgets.dart' show OutlineButton;
 import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 /// Step 1 of "+ New" category on the Bill: name it (or tap a common one). Answers the trimmed name, or null when cancelled.
 /// Step 2, adding its first product, is the caller's (a category only exists once a product is in it).
 Future<String?> askNewCategory(BuildContext context, {List<String> existing = const []}) =>
-    showDialog<String>(context: context, builder: (_) => _NewCategory(existing: existing));
+    showOlDialog<String>(context: context, builder: (_) => _NewCategory(existing: existing));
 
 const _examples = ['Snacks', 'Dairy', 'Beverages', 'Personal care', 'Household', 'Fruits & vegetables'];
 

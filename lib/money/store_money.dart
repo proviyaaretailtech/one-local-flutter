@@ -19,6 +19,7 @@ import '../ui/theme.dart';
 import 'money_flow.dart';
 import 'money_style.dart';
 import 'money_transfer.dart';
+import '../ui/motion.dart';
 
 // Store Money (founder's sketches, 28 Oct 2026): the wallet balance (cash drawer + UPI + bank, the shop's own money) with Money in, Money out
 // and Transfer; on the POS + OneLocal plan, the OneLocal wallet and the ad and discount credits; then the cash register and dues.
@@ -443,7 +444,7 @@ class _StoreMoneyScreenState extends State<StoreMoneyScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : RefreshIndicator(
                       onRefresh: _load,
-                      child: ListView(key: const ValueKey('store-money'), padding: const EdgeInsets.fromLTRB(14, 12, 14, 28), children: [
+                      child: ListView(key: const ValueKey('store-money'), padding: const EdgeInsets.fromLTRB(14, 12, 14, 28), children: staggered([
                         _wallet(h),
                         if (_sellsOnline) ...[const SizedBox(height: 12), _onelocalCards()],
                         const SizedBox(height: 18),
@@ -457,7 +458,7 @@ class _StoreMoneyScreenState extends State<StoreMoneyScreen> {
                             ),
                           _ => _RegisterPart(key: ValueKey('register-$_reload'), api: _api, canRecord: h['can_record'] == true, onChanged: _load),
                         },
-                      ]),
+                      ])),
                     ),
         ),
       ]),
@@ -528,7 +529,7 @@ class _RegisterPartState extends State<_RegisterPart> {
 
   Future<void> _close() async {
     final c = TextEditingController();
-    final counted = await showDialog<num>(
+    final counted = await showOlDialog<num>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(tr('Close day'), style: inter(18, 700)),

@@ -28,8 +28,12 @@ List<String> setupSequence(SetupState s) => [
       ..._optionalSteps.where((o) => s.sellsOnline || o != 'delivery'),
     ];
 
-/// Steps that can be skipped ("Skip for now"); they stay on the checklist to do later.
+/// Optional extras walked last; skippable ("Skip for now") and left on the checklist to do later.
 const _optionalSteps = ['staff', 'delivery'];
+
+/// Every step with "Skip for now": the extras, and the bank account (founder, 29 Oct 2026: start selling first, add the bank later in
+/// Settings → Money & documents).
+const _skippable = ['payment', ..._optionalSteps];
 
 /// The checklist in the same order as the walk (the server's order differs); rows it does not know keep their place at the end.
 const _checklistOrder = ['business_profile', 'location', 'owner_details', 'plan', 'payment', 'catalogue', 'pos', 'onelocal_profile', 'staff', 'inventory', 'delivery'];
@@ -83,7 +87,7 @@ Widget setupScreenFor(String step, SetupApi api, SetupState s) {
     // The first step of the walk has no earlier screen here (sign-up came before); its ✕ is the way out.
     onBack: i == 0 ? null : (ctx) => Navigator.of(ctx).pop(StepResult(s, advance: false, back: true)),
     // Skipping saves nothing and moves on, as "Save & Continue" would.
-    onSkip: _optionalSteps.contains(step) ? (ctx) => Navigator.of(ctx).pop(StepResult(s)) : null,
+    onSkip: _skippable.contains(step) ? (ctx) => Navigator.of(ctx).pop(StepResult(s)) : null,
     child: screen,
   );
 }
@@ -418,7 +422,7 @@ class SetupReviewScreen extends StatelessWidget {
 
   (String, Color) _status(String k) {
     if (stepDone(state, k)) return ('Done', kDone);
-    if (_optionalSteps.contains(k)) return ('Skipped · optional', kMuted);
+    if (_skippable.contains(k)) return ('Skipped · optional', kMuted);
     return ('To do', kPending);
   }
 }

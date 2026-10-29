@@ -19,6 +19,7 @@ import '../ui/theme.dart';
 import '../ui/whatsapp.dart';
 import 'money_style.dart';
 import 'store_money.dart';
+import '../ui/motion.dart';
 
 export '../ui/whatsapp.dart' show whatsAppLink;
 
@@ -823,7 +824,7 @@ class _MoneyFlowScreenState extends State<MoneyFlowScreen> {
 
   /// The date pill opens a small calendar (founder, 28 Oct 2026): tap a day, or Today / This week / This month under it.
   Future<void> _pickRange() async {
-    final pick = await showDialog<(String, DateTime?)>(
+    final pick = await showOlDialog<(String, DateTime?)>(
       context: context,
       builder: (c) => Dialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -895,7 +896,7 @@ class _MoneyFlowScreenState extends State<MoneyFlowScreen> {
 
   Future<void> _void(Map<String, dynamic> e) async {
     final reason = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text('${tr('Cancel')} ${e['no']}?', style: inter(18, 700)),

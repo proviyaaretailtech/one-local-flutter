@@ -9,6 +9,7 @@ import '../ui/i18n.dart';
 import '../ui/theme.dart';
 import 'order_widgets.dart';
 import 'orders_api.dart';
+import '../ui/motion.dart';
 
 /// Packing an order in one place (founder, 29 Oct 2026: "the current way is a bit confusing"; returns spec §6): tick each item as it goes
 /// in the bag, take a photo of the packed bag (or say why there is none), then "Mark packed". Answers the updated order, or null.
@@ -438,7 +439,7 @@ class _PackedPhotoCardState extends State<PackedPhotoCard> {
     );
   }
 
-  void _open(String url) => showDialog<void>(
+  void _open(String url) => showOlDialog<void>(
         context: context,
         builder: (ctx) => Dialog(
           insetPadding: const EdgeInsets.all(16),

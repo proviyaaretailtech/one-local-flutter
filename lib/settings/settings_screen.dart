@@ -12,6 +12,7 @@ import 'settings_api.dart';
 import 'settings_sheets.dart';
 import 'settings_widgets.dart';
 import 'support_screens.dart';
+import '../ui/motion.dart';
 
 /// Settings and store profile (Figma section P "Settings"). Everything shown is what `pos_settings_get` says; every Edit opens one sheet
 /// that saves one field group. Who may save is the database's decision (`can_edit`); a person who may not sees the page read-only.
@@ -140,7 +141,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onRefresh: _load,
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-                        children: part == null ? _hub(s) : [const SizedBox(height: 10), GroupCard(children: part.rows)],
+                        key: ValueKey(part?.id ?? 'hub'), // a section opening builds in again
+                        children: staggered(part == null ? _hub(s) : [const SizedBox(height: 10), GroupCard(children: part.rows)]),
                       ),
                     ),
             ),

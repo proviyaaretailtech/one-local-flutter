@@ -10,6 +10,7 @@ import '../ui/theme.dart';
 import 'money_api.dart';
 import 'money_env.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 export '../inventory/inventory_widgets.dart' show InvCard, InvTiles, InvStatTile, InvPrimary, InvSecondary, InvLabel, InvInput, InvPickBox, pickOne;
 
@@ -96,7 +97,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: ListView(padding: const EdgeInsets.fromLTRB(14, 16, 14, 24), children: [
+            child: ListView(padding: const EdgeInsets.fromLTRB(14, 16, 14, 24), children: staggered([
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -106,7 +107,7 @@ class _MoneyScreenState extends State<MoneyScreen> {
               ),
               if (widget.switcher) _Switcher(env: env, current: widget.screen, index: idx, total: sw.length),
               if (data != null) ...widget.body(ctx, data!) else if (error != null) _ErrorBox(error!, _load) else const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(color: kInk))),
-            ]),
+            ])),
           ),
         ),
       ]),

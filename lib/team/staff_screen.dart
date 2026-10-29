@@ -10,6 +10,7 @@ import '../auth/partner_api.dart';
 import '../ui/app_header.dart';
 import '../ui/i18n.dart';
 import '../ui/theme.dart';
+import '../ui/motion.dart';
 
 // Store staff (founder, 28 Oct 2026; the web POS's Store Staff Management made for the phone, with only what a shop needs):
 // Staff | Attendance | Salary | Advances, on the same pos_staff tables. Salary payments and advances also show in Money.
@@ -483,7 +484,7 @@ class _AttendanceState extends State<_Attendance> {
 
   Future<void> _ot(Map<String, dynamic> r) async {
     final c = TextEditingController(text: (r['ot_hours'] as num? ?? 0) == 0 ? '' : '${r['ot_hours']}');
-    final v = await showDialog<num>(
+    final v = await showOlDialog<num>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('${tr('Overtime')} · ${r['name']}', style: inter(17, 700)),
@@ -702,7 +703,7 @@ class _SalaryState extends State<_Salary> {
   Future<void> _adjust(Map<String, dynamic> r) async {
     final bonus = TextEditingController(text: (r['bonus_minor'] as num? ?? 0) == 0 ? '' : '${(r['bonus_minor'] as num) / 100}');
     final penalty = TextEditingController(text: (r['penalty_minor'] as num? ?? 0) == 0 ? '' : '${(r['penalty_minor'] as num) / 100}');
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('${tr('Bonus or penalty')} · ${r['name']}', style: inter(17, 700)),

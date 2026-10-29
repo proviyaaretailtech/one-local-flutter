@@ -467,7 +467,24 @@ void main() {
       await fill(t, email: 'riya@');
       await t.tap(find.text('Create account'));
       await t.pump();
-      expect(toast('Please enter a valid email address.'), findsOneWidget);
+      expect(toast('Please enter a valid email address, or leave it empty.'), findsOneWidget);
+    });
+    testWidgets('the email is optional: the mobile is enough', (t) async {
+      final a = FakeAuth();
+      await show(t, RegisterPersonalScreen(auth: a));
+      await fill(t, email: '');
+      expect(find.text('Email address (optional)'), findsOneWidget);
+      await t.tap(find.text('I confirm that I meet the age eligibility described in the service terms.'));
+      await t.tap(find.text('I agree to the service terms and acknowledge the privacy notice.'));
+      await t.tap(find.text('Create account'));
+      await t.pump();
+      expect(a.calls.where((c) => c.startsWith('registerWithPhone +919876543210 Riya Sharma')), hasLength(1));
+    });
+    testWidgets('the name takes letters only: digits and symbols cannot be typed', (t) async {
+      await show(t, RegisterPersonalScreen(auth: FakeAuth()));
+      await t.enterText(find.byType(TextField).at(0), 'Riya2 Sh@rma3');
+      await t.pump();
+      expect(t.widget<TextField>(find.byType(TextField).at(0)).controller!.text, 'Riya Shrma');
     });
     testWidgets('both consents are required, in order', (t) async {
       await show(t, RegisterPersonalScreen(auth: FakeAuth()));

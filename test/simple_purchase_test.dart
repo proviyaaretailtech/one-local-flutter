@@ -36,6 +36,12 @@ class Fake {
             {'id': 's2', 'name': 'Fresh Farms Dairy', 'phone': '9890112233', 'gstin': '', 'city': 'Latur'},
           ],
         }),
+      'pur_item_browse' => ok(b['category_id'] == null
+          ? {'categories': [{'id': 'c1', 'name': 'Biscuits', 'count': 2}, {'id': 'none', 'name': 'Other items', 'count': 1}], 'items': []}
+          : {'categories': [], 'items': [
+              {'id': 'i9', 'name': 'Parle-G 250g', 'sku': 'PG250', 'mrp_minor': 2500, 'cost_minor': 2100},
+              {'id': 'i8', 'name': 'Good Day Cashew 100g', 'sku': 'GD100', 'mrp_minor': 3000, 'cost_minor': 2500, 'image_url': ''},
+            ]}),
       'pur_supplier_save' => ok({'id': 's9', 'name': b['name'], 'phone': b['phone'], 'gstin': ''}),
       'pur_receive_post' => ok({'document_id': 'rcv1', 'doc_no': 'RCV-012', 'replayed': false}),
       'pur_bill_get' => ok({
@@ -129,6 +135,45 @@ void main() {
       expect(f.body('pur_item_find')['q'], '8901234567890');
       expect(find.text('Parle-G 250g'), findsOneWidget);
       expect(find.text('Not on order'), findsNWidgets(2));
+    });
+
+    testWidgets('the search drops down from the first letter: one line each, a photo (or its letter), the name and the MRP', (t) async {
+      final f = Fake();
+      await show(t, ReceiveGoodsScreen(api: f.api, po: _po, openBill: (_, _) {}));
+      await t.enterText(find.byKey(const ValueKey('recv-find')), ' ');
+      await t.pumpAndSettle();
+      expect(f.calls('pur_item_find'), isEmpty); // nothing typed yet
+      expect(find.byKey(const ValueKey('recv-dropdown')), findsNothing);
+      await t.enterText(find.byKey(const ValueKey('recv-find')), 'a');
+      await t.pumpAndSettle();
+      expect(f.body('pur_item_find')['q'], 'a');
+      expect(find.byKey(const ValueKey('recv-dropdown')), findsOneWidget);
+      expect(t.widget<Text>(find.byKey(const ValueKey('recv-hit-mrp-i7'))).data, 'MRP ₹290');
+      expect(find.descendant(of: find.byKey(const ValueKey('recv-hit-i7')), matching: find.text('A')), findsOneWidget); // no photo: its letter
+      expect(t.getSize(find.byKey(const ValueKey('recv-hit-i7'))).height, 48); // one line
+      await tapKey(t, 'recv-hit-i7');
+      expect(find.byKey(const ValueKey('recv-dropdown')), findsNothing);
+      expect(find.text('Amul Butter 500g'), findsOneWidget);
+    });
+
+    testWidgets('add items by category: choose it, tick several, Add N items', (t) async {
+      final f = Fake();
+      await show(t, ReceiveGoodsScreen(api: f.api, po: _po, openBill: (_, _) {}));
+      expect(find.byKey(const ValueKey('recv-cat-items')), findsNothing);
+      await tapKey(t, 'recv-category');
+      expect(find.text('Biscuits'), findsOneWidget);
+      expect(find.text('Other items'), findsOneWidget);
+      await tapKey(t, 'recv-cat-c1');
+      expect(f.body('pur_item_browse'), {'category_id': 'c1'});
+      expect(find.byKey(const ValueKey('recv-cat-items')), findsOneWidget);
+      expect(find.text('Tick the items that came'), findsOneWidget);
+      await tapKey(t, 'recv-cat-all');
+      expect(find.text('Add 2 items'), findsOneWidget);
+      await tapKey(t, 'recv-cat-item-i8'); // untick one
+      expect(find.text('Add 1 item'), findsOneWidget);
+      await tapKey(t, 'recv-cat-add');
+      expect(find.text('Parle-G 250g · on the bill'), findsOneWidget); // now on the bill
+      expect(find.text('Not on order'), findsOneWidget);
     });
 
     testWidgets('Add purchase (no order): asks who it came from, then sends the supplier', (t) async {

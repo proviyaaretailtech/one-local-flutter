@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'motion.dart';
 
 // Design tokens, read from Figma FINAL-PARTNER-APP section A (values as drawn).
 const kBg = Color(0xFFF5F5F0);
@@ -53,6 +54,7 @@ ThemeData posTheme() {
     scaffoldBackgroundColor: kBg,
     fontFamily: 'Inter',
     colorScheme: ColorScheme.fromSeed(seedColor: kPrimary, primary: kPrimary),
+    pageTransitionsTheme: olPageTransitions, // soft fade and rise between pages (lib/ui/motion.dart)
   );
 }
 
@@ -82,7 +84,7 @@ class ScreenShell extends StatelessWidget {
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: staggered(children)),
                 ),
               ),
               Padding(
@@ -539,17 +541,26 @@ const kButtonShadows = [
 double degToRad(double d) => d * math.pi / 180;
 
 /// Short message at the bottom of the screen (validation, errors). Replaces any toast already showing.
-void showToast(BuildContext context, String message) {
+/// A short message as a dark pill that rises from the bottom (founder's reference video, 29 Oct 2026). With [actionLabel] and
+/// [onAction] it carries one button, for example "Undo", and stays a little longer.
+void showToast(BuildContext context, String message, {String? actionLabel, VoidCallback? onAction}) {
   final m = ScaffoldMessenger.of(context);
+  final w = MediaQuery.sizeOf(context).width;
   m.hideCurrentSnackBar();
   m.showSnackBar(
     SnackBar(
       content: Text(message, style: inter(14, 500, color: Colors.white)),
       behavior: SnackBarBehavior.floating,
-      backgroundColor: kPrimary,
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kRadius)),
-      duration: const Duration(seconds: 3),
+      backgroundColor: const Color(0xFF16191F),
+      elevation: 6,
+      width: w > 480 ? 440 : null,
+      margin: w > 480 ? null : const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      padding: const EdgeInsets.fromLTRB(18, 12, 10, 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      duration: Duration(seconds: actionLabel == null ? 3 : 5),
+      action: actionLabel == null || onAction == null
+          ? null
+          : SnackBarAction(label: actionLabel, textColor: const Color(0xFFD2F64B), onPressed: onAction),
     ),
   );
 }

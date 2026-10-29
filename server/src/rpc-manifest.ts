@@ -258,6 +258,7 @@ export const MANIFEST: Entry[] = [
   // one-step purchase (founder, 28 Oct 2026): open orders with days waiting, Received (stock with MRP), the bill, past purchases
   db('pur_po_open', { args: pur.Options, map: P, rate: 'read', roles: 'staff of the business' }),
   db('pur_item_find', { args: pur.ItemFind, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('pur_item_browse', { args: pur.ItemBrowse, map: P, rate: 'read', roles: 'staff of the business' }),
   db('pur_receive_post', { args: pur.ReceivePost, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('pur_bill_get', { args: pur.BillGet, map: P, rate: 'read', roles: 'staff of the business' }),
   db('pur_bill_save', { args: pur.BillSave, map: P, rate: 'write', roles: 'staff with inventory:record' }),

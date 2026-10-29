@@ -6,6 +6,7 @@ import '../ui/theme.dart';
 import 'notices_api.dart';
 import 'notices_widgets.dart';
 import '../ui/i18n.dart';
+import '../ui/motion.dart';
 
 /// Customer feedback: average rating, status chips, each comment with Acknowledge / Resolve and an optional reply.
 class FeedbackScreen extends StatefulWidget {
@@ -47,7 +48,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   Future<void> _answer(Facts f, String status) async {
     final reply = TextEditingController(text: f.s('response'));
-    final send = await showDialog<bool>(
+    final send = await showOlDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(

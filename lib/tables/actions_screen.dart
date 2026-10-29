@@ -6,6 +6,7 @@ import '../ui/theme.dart';
 import 'floor_screen.dart';
 import 'table_order_screen.dart';
 import 'table_widgets.dart';
+import '../ui/motion.dart';
 
 /// Figma "Table 12 Actions" (screen-actions-modal): Dine-In • Occupied • Bill Amount • Waiter, Open Existing Order, Transfer Table.
 /// Transfer asks for the destination on the same grid, then "Confirm Table Transfer?" with Cancel / Confirm Transfer.
@@ -94,7 +95,7 @@ Future<bool> runTransfer(BuildContext context, TablesEnv env, {required Facts fr
   final nav = Navigator.of(context);
   final dest = await nav.push<Facts>(MaterialPageRoute(builder: (_) => FloorScreen(env: env, pickFor: from.s('id'), pickTitle: 'Transfer ${from.s('label')} to…')));
   if (dest == null || !context.mounted) return false;
-  final yes = await showDialog<bool>(
+  final yes = await showOlDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: Colors.white,

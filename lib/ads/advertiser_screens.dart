@@ -9,6 +9,7 @@ import '../auth/partner_api.dart';
 import '../inventory/inventory_widgets.dart' show kCardLine;
 import '../onboarding/onboarding_widgets.dart';
 import '../ui/i18n.dart';
+import '../ui/name_input.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 import 'ads_api.dart';
@@ -215,7 +216,8 @@ class _AdvertiserSignupScreenState extends State<AdvertiserSignupScreen> {
     if (_busy) return;
     if (_brand.text.trim().length < 2) return showToast(context, tr('Enter your brand name.'));
     if (_category == null) return showToast(context, tr('Choose your business category.'));
-    if (_rep.text.trim().length < 2) return showToast(context, tr('Enter the name of the person authorised for the brand.'));
+    final repProblem = nameProblem(_rep.text, empty: tr('Enter the name of the person authorised for the brand.'));
+    if (repProblem != null) return showToast(context, repProblem);
     if (!RegExp(r'^[6-9]\d{9}$').hasMatch(_phone.text.trim())) return showToast(context, tr('Enter a 10-digit mobile number.'));
     if (_areas.isEmpty) return showToast(context, tr('Add at least one area to advertise in.'));
     if (_objectives.isEmpty) return showToast(context, tr('Choose at least one goal.'));
@@ -284,7 +286,7 @@ class _AdvertiserSignupScreenState extends State<AdvertiserSignupScreen> {
             const SizedBox(height: 4),
             Text(tr('OneLocal checks that this person may act for the brand before ads run.'), style: inter(12.5, 400, color: kMuted)),
             const SizedBox(height: 14),
-            LabeledField(key: const ValueKey('adv-rep-name'), label: tr('Full name'), controller: _rep, maxLength: 80),
+            LabeledField(key: const ValueKey('adv-rep-name'), label: tr('Full name'), controller: _rep, inputFormatters: nameFormatters),
             const SizedBox(height: 14),
             LabeledField(key: const ValueKey('adv-rep-role'), label: tr('Role (optional)'), controller: _role, hint: tr('Owner, marketing head…'), maxLength: 60),
             const SizedBox(height: 14),
@@ -564,7 +566,7 @@ class _BrandProfileScreenState extends State<BrandProfileScreen> {
                 LabeledField(key: const ValueKey('brand-name'), label: tr('Brand name'), controller: _brand, maxLength: 80),
                 SelectField(label: tr('Business category'), value: _category, options: _strings(p['categories']), onChanged: (v) => setState(() => _category = v)),
                 LabeledField(key: const ValueKey('brand-website'), label: tr('Website (optional)'), controller: _website, keyboardType: TextInputType.url),
-                LabeledField(key: const ValueKey('brand-rep'), label: tr('Authorised person'), controller: _rep, maxLength: 80),
+                LabeledField(key: const ValueKey('brand-rep'), label: tr('Authorised person'), controller: _rep, inputFormatters: nameFormatters),
                 LabeledField(key: const ValueKey('brand-role'), label: tr('Their role (optional)'), controller: _role, maxLength: 60),
                 _AreasField(areas: _areas, onChanged: (v) => setState(() => _areas = v)),
                 MultiChipField(

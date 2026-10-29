@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../ads/advertiser_screens.dart' show AdvertiserSignupScreen;
 import '../screens/register_account_type_screen.dart';
 import '../ui/theme.dart';
+import '../ui/name_input.dart';
 import '../ui/widgets.dart';
 import 'checklist_screen.dart';
 import 'onboarding_draft.dart';
@@ -103,7 +104,8 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
     if (_rst && _cuisines.isEmpty) return showToast(context, 'Choose the cuisines you serve.');
     if (!_rst && _category == null) return showToast(context, widget.type == 'service' ? 'Choose your service.' : 'Choose your category.');
     if (widget.type == 'store' && _sub == null) return showToast(context, 'Choose your subcategory.');
-    if (_owner.text.trim().length < 2) return showToast(context, "Enter the owner's full name.");
+    final ownerProblem = nameProblem(_owner.text, empty: "Enter the owner's full name.");
+    if (ownerProblem != null) return showToast(context, ownerProblem);
     if (!RegExp(r'^[6-9]\d{9}$').hasMatch(_phone.text)) return showToast(context, 'Enter a 10-digit mobile number.');
     if (_mode == null) return showToast(context, 'Choose how you sell.');
     if (_plan == null) return showToast(context, 'Choose your OneLocal plan.');
@@ -191,7 +193,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
               ),
             if (widget.type == 'store')
               SelectField(label: 'Subcategory', value: _sub, options: subs, hint: _category == null ? 'Choose a category first' : 'Choose', onChanged: (v) => _set(() => _sub = v)),
-            LabeledField(label: '$_noun owner', controller: _owner, labelSize: 14, labelWeight: 500, textInputAction: TextInputAction.next),
+            LabeledField(label: '$_noun owner', controller: _owner, inputFormatters: nameFormatters, labelSize: 14, labelWeight: 500, textInputAction: TextInputAction.next),
             LabeledField(
               label: 'Owner mobile',
               controller: _phone,

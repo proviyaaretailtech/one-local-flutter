@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../ui/app_tab_bar.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'home_nav.dart';
 import 'home_widgets.dart';
@@ -21,7 +22,15 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> implements TabShell {
+class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin implements TabShell {
+  /// Switching tabs (founder's reference video, 29 Oct 2026): the tab you open fades in and rises, like a page arriving.
+  late final AnimationController _swap = AnimationController(vsync: this, duration: const Duration(milliseconds: 380), value: 1);
+  late final Animation<double> _swapT = CurvedAnimation(parent: _swap, curve: Curves.easeOutCubic);
+
+  void _playSwap() {
+    if (!reduceMotion(context)) _swap.forward(from: 0);
+  }
+
   late String _kind = _known(widget.initialKind ?? HomeNav.partnerType);
   String _current = 'Home';
   final _navigators = <String, GlobalKey<NavigatorState>>{};
@@ -54,6 +63,7 @@ class _AppShellState extends State<AppShell> implements TabShell {
 
   @override
   void dispose() {
+    _swap.dispose();
     if (HomeNav.shell == this) HomeNav.shell = null;
     super.dispose();
   }
@@ -87,6 +97,7 @@ class _AppShellState extends State<AppShell> implements TabShell {
         _current = label;
         _opened.add(label);
       });
+      _playSwap();
     }
     return true;
   }
@@ -101,6 +112,7 @@ class _AppShellState extends State<AppShell> implements TabShell {
       nav.pop();
     } else if (_current != 'Home') {
       setState(() => _current = 'Home');
+      _playSwap();
     } else {
       Navigator.of(context).pop();
     }
@@ -118,7 +130,13 @@ class _AppShellState extends State<AppShell> implements TabShell {
       child: Scaffold(
         backgroundColor: kBg,
         body: TabShellScope(
-          child: IndexedStack(
+          child: AnimatedBuilder(
+            animation: _swapT,
+            builder: (_, child) => Opacity(
+              opacity: 0.15 + 0.85 * _swapT.value,
+              child: Transform.translate(offset: Offset(0, 28 * (1 - _swapT.value)), child: child),
+            ),
+            child: IndexedStack(
             index: index < 0 ? 0 : index,
             children: [
               for (final t in tabs)
@@ -130,6 +148,7 @@ class _AppShellState extends State<AppShell> implements TabShell {
                       )
                     : const SizedBox.shrink(),
             ],
+          ),
           ),
         ),
         bottomNavigationBar: (_popups[_current] ?? 0) > 0 ? null : FloatingTabBar(tabs: tabs, onTap: _tap, current: _current),

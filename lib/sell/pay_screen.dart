@@ -7,13 +7,14 @@ import '../orders/orders_api.dart';
 import '../ui/theme.dart';
 import '../ui/whatsapp.dart';
 import '../shift/shift_screens.dart';
+import 'cart_customer.dart';
 import 'payment_pending_screen.dart';
-import 'razorpay_screen.dart';
 import 'result_screens.dart';
 import 'sell_carts.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
 import '../ui/i18n.dart';
+import '../settings/store_qr.dart';
 
 /// Figma "446 Payment": the bill, how it is paid (Cash, Card, UPI / QR, Split Pay), the totals the server worked out, a coupon, the cash
 /// received and the change. Pays a new [cart] through section E's checkout, or a held bill ([held]) through its pay; a split pays one
@@ -129,21 +130,10 @@ class _PayScreenState extends State<PayScreen> {
   Future<void> _customer() async {
     final cart = widget.cart;
     if (cart == null) return;
-    final name = TextEditingController(text: cart.customerName), phone = TextEditingController(text: cart.customerPhone);
-    final ok = await showOrderSheet<bool>(
-      context,
-      title: tr('Customer'),
-      body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        TextField(controller: name, decoration: InputDecoration(hintText: tr('Name'))),
-        const SizedBox(height: 10),
-        TextField(controller: phone, keyboardType: TextInputType.phone, decoration: InputDecoration(hintText: tr('Mobile number'))),
-        const SizedBox(height: 16),
-        DarkCta(label: tr('Save'), onPressed: () => Navigator.pop(ctx, true)),
-      ]),
-    );
-    if (ok == true && mounted) {
-      cart.customerName = name.text.trim();
-      cart.customerPhone = phone.text.replaceAll(RegExp(r'\D'), '');
+    final r = await askCartCustomer(context, name: cart.customerName, phone: cart.customerPhone);
+    if (r != null && mounted) {
+      cart.customerName = r.$1;
+      cart.customerPhone = r.$2;
       env.carts.changed();
       setState(() {});
     }
@@ -241,21 +231,63 @@ class _PayScreenState extends State<PayScreen> {
         Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => FailedScreen(env: env, failure: f)));
       });
 
-  Future<void> _online() => _guard(() async {
-        final order = await _ensurePlaced();
-        if (!mounted) return;
-        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => RazorpayScreen(env: env, order: order)));
-      });
+  /// Who the bill is for: the cart's customer, or the held bill's.
+  String get _phone => (widget.cart?.customerPhone ?? _order?.raw['customer_phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+  String get _name {
+    final n = widget.cart != null ? widget.cart!.customerName : (_order?.customer ?? '');
+    return n == 'Guest' || n == 'Walk-in' ? '' : n.trim();
+  }
+
+  /// The bill's lines: name, quantity and amount (the server's prices).
+  List<(String, int, num)> get _rows {
+    final order = _order, cart = widget.cart;
+    if (order != null) return [for (final i in order.items) (i['name'].toString(), (i['qty'] as num).toInt(), (i['amount'] as num))];
+    final priced = {for (final l in _quote?.lines ?? const <Map<String, dynamic>>[]) l['menu_item_id']: l};
+    return [for (final l in cart!.lines) (l.name, l.qty, num.tryParse('${priced[l.menuItemId]?['amount'] ?? 0}') ?? 0)];
+  }
+
+  /// The bill as a WhatsApp message (founder, 29 Oct 2026): the store, the date and day, every item, the totals and how it is paid.
+  String billMessage(DateTime now) {
+    final q = _quote, b = _order?.bill;
+    final subtotal = q?.subtotal ?? (b?['subtotal'] as num?) ?? 0;
+    final gstPct = q?.gstPct ?? (b?['gst_pct'] as num?) ?? 0;
+    final gst = q?.gst ?? (b?['gst'] as num?) ?? 0;
+    final sc = q?.serviceCharge ?? (b?['service_charge'] as num?) ?? 0;
+    final disc = q?.discount ?? (b?['discount'] as num?) ?? 0;
+    final code = widget.cart?.couponCode;
+    final rows = _rows;
+    final units = rows.fold<int>(0, (n, r) => n + r.$2);
+    final method = _methods.firstWhere((m) => m.$1 == _method).$2;
+    return [
+      '🧾 *${env.storeName}*',
+      if (env.branchName != null) env.branchName!,
+      '',
+      _name.isEmpty ? 'Hello! Here is your bill.' : 'Hello *$_name*, here is your bill.',
+      '📅 ${billDate(now)}',
+      if (_order != null) 'Bill no: ${_order!.displayNo}',
+      '',
+      '*Items (${rows.length} · $units ${units == 1 ? 'unit' : 'units'})*',
+      for (final (i, (name, qty, amount)) in rows.indexed) '${i + 1}. $name × $qty = ${rupees(amount)}',
+      '',
+      'Subtotal: ${rupees(subtotal)}',
+      if (gst > 0) 'GST (${gstPct == gstPct.roundToDouble() ? gstPct.toInt() : gstPct}%): ${rupees(gst)}',
+      if (sc > 0) 'Service charge: ${rupees(sc)}',
+      if (disc > 0) 'Discount${code == null ? '' : ' ($code)'}: −${rupees(disc)}',
+      '*Total: ${rupees(_total)}*',
+      'Payment: $method',
+      '',
+      'Thank you for shopping with us! 🙏',
+      'Please visit again.',
+    ].join('\n');
+  }
 
   Future<void> _whatsapp() async {
-    final phone = widget.cart?.customerPhone ?? '';
-    if (phone.length < 10) {
-      showToast(context, 'Ask for a mobile number before sharing.');
-      return;
+    if (_phone.length < 10) {
+      showToast(context, 'Add the customer\'s mobile number first.');
+      if (widget.cart != null) await _customer();
+      if (_phone.length < 10 || !mounted) return;
     }
-    final q = _quote;
-    final text = q == null ? 'Your bill' : 'Your bill: ${rupees(q.total)} (subtotal ${rupees(q.subtotal)}, GST ${rupees(q.gst)}${q.discount > 0 ? ', discount -${rupees(q.discount)}' : ''}).';
-    await env.openUrl(whatsAppLink(phone, text));
+    await env.openUrl(whatsAppLink(_phone, billMessage(DateTime.now())));
   }
 
   @override
@@ -285,10 +317,11 @@ class _PayScreenState extends State<PayScreen> {
             if (_method == 'card' || _method == 'upi') ...[
               const SizedBox(height: 4),
               UnderLink('Payment did not go through', onTap: _busy ? null : () => _failed(_method)),
-              UnderLink('Collect online instead (Razorpay checkout)', onTap: _busy ? null : _online),
             ],
-            const SizedBox(height: 8),
-            Text(((cart?.customerPhone ?? order?.raw['customer_phone'] ?? '') as String).length >= 10 ? 'Customer · ${cart?.customerName ?? ''}' : 'Guest sale · Ask for a mobile number before sharing.', style: inter(13, 400, color: kMuted)),
+            if (_phone.length < 10) ...[
+              const SizedBox(height: 8),
+              Text(tr('Walk-in sale · Add the customer\'s number to send the bill on WhatsApp.'), style: inter(13, 400, color: kMuted)),
+            ],
           ]),
         ),
       ]),
@@ -296,17 +329,39 @@ class _PayScreenState extends State<PayScreen> {
   }
 
   Widget _itemsCard(SellCart? cart, OrderView? order) {
-    final priced = {for (final l in _quote?.lines ?? const <Map<String, dynamic>>[]) l['menu_item_id']: l};
-    final rows = order != null
-        ? [for (final i in order.items) (i['name'].toString(), (i['qty'] as num).toInt(), (i['amount'] as num))]
-        : [for (final l in cart!.lines) (l.name, l.qty, num.tryParse('${priced[l.menuItemId]?['amount'] ?? 0}') ?? 0)];
-    final who = order != null ? order.customer : (cart!.customerName.isEmpty ? 'Guest' : cart.customerName);
+    final rows = _rows;
+    final name = _name, phone = _phone;
     return OrderCardBox(
       radius: 22,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(env.storeLine, style: inter(18, 700)),
-        const SizedBox(height: 4),
-        Text('${order?.displayNo ?? 'New bill'} · ${_methods.firstWhere((m) => m.$1 == _method).$2} selected · $who', style: inter(13, 400, color: kMuted)),
+        // who it is for, big: the name, then the number (founder, 29 Oct 2026)
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                name.isNotEmpty ? name : (phone.length >= 10 ? showMobile(phone) : tr('Walk-in customer')),
+                key: const ValueKey('pay-customer-name'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: inter(24, 800),
+              ),
+              if (name.isNotEmpty && phone.length >= 10) ...[
+                const SizedBox(height: 2),
+                Text('+91 ${showMobile(phone)}', key: const ValueKey('pay-customer-phone'), style: inter(15, 600, color: kMuted)),
+              ],
+            ]),
+          ),
+          if (cart != null && order == null)
+            IconButton(
+              key: const ValueKey('pay-edit-customer'),
+              tooltip: tr('Change customer'),
+              onPressed: _customer,
+              style: IconButton.styleFrom(backgroundColor: kSoftField),
+              icon: Icon(phone.length >= 10 ? LucideIcons.userPen : LucideIcons.userPlus, size: 18, color: kInk),
+            ),
+        ]),
+        const SizedBox(height: 8),
+        Text('${env.storeLine} · ${_methods.firstWhere((m) => m.$1 == _method).$2} selected', style: inter(13, 400, color: kMuted)),
         Text(order == null ? 'Payment not completed' : 'Payment not completed · ${order.paymentChip}', style: inter(13, 400, color: kMuted)),
         const Divider(height: 20, color: kLine),
         for (final (name, qty, amount) in rows)
@@ -314,7 +369,6 @@ class _PayScreenState extends State<PayScreen> {
         if (cart != null && order == null) ...[
           const Divider(height: 18, color: kLine),
           Wrap(spacing: 8, children: [
-            SmallPill('Customer', onTap: _customer),
             SmallPill(cart.couponCode == null ? 'Apply coupon' : 'Coupon ${cart.couponCode}', bg: kChipGreen, fg: kGreenText, border: kChipGreen, onTap: _coupon),
           ]),
         ],
@@ -443,7 +497,13 @@ class _PayScreenState extends State<PayScreen> {
           ]),
         ] else ...[
           const SizedBox(height: 10),
-          Text(_method == 'card' ? 'Press Pay, take the card on the machine, then confirm with the approval code.' : 'Press Pay, show the UPI QR, then confirm with the UPI reference once the customer has paid.', style: inter(13, 400, color: kMuted)),
+          // UPI (founder, 29 Oct 2026): the store's own QR, big enough to scan from across the counter
+          if (_method == 'upi') ...[
+            const SizedBox(height: 4),
+            const StoreQrCard(key: ValueKey('pay-store-qr'), big: true),
+            const SizedBox(height: 12),
+          ],
+          Text(_method == 'card' ? 'Press Pay, take the card on the machine, then confirm with the approval code.' : 'The customer scans your QR and pays. Press Pay, then confirm with the UPI reference once the money has come.', style: inter(13, 400, color: kMuted)),
         ],
       ]),
     );
@@ -498,4 +558,13 @@ class _PayScreenState extends State<PayScreen> {
       ]),
     );
   }
+}
+
+const _days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/// "Wednesday, 29 Oct 2026 · 7:18 PM".
+String billDate(DateTime d) {
+  final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  return '${_days[d.weekday - 1]}, ${d.day} ${_months[d.month - 1]} ${d.year} · $h:${d.minute.toString().padLeft(2, '0')} ${d.hour < 12 ? 'AM' : 'PM'}';
 }

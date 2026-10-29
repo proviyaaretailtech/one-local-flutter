@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../auth/partner_api.dart';
 import '../ui/theme.dart';
+import '../ui/name_input.dart';
 import '../ui/widgets.dart';
+import 'current_location.dart';
 import 'document_picker.dart';
 import 'onboarding_api.dart';
 import 'india_cities.dart';
@@ -11,11 +14,12 @@ import 'pan_scan.dart';
 import 'pin_codes.dart';
 import 'onboarding_draft.dart';
 import 'onboarding_widgets.dart';
+import '../ui/motion.dart';
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Section 3: address. Figma "Address".
-// The map is the illustrative picture the design draws; no map provider or location permission exists yet, so the pin is
-// not set and the server stores the address without coordinates.
+// "Use my current location" (founder, 29 Oct 2026) finds the phone's position and fills the address from it; the person checks
+// it and can still type everything. The position is saved with the address.
 // ---------------------------------------------------------------------------------------------------------------------
 class AddressScreen extends StatefulWidget {
   const AddressScreen({super.key, required this.api, required this.app});
@@ -38,6 +42,40 @@ class _AddressScreenState extends State<AddressScreen> {
   late final Future<Taxonomy> _tax = widget.api.taxonomy();
   bool _saving = false;
   final _draft = OnbDraft('address');
+
+  /// The pin from "Use my current location"; null until it is used.
+  late double? _lat = (widget.app.address['lat'] as num?)?.toDouble();
+  late double? _lng = (widget.app.address['lng'] as num?)?.toDouble();
+  bool _locating = false;
+
+  Future<void> _locate() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      final f = await locateBusiness();
+      final states = (await _tax).states;
+      if (!mounted) return;
+      final state = states.where((s) => s.toLowerCase() == f.state.toLowerCase()).firstOrNull;
+      setState(() {
+        _lat = f.lat;
+        _lng = f.lng;
+        if (f.line.isNotEmpty) _line.text = f.line;
+        if (f.area.isNotEmpty) _area.text = f.area;
+        if (state != null) _state = state;
+        if (f.city.isNotEmpty) {
+          final city = citiesOf(_state).where((c) => c.toLowerCase() == f.city.toLowerCase()).firstOrNull;
+          _otherCity = city == null;
+          _city.text = city ?? f.city;
+        }
+        if (f.pin.length == 6) _pin.text = f.pin;
+      });
+      showToast(context, f.line.isEmpty && f.city.isEmpty ? 'Location found. Type the address below.' : 'Address filled from your location. Check it and correct anything.');
+    } catch (e) {
+      if (mounted) showToast(context, e is PartnerApiException ? e.message : 'Could not find your location. Type the address below.');
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
 
   // what was typed before the app closed, where the server has nothing yet
   @override
@@ -85,6 +123,8 @@ class _AddressScreenState extends State<AddressScreen> {
         'state': _state,
         'pin_code': _pin.text,
         'confirmed': true,
+        if (_lat != null && _lng != null) 'lat': _lat,
+        if (_lat != null && _lng != null) 'lng': _lng,
       }),
     );
     if (!mounted) return;
@@ -100,7 +140,7 @@ class _AddressScreenState extends State<AddressScreen> {
     return OnbPage(
       kicker: 'Business setup',
       title: 'Locate your business.',
-      caption: 'Section 3 of 7',
+      caption: 'Section 3 of 6',
       subtitle: 'Confirm your business address and map pin. You can always enter the address manually.',
       children: [
         Container(
@@ -116,8 +156,23 @@ class _AddressScreenState extends State<AddressScreen> {
               alignment: Alignment.bottomLeft,
               child: Text([_area.text, _city.text].where((s) => s.trim().isNotEmpty).join(' · '), style: inter(13, 600)),
             ),
-            Align(alignment: Alignment.bottomRight, child: Text('Illustrative map', style: inter(11, 400, color: kMuted))),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Text(_lat == null ? 'Illustrative map' : 'Pin set from your location', key: const ValueKey('address-pin-state'), style: inter(11, 400, color: kMuted)),
+            ),
           ]),
+        ),
+        SizedBox(
+          height: 52,
+          child: FilledButton.icon(
+            key: const ValueKey('address-locate'),
+            onPressed: _locating ? null : _locate,
+            icon: _locating
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: kCheck))
+                : const Icon(Icons.my_location, size: 20, color: kCheck),
+            label: Text(_locating ? 'Finding your location…' : 'Use my current location', style: inter(15, 700, color: Colors.white)),
+            style: FilledButton.styleFrom(backgroundColor: kPrimary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+          ),
         ),
         LabeledField(label: 'Address line', controller: _line, labelSize: 13, labelWeight: 500, onChanged: (_) => setState(() {})),
         LabeledField(label: 'Area / locality', controller: _area, labelSize: 13, labelWeight: 500, onChanged: (_) => setState(() {})),
@@ -236,7 +291,7 @@ class _TaxScreenState extends State<TaxScreen> {
     return OnbPage(
       kicker: 'Business setup',
       title: 'Tax information.',
-      caption: 'Section 4 of 7',
+      caption: 'Section 4 of 6',
       subtitle: 'Share the tax details that apply to your business in India.',
       children: [
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -317,7 +372,7 @@ class _IdentityScreenState extends State<IdentityScreen> {
     return OnbPage(
       kicker: 'Business setup',
       title: 'Verify who’s behind your business.',
-      caption: 'Section 5 of 7 · Identity',
+      caption: 'Section 5 of 6 · Identity',
       subtitle: 'Individual identity and business verification are separate checks. Provide only what applies to your profile.',
       children: [
         Text('KYC · Individual identity', style: inter(17, 600)),
@@ -408,7 +463,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       problem = 'The PAN on this card (${s.panNumber}) is not the one in your tax details ($masked).';
     }
     if (problem != null) {
-      final use = await showDialog<bool>(
+      final use = await showOlDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
           title: Text('Check the photo', style: inter(18, 700)),
@@ -430,7 +485,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
   Future<void> _remove(String kind, String what) async {
     if (_busy != null) return;
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text('Remove $what?', style: inter(18, 700)),
@@ -556,7 +611,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     return OnbPage(
       kicker: 'Business setup',
       title: 'Add your documents.',
-      caption: 'Section 5 of 7 · Documents',
+      caption: 'Section 5 of 6 · Documents',
       subtitle: 'Add clear, readable copies of applicable documents.',
       onBack: () => Navigator.of(context).pop(_app),
       children: [
@@ -720,8 +775,8 @@ class _BankScreenState extends State<BankScreen> {
     return OnbPage(
       kicker: 'Business setup',
       title: 'Add your bank details.',
-      caption: 'Section 6 of 7',
-      subtitle: 'Use an account associated with the business or proprietor, as applicable.',
+      caption: 'Optional · Bank details',
+      subtitle: 'Optional for now: you can start selling and add your bank later in Settings → Money & documents. Use an account of the business or proprietor.',
       children: [
         if (saved != null)
           WhiteCard(
@@ -737,7 +792,7 @@ class _BankScreenState extends State<BankScreen> {
             ]),
           ),
         const NoteCard(title: 'Ownership will be checked separately.', body: 'Saved details are not the same as verified details.'),
-        LabeledField(label: 'Account holder name', controller: _holder, labelWeight: 500),
+        LabeledField(label: 'Account holder name', controller: _holder, inputFormatters: nameFormatters, labelWeight: 500),
         FutureBuilder<Taxonomy>(future: _tax, builder: (_, s) => SelectField(label: 'Bank name', value: _bank, options: s.data?.banks ?? const [], hint: s.hasError ? 'Could not load banks' : 'Choose', onChanged: (v) => setState(() => _bank = v))),
         LabeledField(label: 'Account number', controller: _acct, labelWeight: 500, obscure: true, keyboardType: TextInputType.number, maxLength: 18, hint: saved?['account_masked'] as String?, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
         LabeledField(label: 'Confirm account number', controller: _confirm, labelWeight: 500, keyboardType: TextInputType.number, maxLength: 18, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
@@ -755,6 +810,12 @@ class _BankScreenState extends State<BankScreen> {
         PrimaryAction(label: _saving ? 'Saving…' : 'Save & continue', onPressed: _saving ? null : () => _save(draft: false)),
         const SizedBox(height: 12),
         SecondaryAction(label: 'Save for later', onPressed: _saving ? null : () => _save(draft: true)),
+        // optional (founder, 29 Oct 2026): start selling first; add the bank any time in Settings → Money & documents
+        TextButton(
+          key: const ValueKey('bank-skip'),
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: Text('Skip for now · add it later', style: inter(14, 700, color: kLink)),
+        ),
       ],
     );
   }

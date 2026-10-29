@@ -37,7 +37,8 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     if (widget.autoNext) WidgetsBinding.instance.addPostFrameCallback((_) => _advance());
   }
 
-  Map<String, dynamic>? get _next => _app.sections.where((s) => s['done'] != true).firstOrNull;
+  /// The next section still needed. Bank details are optional (founder, 29 Oct 2026): never "next", added later in Settings.
+  Map<String, dynamic>? get _next => _app.sections.where((s) => s['done'] != true && s['optional'] != true).firstOrNull;
 
   /// On to the next section that is not done.
   void _advance() {
@@ -88,7 +89,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Widget build(BuildContext context) {
     final sections = _app.sections;
     final left = _app.total - _app.done;
-    final next = sections.where((s) => s['done'] != true).firstOrNull;
+    final next = _next;
     final ready = _app.canSubmit;
     return OnbPage(
       kicker: 'Application · Draft',
@@ -116,7 +117,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(s['title'] as String, style: inter(17, 600)),
                       const SizedBox(height: 4),
-                      Text('${s['done'] == true ? 'Saved' : 'To do'} · ${s['summary']}', style: inter(14, 400, color: kMuted)),
+                      Text('${s['done'] == true ? 'Saved' : s['optional'] == true ? 'Optional' : 'To do'} · ${s['summary']}', style: inter(14, 400, color: kMuted)),
                     ]),
                   ),
                 ]),

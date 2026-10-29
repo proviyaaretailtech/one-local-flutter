@@ -20,6 +20,7 @@ import '../ui/theme.dart';
 import 'ads_api.dart';
 import 'ads_campaign.dart';
 import 'advertiser_screens.dart' show AdvertiserApi, BrandProfileScreen;
+import '../ui/motion.dart';
 
 // The Ads section (founder's sketch and the "Advertising & Partner Growth System" spec, 29 Oct 2026): a dashboard (coins available,
 // held, spent and disputed; campaigns by stage; views, clicks and valid clicks), a new campaign (what it is for, where it shows, a 9:16
@@ -226,7 +227,7 @@ class _AdsHomeScreenState extends State<AdsHomeScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : RefreshIndicator(
                       onRefresh: _load,
-                      child: ListView(key: const ValueKey('ads-home'), padding: const EdgeInsets.fromLTRB(14, 12, 14, 120), children: [
+                      child: ListView(key: const ValueKey('ads-home'), padding: const EdgeInsets.fromLTRB(14, 12, 14, 120), children: staggered([
                         _coinsCard(h),
                         const SizedBox(height: 12),
                         _counts(h),
@@ -261,7 +262,7 @@ class _AdsHomeScreenState extends State<AdsHomeScreen> {
                         ),
                         const SizedBox(height: 10),
                         ..._list(),
-                      ]),
+                      ])),
                     ),
         ),
       ]),
@@ -1543,7 +1544,7 @@ class _TopUpScreenState extends State<TopUpScreen> {
   Future<void> _done(Map<String, dynamic> r, {required bool opened}) async {
     _key = AdsApi.newKey();
     setState(() => _busy = false); // the request is in; no spinner behind the message
-    await showDialog<void>(
+    await showOlDialog<void>(
       context: context,
       builder: (c) => AlertDialog(
         title: Row(children: [const CoinMark(size: 24), const SizedBox(width: 8), Expanded(child: Text('${_coinWord(_int(r['coins']))} ${tr('on the way')}', style: inter(18, 800)))]),

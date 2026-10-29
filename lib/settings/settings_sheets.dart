@@ -6,6 +6,7 @@ import '../ui/theme.dart';
 import 'settings_api.dart';
 import 'settings_widgets.dart';
 import '../ui/i18n.dart';
+import 'store_qr.dart';
 
 // The edit sheets of the Settings page (Figma section P). Each one asks the server to save and shows the database's own sentence when it
 // refuses; the only checks here are "is it empty". A sheet that saves answers with the new page state.
@@ -490,8 +491,11 @@ class _QrSheetState extends State<_QrSheet> {
     setState(() {
       _busy = false;
       if (fresh != null) _s = fresh;
+      _version++; // the picture reloads
     });
   }
+
+  int _version = 0;
 
   Future<void> _remove() async {
     final fresh = await guarded(context, () async {
@@ -511,6 +515,18 @@ class _QrSheetState extends State<_QrSheet> {
     final up = _s.qrUploaded;
     final can = _s.canEdit;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      // the QR itself (founder, 29 Oct 2026): the picture customers scan on the Bill screen when they pay by UPI
+      if (up) ...[
+        StoreQrCard(
+          key: ValueKey('settings-qr-${_version}'),
+          load: () async {
+            final r = await widget.env.api.fileLinkInfo('store_qr');
+            return (url: r['url'] as String, pdf: r['content_type'] == 'application/pdf');
+          },
+          openLink: widget.env.onOpenLink,
+        ),
+        const SizedBox(height: 12),
+      ],
       EmptyPanel(
         title: up ? 'QR uploaded' : 'No QR uploaded',
         body: up ? 'Your store QR code is saved.' : 'Choose your store QR code from your device.',
@@ -519,7 +535,7 @@ class _QrSheetState extends State<_QrSheet> {
       const SizedBox(height: 14),
       Text(tr('Supported formats: JPG / PNG / PDF'), style: inter(12.5, 400, color: kMuted)),
       const SizedBox(height: 10),
-      Text(tr('Once uploaded, you can replace or remove your QR.'), style: inter(12.5, 400, color: kMuted)),
+      Text(tr('Once uploaded, you can replace or remove your QR. It shows on the Bill screen when a customer pays by UPI.'), style: inter(12.5, 400, color: kMuted)),
       Row(children: [
         if (up) RowAction(tr('View'), onTap: _view),
         if (up && can) RowAction(tr('Remove'), onTap: _remove),

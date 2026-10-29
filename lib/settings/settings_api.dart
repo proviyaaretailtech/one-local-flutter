@@ -94,7 +94,10 @@ class SettingsApi {
   }
 
   /// A short-lived link to the store QR or one document.
-  Future<String> fileLink(String kind, {String? id}) async => (await _rpc.callMap('pos_settings_file_link', {'kind': kind, 'id': ?id}))['url'] as String;
+  Future<String> fileLink(String kind, {String? id}) async => (await fileLinkInfo(kind, id: id))['url'] as String;
+
+  /// The link and its content type (a PDF opens; a photo shows).
+  Future<Map<String, dynamic>> fileLinkInfo(String kind, {String? id}) => _rpc.callMap('pos_settings_file_link', {'kind': kind, 'id': ?id});
 
   Future<Map<String, dynamic>> help() => _rpc.callMap('pos_help_content');
   Future<Map<String, dynamic>> supportList() => _rpc.callMap('pos_support_list');
