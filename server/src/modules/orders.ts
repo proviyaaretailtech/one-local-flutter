@@ -241,8 +241,8 @@ function actionsFor(stage: Stage, c: { f: Row | null; ol: Row | null; next: stri
     switch (stage) {
       case 'pending': return [a('online_accept', 'Accept order', 'primary'), a('online_reject', 'Reject order', 'secondary'), a('receipt', 'View receipt', 'link')];
       case 'preparing': return [a('online_ready', 'Mark ready', 'primary'), a('receipt', 'View receipt', 'link')];
-      case 'ready': return [a('refresh', 'Check rider status', 'primary'), a('receipt', 'View receipt', 'link')];
-      case 'in_transit': return [a('refresh', 'Check delivery status', 'primary'), a('receipt', 'View receipt', 'link')];
+      case 'ready': return [a('online_delivery', 'Check rider status', 'primary'), a('receipt', 'View receipt', 'link')];
+      case 'in_transit': return [a('online_delivery', 'Check delivery status', 'primary'), a('receipt', 'View receipt', 'link')];
       default: return [a('receipt', 'View receipt', 'link')];
     }
   }

@@ -25,8 +25,11 @@ class TabShellScope extends InheritedWidget {
 /// tab ([active]) is a filled lime tile. All bars share one hero tag, so on a page change the bar stays where it is
 /// while the page above it moves. [keyPrefix] keeps each caller's tab keys (for example 'tab-', 'inv-tab-').
 class AppTabBar extends StatelessWidget {
-  const AppTabBar({super.key, required this.tabs, required this.onTap, this.active, this.keyPrefix = 'tab-'});
+  const AppTabBar({super.key, required this.tabs, required this.onTap, this.active, this.keyPrefix = 'tab-', this.trailing});
   final List<AppTab> tabs;
+
+  /// One more slot after the tabs, as wide as a tab (the restaurant bar puts Ol, the helper, here).
+  final Widget? trailing;
   final String? active;
   final ValueChanged<String> onTap;
   final String keyPrefix;
@@ -60,6 +63,7 @@ class AppTabBar extends StatelessWidget {
                       child: Row(children: [
                         for (final t in tabs)
                           Expanded(child: _Tab(tab: t, current: t.id == active, onTap: () => onTap(t.id), tabKey: ValueKey('$keyPrefix${t.id}'))),
+                        if (trailing != null) Expanded(child: trailing!),
                       ]),
                     ),
                   ),

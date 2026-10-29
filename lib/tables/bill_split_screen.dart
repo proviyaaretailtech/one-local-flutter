@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../inventory/inventory_api.dart';
-import '../inventory/inventory_widgets.dart' show kNavyH, qty;
 import '../ui/theme.dart';
 import 'bill_api.dart';
 import 'bill_pay_screen.dart';
@@ -9,10 +8,10 @@ import 'bill_widgets.dart';
 import 'table_widgets.dart';
 import 'tables_api.dart';
 
-/// Figma Journey 5 "Split the bill" (node 18:710), step 2: Equal, By item or By amount; one part per guest, each with its own payment
-/// method. The database works out each guest's amount (`rst_bill_split`: to the paisa, GST and discount follow the items) and keeps the plan;
-/// each part is paid separately through the Checkout screen; the table closes only when every part is paid. A plan can be changed until
-/// the first guest pays.
+/// "Split the bill" by how it is paid (founder, 27 Oct 2026): not per guest, but one bill paid partly by Cash, Card and UPI. The cashier
+/// enters each method's amount; they must add up to what is due. It is the database's split by amount (`rst_bill_split`, one part per
+/// method, carrying that method), so each part is taken through the Checkout screen and the table closes only when every part is paid.
+/// A split can be changed until the first part is paid.
 class BillSplitScreen extends StatefulWidget {
   const BillSplitScreen({super.key, required this.env, required this.tableId, required this.orderId, this.bill});
   final TablesEnv env;
@@ -23,15 +22,12 @@ class BillSplitScreen extends StatefulWidget {
 }
 
 class _BillSplitScreenState extends State<BillSplitScreen> {
+  static const _methods = [('cash', 'Cash'), ('card', 'Card'), ('upi', 'UPI')];
   late final BillApi _api = widget.bill ?? BillApi();
   Facts? _v;
   String? _error, _formError;
   bool _busy = false, _editing = false;
-  String _mode = 'equal';
-  int _guests = 2;
-  final List<String> _methods = ['cash', 'cash'];
-  final Map<String, int> _itemGuest = {}; // order item id -> guest index (0-based)
-  final List<TextEditingController> _amounts = [TextEditingController(), TextEditingController()];
+  final Map<String, TextEditingController> _amounts = {for (final (m, _) in _methods) m: TextEditingController()};
   String? _key; // the key of a split request that got no answer, re-sent on the next tap
 
   @override
@@ -42,7 +38,7 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
 
   @override
   void dispose() {
-    for (final c in _amounts) {
+    for (final c in _amounts.values) {
       c.dispose();
     }
     super.dispose();
@@ -60,6 +56,8 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
     return s != null && s.s('status') == 'active' ? s : null;
   }
 
+  num get _entered => _amounts.values.fold<num>(0, (a, c) => a + (typedAmount(c.text) ?? 0));
+
   Future<void> _load() async {
     try {
       final v = await _api.view(widget.tableId);
@@ -74,17 +72,12 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
     }
   }
 
-  void _setGuests(int n) {
-    if (n < 2 || n > 20) return;
+  /// "Rest": this method takes whatever is still left to pay.
+  void _fillRest(String method, num due) {
+    final others = _amounts.entries.where((e) => e.key != method).fold<num>(0, (a, e) => a + (typedAmount(e.value.text) ?? 0));
+    final rest = due - others;
     setState(() {
-      _guests = n;
-      while (_methods.length < n) {
-        _methods.add('cash');
-      }
-      while (_amounts.length < n) {
-        _amounts.add(TextEditingController());
-      }
-      _itemGuest.updateAll((_, g) => g >= n ? n - 1 : g);
+      _amounts[method]!.text = rest > 0 ? (rest == rest.roundToDouble() ? '${rest.toInt()}' : rest.toStringAsFixed(2)) : '';
       _formError = null;
     });
   }
@@ -92,19 +85,19 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
   Future<void> _save() async {
     final o = _order!;
     final parts = <Map<String, Object?>>[];
-    for (var g = 0; g < _guests; g++) {
-      final p = <String, Object?>{'label': 'Guest ${g + 1}', 'method': _methods[g]};
-      if (_mode == 'amount') {
-        final a = typedAmount(_amounts[g].text);
-        if (a == null || a <= 0) return setState(() => _formError = 'Enter an amount for Guest ${g + 1}.');
-        p['amount'] = a;
-      }
-      if (_mode == 'item') {
-        final ids = [for (final i in o.l('items')) if ((_itemGuest[i.s('id')] ?? 0) == g) i.s('id')];
-        if (ids.isEmpty) return setState(() => _formError = 'Give Guest ${g + 1} at least one item.');
-        p['item_ids'] = ids;
-      }
-      parts.add(p);
+    for (final (m, label) in _methods) {
+      final text = _amounts[m]!.text.trim();
+      if (text.isEmpty) continue;
+      final a = typedAmount(text);
+      if (a == null || a < 0) return setState(() => _formError = 'Enter a valid amount for $label.');
+      if (a > 0) parts.add({'label': label, 'method': m, 'amount': a});
+    }
+    if (parts.length < 2) {
+      return setState(() => _formError = 'Enter amounts for at least two of Cash, Card and UPI. Paying by one method? Use Complete Payment.');
+    }
+    final left = o.n('due') - _entered;
+    if (left.abs() >= 0.005) {
+      return setState(() => _formError = left > 0 ? '${money(left)} is still left to pay.' : 'That is ${money(-left)} more than the bill.');
     }
     setState(() {
       _busy = true;
@@ -112,7 +105,7 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
     });
     final key = _key ??= BillApi.newKey();
     try {
-      await _api.split(o.s('id'), mode: _mode, guests: _mode == 'equal' ? _guests : null, parts: parts, key: key);
+      await _api.split(o.s('id'), mode: 'amount', parts: parts, key: key);
       _key = null;
       _editing = false;
       await _load();
@@ -151,21 +144,19 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
         if (_error != null) TablesError(_error!, onRetry: _load),
         if (v != null && o == null) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text('This bill is already settled.', style: inter(15, 400, color: kMuted)))),
         if (v != null && o != null) ...[
-          _modes(split != null && !_editing ? split.s('mode') : _mode, enabled: _editing),
-          const SizedBox(height: 14),
           if (split != null && !_editing) ...[
             for (final p in split.l('parts')) _partCard(p),
           ] else
-            ..._form(o),
+            _form(o),
           Container(
             margin: const EdgeInsets.symmetric(vertical: 12),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: kAvailBg, borderRadius: BorderRadius.circular(14)),
-            child: Text('Each part is paid separately. The table closes when all parts are paid.', style: inter(14.5, 500)),
+            child: Text('Each payment method is taken separately. The table closes when all are paid.', style: inter(14.5, 500)),
           ),
           if (_formError != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_formError!, key: const ValueKey('split-error'), style: inter(14.5, 500, color: kError))),
           if (split != null && !_editing && open.isNotEmpty)
-            DarkLimeButton('Take payment · ${open.first.s('label')}', key: const ValueKey('take-payment'), onPressed: () => _pay(open.first)),
+            DarkLimeButton('Take payment · ${open.first.s('label')} ${money(open.first.n('amount'))}', key: const ValueKey('take-payment'), onPressed: () => _pay(open.first)),
           if (_editing) DarkLimeButton('Split the bill', key: const ValueKey('save-split'), busy: _busy, onPressed: v.m('can').b('split') ? _save : null),
           if (split != null && !_editing && !paidAny) ...[
             const SizedBox(height: 10),
@@ -178,34 +169,10 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
     );
   }
 
-  Widget _modes(String mode, {required bool enabled}) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(color: const Color(0xFFF0F1EE), borderRadius: BorderRadius.circular(14)),
-        child: Row(children: [
-          for (final (m, label) in const [('equal', 'Equal'), ('item', 'By item'), ('amount', 'By amount')])
-            Expanded(
-              child: Semantics(
-                button: true,
-                selected: m == mode,
-                child: InkWell(
-                  key: ValueKey('mode-$m'),
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: enabled ? () => setState(() => _mode = m) : null,
-                  child: Container(
-                    height: 42,
-                    alignment: Alignment.center,
-                    decoration: m == mode ? BoxDecoration(color: kNavyH, borderRadius: BorderRadius.circular(10)) : null,
-                    child: Text(label, style: inter(14.5, 600, color: m == mode ? Colors.white : kInk)),
-                  ),
-                ),
-              ),
-            ),
-        ]),
-      );
-
   Widget _partCard(Facts p) {
     final paid = p.s('status') == 'paid';
     final label = p.s('label');
+    final method = p.so('paid_method') ?? p.s('method');
     return Container(
       key: ValueKey('part-${p.n('part_no')}'),
       margin: const EdgeInsets.only(bottom: 10),
@@ -217,13 +184,21 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
           height: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(color: paid ? kAvailBg : kResBg, borderRadius: BorderRadius.circular(12)),
-          child: Text(label.isEmpty ? 'G' : label[0].toUpperCase(), style: inter(17, 700, color: paid ? kAvailText : kResText)),
+          child: Text(label.isEmpty ? '·' : label[0].toUpperCase(), style: inter(17, 700, color: paid ? kAvailText : kResText)),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label, style: inter(17, 700)),
-            Text(paid ? 'Paid by ${methodName(p.so('paid_method') ?? p.s('method'))}' : 'Pays by ${methodName(p.s('method'))}', style: inter(13.5, 400, color: paid ? kAvailText : kMuted)),
+            // a split made before this change still names its guests: then say the method they pay by
+            Text(
+              paid
+                  ? 'Paid by ${methodName(method)}'
+                  : label.toLowerCase() == methodName(method).toLowerCase()
+                      ? 'To be paid'
+                      : 'Pays by ${methodName(method)}',
+              style: inter(13.5, 400, color: paid ? kAvailText : kMuted),
+            ),
           ]),
         ),
         Text(money(p.n('amount')), style: inter(18, 700)),
@@ -231,51 +206,30 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
     );
   }
 
-  List<Widget> _form(Facts o) => [
-        Row(children: [
-          Expanded(child: Text('Guests', style: inter(16, 600))),
-          IconButton(key: const ValueKey('guests-minus'), onPressed: () => _setGuests(_guests - 1), icon: const Icon(Icons.remove_circle_outline)),
-          Text('$_guests', key: const ValueKey('guests-count'), style: inter(18, 700)),
-          IconButton(key: const ValueKey('guests-plus'), onPressed: () => _setGuests(_guests + 1), icon: const Icon(Icons.add_circle_outline)),
-        ]),
-        if (_mode == 'item')
-          BillCard(title: 'WHO HAD WHAT', children: [
-            for (final i in o.l('items')) ...[
-              BillLine('${qty(i.n('qty'))} × ${i.s('name')}', money(i.n('line_total'))),
-              ChoiceRow(
-                keyPrefix: 'item-${i.s('id')}',
-                options: [for (var g = 0; g < _guests; g++) ('$g', 'Guest ${g + 1}')],
-                selected: '${_itemGuest[i.s('id')] ?? 0}',
-                onSelect: (g) => setState(() => _itemGuest[i.s('id')] = int.parse(g)),
+  Widget _form(Facts o) {
+    final left = o.n('due') - _entered;
+    return BillCard(title: 'PAY BY', children: [
+      for (final (m, label) in _methods)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(children: [
+            SizedBox(width: 64, child: Text(label, style: inter(15.5, 700))),
+            Expanded(
+              child: BillField(
+                fieldKey: ValueKey('amount-$m'),
+                controller: _amounts[m]!,
+                hint: '₹0',
+                keyboard: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() => _formError = null),
               ),
-              const SizedBox(height: 10),
-            ],
-          ]),
-        BillCard(title: 'EACH GUEST PAYS BY', children: [
-          for (var g = 0; g < _guests; g++)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Guest ${g + 1}', style: inter(15.5, 700)),
-                const SizedBox(height: 6),
-                if (_mode == 'amount') ...[
-                  BillField(fieldKey: ValueKey('amount-$g'), controller: _amounts[g], hint: 'Amount', keyboard: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => setState(() {})),
-                  const SizedBox(height: 6),
-                ],
-                ChoiceRow(
-                  keyPrefix: 'guest-$g-method',
-                  options: const [('cash', 'Cash'), ('card', 'Card'), ('upi', 'UPI')],
-                  selected: _methods[g],
-                  onSelect: (m) => setState(() => _methods[g] = m),
-                ),
-              ]),
             ),
-          if (_mode == 'amount') ...[
-            const Divider(height: 18, color: kLine),
-            BillLine('Left to share', money(o.n('due') - [for (var g = 0; g < _guests; g++) typedAmount(_amounts[g].text) ?? 0].fold<num>(0, (a, b) => a + b)),
-                valueKey: const ValueKey('left-to-share')),
-          ],
-          if (_mode == 'equal') Padding(padding: const EdgeInsets.only(top: 6), child: Text('The bill is shared equally; the last guest takes any paise left over.', style: inter(13, 400, color: kMuted))),
-        ]),
-      ];
+            TextButton(key: ValueKey('fill-$m'), onPressed: () => _fillRest(m, o.n('due')), child: Text('Rest', style: inter(14, 700, color: kLink))),
+          ]),
+        ),
+      const Divider(height: 18, color: kLine),
+      BillLine('Bill', money(o.n('due'))),
+      BillLine(left >= 0 ? 'Left to pay' : 'Over by', money(left.abs()),
+          valueKey: const ValueKey('left-to-pay'), valueColor: left.abs() < 0.005 ? kAvailText : kError),
+    ]);
+  }
 }

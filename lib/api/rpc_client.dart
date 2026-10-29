@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/partner_api.dart';
 import 'app_env.dart';
+import 'net_guard.dart';
 
 /// The one door to the POS server: `POST {PARTNER_API_BASE_URL}/rpc/<name>` with the JSON arguments as the body and the Supabase
 /// session token as the bearer. The server runs the named database function as the signed-in person, so the database decides
@@ -25,14 +26,15 @@ class RpcClient {
   Future<dynamic> call(String fn, [Map<String, dynamic> args = const {}, String? idempotencyKey]) async {
     final token = _token();
     if (token == null) throw const PartnerApiException(401, 'Sign in to continue.');
-    final res = await _http
-        .post(
-          Uri.parse('$_base/rpc/$fn'),
-          headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json', if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey},
-          body: jsonEncode(args),
-        )
-        .timeout(const Duration(seconds: 30));
-    final decoded = res.body.isEmpty ? null : jsonDecode(res.body);
+    final res = await guardNet(
+      _http.post(
+        Uri.parse('$_base/rpc/$fn'),
+        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json', if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey},
+        body: jsonEncode(args),
+      ),
+      (s) => throw RpcException(0, s, 'offline'),
+    );
+    final decoded = readJson(res, (s) => throw RpcException(res.statusCode, s, 'unreadable'));
     if (res.statusCode < 200 || res.statusCode >= 300) {
       final detail = decoded is Map ? decoded['detail'] as String? : null;
       throw RpcException(res.statusCode, detail ?? 'Something went wrong. Please try again.', decoded is Map ? decoded['code'] as String? : null);

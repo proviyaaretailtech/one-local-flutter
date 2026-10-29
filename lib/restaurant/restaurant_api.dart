@@ -68,6 +68,24 @@ class RestaurantApi {
            );
   final RpcClient _rpc;
 
+  /// More for Home (0608 `rst_home_insights`): how today's orders were served, payments by method, top dishes, menu health, ready dishes.
+  Future<Map<String, dynamic>> insights({String? locationId}) async {
+    try {
+      return await _rpc.callMap('rst_home_insights', {'location_id': locationId ?? 'all'});
+    } on RpcException catch (e) {
+      throw RestaurantApiException(e.status, e.message);
+    }
+  }
+
+  /// Today's delivery orders by source (0607 `rst_channel_orders`), for Home's channel strip.
+  Future<Map<String, dynamic>> deliveryChannels({String? locationId}) async {
+    try {
+      return await _rpc.callMap('rst_channel_orders', {'location_id': ?locationId});
+    } on RpcException catch (e) {
+      throw RestaurantApiException(e.status, e.message);
+    }
+  }
+
   /// One outlet, or (no [locationId]) all outlets the person may see, summed by the server (0524 `rst_dashboard_scope`).
   Future<RestaurantDashboardData> dashboard({String? locationId}) async {
     try {

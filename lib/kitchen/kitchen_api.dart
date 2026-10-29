@@ -41,6 +41,21 @@ class KitchenApi {
   Future<Facts> queue({String? station, String status = 'all', String q = ''}) async =>
       Facts(await _call('kds_queue', {'station': station, 'status': status, 'q': q.trim().isEmpty ? null : q.trim()}));
 
+  /// Each dish's photo and category (the till's menu read, `pos_sell_catalog`), for the KDS board's pictures and its Category list.
+  Future<Map<String, ({String? image, String category})>> dishes() async {
+    final r = await _call('pos_sell_catalog', {});
+    return {
+      for (final i in (r['items'] as List?) ?? const [])
+        if (i is Map) '${i['name']}': (image: (i['image_url'] as String?)?.trim().isEmpty ?? true ? null : i['image_url'] as String, category: '${i['category'] ?? ''}'),
+    };
+  }
+
+  /// The KOT view (0609 `rst_kot_orders`): today's orders that went to the kitchen, each with its KOTs, stations and ready count.
+  Future<Facts> kotOrders({String status = 'all'}) async => Facts(await _call('rst_kot_orders', {'status': status}));
+
+  /// Serve the ready dishes of an order (the floor's `tbl_mark_served`); safe to repeat.
+  Future<Facts> serve(List<String> itemIds) async => Facts(await _call('tbl_mark_served', {'item_ids': itemIds}));
+
   /// start / item_done / item_undo / ready / serve / print on ONE card: [station] is the card's station key (a ticket with items for several stations
   /// is acted on one station at a time) and [version] the card's `version` the person saw. Answers the card as it is now.
   Future<Facts> act(String ticketId, String action, {String? station, String? itemId, String? version, String? key}) async =>

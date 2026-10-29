@@ -37,6 +37,8 @@ export const SupplierSave = obj({
   city: z.string().trim().max(60, 'The city name is too long.').optional(), ...key,
 });
 export const PoAct = obj({ id, action: z.enum(['submit', 'approve', 'reject', 'cancel'], { message: 'Unknown action.' }), note: z.string().max(200).nullish() });
+// 0615: send an approved order to the supplier: the app opens WhatsApp / SMS; the database checks the number and records the send.
+export const PoSend = obj({ id, channel: z.enum(['whatsapp', 'sms'], { message: 'Send by WhatsApp or SMS.' }), to: z.string().min(10, 'Enter the supplier mobile number.').max(20) });
 export const PoReceive = obj({ id, ...key });
 export const PriceView = obj({ price_id: id });
 export const SourcingSelect = obj({ price_id: id, note: z.string().max(200).nullish(), ...key });

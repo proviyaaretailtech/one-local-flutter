@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
+import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import 'pay_screen.dart';
 import 'search_screen.dart';
@@ -108,7 +109,7 @@ class _CartsScreenState extends State<CartsScreen> {
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         TextField(controller: name, decoration: const InputDecoration(hintText: 'Name')),
         const SizedBox(height: 10),
-        TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: 'Mobile number')),
+        TextField(controller: phone, keyboardType: TextInputType.phone, inputFormatters: mobileFormatters, decoration: const InputDecoration(hintText: 'Mobile number', prefixText: kMobilePrefix)),
         const SizedBox(height: 16),
         DarkCta(label: 'Save', onPressed: () => Navigator.pop(ctx, true)),
       ]),

@@ -37,6 +37,14 @@ test('the photo goes to remove.bg as base64 PNG output and comes back as image_b
   assert.deepEqual(calls.call, [{ image_file_b64: PHOTO, size: 'auto', format: 'png' }]);
 });
 
+test('with a background colour: the dish on that backdrop, as a JPG', async () => {
+  const { deps, calls } = fake();
+  const out = await removeBackground({ request: req, userId: 'u', args: { ...args, bg_color: 'f6efe2' } }, deps);
+  assert.deepEqual(out, { image_b64: 'Q0xFQU4=', content_type: 'image/jpeg' });
+  assert.deepEqual(calls.call, [{ image_file_b64: PHOTO, size: 'auto', format: 'jpg', bg_color: 'f6efe2' }]);
+  await assert.rejects(removeBackground({ request: req, userId: 'u', args: { ...args, bg_color: '#fff' } }, deps), e => status(e) === 400);
+});
+
 test('no key: 503 bg_not_configured before the staff check or any call', async () => {
   const { deps, calls } = fake({ key: () => null });
   await assert.rejects(removeBackground({ request: req, userId: 'u', args }, deps), e => status(e) === 503 && code(e) === 'bg_not_configured');

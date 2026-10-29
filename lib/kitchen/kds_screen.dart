@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../api/net_guard.dart';
 import '../inventory/inventory_api.dart' show Facts;
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
@@ -52,7 +53,7 @@ class _KdsScreenState extends State<KdsScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = errorSentence(e));
     }
   }
 
@@ -243,6 +244,12 @@ class _TicketCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: Row(children: [
               Expanded(child: Text(i.s('name'), style: inter(17, 400, color: i.b('done') ? kMuted : kInk))),
+              // pack this one: a takeaway dish on a dine-in order (0606)
+              if (i.b('takeaway'))
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: KitchenTag('TAKEAWAY', key: ValueKey('kds-takeaway-${i.s('id')}'), bg: const Color(0xFFFFEDD5), fg: const Color(0xFFC2410C)),
+                ),
               Semantics(
                 label: '${i.s('name')} done',
                 toggled: i.b('done'),

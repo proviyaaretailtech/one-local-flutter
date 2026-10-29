@@ -36,3 +36,18 @@ export const AdjustmentRequest = obj({ order_id: id.nullish(), kind: z.enum(['pr
 export const AdjustmentDecide = z.object({ id, decision: z.enum(['approve', 'reject'], { message: 'Choose approve or reject.' }), note: z.string().max(300).optional(), ...key }).loose();
 export const InvoicePay = z.object({ invoice_id: id, amount_minor: amount, method: method.optional(), paid_on: day.optional(), note: z.string().max(300).optional(), ...key }).loose();
 export const InvoiceDue = z.object({ invoice_id: id, due_date: day }).loose();
+
+// Restaurant Money in the store's design (0622): the wallet, Money in / out, Transfer, cash register and close, dues, contacts to pay.
+const account = z.enum(['cash', 'upi', 'bank'], { message: 'Choose cash, UPI or bank.' });
+export const RmEntries = obj({ direction: z.enum(['in', 'out'], { message: 'Choose money in or money out.' }), method: z.enum(['all', 'cash', 'upi', 'card']).optional(),
+  from: day.optional(), to: day.optional() });
+export const RmRecord = obj({ direction: z.enum(['in', 'out', 'move'], { message: 'Choose money in, money out or a move.' }), amount_minor: amount,
+  kind: z.string().trim().max(40).optional(), category: z.string().max(60).optional(),
+  method: z.enum(['cash', 'upi', 'gpay', 'phonepe', 'card', 'bank'], { message: 'Choose how the money moved.' }).optional(),
+  party: z.string().max(60).optional(), party_phone: z.string().max(20).optional(), reference: z.string().max(60).optional(), note: z.string().max(300).optional(),
+  from_account: account.optional(), to_account: account.optional(), entry_date: day.optional(), ...key });
+export const RmVoid = z.object({ id, reason: z.string().trim().min(3, 'Say why (3 to 200 characters).').max(200) }).loose();
+export const RmClose = obj({ day: day.optional(), counted_minor: z.number({ message: 'Enter the cash you counted.' }).int().min(0).max(99_999_999_999) });
+export const RmContacts = z.object({ q: z.string().max(60).optional() }).loose();
+export const RmContactSave = z.object({ id: id.optional(), name: z.string().trim().min(1, 'Enter a name.').max(60), phone: z.string().max(20).optional(),
+  upi_id: z.string().max(260).optional() }).loose();

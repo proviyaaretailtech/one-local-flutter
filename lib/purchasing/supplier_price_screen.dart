@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../api/net_guard.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
@@ -42,7 +43,7 @@ class _SupplierPriceScreenState extends State<SupplierPriceScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = errorSentence(e));
     }
   }
 
@@ -52,7 +53,7 @@ class _SupplierPriceScreenState extends State<SupplierPriceScreen> {
       final d = await call();
       if (mounted) setState(() => _d = d);
     } catch (e) {
-      if (mounted) showToast(context, e.toString());
+      if (mounted) showToast(context, errorSentence(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -48,7 +48,7 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
     }
   }
 
-  Future<String?> _ask(String title, String label, {String initial = '', TextInputType? type, String? hint, String action = 'Save'}) {
+  Future<String?> _ask(String title, String label, {String initial = '', TextInputType? type, String? hint, String action = 'Save', bool mobile = false}) {
     final c = TextEditingController(text: initial);
     return showModalBottomSheet<String>(
       context: context,
@@ -60,7 +60,7 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(title, style: inter(18, 700)),
           const SizedBox(height: 14),
-          CwaField(label: label, controller: c, keyboardType: type, hint: hint, fieldKey: const ValueKey('acct-ask')),
+          CwaField(label: label, controller: c, keyboardType: type, hint: hint, mobile: mobile, fieldKey: const ValueKey('acct-ask')),
           CwaButton(key: const ValueKey('acct-ask-ok'), label: action, onPressed: () => Navigator.pop(ctx, c.text.trim())),
         ]),
       ),
@@ -100,7 +100,7 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
   }
 
   Future<void> _editPhone() async {
-    final raw = await _ask('Change mobile number', 'New mobile number', type: TextInputType.phone, hint: '10-digit mobile', action: 'Send code');
+    final raw = await _ask('Change mobile number', 'New mobile number', mobile: true, hint: '10-digit mobile', action: 'Send code');
     if (raw == null || !mounted) return;
     final digits = raw.replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^(91|0)(?=[6-9]\d{9}$)'), '');
     if (!RegExp(r'^[6-9]\d{9}$').hasMatch(digits)) {

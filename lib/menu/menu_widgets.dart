@@ -172,3 +172,22 @@ class MenuOutletPicker extends StatelessWidget {
         ]),
       );
 }
+
+/// How many of a dish the kitchen can still make, from its recipe and the ingredients in stock (0605: menu_can_make):
+/// "200 can be made" (red at 0, orange under 10); "Stock not counted" when the recipe's ingredients were never stocked; "No recipe yet".
+class CanMakeLabel extends StatelessWidget {
+  const CanMakeLabel({super.key, required this.hasRecipe, required this.count, this.size = 12.5});
+  final bool hasRecipe;
+  final int? count;
+  final double size;
+  @override
+  Widget build(BuildContext context) {
+    final n = count;
+    final (text, color) = !hasRecipe
+        ? ('No recipe yet', kMuted)
+        : n == null
+            ? ('Stock not counted', kMuted)
+            : ('$n can be made', n == 0 ? const Color(0xFFB42318) : n < 10 ? const Color(0xFFC2410C) : const Color(0xFF2E7D32));
+    return Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(size, 600, color: color));
+  }
+}

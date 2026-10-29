@@ -35,6 +35,10 @@ const line = z.object({
   menu_item_id: id,
   qty: z.number({ message: 'Choose a quantity.' }).int('Choose a quantity.').min(1, 'Quantities are 1 to 99.').max(99, 'Quantities are 1 to 99.'),
   notes: z.string().max(200, 'A note can be up to 200 characters.').nullish(),
+  takeaway: z.boolean({ message: 'takeaway is true or false.' }).optional(), // a takeaway dish on a dine-in bill (0606)
+  variant_id: id.optional(), // a size of the dish (0611): Small / Medium / Large
+  addons: z.array(id, { message: 'Add-ons are a list.' }).max(40, 'Too many add-ons on one dish.').optional(), // add-ons chosen in the billing pop-up (0624); an id twice = two
+  combos: z.array(id, { message: 'Combos are a list.' }).max(10).optional(), // combos chosen on the dish (0624)
 }).loose();
 export const OrderAdd = obj({
   table_id: id,
@@ -42,6 +46,25 @@ export const OrderAdd = obj({
   send: z.boolean({ message: 'send is true or false.' }).optional(),
   guest_count: z.number().int().min(1).max(50).optional(),
 });
+// The Bill's Takeaway / Delivery pills (0604): an order without a table. Delivery needs a phone and an address (checked again in the database).
+export const CounterOrder = obj({
+  service_type: z.enum(['pickup', 'delivery'], { message: 'Choose Takeaway or Delivery.' }),
+  lines: z.array(line, { message: 'Choose the dishes.' }).min(1, 'Choose at least one dish.').max(50, 'Up to 50 dishes at a time.'),
+  send: z.boolean({ message: 'send is true or false.' }).optional(),
+  customer_name: z.string().trim().max(80, 'The name is too long.').nullish(),
+  customer_phone: z.string().trim().regex(/^[+0-9 ()-]{0,20}$/, 'Enter a phone number.').nullish(),
+  address: z.string().trim().max(300, 'The address can be up to 300 characters.').nullish(),
+  notes: z.string().max(300).nullish(),
+});
 export const KotSend = obj({ order_id: id.optional(), table_id: id.optional() }).refine(v => !!(v.order_id || v.table_id), { message: 'Choose the order or the table.' });
 export const ReadyList = obj({});
 export const MarkServed = obj({ item_ids: z.array(id, { message: 'Choose the dishes.' }).min(1, 'Choose at least one dish.').max(100, 'Up to 100 dishes at a time.') });
+
+// Manage tables (0602): create, rename, change seats, remove. Names unique per outlet, seats 1 to 50, and who may are checked again in the database.
+export const TableList = obj({});
+export const TableSave = obj({
+  id: id.optional(),
+  label: z.string({ message: 'Give the table a name.' }).trim().min(1, 'Give the table a name.').max(20, 'A table name is up to 20 characters.'),
+  seats: z.number({ message: 'Enter the seats.' }).int().min(1, 'Seats are 1 to 50.').max(50, 'Seats are 1 to 50.'),
+});
+export const TableRemove = obj({ id });

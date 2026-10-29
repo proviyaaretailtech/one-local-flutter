@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../api/net_guard.dart';
 import '../inventory/inventory_api.dart' show Facts;
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
@@ -36,7 +37,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = errorSentence(e));
     }
   }
 

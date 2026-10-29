@@ -1,26 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart' show qty;
+import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
+import '../ui/whatsapp_icon.dart';
 import 'bill_api.dart';
 import 'bill_paid_screen.dart';
+import 'bill_receipt_popup.dart';
 import 'bill_split_screen.dart';
 import 'bill_widgets.dart';
 import 'table_widgets.dart';
 import 'tables_api.dart';
 
-/// Figma "Checkout" (screen-payment.png), step 3 of the restaurant "Bill and pay" journey: the current items of the table, a note for the
-/// kitchen, the bill summary, a discount code, the payment method (Cash / Card / UPI-QR / Split Pay), the amount received with the change,
-/// Complete Payment and Print Bill. Every amount, the coupon, the change and what may be done come from the database (`rst_bill_view`,
+/// Figma "Checkout" (screen-payment.png), step 3 of the restaurant "Bill and pay" journey: the current items of the table (no kitchen note:
+/// the kitchen is done by now; founder, 29 Oct 2026), the bill summary, a discount code, the payment method (Cash / Card / UPI-QR / Split Pay), the amount received with the change,
+/// Complete Payment, then send the bill on WhatsApp or SMS or print it. Every amount, the coupon, the change and what may be done come from the database (`rst_bill_view`,
 /// `rst_bill_pay`). With [part] it takes one guest's part of a split bill (opened from the split screen) and returns the answer to it.
 /// Card and UPI are recorded only after the cashier confirms the money arrived; a retried tap re-sends the same key, so it is never paid twice.
 class BillPayScreen extends StatefulWidget {
-  const BillPayScreen({super.key, required this.env, required this.tableId, this.bill, this.part, this.orderId});
+  const BillPayScreen({super.key, required this.env, required this.tableId, this.bill, this.part, this.orderId, this.openUrl});
   final TablesEnv env;
   final String tableId;
   final BillApi? bill;
+
+  /// Opens WhatsApp / the SMS app (tests pass a fake).
+  final Future<bool> Function(Uri)? openUrl;
 
   /// One guest's part (from `rst_bill_split`): id, order_id, label, amount, method.
   final Facts? part;
@@ -34,13 +41,13 @@ class BillPayScreen extends StatefulWidget {
 
 class _BillPayScreenState extends State<BillPayScreen> {
   late final BillApi _api = widget.bill ?? BillApi();
+  late final Future<bool> Function(Uri) _open = widget.openUrl ?? ((u) => launchUrl(u, mode: LaunchMode.externalApplication));
   Facts? _v;
   String? _error, _payError;
   bool _busy = false;
   late String _method = widget.part?.s('method') ?? 'cash';
   final _received = TextEditingController();
   final _code = TextEditingController();
-  final _note = TextEditingController();
   String? _payKey; // the key of the tap in flight; kept only when the server gave no answer, so a retry cannot pay twice
 
   @override
@@ -53,7 +60,6 @@ class _BillPayScreenState extends State<BillPayScreen> {
   void dispose() {
     _received.dispose();
     _code.dispose();
-    _note.dispose();
     super.dispose();
   }
 
@@ -83,25 +89,11 @@ class _BillPayScreenState extends State<BillPayScreen> {
       final o = _order;
       if (o != null) {
         if (_received.text.isEmpty) _received.text = money(_due);
-        if (_note.text.isEmpty) _note.text = o.s('notes');
         if (o.so('coupon_code') != null) _code.text = o.s('coupon_code');
       }
     } catch (e) {
       if (mounted) setState(() => _error = sayError(e));
     }
-  }
-
-  Future<void> _saveNote() async {
-    final o = _order;
-    if (o == null) return;
-    setState(() => _busy = true);
-    try {
-      await _api.note(o.s('id'), _note.text);
-      if (mounted) showToast(context, 'Note saved for the kitchen.');
-    } catch (e) {
-      if (mounted) showToast(context, sayError(e));
-    }
-    if (mounted) setState(() => _busy = false);
   }
 
   Future<void> _applyCode() async {
@@ -185,11 +177,36 @@ class _BillPayScreenState extends State<BillPayScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
-  void _printBill() {
+  /// Asks the customer's mobile number (filled in when the bill has one), then opens WhatsApp or the SMS app with the bill text.
+  Future<void> _sendBill(String channel) async {
     final o = _order;
     if (o == null) return;
-    Clipboard.setData(ClipboardData(text: billText(o, table: _v!.m('table').s('label'))));
-    showToast(context, 'Bill text copied. Printers connect in a later release.');
+    final c = TextEditingController(text: localMobile(o.so('customer_phone')));
+    final to = await showDialog<String>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text(channel == 'whatsapp' ? 'Send bill on WhatsApp' : 'Send bill on SMS', style: inter(18, 700)),
+        content: TextField(key: const ValueKey('send-to'), controller: c, keyboardType: TextInputType.phone, inputFormatters: mobileFormatters, autofocus: true, decoration: const InputDecoration(hintText: 'Mobile number', prefixText: kMobilePrefix)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+          TextButton(key: const ValueKey('send-go'), onPressed: () => Navigator.pop(d, c.text.trim()), child: const Text('Send')),
+        ],
+      ),
+    );
+    if (to == null || !mounted) return;
+    var digits = to.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 10) digits = '91$digits';
+    if (digits.length < 11) return showToast(context, 'Enter a 10-digit mobile number.');
+    final text = billText(o, table: _v!.m('table').s('label'));
+    final uri = channel == 'whatsapp' ? Uri.parse('https://wa.me/$digits?text=${Uri.encodeComponent(text)}') : Uri(scheme: 'sms', path: '+$digits', query: 'body=${Uri.encodeComponent(text)}'); // %20, not +, for spaces
+    if (!await _open(uri) && mounted) showToast(context, channel == 'whatsapp' ? 'WhatsApp could not be opened.' : 'The SMS app could not be opened.');
+  }
+
+  /// Sends the bill to the printer as the 80 mm slip.
+  Future<void> _printBill() async {
+    final o = _order;
+    if (o == null) return;
+    if (!await printBillSlip(view: _v!, order: o) && mounted) showToast(context, 'Could not open the printer. Try again.');
   }
 
   @override
@@ -219,15 +236,21 @@ class _BillPayScreenState extends State<BillPayScreen> {
         if (v != null && o == null) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text('No open bill on this table.', style: inter(15, 400, color: kMuted)))),
         if (v != null && o != null) ...[
           BillCard(title: 'CURRENT ITEMS (TABLE ${t!.s('label').toUpperCase()})', children: [
-            for (final i in o.l('items')) BillLine('${qty(i.n('qty'))} × ${i.s('name')}', money(i.n('line_total'))),
-            if (part == null) ...[
-              const SizedBox(height: 10),
-              Text('ORDER NOTES · OPTIONAL', style: inter(14, 700, color: kMuted)),
-              const SizedBox(height: 8),
-              Row(children: [
-                Expanded(child: BillField(fieldKey: const ValueKey('bill-note'), controller: _note, hint: 'Add a note for the kitchen', maxLength: 300, enabled: v.m('can').b('note'))),
-                if (v.m('can').b('note')) TextButton(key: const ValueKey('save-note'), onPressed: _busy ? null : _saveNote, child: Text('Save', style: inter(15, 700, color: kInk))),
-              ]),
+            // eaten here first, then the dishes packed to take away on the same bill (0606)
+            for (final i in billItems(o).where((i) => !i.b('takeaway'))) ...[
+              BillLine('${qty(i.n('qty'))} × ${i.s('name')}${(i.so('variant') ?? '').isEmpty ? '' : ' (${i.s('variant')})'}', money(i.n('line_total'))),
+              // add-ons and combos chosen with the dish (0625), each for one dish
+              for (final (what, price) in billAddOns(i)) BillLine('    $what', '${money(price)} each', muted: true),
+            ],
+            if (billItems(o).any((i) => i.b('takeaway'))) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 2),
+                child: Text('TAKEAWAY', key: const ValueKey('bill-takeaway-head'), style: inter(13, 800, color: const Color(0xFFC2410C))),
+              ),
+              for (final i in billItems(o).where((i) => i.b('takeaway'))) ...[
+                BillLine('${qty(i.n('qty'))} × ${i.s('name')}${(i.so('variant') ?? '').isEmpty ? '' : ' (${i.s('variant')})'} (Takeaway)', money(i.n('line_total'))),
+                for (final (what, price) in billAddOns(i)) BillLine('    $what', '${money(price)} each', muted: true),
+              ],
             ],
           ]),
           BillCard(title: 'BILL SUMMARY', children: [
@@ -250,14 +273,12 @@ class _BillPayScreenState extends State<BillPayScreen> {
             ),
           if (part == null)
             BillCard(title: 'DISCOUNT CODE', children: [
-              Text('CODE', style: inter(13, 500, color: kMuted)),
-              const SizedBox(height: 8),
               Row(children: [
                 Expanded(
                   child: BillField(
                     fieldKey: const ValueKey('bill-code'),
                     controller: _code,
-                    hint: 'dineQR30',
+                    hint: 'Enter code',
                     enabled: v.m('can').b('coupon'),
                   ),
                 ),
@@ -300,11 +321,42 @@ class _BillPayScreenState extends State<BillPayScreen> {
             Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(v.m('unavailable').s('pay'), key: const ValueKey('pay-unavailable'), style: inter(14.5, 500, color: kMuted))),
           LimeButton(part == null ? 'Complete Payment' : 'Complete Payment · ${part.s('label')}', height: 60, busy: _busy, onPressed: v.m('can').b('pay') ? _complete : null),
           const SizedBox(height: 10),
-          OutlineButtonT('Print Bill', height: 56, onPressed: _printBill),
+          // send the bill: WhatsApp, SMS, or the printer
+          Row(children: [
+            Expanded(child: _SendButton(key: const ValueKey('bill-whatsapp'), tip: 'Send bill on WhatsApp', bg: kWhatsAppGreen, onTap: () => _sendBill('whatsapp'), child: const WhatsAppIcon())),
+            const SizedBox(width: 10),
+            Expanded(child: _SendButton(key: const ValueKey('bill-sms'), tip: 'Send bill on SMS', onTap: () => _sendBill('sms'), child: const Icon(LucideIcons.messageSquareText, size: 26, color: Color(0xFF2563EB)))),
+            const SizedBox(width: 10),
+            Expanded(child: _SendButton(key: const ValueKey('bill-print'), tip: 'Print bill', onTap: _printBill, child: const Icon(LucideIcons.printer, size: 26, color: kInk))),
+          ]),
         ],
       ],
     );
   }
+}
+
+/// One of the three send buttons under Complete Payment: an icon only, named by its tooltip.
+class _SendButton extends StatelessWidget {
+  const _SendButton({super.key, required this.tip, required this.onTap, required this.child, this.bg = Colors.white});
+  final String tip;
+  final VoidCallback onTap;
+  final Widget child;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: tip,
+        child: Semantics(
+          button: true,
+          label: tip,
+          child: Material(
+            color: bg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: bg == Colors.white ? const BorderSide(color: kLine) : BorderSide.none),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(onTap: onTap, child: SizedBox(height: 56, child: Center(child: child))),
+          ),
+        ),
+      );
 }
 
 String _pct(num v) => v == v.roundToDouble() ? '${v.toInt()}' : '$v';

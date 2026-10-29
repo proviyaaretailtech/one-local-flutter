@@ -116,8 +116,8 @@ void main() {
         await t.tap(find.text('go'));
         await t.pumpAndSettle();
         expect(find.text(title), findsWidgets, reason: page);
-        expect(find.byTooltip('Back'), findsOneWidget, reason: page);
-        await t.tap(find.byTooltip('Back'));
+        expect(find.bySemanticsLabel('Back'), findsOneWidget, reason: '$page: one back arrow, in the header');
+        await t.tap(find.bySemanticsLabel('Back'));
         await t.pumpAndSettle();
         expect(find.text('go'), findsOneWidget, reason: page);
       }

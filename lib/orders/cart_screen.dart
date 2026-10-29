@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../api/net_guard.dart';
 import '../customers/customer_picker.dart';
 import '../customers/customers_api.dart';
 import '../ui/theme.dart';
@@ -107,7 +108,7 @@ class _CartScreenState extends State<CartScreen> {
       });
     } catch (e) {
       if (!mounted || mine != _seq) return;
-      setState(() => _quoteError = e.toString());
+      setState(() => _quoteError = errorSentence(e));
     }
   }
 
@@ -141,7 +142,7 @@ class _CartScreenState extends State<CartScreen> {
       await _api.quote(_lines, coupon: entered);
       // The server prices coupons; until POS coupons exist it refuses every code, and that refusal is what the person sees.
     } catch (e) {
-      if (mounted) showToast(context, e.toString());
+      if (mounted) showToast(context, errorSentence(e));
     }
   }
 
@@ -193,7 +194,7 @@ class _CartScreenState extends State<CartScreen> {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => OrderScreen(api: _api, orderId: view.id, initial: view, onNavigate: widget.onNavigate)));
     } catch (e) {
-      if (mounted) showToast(context, e.toString());
+      if (mounted) showToast(context, errorSentence(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -219,7 +220,7 @@ class _CartScreenState extends State<CartScreen> {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => OrderScreen(api: _api, orderId: view.id, initial: view, onNavigate: widget.onNavigate)));
     } catch (e) {
-      if (mounted) showToast(context, e.toString());
+      if (mounted) showToast(context, errorSentence(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -525,7 +526,7 @@ class _CatalogPickerState extends State<_CatalogPicker> {
       final items = await widget.api.catalog(q: _q.text);
       if (mounted) setState(() => _items = items);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = errorSentence(e));
     }
   }
 

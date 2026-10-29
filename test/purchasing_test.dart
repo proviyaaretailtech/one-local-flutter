@@ -183,6 +183,70 @@ void main() {
       expect(find.text('Confirm Receipt & Update Stock'), findsOneWidget);
     });
 
+    testWidgets('an approved order is sent to the supplier on WhatsApp: the number is checked and recorded first, then WhatsApp opens with the order', (t) async {
+      final base = Map<String, dynamic>.from(fx['po_partial'] as Map);
+      final po = {
+        ...base,
+        'status': 'Approved',
+        'notes': 'Morning delivery',
+        'supplier': {...(base['supplier'] as Map), 'phone': '9876500011'},
+        'allowed_actions': ['receive', 'send'],
+      };
+      final opened = <Uri>[];
+      final s = Fake((r) => switch (fnOf(r)) {
+            'pur_po_view' => ok(po),
+            'pur_po_send' => ok({...po, 'sent': {'at': '2026-10-28T05:30:00Z', 'channel': 'whatsapp', 'to': '******0011', 'times': 1}}),
+            _ => null,
+          });
+      await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String, openUrl: (u) async {
+        opened.add(u);
+        return true;
+      }));
+      expect(find.text('Send to supplier'), findsOneWidget);
+      expect(find.textContaining('(9876500011)'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('po-send-whatsapp')));
+      await t.pumpAndSettle();
+      expect(find.text('9876500011'), findsOneWidget, reason: 'the supplier\'s saved number is filled in');
+      await t.tap(find.byKey(const ValueKey('po-send-go')));
+      await t.pumpAndSettle();
+      expect(argsOf(s.requests.lastWhere((r) => fnOf(r) == 'pur_po_send')), {'id': po['id'], 'channel': 'whatsapp', 'to': '9876500011'});
+      expect(opened.single.host, 'wa.me');
+      expect(opened.single.path, '/919876500011');
+      final text = opened.single.queryParameters['text']!;
+      expect(text, startsWith('Purchase Order ${po['number']}'));
+      expect(text, contains('To: ${(po['supplier'] as Map)['name']}'));
+      expect(text, contains('1. ${((po['lines'] as List).first as Map)['name']}'));
+      expect(text, contains('Note: Morning delivery'));
+      expect(find.byKey(const ValueKey('po-sent-chip')), findsOneWidget);
+      expect(find.textContaining('Sent on WhatsApp to ******0011'), findsOneWidget);
+    });
+
+    testWidgets('SMS: a number the database refuses shows its sentence and opens nothing; a pending order has no send', (t) async {
+      final po = {...(fx['po_partial'] as Map<String, dynamic>), 'status': 'Approved', 'allowed_actions': ['send']};
+      final opened = <Uri>[];
+      final s = Fake((r) => switch (fnOf(r)) {
+            'pur_po_view' => ok(po),
+            'pur_po_send' => err(400, "Enter the supplier's 10-digit mobile number.", 'bad_request'),
+            _ => null,
+          });
+      await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String, openUrl: (u) async {
+        opened.add(u);
+        return true;
+      }));
+      await t.tap(find.byKey(const ValueKey('po-send-sms')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('po-send-to')), '12345');
+      await t.tap(find.byKey(const ValueKey('po-send-go')));
+      await t.pumpAndSettle();
+      expect(argsOf(s.requests.lastWhere((r) => fnOf(r) == 'pur_po_send'))['channel'], 'sms');
+      expect(find.textContaining('10-digit mobile number'), findsOneWidget);
+      expect(opened, isEmpty);
+
+      final pending = Fake();
+      await showTall(t, PoGrnScreen(env: pending.env, orderId: (fx['po_pending'] as Map)['id'] as String));
+      expect(find.text('Send to supplier'), findsNothing);
+    });
+
     testWidgets('a refused action shows the server sentence, not a crash', (t) async {
       final po = {...(fx['po_pending'] as Map<String, dynamic>), 'allowed_actions': ['approve']};
       final s = Fake((r) => fnOf(r) == 'pur_po_view' ? ok(po) : (fnOf(r) == 'pur_po_act' ? err(403, 'An order above 1000000 paise is approved by someone other than the person who raised it.', 'forbidden') : null));

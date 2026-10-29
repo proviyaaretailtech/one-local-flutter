@@ -6,6 +6,7 @@ import 'package:vinii_pos/home/side_nav.dart';
 import 'package:vinii_pos/orders/orders_board_screen.dart';
 import 'package:vinii_pos/orders/orders_home.dart';
 import 'package:vinii_pos/restaurant/restaurant_more_screen.dart';
+import 'package:vinii_pos/restaurant/rst_plans_screen.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
 import 'helpers.dart';
@@ -46,6 +47,7 @@ void main() {
       ('money', HomeNav.money), ('team', HomeNav.team), ('storefront', HomeNav.storefront), ('deliverySettings', HomeNav.deliverySettings),
       ('kitchen', HomeNav.kitchen), ('settings', HomeNav.settings), ('support', HomeNav.support), ('notifications', HomeNav.notifications),
       ('reviews', HomeNav.reviews), ('items', HomeNav.items), ('orderHistory', HomeNav.orderHistory), ('setup', HomeNav.setup),
+      ('outletTimings', HomeNav.outletTimings), ('phoneNumbers', HomeNav.phoneNumbers), ('outletInfo', HomeNav.outletInfo),
     ]) {
       expect(hook, isNotNull, reason: name);
     }
@@ -65,8 +67,12 @@ void main() {
     HomeNav.kitchen = rec('kitchen');
     HomeNav.tableQr = rec('tableQr');
     HomeNav.menuLink = rec('menuLink');
+    HomeNav.purchases = rec('purchases');
     HomeNav.settings = rec('settings');
     HomeNav.setup = rec('setup');
+    HomeNav.outletTimings = rec('outletTimings');
+    HomeNav.phoneNumbers = rec('phoneNumbers');
+    HomeNav.outletInfo = rec('outletInfo');
     HomeNav.support = rec('support');
     HomeNav.notifications = rec('notifications');
     HomeNav.reviews = rec('reviews');
@@ -130,59 +136,193 @@ void main() {
     });
   });
 
-  group('restaurant More page', () {
-    Future<void> showMore(WidgetTester t) async {
+  group('restaurant side bar (the store design, the restaurant links)', () {
+    Future<void> showMore(WidgetTester t, {VoidCallback? onReports}) async {
       ignoreOverflow();
-      t.view.physicalSize = const Size(780, 2400);
+      t.view.physicalSize = const Size(780, 3200);
       t.view.devicePixelRatio = 2;
       addTearDown(t.view.reset);
-      await t.pumpWidget(MaterialApp(theme: posTheme(), home: RestaurantMoreScreen(outletName: 'Spice Route', onLogout: () {})));
-      await t.pump();
+      await t.pumpWidget(MaterialApp(
+        theme: posTheme(),
+        home: Builder(
+            builder: (c) => TextButton(
+                onPressed: () => RestaurantMoreScreen.open(c, name: 'Nikhil Agarwal', email: 'n@example.com', outletName: 'Spice Route', onLogout: () {}, onReports: onReports),
+                child: const Text('open'))),
+      ));
+      await t.tap(find.text('open'));
+      await t.pumpAndSettle();
     }
 
-    testWidgets('every quick link with a built screen opens it; Money links open the named Money screen', (t) async {
+    testWidgets('the store\'s ten options, in the store\'s order, and nothing else', (t) async {
+      fakeHooks();
+      await showMore(t, onReports: () {});
+      const ten = ['All Orders', 'Money', 'Inventory', 'Customer', 'Business profile', 'Reports', 'Team', 'Settings', 'One Local Wallet', 'Help & support', 'Subscription plans'];
+      final tops = [for (final l in ten) t.getRect(find.text(l)).top];
+      expect(tops, [...tops]..sort(), reason: 'in this order');
+      for (final gone in ['Kitchen display', 'Purchase orders', 'Table QR codes', 'Menu link', 'Payout', 'Notifications', 'Outlet timings', 'Feedback', 'Taxes']) {
+        expect(find.text(gone), findsNothing, reason: gone);
+      }
+    });
+
+    testWidgets('Inventory (0627) folds open after Money; each of its six pages opens through the Inventory hook', (t) async {
+      fakeHooks();
+      final opened = <String>[];
+      HomeNav.inventory = (_, page) async {
+        opened.add(page);
+        return false;
+      };
+      addTearDown(() => HomeNav.inventory = null);
+      const six = {
+        'Purchase': 'purchase', 'Price control': 'prices', 'Closing stock check': 'closing',
+        'Recipe': 'recipes', 'Ingredients': 'ingredients', 'Table management': 'tables',
+      };
+      await showMore(t, onReports: () {});
+      for (final l in six.keys) {
+        expect(find.text(l), findsNothing, reason: 'folded: $l');
+      }
+      await t.tap(find.byKey(const ValueKey('side-nav-group-Inventory')));
+      await t.pumpAndSettle();
+      final tops = [for (final l in six.keys) t.getRect(find.text(l)).top];
+      expect(tops, [...tops]..sort(), reason: 'in this order');
+      expect(t.getRect(find.text('Purchase')).top, greaterThan(t.getRect(find.text('Inventory')).top));
+      expect(t.getRect(find.text('Table management')).top, lessThan(t.getRect(find.text('Page Manager')).top));
+      expect(t.getRect(find.text('Page Manager')).top, lessThan(t.getRect(find.text('Customer')).top));
+      await t.tap(find.byKey(const ValueKey('side-nav-group-Inventory')));
+      await t.pumpAndSettle();
+      expect(find.text('Purchase'), findsNothing, reason: 'folds shut again');
+      // close the side bar, or the next "open" tap lands on one of its rows
+      Navigator.of(t.element(find.byKey(const ValueKey('side-nav-group-Inventory')))).pop();
+      await t.pumpAndSettle();
+      for (final e in six.entries) {
+        await showMore(t, onReports: () {});
+        await t.tap(find.byKey(const ValueKey('side-nav-group-Inventory')));
+        await t.pumpAndSettle();
+        await t.ensureVisible(find.text(e.key));
+        await t.pumpAndSettle();
+        await t.tap(find.text(e.key));
+        await t.pumpAndSettle();
+        expect(opened.last, e.value, reason: e.key);
+      }
+    });
+
+    testWidgets('Back from an Inventory page (Closing stock) opens the side bar again with Inventory unfolded, not the dashboard', (t) async {
+      fakeHooks();
+      HomeNav.inventory = (c, page) async {
+        await Navigator.of(c).push(MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: Text('page $page')))));
+        return true;
+      };
+      addTearDown(() => HomeNav.inventory = null);
+      await showMore(t, onReports: () {});
+      await t.tap(find.byKey(const ValueKey('side-nav-group-Inventory')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Closing stock check'));
+      await t.pumpAndSettle();
+      expect(find.text('page closing'), findsOneWidget);
+      expect(find.byKey(const ValueKey('side-nav')), findsNothing, reason: 'the side bar closed for the page');
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('side-nav')), findsOneWidget, reason: 'back on the side bar');
+      expect(find.text('Closing stock check'), findsOneWidget, reason: 'Inventory is unfolded');
+    });
+
+    testWidgets('Back from any page opened from the side bar (Money, Reports) opens the side bar again; a link that only switches a tab does not', (t) async {
+      fakeHooks();
+      HomeNav.money = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Money page')))));
+      HomeNav.team = (_) {}; // only switches a tab: no page on top
+      addTearDown(() {
+        HomeNav.money = null;
+        HomeNav.team = null;
+      });
+      await showMore(t, onReports: () {});
+      await t.tap(find.text('Money'));
+      await t.pumpAndSettle();
+      expect(find.text('Money page'), findsOneWidget);
+      expect(find.byKey(const ValueKey('side-nav')), findsNothing);
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('side-nav')), findsOneWidget, reason: 'back on the side bar');
+      expect(find.text('Closing stock check'), findsNothing, reason: 'Inventory folded: it was not opened from there');
+
+      await t.tap(find.text('Team'));
+      await t.pumpAndSettle();
+      await t.pump(const Duration(seconds: 2));
+      expect(find.byKey(const ValueKey('side-nav')), findsNothing, reason: 'nothing to come back from');
+    });
+
+    testWidgets('Back from Reports opens the side bar again', (t) async {
+      fakeHooks();
+      ignoreOverflow();
+      t.view.physicalSize = const Size(780, 3200);
+      t.view.devicePixelRatio = 2;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(
+        theme: posTheme(),
+        home: Builder(
+            builder: (c) => TextButton(
+                onPressed: () => RestaurantMoreScreen.open(c, name: 'N', outletName: 'Spice Route', onLogout: () {},
+                    onReports: () => Navigator.of(c).push(MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Reports page')))))),
+                child: const Text('open'))),
+      ));
+      await t.tap(find.text('open'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Reports'));
+      await t.pumpAndSettle();
+      expect(find.text('Reports page'), findsOneWidget);
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('side-nav')), findsOneWidget);
+    });
+
+    testWidgets('searching for an Inventory page opens its group', (t) async {
+      fakeHooks();
+      HomeNav.inventory = (_, _) async => false;
+      addTearDown(() => HomeNav.inventory = null);
+      await showMore(t, onReports: () {});
+      await t.enterText(find.byKey(const ValueKey('side-nav-search')), 'recipe');
+      await t.pump();
+      expect(find.text('Recipe'), findsOneWidget);
+      expect(find.text('Money'), findsNothing);
+    });
+
+    testWidgets('each option with a built screen opens it; Reports opens the reports', (t) async {
+      HomeNav.customers = null;
+      HomeNav.wallet = null;
       const expected = {
-        'Manage staff': 'team',
-        'OneLocal manager': 'storefront',
-        'Delivery settings': 'delivery',
-        'Kitchen display': 'kitchen',
-        'Table QR codes': 'tableQr',
-        'Menu link': 'menuLink',
-        'Payout': 'money:payouts',
-        'Invoices': 'money:invoices',
-        'Fees & charges': 'money:settlements',
-        'Notifications': 'notifications',
-        'Customer support': 'support',
-        'Feedback': 'reviews',
-        'Outlet timings': 'settings',
-        'Phone numbers': 'settings',
-        'Outlet info': 'setup',
-        'Order history': 'history',
-        'Menu': 'items',
+        'All Orders': 'history',
+        'Money': 'money',
+        'Customer': 'customers',
+        'Business profile': 'outletInfo',
+        'Reports': 'reports',
+        'Team': 'team',
+        'Settings': 'settings',
+        'One Local Wallet': 'wallet',
+        'Help & support': 'support',
       };
       for (final e in expected.entries) {
         final opened = fakeHooks();
-        await showMore(t);
+        HomeNav.customers = (_) => opened.add('customers');
+        HomeNav.wallet = (_) => opened.add('wallet');
+        await showMore(t, onReports: () => opened.add('reports'));
         await t.tap(find.text(e.key));
         await t.pump();
         expect(opened, [e.value], reason: e.key);
       }
+      HomeNav.customers = null;
+      HomeNav.wallet = null;
     });
 
-    testWidgets('only Taxes still says "Soon" (no tax screen yet) and opens nothing', (t) async {
+    testWidgets('every option is live (no "Soon"); Subscription plans opens the plans page', (t) async {
       final opened = fakeHooks();
-      await showMore(t);
-      expect(find.text('Soon'), findsOneWidget);
-      expect(soonOn('Taxes'), findsOneWidget);
-      expect(soonOn('Payout'), findsNothing);
-      await t.tap(find.text('Taxes'));
+      HomeNav.customers = (_) => opened.add('customers');
+      HomeNav.wallet = (_) => opened.add('wallet');
+      await showMore(t, onReports: () {});
+      expect(find.text('Soon'), findsNothing);
+      await t.tap(find.text('Subscription plans'));
       await t.pump();
-      expect(opened, isEmpty);
-    });
-
-    testWidgets('with no hooks plugged every link says "Soon"', (t) async {
-      await showMore(t);
-      expect(find.text('Soon'), findsNWidgets(18));
+      await t.pump(const Duration(milliseconds: 400));
+      expect(find.byType(RstPlansScreen), findsOneWidget);
+      HomeNav.customers = null;
+      HomeNav.wallet = null;
     });
   });
 }

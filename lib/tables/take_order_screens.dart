@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_api.dart';
 import '../ui/theme.dart';
+import 'dish_options_sheet.dart';
 import 'table_order_screen.dart';
 import 'table_widgets.dart';
 import 'tables_api.dart';
@@ -105,6 +106,7 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
         if (q <= 0) {
           _qty.remove(id);
           _note.remove(id);
+          _extras.remove(id);
         } else {
           _qty[id] = q.clamp(1, 99);
         }
@@ -136,7 +138,114 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
   }
 
   // Display only: what the dishes chosen here add to the bill so far; the bill itself is worked out by the database.
-  num get _soFar => _already + _qty.entries.fold<num>(0, (a, e) => a + (_item(e.key)?.n('price') ?? 0) * e.value);
+  num get _soFar => _already + _qty.entries.fold<num>(0, (a, e) => a + _priceOf(e.key) * e.value);
+
+  // A choice's key is the dish id, or "dish#size" for a size of a dish with sizes (0611: Small / Medium / Large).
+  // 0624: then "~…" for the add-ons and combos chosen in the pop-up; what was chosen is kept in _extras.
+  static String _main(String k) => k.split('~').first;
+  static String _dishOf(String k) => _main(k).split('#').first;
+  static String? _sizeOf(String k) => _main(k).contains('#') ? _main(k).split('#').last : null;
+  final _extras = <String, DishChoice>{};
+  num _priceOf(String k) {
+    final item = _item(_dishOf(k));
+    final size = _sizeOf(k);
+    final v = size == null ? null : item?.l('variants').where((x) => x.s('id') == size).firstOrNull;
+    return (v?.n('price') ?? item?.n('price') ?? 0) + (_extras[k]?.extra ?? 0);
+  }
+
+  /// Opens the pop-up (0624) and adds one of the dish as chosen; the same choice again adds to that line.
+  Future<void> _addWithOptions(Facts i) async {
+    final c = await showDishOptions(context, i);
+    if (c == null || !mounted) return;
+    final k = '${i.s('id')}${c.variantId == null ? '' : '#${c.variantId}'}${c.signature}';
+    setState(() {
+      if (c.hasExtras) _extras[k] = c;
+      _qty[k] = ((_qty[k] ?? 0) + 1).clamp(1, 99);
+      _key = null;
+    });
+  }
+
+  /// A dish with add-ons or combos (0624): its name and Add (opens the pop-up), then one line per way it was chosen, with what was chosen,
+  /// its price and its own − / +.
+  Widget _optionsRow(Facts i, {required bool last}) {
+    final id = i.s('id');
+    final keys = [for (final k in _qty.keys) if (_dishOf(k) == id) k];
+    return Container(
+      key: ValueKey('dish-$id'),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
+      decoration: BoxDecoration(border: last ? null : const Border(bottom: BorderSide(color: kLine))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          _letter(i.s('name')),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(i.s('name'), style: inter(15, 600)),
+              Text('${rupees(i.n('price'))} · add-ons & combos', style: inter(12.5, 400, color: kMuted)),
+            ]),
+          ),
+          TextButton.icon(
+            key: ValueKey('options-$id'),
+            onPressed: _busy ? null : () => _addWithOptions(i),
+            icon: const Icon(LucideIcons.plus, size: 16, color: kLink),
+            label: Text('Add', style: inter(14, 700, color: kLink)),
+          ),
+        ]),
+        for (final k in keys)
+          Padding(
+            padding: const EdgeInsets.only(left: 48, top: 6),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Builder(builder: (_) {
+                    final size = _sizeOf(k) == null ? null : i.l('variants').where((v) => v.s('id') == _sizeOf(k)).firstOrNull?.s('name');
+                    final what = [if (size != null) size, if ((_extras[k]?.summary ?? '').isNotEmpty) _extras[k]!.summary].join(' · ');
+                    return Text(what.isEmpty ? 'Plain' : what, key: ValueKey('line-$k'), style: inter(13, 600));
+                  }),
+                  Text('${rupees(_priceOf(k))} each', style: inter(12, 500, color: kMuted)),
+                ]),
+              ),
+              Text('${_qty[k]}', style: inter(14, 800)),
+              const SizedBox(width: 6),
+              _step(LucideIcons.minus, 'Less ${i.s('name')}', () => _set(k, (_qty[k] ?? 0) - 1), ValueKey('minus-$k')),
+              _step(LucideIcons.plus, 'More ${i.s('name')}', () => _set(k, (_qty[k] ?? 0) + 1), ValueKey('plus-$k')),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  /// A dish with sizes: its name, then one line per size with its price and its own − / +.
+  Widget _sizedRow(Facts i, {required bool last}) {
+    final id = i.s('id');
+    return Container(
+      key: ValueKey('dish-$id'),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
+      decoration: BoxDecoration(border: last ? null : const Border(bottom: BorderSide(color: kLine))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          _letter(i.s('name')),
+          const SizedBox(width: 12),
+          Expanded(child: Text(i.s('name'), style: inter(15, 600))),
+          Text('Choose a size', style: inter(12, 500, color: kMuted)),
+        ]),
+        for (final v in i.l('variants'))
+          Builder(builder: (context) {
+            final k = '$id#${v.s('id')}', q = _qty[k] ?? 0;
+            return Padding(
+              padding: const EdgeInsets.only(left: 48, top: 4),
+              child: Row(children: [
+                Expanded(child: Text('${v.s('name')} · ${rupees(v.n('price'))}', style: inter(13.5, q > 0 ? 700 : 500, color: q > 0 ? kInk : kMuted))),
+                if (q > 0) Text('$q', key: ValueKey('qty-$id-${v.s('name')}'), style: inter(14, 800)),
+                const SizedBox(width: 6),
+                if (q > 0) _step(LucideIcons.minus, 'Less ${v.s('name')} ${i.s('name')}', () => _set(k, q - 1), ValueKey('minus-$id-${v.s('name')}')),
+                _step(LucideIcons.plus, 'More ${v.s('name')} ${i.s('name')}', () => _set(k, q + 1), ValueKey('plus-$id-${v.s('name')}')),
+              ]),
+            );
+          }),
+      ]),
+    );
+  }
 
   Future<void> _submit(bool send) async {
     if (_qty.isEmpty) return showToast(context, 'Choose at least one dish.');
@@ -145,7 +254,13 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
     try {
       final r = await widget.env.api.addDishes(
         widget.tableId,
-        [for (final e in _qty.entries) {'menu_item_id': e.key, 'qty': e.value, if (_note[e.key] != null) 'notes': _note[e.key]}],
+        [
+          for (final e in _qty.entries)
+            {
+              'menu_item_id': _dishOf(e.key), 'qty': e.value, if (_sizeOf(e.key) != null) 'variant_id': _sizeOf(e.key), if (_note[e.key] != null) 'notes': _note[e.key],
+              ...?_extras[e.key]?.lineFields,
+            },
+        ],
         send: send,
         key: key,
         guests: widget.guests,
@@ -236,6 +351,8 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
   }
 
   Widget _row(Facts i, {required bool last}) {
+    if (dishHasExtras(i)) return _optionsRow(i, last: last);
+    if (i.l('variants').isNotEmpty) return _sizedRow(i, last: last);
     final id = i.s('id'), q = _qty[id] ?? 0, note = _note[id];
     return Container(
       key: ValueKey('dish-$id'),
@@ -399,7 +516,8 @@ class _ReadyToServeScreenState extends State<ReadyToServeScreen> {
       subtitle: 'The kitchen says these are done',
       back: true,
       onRefresh: _load,
-      footer: _d == null
+      // no greyed-out button when nothing is waiting at the pass
+      footer: _d == null || items.isEmpty
           ? null
           : Padding(
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),

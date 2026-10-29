@@ -186,22 +186,25 @@ const kHubTabs = [
   BarTab('Menu', LucideIcons.bookOpenText),
   BarTab('Bill', LucideIcons.receiptText, hero: true),
   BarTab('Orders', LucideIcons.shoppingBag),
-  BarTab('Stock', LucideIcons.boxes),
+  // Stock is off the restaurant bar for now (founder, 27 Oct 2026); it comes back later
 ];
 
 /// Floating navy bar, radius 40, five tabs, the centre one a lime tile (Figma bottom nav in both frames).
 /// With [current], that tab is the filled lime tile (as on the Stock bar) and the centre action, when it is not
 /// the current tab, keeps only a lime outline, so it stands out without looking selected.
 class FloatingTabBar extends StatelessWidget {
-  const FloatingTabBar({super.key, required this.tabs, required this.onTap, this.current});
+  const FloatingTabBar({super.key, required this.tabs, required this.onTap, this.current, this.trailing});
   final List<BarTab> tabs;
   final ValueChanged<String> onTap;
   final String? current;
+  /// After the tabs: Ol, the helper, on the restaurant bar.
+  final Widget? trailing;
   // The app's one bottom bar ([AppTabBar]); tabs are keyed by label ('tab-Home').
   @override
   Widget build(BuildContext context) => AppTabBar(
         tabs: [for (final t in tabs) AppTab(t.label, t.label, t.icon, primary: t.hero)],
         active: current,
         onTap: onTap,
+        trailing: trailing,
       );
 }

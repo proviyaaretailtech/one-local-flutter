@@ -25,6 +25,7 @@ import * as tbl from './schemas/tables.ts';
 import * as bo from './schemas/backoffice.ts';
 import * as svc from './schemas/service.ts';
 import * as rst from './schemas/restaurant.ts';
+import * as mb from './schemas/menu_build.ts';
 import * as sell from './schemas/sell.ts';
 import * as pur from './schemas/purchasing.ts';
 import * as mo from './schemas/money.ts';
@@ -124,6 +125,10 @@ export const MANIFEST: Entry[] = [
   // ---- Orders tab: Live orders and Hold orders (0530-0531). Resume POS = pos_hold_update (same order, re-priced lines), then pos_checkout_pay.
   //      Save & Hold with a reason is POST /api/partner/pos-orders/hold (pos_hold_place); cancel stays pos_set_order_status.
   db('pos_orders_board', { args: ord.Board, map: P, rate: 'read', roles: STAFF }),
+  db('rst_channel_orders', { args: ord.ChannelOrders, map: P, rate: 'read', roles: STAFF }),
+  db('rst_channel_accept', { args: ord.ChannelAccept, map: P, rate: 'write', roles: 'staff who may move orders (order:update_status; checked in the database)' }),
+  db('rst_channel_delivery', { args: ord.ChannelDelivery, map: P, rate: 'write', roles: 'staff who may move orders (order:update_status; checked in the database)' }),
+  db('rst_auto_accept_set', { args: ord.AutoAcceptSet, map: P, rate: 'write', roles: 'owner or manager (checked in the database)' }),
   db('pos_hold_list', { args: ord.HoldList, map: P, rate: 'read', roles: STAFF }),
   db('pos_hold_update', { args: ord.HoldUpdate, map: P, rate: 'write', idem: true, roles: 'staff allowed to place orders' }),
   // ---- store inventory, section H (0400-0403). Body = the function's `p` object (location_id, ids, filters); the database validates it and
@@ -174,6 +179,12 @@ export const MANIFEST: Entry[] = [
   // ---- tables and floor, section H (0404). Body = the function's `p` object (location_id, table ids); the database validates it and checks
   //      organisation, store and role (order:place for reserving; order:place + order:update_status or dining_tables:manage for transfer / merge / split).
   db('tbl_floor', { args: tbl.Floor, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  // ---- Manage tables (0602): create, rename, change seats, remove (hidden when it has history). Managers of the floor only (tbl_can_manage).
+  db('tbl_table_list', { args: tbl.TableList, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  db('tbl_table_save', { args: tbl.TableSave, map: P, rate: 'write', roles: 'table managers (dining_tables manage, or order place + update status)' }),
+  db('tbl_table_remove', { args: tbl.TableRemove, map: P, rate: 'write', roles: 'table managers (dining_tables manage, or order place + update status)' }),
+  // 0603: end Cleaning early (floor staff; only a Cleaning table; joined tables are marked together).
+  db('tbl_mark_clean', { args: tbl.TableRef, map: P, rate: 'write', roles: 'floor staff (order place / update status, or table manager)' }),
   db('tbl_view', { args: tbl.TableRef, map: P, rate: 'read', roles: 'floor staff' }),
   db('tbl_order_view', { args: tbl.TableRef, map: P, rate: 'read', roles: 'floor staff' }),
   db('tbl_history', { args: tbl.History, map: P, rate: 'read', roles: 'floor staff' }),
@@ -185,6 +196,7 @@ export const MANIFEST: Entry[] = [
   // ---- take an order at a table (0485): add dishes (send or hold), send held dishes, Ready to serve, Mark as served. Writes carry the Idempotency-Key
   //      header (the database refuses a reused key with another body); Mark as served is safe to repeat (dishes already served are counted, not refused).
   db('tbl_order_add', { args: tbl.OrderAdd, map: P, rate: 'write', idem: true, roles: 'staff with order:place' }),
+  db('pos_counter_order', { args: tbl.CounterOrder, map: P, rate: 'write', idem: true, roles: 'staff with order:place' }),
   db('tbl_kot_send', { args: tbl.KotSend, map: P, rate: 'write', idem: true, roles: 'staff with order:place or order:update_status' }),
   db('tbl_ready_list', { args: tbl.ReadyList, map: P, rate: 'read', roles: 'floor staff' }),
   db('tbl_mark_served', { args: tbl.MarkServed, map: P, rate: 'write', roles: 'staff with order:update_status' }),
@@ -208,6 +220,34 @@ export const MANIFEST: Entry[] = [
   db('rst_menu_item_save', { args: rst.MenuItemSave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
   db('rst_menu_stock_set', { args: rst.MenuStockSet, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
   sec('menu_ai_describe', { args: rst.AiDescribe, rate: 'secure', roles: 'menu editors (menu.update; checked in the database)', maxBytes: 8 * 1024 }),
+  // ---- Menu module: Menu · Recipe · Ingredients (migrations/0600). Ingredients are inventory items of type ingredient (purchasing and
+  //      stock already use them); a recipe is menu_item_recipes (selling deducts it). Reads and writes check menu / inventory roles inside.
+  db('ing_list', { args: mb.IngList, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('ing_library', { args: mb.IngLibrary, map: P, rate: 'read', roles: 'staff with inventory:read' }),
+  db('ing_add_from_library', { args: mb.IngAdd, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('ing_save', { args: mb.IngSave, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('rcp_list', { args: mb.RcpList, map: P, rate: 'read', roles: 'menu editors (menu.update)' }),
+  db('rcp_view', { args: mb.RcpView, map: P, rate: 'read', roles: 'menu editors (menu.update)' }),
+  db('rcp_save', { args: mb.RcpSave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
+  db('menu_channel_price_save', { args: mb.ChannelPriceSave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }), // OneLocal / Zomato / Swiggy price (0627)
+  db('menu_category_save', { args: mb.CategorySave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
+  db('menu_category_list', { args: mb.CategoryList, map: P, rate: 'read', roles: 'staff of a business (can_edit says who may change)' }),
+  db('menu_category_delete', { args: mb.CategoryDelete, map: P, rate: 'write', roles: 'menu editors (menu.update); only an empty category' }),
+  db('menu_item_quick_add', { args: mb.QuickAdd, map: P, rate: 'write', roles: 'menu creators (menu.create)' }),
+  db('menu_item_settings', { args: mb.ItemSettings, map: P, rate: 'read', roles: 'menu editors (menu.update)' }),
+  db('menu_item_settings_save', { args: mb.ItemSettingsSave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
+  db('menu_price_save', { args: mb.PriceSave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
+  db('menu_addon_list', { args: mb.None, map: P, rate: 'read', roles: 'menu editors (menu.update)' }),
+  db('menu_addon_group_save', { args: mb.AddonGroupSave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
+  db('menu_addon_group_delete', { args: mb.ById, map: P, rate: 'write', roles: 'menu deleters (menu.delete)' }),
+  db('menu_combo_list', { args: mb.None, map: P, rate: 'read', roles: 'menu editors (menu.update)' }),
+  db('menu_combo_save', { args: mb.ComboSave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
+  db('menu_combo_group_list', { args: mb.None, map: P, rate: 'read', roles: 'menu editors (menu.update)' }), // combo groups (0624)
+  db('menu_combo_group_save', { args: mb.ComboGroupSave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
+  db('menu_combo_group_delete', { args: mb.ById, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
+  db('menu_combo_delete', { args: mb.ById, map: P, rate: 'write', roles: 'menu deleters (menu.delete)' }),
+  // 0601: per dish "out" / "low" from its recipe and its ingredients' stock (the Menu's red / orange tags). Read only.
+  db('menu_stock_signals', { args: mb.None, map: P, rate: 'read', roles: STAFF }),
   // ---- Restaurant bill and pay (0550): the bill of a table, split it per guest, pay a part or the whole bill (money, idempotent: a part is never
   //      paid twice), discount code on a placed bill, kitchen note, receipt view and send log. Roles and amounts are the database's.
   db('rst_bill_view', { args: rst.BillView, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
@@ -246,6 +286,7 @@ export const MANIFEST: Entry[] = [
   db('pur_supplier_list', { args: pur.Options, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
   db('pur_supplier_save', { args: pur.SupplierSave, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
   db('pur_po_act', { args: pur.PoAct, map: P, rate: 'write', roles: 'purchasing:record (submit, cancel a draft or pending order); purchasing:approve_po (approve, reject, cancel an approved order)' }),
+  db('pur_po_send', { args: pur.PoSend, map: P, rate: 'write', roles: 'purchasing:record (an approved or partly received order)' }),
   db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
   db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),
   db('pur_audit_record', { args: pur.AuditRecord, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
@@ -273,6 +314,17 @@ export const MANIFEST: Entry[] = [
   db('money_adjustment_decide', { args: mo.AdjustmentDecide, map: P, rate: 'money', idem: true, roles: 'staff with money:approve (not the requester)' }),
   db('money_invoice_pay', { args: mo.InvoicePay, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
   db('money_invoice_set_due', { args: mo.InvoiceDue, map: P, rate: 'write', roles: 'staff with money:record' }),
+  db('org_sell_plan', { args: mo.Options, map: P, rate: 'read', roles: ANY }), // the business's plan for Subscription plans (0623)
+  // restaurant Money in the store design (0622)
+  db('rmoney_home', { args: mo.Options, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('rmoney_entries_list', { args: mo.RmEntries, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('rmoney_register', { args: mo.Day, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('rmoney_dues', { args: mo.Options, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('rmoney_contacts_list', { args: mo.RmContacts, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('rmoney_record', { args: mo.RmRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('rmoney_close_day', { args: mo.RmClose, map: P, rate: 'money', roles: 'staff with money:record' }),
+  db('rmoney_contact_save', { args: mo.RmContactSave, map: P, rate: 'write', roles: 'staff with money:record' }),
+  db('rmoney_void', { args: mo.RmVoid, map: P, rate: 'money', roles: 'staff with money:approve' }),
   // ---- team, section L (0440). Body = the function's `p` object; the database checks organisation, place and role (owner/admin invite and change people;
   //      managers read and run tasks; the assigned person starts and submits their own). Roles are read-only here. No pay or bank data is ever returned.
   db('team_options', { args: team.Options, map: P, rate: 'read', roles: 'staff who may open the team (pos_staff:read or org_invitations:manage)' }),
@@ -399,6 +451,9 @@ export const MANIFEST: Entry[] = [
   db('outlet_draft_submit', { args: out.DraftRef, map: P, rate: 'write', roles: 'locations:manage of an approved business' }),
   db('outlet_draft_discard', { args: out.DraftRef, map: P, rate: 'write', roles: 'locations:manage of an approved business' }),
   db('rst_dashboard_scope', { args: rst.DashboardScope, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  db('rst_home_insights', { args: rst.DashboardScope, map: P, rate: 'read', roles: STAFF }),
+  db('rst_kot_orders', { args: rst.KotOrders, map: P, rate: 'read', roles: STAFF }),
+  db('rst_activity_log', { args: rst.ActivityLog, map: P, rate: 'read', roles: STAFF }),
 ];
 
 const byAlias = new Map<string, Entry>(MANIFEST.map(e => [e.alias, e]));

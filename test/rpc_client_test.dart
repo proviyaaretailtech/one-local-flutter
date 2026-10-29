@@ -47,6 +47,13 @@ void main() {
     expect(await rpc.callMap('f'), isEmpty);
   });
 
+  test('no internet and a non-JSON answer become plain sentences, never ClientException / FormatException', () async {
+    final offline = RpcClient(client: MockClient((_) async => throw http.ClientException('Failed host lookup')), baseUrl: base, accessToken: () => 't');
+    await expectLater(offline.call('f'), throwsA(isA<RpcException>().having((e) => e.code, 'code', 'offline').having((e) => e.message, 'message', contains('internet'))));
+    final html = RpcClient(client: MockClient((_) async => http.Response('<html>502 Bad Gateway</html>', 502)), baseUrl: base, accessToken: () => 't');
+    await expectLater(html.call('f'), throwsA(isA<RpcException>().having((e) => e.status, 'status', 502).having((e) => e.code, 'code', 'unreadable')));
+  });
+
   test('onboarding calls go to the right names', () async {
     final seen = <String>[];
     final api = OnboardingApi(

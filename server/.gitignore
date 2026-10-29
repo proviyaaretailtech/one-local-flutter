@@ -6,3 +6,6 @@ dist/
 .vercel
 # the guest menu web build (../tool/build_guest_web.sh)
 public/t/
+
+# hosted push: dish photos stay out of git (rebuilt from local storage)
+hosted-push/item-images/

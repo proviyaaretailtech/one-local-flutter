@@ -5,6 +5,8 @@ import '../auth/partner_api.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../outlets/outlet_header.dart';
+import '../ui/app_header.dart';
+import '../ui/app_tab_bar.dart' show TabShellScope;
 import '../ui/theme.dart';
 import 'table_qr_api.dart';
 import 'tables_api.dart';
@@ -54,7 +56,7 @@ const kTableDot = Color(0xFF10B981);
       'occupied' => ('OCCUPIED', kOccBorder, kOccBg, kOccText),
       'reserved' => ('RESERVED', kResBorder, kResBg, kResText),
       'cleaning' => ('CLEANING', kCleanBorder, kCleanBg, kCleanText),
-      _ => (status.toUpperCase(), kCleanBorder, kCleanBg, kCleanText),
+      _ => (status.isEmpty ? 'NO STATUS' : status.toUpperCase().replaceAll('_', ' '), kCleanBorder, kCleanBg, kCleanText),
     };
 
 /// "1h 15m" / "45m" / "2h". Display only; the minutes come from the server.
@@ -88,8 +90,11 @@ String pax(num seats) => '${seats.toInt()} Pax';
 
 /// Page shell of the tables screens: header (menu or back, title, subtitle, round initials badge), body, floating bottom bar.
 class TablesPage extends StatelessWidget {
-  const TablesPage({super.key, required this.env, required this.title, this.subtitle, required this.children, this.back = false, this.onRefresh, this.nav = true, this.footer});
+  const TablesPage({super.key, required this.env, required this.title, this.subtitle, required this.children, this.back = false, this.onRefresh, this.nav = true, this.footer, this.banner = false});
   final TablesEnv env;
+
+  /// With [back]: the app's green banner and round ← instead of the plain back row.
+  final bool banner;
   final String title;
   final String? subtitle;
   final List<Widget> children;
@@ -107,8 +112,13 @@ class TablesPage extends StatelessWidget {
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          // the floor (first-level) shows the outlet header (specs/outlets-multi); inner screens keep back arrow and title
-          if (!back) OutletHeader(title: title, onMenu: env.onMenu, safeTop: false, initials: env.initials) else Container(
+          // the floor (first-level) shows the outlet header (specs/outlets-multi); inner screens keep back arrow and title; [banner]
+          // pages (opened from the side bar) get the green banner with the round ← (founder, 29 Oct 2026)
+          if (!back)
+            OutletHeader(title: title, onMenu: env.onMenu, safeTop: false, initials: env.initials)
+          else if (banner)
+            AppHeader(title: title, subtitle: subtitle == null ? null : Text(subtitle!, style: inter(12.5, 500, color: kMuted)), back: true, safeTop: false)
+          else Container(
             color: subtitle == null ? kBg : Colors.white,
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
@@ -153,7 +163,8 @@ class TablesPage extends StatelessWidget {
   }
 }
 
-/// Floating dark bottom bar of the POS frames: Home, Menu, Bill (active), Orders, Stock.
+/// Floating dark bottom bar of the POS frames: Home, Menu, Bill (active), Orders, Stock. Inside the app shell (the restaurant's
+/// Bill tab) the shell draws the one bar, so this draws nothing, like [AppTabBar].
 class TablesNav extends StatelessWidget {
   const TablesNav({super.key, required this.onTap});
   final ValueChanged<String> onTap;
@@ -162,10 +173,10 @@ class TablesNav extends StatelessWidget {
     ('menu', 'Menu', LucideIcons.bookOpen),
     ('pos', 'Bill', LucideIcons.receiptText),
     ('orders', 'Orders', LucideIcons.shoppingBag),
-    ('stock', 'Stock', LucideIcons.boxes),
+    // no Stock tab for now (founder, 27 Oct 2026)
   ];
   @override
-  Widget build(BuildContext context) => SafeArea(
+  Widget build(BuildContext context) => TabShellScope.inside(context) ? const SizedBox.shrink() : SafeArea(
         top: false,
         minimum: const EdgeInsets.fromLTRB(14, 12, 14, 14), // 12 above: the last button of a page never touches the bar
         child: Container(
@@ -201,10 +212,16 @@ class TablesNav extends StatelessWidget {
 
 /// One card of the grid: "T1  4 Pax", status chip, elapsed or booking time.
 class TableCard extends StatelessWidget {
-  const TableCard({super.key, required this.table, required this.onTap, this.selected = false, this.busyLook = false, this.compact = false});
+  const TableCard({super.key, required this.table, required this.onTap, this.selected = false, this.busyLook = false, this.compact = false, this.onAddItems, this.height});
   final Facts table;
   final VoidCallback? onTap;
   final bool selected;
+
+  /// The floor: a table that already ordered gets "+ Add items" (more dishes on the same order, as a new KOT).
+  final VoidCallback? onAddItems;
+
+  /// A fixed card height (the floor keeps every card in a row the same height); null = the default.
+  final double? height;
 
   /// Merge screen: an occupied table is drawn orange.
   final bool busyLook;
@@ -232,7 +249,7 @@ class TableCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
-          height: compact ? 108 : 112,
+          height: height ?? (compact ? 108 : 112),
           decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16), border: Border.all(color: border, width: 2)),
           child: Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -246,6 +263,27 @@ class TableCard extends StatelessWidget {
                 child: Text(label, style: inter(compact ? 13 : 14.5, 700, color: text)),
               ),
               if (sub != null) Padding(padding: const EdgeInsets.only(top: 3), child: Text(sub, style: inter(14, 400, color: kMuted))),
+              if (onAddItems != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Material(
+                    color: kLimeBtn,
+                    borderRadius: BorderRadius.circular(999),
+                    child: InkWell(
+                      key: ValueKey('add-items-${table.s('label')}'),
+                      borderRadius: BorderRadius.circular(999),
+                      onTap: onAddItems,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(LucideIcons.plus, size: 14, color: kInk),
+                          const SizedBox(width: 3),
+                          Text('Add items', style: inter(12.5, 700)),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ),
             ]),
           ),
         ),

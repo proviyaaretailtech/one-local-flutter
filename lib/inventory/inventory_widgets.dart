@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../api/net_guard.dart';
 import '../ui/app_tab_bar.dart';
 import '../ui/app_header.dart';
 import '../ui/theme.dart';
+import '../ui/mobile_input.dart';
 import '../outlets/outlet_header.dart';
 import 'inventory_api.dart';
 
@@ -496,7 +498,10 @@ class InvPickBox extends StatelessWidget {
 
 /// Text / number box in the same style as [InvPickBox].
 class InvInput extends StatelessWidget {
-  const InvInput({super.key, required this.controller, this.number = false, this.hint, this.onChanged, this.label, this.prefixIcon, this.suffix});
+  const InvInput({super.key, required this.controller, this.number = false, this.hint, this.onChanged, this.label, this.prefixIcon, this.suffix, this.mobile = false});
+
+  /// A mobile number: +91 in front, 10 digits.
+  final bool mobile;
   final TextEditingController controller;
   final bool number;
   final String? hint, label;
@@ -511,11 +516,13 @@ class InvInput extends StatelessWidget {
         child: TextField(
           controller: controller,
           onChanged: onChanged,
-          keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
-          inputFormatters: number ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))] : null,
+          keyboardType: mobile ? TextInputType.phone : number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+          inputFormatters: mobile ? mobileFormatters : number ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))] : null,
           style: inter(15, 400),
           decoration: InputDecoration(
             hintText: hint,
+            prefixText: mobile ? kMobilePrefix : null,
+            prefixStyle: inter(15, 600),
             labelText: null,
             semanticCounterText: label,
             hintStyle: inter(15, 400, color: kMuted),
@@ -744,7 +751,7 @@ class _ItemPickerState extends State<_ItemPicker> {
       });
     } catch (e) {
       if (!mounted || mine != _seq) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = errorSentence(e));
     }
   }
 

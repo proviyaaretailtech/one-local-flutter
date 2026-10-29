@@ -204,7 +204,9 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
 
   // ---------------------------------------------------------------- orders
   Widget _orderRow(PurchaseOrder po) {
-    final total = po.totals.no('total_minor') ?? po.totals.no('estimated_minor');
+    // what was received once goods are in, else what the order is for (with GST); the received total is 0 until then
+    final received = po.totals.no('total_minor') ?? 0;
+    final total = received > 0 ? received : (po.totals.no('ordered_total_minor') ?? po.totals.no('estimated_minor'));
     final expected = po.t('expected_delivery');
     return InvCard(
       key: ValueKey('po-${po.id}'),
@@ -214,7 +216,11 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${po.number} · ${po.supplierName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(14.5, 700)),
             Text(
-              [if (total != null) money(total), if (expected != null) '${po.overdue ? 'overdue · ' : ''}expected ${dayMonth(expected)}'].join(' · '),
+              [
+                if (total != null) money(total),
+                if (expected != null) '${po.overdue ? 'overdue · ' : ''}expected ${dayMonth(expected)}',
+                if (po.sent != null) 'sent to supplier' else if (po.can('send')) 'not sent yet',
+              ].join(' · '),
               style: inter(12.5, 400, color: po.overdue ? kRedText : kMuted),
             ),
           ]),
@@ -423,7 +429,7 @@ class _AddSupplierSheetState extends State<_AddSupplierSheet> {
             const InvLabel('Name'),
             InvInput(key: const ValueKey('supplier-name'), controller: _name, hint: 'For example ABC Foods'),
             const InvLabel('Phone (optional)'),
-            InvInput(key: const ValueKey('supplier-phone'), controller: _phone, number: true, hint: '10-digit mobile'),
+            InvInput(key: const ValueKey('supplier-phone'), controller: _phone, mobile: true, hint: '10-digit mobile'),
             const InvLabel('GSTIN (optional)'),
             InvInput(key: const ValueKey('supplier-gstin'), controller: _gstin, hint: '15 letters and numbers'),
             const InvLabel('City (optional)'),

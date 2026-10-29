@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../auth/partner_api.dart';
+import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import 'outlet_header.dart' show kOutletOnline, kOutletSquare;
 import 'outlets_api.dart';
@@ -271,15 +272,17 @@ class _AddOutletScreenState extends State<AddOutletScreen> {
     }
   }
 
-  Widget _field(String label, TextEditingController c, {String? hint, TextInputType? type, required String key}) => Padding(
+  Widget _field(String label, TextEditingController c, {String? hint, TextInputType? type, required String key, bool mobile = false}) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: TextField(
           key: ValueKey(key),
           controller: c,
-          keyboardType: type,
+          keyboardType: mobile ? TextInputType.phone : type,
+          inputFormatters: mobile ? mobileFormatters : null,
           decoration: InputDecoration(
             labelText: label,
             hintText: hint,
+            prefixText: mobile ? kMobilePrefix : null,
             filled: true,
             fillColor: Colors.white,
             isDense: true,
@@ -381,7 +384,7 @@ class _AddOutletScreenState extends State<AddOutletScreen> {
         return [
           _note('This person will be the admin of this outlet only, after One Local approves it. They get an invitation to sign in.'),
           _field('Full name', _cName, key: 'outlet-contact-name'),
-          _field('Mobile number', _cMobile, type: TextInputType.phone, key: 'outlet-contact-mobile'),
+          _field('Mobile number', _cMobile, mobile: true, key: 'outlet-contact-mobile'),
           _field('Email (the invitation is sent here)', _cEmail, type: TextInputType.emailAddress, key: 'outlet-contact-email'),
         ];
       default:

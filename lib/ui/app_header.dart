@@ -86,7 +86,7 @@ class AppHeader extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(8, 7, 8, 7), // compact (founder, 22 Oct 2026)
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               if (showBack)
-                _Round(icon: LucideIcons.arrowLeft, label: 'Back', onTap: onBack ?? () => Navigator.of(context).maybePop())
+                _Round(key: const ValueKey('app-header-back'), icon: LucideIcons.arrowLeft, label: 'Back', onTap: onBack ?? () => Navigator.of(context).maybePop())
               else if (menu != null)
                 _Round(key: menuKey, icon: LucideIcons.menu, label: 'Menu', onTap: menu)
               else
@@ -174,4 +174,9 @@ class _Profile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The header's round white button, for a page's own [AppHeader.trailing] (for example the wallet on Page Manager).
+class HeaderRound extends _Round {
+  const HeaderRound({super.key, required super.icon, required super.label, required super.onTap});
 }

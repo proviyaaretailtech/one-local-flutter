@@ -21,6 +21,12 @@ class MenuDish {
   String? get imageUrl => (_s(raw['image_url']) ?? '').trim().isEmpty ? null : _s(raw['image_url']);
   bool get inStock => _b(raw['in_stock']);
   int get variants => _i(raw['variants']);
+  /// The dish's sizes with prices (0611), e.g. Small ₹69 · Medium ₹89 · Large ₹109; empty when it has none.
+  /// [factor] is how many times the dish's recipe a size uses (0612: Small 1, Medium 2, Large 3).
+  List<({String name, num price, num factor})> get sizes => [
+        for (final s in (raw['sizes'] as List?) ?? const [])
+          if (s is Map) (name: '${s['name']}', price: (s['price'] as num?) ?? 0, factor: (s['recipe_factor'] as num?) ?? 1),
+      ];
   bool get hasWindows => _b(raw['has_windows']);
   bool get orderableNow => _b(raw['orderable_now']);
 }
@@ -30,6 +36,10 @@ class MenuCategory {
   final Map<String, dynamic> raw;
   String? get id => _s(raw['id']);
   String get name => '${raw['name'] ?? ''}';
+
+  /// A subcategory's parent (0616); null for a main category.
+  String? get parentId => _s(raw['parent_id']);
+  String? get parentName => _s(raw['parent_name']);
   int get count => _i(raw['count']);
   bool get allInStock => _b(raw['all_in_stock']);
   List<MenuDish> get items => _list(raw['items']).map(MenuDish.new).toList();

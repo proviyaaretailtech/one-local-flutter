@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../home/home_widgets.dart' show kLime;
 import '../ui/app_header.dart';
 import '../ui/theme.dart';
+import '../ui/mobile_input.dart';
 
 /// Small building blocks shared by the Customer, One Local Wallet and Manage account screens, in the app's look
 /// (white top band with a round back button, white cards with a hairline, dark full-width action with a lime label).
@@ -62,7 +63,10 @@ class CwaButton extends StatelessWidget {
 }
 
 class CwaField extends StatelessWidget {
-  const CwaField({super.key, required this.label, required this.controller, this.hint, this.keyboardType, this.maxLines = 1, this.enabled = true, this.fieldKey});
+  const CwaField({super.key, required this.label, required this.controller, this.hint, this.keyboardType, this.maxLines = 1, this.enabled = true, this.fieldKey, this.mobile = false});
+
+  /// A mobile number: +91 in front, 10 digits.
+  final bool mobile;
   final String label;
   final TextEditingController controller;
   final String? hint;
@@ -80,11 +84,14 @@ class CwaField extends StatelessWidget {
             key: fieldKey,
             controller: controller,
             enabled: enabled,
-            keyboardType: keyboardType,
+            keyboardType: mobile ? TextInputType.phone : keyboardType,
+            inputFormatters: mobile ? mobileFormatters : null,
             maxLines: maxLines,
             style: inter(15, 500),
             decoration: InputDecoration(
               hintText: hint,
+              prefixText: mobile ? kMobilePrefix : null,
+              prefixStyle: inter(15, 600),
               hintStyle: inter(14, 400, color: kMuted),
               filled: true,
               fillColor: kField,

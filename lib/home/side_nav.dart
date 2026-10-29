@@ -43,6 +43,20 @@ Future<void> showStoreSideNav(
     SideNavEntry(LucideIcons.wallet, 'One Local Wallet', hook(HomeNav.wallet)),
     SideNavEntry(LucideIcons.circleQuestionMark, 'Help & support', hook(HomeNav.support)),
   ];
+  return showSideNav(context, name: name, email: email, entries: entries, onSignOut: onSignOut);
+}
+
+/// The side nav with any list of rows: the store's (above) and the restaurant's (founder, 29 Oct 2026: the restaurant side bar looks like
+/// the store's, with the restaurant's own links). Profile (Manage account), Search the app, the rows, Sign out.
+Future<void> showSideNav(
+  BuildContext context, {
+  required String name,
+  String? email,
+  String? line,
+  required List<SideNavEntry> entries,
+  required VoidCallback onSignOut,
+  Set<String> openGroups = const {},
+}) {
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
@@ -54,8 +68,10 @@ Future<void> showStoreSideNav(
       child: _StoreSideNav(
         name: name,
         email: email,
+        line: line,
         entries: entries,
-        onAccount: hook(HomeNav.account),
+        openGroups: openGroups,
+        onAccount: HomeNav.account == null ? null : () => HomeNav.account!(context),
         onSignOut: onSignOut,
       ),
     ),
@@ -66,13 +82,33 @@ Future<void> showStoreSideNav(
   );
 }
 
-class _StoreSideNav extends StatelessWidget {
-  const _StoreSideNav({required this.name, required this.email, required this.entries, required this.onSignOut, this.onAccount});
+class _StoreSideNav extends StatefulWidget {
+  const _StoreSideNav({required this.name, required this.email, required this.entries, required this.onSignOut, this.onAccount, this.line, this.openGroups = const {}});
+
+  /// The folding rows open from the start (back from an Inventory page: Inventory).
+  final Set<String> openGroups;
   final String name;
   final String? email;
+
+  /// A line under the email (the restaurant's outlet).
+  final String? line;
   final List<SideNavEntry> entries;
   final VoidCallback onSignOut;
   final VoidCallback? onAccount;
+
+  @override
+  State<_StoreSideNav> createState() => _StoreSideNavState();
+}
+
+class _StoreSideNavState extends State<_StoreSideNav> {
+  final _q = TextEditingController();
+  late final _openGroups = <String>{...widget.openGroups}; // the folding rows now open
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
 
   // Close the panel first, then open the screen from the page underneath.
   void _go(BuildContext context, VoidCallback open) {
@@ -82,6 +118,14 @@ class _StoreSideNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final name = widget.name, email = widget.email, onAccount = widget.onAccount, onSignOut = widget.onSignOut;
+    // "Search the app": the rows whose name (or a sub-row's) has the words typed
+    final q = _q.text.trim().toLowerCase();
+    // rows whose name starts with the words first ("settings" → Settings, then Delivery settings)
+    final entries = q.isEmpty
+        ? widget.entries
+        : ([for (final e in widget.entries) if (e.label.toLowerCase().contains(q) || e.children.any((c) => c.label.toLowerCase().contains(q))) e]
+          ..sort((a, b) => (a.label.toLowerCase().startsWith(q) ? 0 : 1).compareTo(b.label.toLowerCase().startsWith(q) ? 0 : 1)));
     final width = (MediaQuery.sizeOf(context).width * 0.78).clamp(260.0, 320.0);
     return Material(
       key: const ValueKey('side-nav'),
@@ -104,7 +148,7 @@ class _StoreSideNav extends StatelessWidget {
                 excludeSemantics: true,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(14),
-                  onTap: onAccount == null ? null : () => _go(context, onAccount!),
+                  onTap: onAccount == null ? null : () => _go(context, onAccount),
                   child: Padding(
                     padding: const EdgeInsets.all(4),
                     child: Row(children: [
@@ -121,7 +165,8 @@ class _StoreSideNav extends StatelessWidget {
                           name.trim().isEmpty
                               ? Text('Add your name', style: inter(15, 700, color: kLink))   // no name on the account yet: Manage account sets it
                               : Text(name, style: inter(15, 700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          if (email != null && email!.isNotEmpty) Text(email!, style: inter(12, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if (email != null && email.isNotEmpty) Text(email, style: inter(12, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if ((widget.line ?? '').isNotEmpty) Text(widget.line!, key: const ValueKey('side-nav-line'), style: inter(12, 600, color: kLink), maxLines: 1, overflow: TextOverflow.ellipsis),
                         ]),
                       ),
                     ]),
@@ -129,8 +174,26 @@ class _StoreSideNav extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              const Divider(height: 1, color: kLine),
-              const SizedBox(height: 10),
+              // Search the app: narrows the rows below as you type
+              TextField(
+                key: const ValueKey('side-nav-search'),
+                controller: _q,
+                onChanged: (_) => setState(() {}),
+                style: inter(14, 500),
+                decoration: InputDecoration(
+                  hintText: 'Search the app',
+                  hintStyle: inter(14, 400, color: kMuted),
+                  prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
+                  filled: true,
+                  fillColor: const Color(0xFFF3F4EE),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDDE0D6))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDDE0D6))),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (entries.isEmpty) Padding(padding: const EdgeInsets.all(16), child: Text('Nothing called "${_q.text.trim()}".', style: inter(13, 500, color: kMuted))),
               Expanded(
                 child: ListView.separated(
                   padding: EdgeInsets.zero,
@@ -138,13 +201,23 @@ class _StoreSideNav extends StatelessWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final e = entries[i];
+                    // a row with sub-rows and no page of its own folds open and shut (Inventory, founder 29 Oct 2026); a search for a
+                    // sub-row opens its group
+                    final group = e.children.isNotEmpty && e.open == null;
+                    final open = group && (_openGroups.contains(e.label) || (q.isNotEmpty && e.children.any((c) => c.label.toLowerCase().contains(q))));
                     final row = _NavRow(
+                      key: group ? ValueKey('side-nav-group-${e.label}') : null,
                       icon: e.icon,
                       label: e.label,
-                      soon: e.open == null,
-                      onTap: e.open == null ? null : () => _go(context, e.open!),
+                      soon: e.open == null && !group,
+                      expanded: group ? open : null,
+                      onTap: group
+                          ? () => setState(() => _openGroups.contains(e.label) ? _openGroups.remove(e.label) : _openGroups.add(e.label))
+                          : e.open == null
+                              ? null
+                              : () => _go(context, e.open!),
                     );
-                    if (e.children.isEmpty) return row;
+                    if (e.children.isEmpty || (group && !open)) return row;
                     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                       row,
                       for (final c in e.children)
@@ -167,11 +240,14 @@ class _StoreSideNav extends StatelessWidget {
 }
 
 class _NavRow extends StatelessWidget {
-  const _NavRow({required this.icon, required this.label, required this.onTap, this.soon = false, this.danger = false, this.sub = false});
+  const _NavRow({super.key, required this.icon, required this.label, required this.onTap, this.soon = false, this.danger = false, this.sub = false, this.expanded});
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
   final bool soon, danger;
+
+  /// A folding row: open (chevron up) or shut (chevron down); null for a plain row.
+  final bool? expanded;
 
   /// A section under a row (Stock management's three): lighter and a little smaller, with a lime edge.
   final bool sub;
@@ -227,6 +303,7 @@ class _NavRow extends StatelessWidget {
                   decoration: BoxDecoration(color: const Color(0xFFFEF0C7), borderRadius: BorderRadius.circular(10)),
                   child: Text('Soon', style: inter(10, 700, color: const Color(0xFFB54708))),
                 ),
+              if (expanded != null) Icon(expanded! ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18, color: kMuted),
             ]),
           ),
         ),

@@ -257,6 +257,37 @@ Widget host(Widget child) => MaterialApp(
 
 void main() {
   setUp(HomeNav.reset);
+  tearDown(() => NotificationCentre.tips = null);
+
+  testWidgets('suggestions (the menu\'s "Add images" / "Add descriptions") come first on All, open their screen, and hide on a filter', (t) async {
+    final f = Fake();
+    final opened = <String>[];
+    NotificationCentre.tips = () async => [
+          NoticeTip(icon: Icons.image, title: 'Add images to items', line: '10/11 items complete', onTap: (_) => opened.add('images')),
+          const NoticeTip(icon: Icons.notes, title: 'Add descriptions', line: 'Missing for 11 items · Write with AI on the dish'),
+        ];
+    await t.pumpWidget(host(Scaffold(body: NotificationCentre(api: f.api, now: () => now))));
+    await t.pumpAndSettle();
+    expect(find.text('Suggestions'), findsOneWidget);
+    expect(find.text('10/11 items complete'), findsOneWidget);
+    expect(find.text('Missing for 11 items · Write with AI on the dish'), findsOneWidget);
+    expect(t.getTopLeft(find.text('Suggestions')).dy, lessThan(t.getTopLeft(find.text('Today')).dy), reason: 'above the notices');
+    await t.tap(find.byKey(const ValueKey('tip-Add images to items')));
+    await t.pump();
+    expect(opened, ['images']);
+    await t.tap(find.text('Orders'));
+    await t.pumpAndSettle();
+    expect(find.text('Suggestions'), findsNothing, reason: 'only on All');
+  });
+
+  testWidgets('a suggestion source that fails shows no suggestions and the notices as usual', (t) async {
+    final f = Fake();
+    NotificationCentre.tips = () async => throw Exception('no menu here');
+    await t.pumpWidget(host(Scaffold(body: NotificationCentre(api: f.api, now: () => now))));
+    await t.pumpAndSettle();
+    expect(find.text('Suggestions'), findsNothing);
+    expect(find.text('Order confirmed'), findsOneWidget);
+  });
 
   testWidgets(
     'notification centre: grouped rows, chips, unread count, same text as the Figma',

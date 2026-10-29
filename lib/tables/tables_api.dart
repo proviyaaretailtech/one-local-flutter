@@ -40,6 +40,19 @@ class TablesApi {
   /// The grid: every table with its state and time, plus the counts for the filter chips. [status] is all / available / occupied / reserved / cleaning.
   Future<Facts> floor({String status = 'all', String? areaId}) async => Facts(await _call('tbl_floor', {'status': status, 'area_id': areaId}));
 
+  /// Manage tables (0602): the outlet's tables with seats and state, and whether this person may change them.
+  Future<Facts> tableList() async => Facts(await _call('tbl_table_list', {}));
+
+  /// Creates ([id] null) or renames / re-seats a table. Answers the list again with the table's `id`.
+  Future<Facts> saveTable({String? id, required String label, required int seats}) async =>
+      Facts(await _call('tbl_table_save', {'id': id, 'label': label, 'seats': seats}));
+
+  /// Removes a table: deleted when it has no history, hidden otherwise (`hidden`); refused while it has guests or a reservation.
+  Future<Facts> removeTable(String id) async => Facts(await _call('tbl_table_remove', {'id': id}));
+
+  /// Ends Cleaning early (0603): the table is Available at once. Refused unless it is Cleaning; joined tables are marked together.
+  Future<Facts> markClean(String tableId) async => Facts(await _call('tbl_mark_clean', {'table_id': tableId}));
+
   /// One table for the bottom sheet and the actions screen (state, bill, guests, waiter, what may be done).
   Future<Facts> view(String tableId) async => Facts(await _call('tbl_view', {'table_id': tableId}));
 
@@ -93,6 +106,19 @@ class TablesApi {
   /// [key] is one per tap: a retry sends the same key and gets the same answer.
   Future<Facts> addDishes(String tableId, List<Map<String, Object?>> lines, {required bool send, required String key, int? guests}) async =>
       Facts(await _call('tbl_order_add', {'table_id': tableId, 'lines': lines, 'send': send, 'guest_count': guests}, key: key));
+
+  /// Takeaway (service type pickup) or Delivery from the Bill (0604): an order without a table. [send] true fires a KOT at once.
+  /// Delivery needs [phone] and [address]. [key] is one per tap, as for [addDishes].
+  Future<Facts> counterOrder(String serviceType, List<Map<String, Object?>> lines,
+          {required bool send, required String key, String? name, String? phone, String? address}) async =>
+      Facts(await _call('pos_counter_order', {
+        'service_type': serviceType,
+        'lines': lines,
+        'send': send,
+        'customer_name': name,
+        'customer_phone': phone,
+        'address': address,
+      }, key: key));
 
   /// Send the held dishes of the table's order as a new KOT.
   Future<Facts> sendHeld(String tableId, {required String key}) async => Facts(await _call('tbl_kot_send', {'table_id': tableId}, key: key));

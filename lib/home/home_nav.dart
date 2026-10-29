@@ -42,6 +42,10 @@ class HomeNav {
   // Section C: setup. Section P: the Settings page and Support & Help. Section L (Team) plugs in `team`: users, invitations, roles, tasks, activity.
   static HomeRoute? setup;
   static HomeRoute? settings;
+  // One part of Settings on its own (the restaurant More page's tiles): timings, phone numbers, outlet info.
+  static HomeRoute? outletTimings;
+  static HomeRoute? phoneNumbers;
+  static HomeRoute? outletInfo;
   static HomeRoute? team;
 
   // Later phases (G catalogue, H inventory, F sell, J–Q back office).
@@ -54,6 +58,8 @@ class HomeNav {
   // Section H kitchen: stations setup and the Kitchen Display System.
   static HomeRoute? kitchenSetup;
   static HomeRoute? kitchenDisplay;
+  // The KOT view: the kitchen order tickets as slips (lib/kitchen/kot_screen.dart).
+  static HomeRoute? kotView;
   // Section H: tables and floor (the POS tab).
   static HomeRoute? tables;
   // Table QR codes (0560): print, share, switch, replace the codes guests scan to order.
@@ -81,6 +87,13 @@ class HomeNav {
   static void Function(BuildContext context, String receiptDocumentId)? receipt;
   // Section J: low stock and purchase suggestions ("view item" uses section H's [stockItem]).
   static HomeRoute? lowStock;
+  // Purchase orders: the list, each order (approve, send to the supplier, receive) and New order.
+  static HomeRoute? purchases;
+  // A new purchase order (Menu → Ingredients "Buy from supplier").
+  static HomeRoute? newPurchase;
+  // The side bar's Inventory pages (0627): purchase, prices, closing, recipes, ingredients, tables. True once a page that was opened on
+  // top is closed again (the side bar then opens again, founder 29 Oct 2026); false when it only switched a tab.
+  static Future<bool> Function(BuildContext context, String page)? inventory;
   // Restaurant: the Menu tab (menu and dish detail). A store keeps [items] (the catalogue).
   static HomeRoute? menu;
   // Restaurant: the kitchen display (KOT queue). Plugged in by the kitchen section; until then the button says so.
@@ -105,8 +118,11 @@ class HomeNav {
     stockPage = null;
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
-    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = team = storefront = settings = customers = wallet = account = menu = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = kotView = team = storefront = settings = customers = wallet = account = menu = null;
     tableQr = menuLink = null;
+    outletTimings = phoneNumbers = outletInfo = null;
+    newPurchase = purchases = null;
+    inventory = null;
     shell = null;
     openMenu = null;
     storeName = null;

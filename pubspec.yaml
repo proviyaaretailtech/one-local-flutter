@@ -16,6 +16,7 @@ dependencies:
   http: ^1.6.0
   flutter_svg: ^2.3.0
   lucide_icons_flutter: ^3.1.25
+  archive: ^4.0.0 # the closing stock .xlsx (0628)
   file_picker: ^13.1.0
   url_launcher: ^6.3.3
   geolocator: ^14.1.1
@@ -24,6 +25,7 @@ dependencies:
   pdf: ^3.13.1
   mobile_scanner: ^7.4.2
   audioplayers: ^6.8.1
+  shared_preferences: ^2.5.6
 
 dev_dependencies:
   flutter_test:
@@ -35,6 +37,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/figma/
+    - assets/channels/
     - assets/sounds/
   fonts:
     - family: Inter

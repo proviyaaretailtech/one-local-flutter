@@ -47,20 +47,23 @@ export const defaultDeps: Deps = {
 };
 
 export async function removeBackground({ request, args }: SecureCtx, deps: Deps = defaultDeps) {
-  const { image_b64 } = parse(RemoveBg, args);
+  const { image_b64, bg_color } = parse(RemoveBg, args);
   const key = deps.key();
   if (!key) throw notConfigured();                                   // before anything else: an unconfigured server spends no credit
   await deps.staff(request);
 
   let out: BgAnswer;
   try {
-    out = await deps.call(key, { image_file_b64: image_b64, size: deps.size(), format: 'png' });
+    // with a background colour: the dish on a clean backdrop, as a JPG; without: the cut-out on transparency, as a PNG
+    out = await deps.call(key, bg_color
+      ? { image_file_b64: image_b64, size: deps.size(), format: 'jpg', bg_color }
+      : { image_file_b64: image_b64, size: deps.size(), format: 'png' });
   } catch (e) {
     console.error('[remove_bg] call failed', e instanceof Error ? e.name : 'error');
     throw new HttpError(502, 'Background removal did not answer. Try again.', undefined, 'bg_failed');
   }
   const b64 = (out.json as { data?: { result_b64?: unknown } } | null)?.data?.result_b64;
-  if (out.status === 200 && typeof b64 === 'string' && b64.length > 0) return { image_b64: b64, content_type: 'image/png' };
+  if (out.status === 200 && typeof b64 === 'string' && b64.length > 0) return { image_b64: b64, content_type: bg_color ? 'image/jpeg' : 'image/png' };
 
   // remove.bg refusals: 400 the photo (no subject found, unreadable), 402 out of credits, 403 key refused, 429 too many requests.
   console.error('[remove_bg] refused', out.status);

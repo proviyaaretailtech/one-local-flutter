@@ -3,19 +3,27 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../api/net_guard.dart';
+import '../home/home_nav.dart';
+import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import 'cart_screen.dart';
 import 'order_widgets.dart';
 import 'orders_api.dart';
+import 'orders_board_screen.dart' show OrdersBoardScreen;
 
 /// Every placed order state from Figma section E: Checkout (held bill), Order Confirmation, Preparing, Picked, Ready, In Transit,
 /// Exception, Cancelled, and Completed. What the screen says and which buttons it shows come from the server's view of the order.
 class OrderScreen extends StatefulWidget {
-  const OrderScreen({super.key, this.api, required this.orderId, this.initial, this.onNavigate});
+  const OrderScreen({super.key, this.api, required this.orderId, this.initial, this.onNavigate, this.onDeliveryStatus});
   final OrdersApi? api;
   final String orderId;
   final OrderView? initial;
   final ValueChanged<String>? onNavigate;
+
+  /// Delivery status opens the delivery update list (founder, 29 Oct 2026) instead of the store's courier sheet. The Orders board passes
+  /// its own (back to it, on this order); elsewhere a restaurant goes to Orders with the order asked for.
+  final void Function(BuildContext context)? onDeliveryStatus;
   @override
   State<OrderScreen> createState() => _OrderScreenState();
 }
@@ -42,7 +50,7 @@ class _OrderScreenState extends State<OrderScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = errorSentence(e));
     }
   }
 
@@ -59,7 +67,7 @@ class _OrderScreenState extends State<OrderScreen> {
       if (e.stale || e.status == 409) await _load();
       return false;
     } catch (e) {
-      if (mounted) showToast(context, e.toString());
+      if (mounted) showToast(context, errorSentence(e));
       return false;
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -95,8 +103,19 @@ class _OrderScreenState extends State<OrderScreen> {
         await _pickingSheet();
       case 'report_missing':
         await _missingSheet();
-      case 'delivery_status':
-        await _deliverySheet();
+      case 'delivery_status' || 'online_delivery':
+        if (widget.onDeliveryStatus != null) {
+          widget.onDeliveryStatus!(context);
+        } else if (HomeNav.shell?.kind == 'restaurant') {
+          // a restaurant's delivery orders are moved on in Orders → the source's delivery list
+          OrdersBoardScreen.requestedDelivery.value = (source: null, orderId: v.id);
+          Navigator.of(context).maybePop();
+          if (mounted) HomeNav.go(context, HomeNav.orders, 'Orders');
+        } else if (id == 'online_delivery') {
+          await _load(); // a store's online order: the latest from the platform
+        } else {
+          await _deliverySheet(); // a store's courier fulfilment
+        }
       case 'report_delivery_issue':
         final note = await _textSheet('Report delivery issue', 'What went wrong?', 'Report issue');
         if (note != null) await _act('report_delivery_issue', note: note);
@@ -136,7 +155,14 @@ class _OrderScreenState extends State<OrderScreen> {
               ? Center(
                   child: _error == null
                       ? const CircularProgressIndicator(color: kGreenText)
-                      : Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center, style: inter(14, 400, color: kMuted))),
+                      : Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            Text(_error!, textAlign: TextAlign.center, style: inter(14, 400, color: kMuted)),
+                            const SizedBox(height: 12),
+                            OutlinedButton(onPressed: _load, child: Text('Try again', style: inter(14, 600))),
+                          ]),
+                        ),
                 )
               : RefreshIndicator(onRefresh: _load, child: _body(v)),
         ),
@@ -174,7 +200,7 @@ class _OrderScreenState extends State<OrderScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [const Expanded(child: Kick('Order items')), Text(v.summary, style: inter(11.5, 400, color: kMuted))]),
           const SizedBox(height: 8),
-          for (final i in v.items) ItemLine(name: '${i['name']}', sub: '${i['sub']}', amount: n(i['amount']), qtyBadge: '${i['qty']}×'),
+          for (final i in v.items) ItemLine(name: '${i['name'] ?? ''}', sub: '${i['sub'] ?? ''}', amount: n(i['amount']), qtyBadge: '${i['qty']}×'),
           const Divider(height: 18, color: kLine),
           Row(children: [
             Container(
@@ -193,10 +219,10 @@ class _OrderScreenState extends State<OrderScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Kick('Payment record'),
             const SizedBox(height: 8),
-            KeyValue('${record['title']}', '${record['value']}', size: 13.5),
-            KeyValue('${record['second']}', '${record['second_value']}', size: 13.5),
+            KeyValue('${record['title'] ?? ''}', '${record['value'] ?? ''}', size: 13.5),
+            KeyValue('${record['second'] ?? ''}', '${record['second_value'] ?? ''}', size: 13.5),
             const SizedBox(height: 6),
-            Text('${record['footer']}', style: inter(12.5, 400, color: kMuted)),
+            Text('${record['footer'] ?? ''}', style: inter(12.5, 400, color: kMuted)),
           ]),
         ),
       ],
@@ -210,11 +236,11 @@ class _OrderScreenState extends State<OrderScreen> {
         roundOff: n(bill['round_off']),
         total: n(bill['total']),
         footer: TenderBlock(
-          label: '${pay['label']}',
+          label: '${pay['label'] ?? ''}',
           amountText: rupees(checkout ? 0 : n(pay['tendered'])),
           chips: checkout
               ? ['${rupees(n(pay['due']))} due', 'Held']
-              : ['${rupees(n(pay['settled']))} ${cancelled && n(pay['settled']) == 0 ? 'captured' : 'settled'}', '${pay['method']}', 'Read-only'],
+              : ['${rupees(n(pay['settled']))} ${cancelled && n(pay['settled']) == 0 ? 'captured' : 'settled'}', if (pay['method'] != null) '${pay['method']}', 'Read-only'],
           selectedChip: checkout ? 'Held' : 'Read-only',
           changeLabel: n(pay['change']) > 0 ? 'Change returned' : 'Change Due · none',
           changeChip: n(pay['change']) > 0 ? 'Returned' : (n(pay['settled']) > 0 ? 'Settled' : 'Unpaid'),
@@ -224,12 +250,12 @@ class _OrderScreenState extends State<OrderScreen> {
       const SizedBox(height: 16),
       if (primary != null) _button(primary, dark: true),
       if (secondary != null) ...[const SizedBox(height: 10), _button(secondary, dark: false)],
-      for (final l in links) ...[const SizedBox(height: 8), UnderLink('${l['label']}', onTap: _busy ? null : () => _onAction('${l['id']}'))],
+      for (final l in links) ...[const SizedBox(height: 8), UnderLink('${l['label'] ?? ''}', onTap: _busy ? null : () => _onAction('${l['id'] ?? ''}'))],
     ]);
   }
 
   Widget _button(Map<String, dynamic> a, {required bool dark}) {
-    final id = '${a['id']}', label = '${a['label']}';
+    final id = '${a['id'] ?? ''}', label = '${a['label'] ?? ''}';
     if (dark) return DarkCta(label: label, busy: _busy, onPressed: () => _onAction(id));
     if (id == 'whatsapp') return LightCta(label: label, bg: kWhatsApp, fg: Colors.white, icon: LucideIcons.messageCircle, onPressed: _busy ? null : () => _onAction(id));
     return LightCta(label: label, onPressed: _busy ? null : () => _onAction(id));
@@ -308,7 +334,7 @@ class _OrderScreenState extends State<OrderScreen> {
 
   Future<void> _pickingSheet() async {
     final v = _v!;
-    final counts = {for (final i in v.items) '${i['order_item_id']}': (i['picked_qty'] ?? 0) as int};
+    final counts = {for (final i in v.items) '${i['order_item_id'] ?? ''}': (i['picked_qty'] ?? 0) as int};
     final save = await showOrderSheet<bool>(
       context,
       title: 'Picking checklist',
@@ -318,17 +344,17 @@ class _OrderScreenState extends State<OrderScreen> {
             child: ListView(shrinkWrap: true, children: [
               for (final i in v.items)
                 Builder(builder: (_) {
-                  final id = '${i['order_item_id']}', qty = i['qty'] as int, missing = (i['missing_qty'] ?? 0) as int;
+                  final id = '${i['order_item_id'] ?? ''}', qty = i['qty'] as int, missing = (i['missing_qty'] ?? 0) as int;
                   final max = qty - missing;
                   return CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     value: counts[id] == max,
                     activeColor: kGreenText,
-                    title: Text('${i['name']}', style: inter(14, 500)),
+                    title: Text('${i['name'] ?? ''}', style: inter(14, 500)),
                     subtitle: Text('${counts[id]} of $qty picked${missing > 0 ? ' · $missing missing' : ''}', style: inter(12, 400, color: kMuted)),
                     secondary: QtyStepper(
                       qty: counts[id]!,
-                      name: '${i['name']}',
+                      name: '${i['name'] ?? ''}',
                       onMinus: () => set(() => counts[id] = (counts[id]! - 1).clamp(0, max)),
                       onPlus: () => set(() => counts[id] = (counts[id]! + 1).clamp(0, max)),
                     ),
@@ -357,11 +383,11 @@ class _OrderScreenState extends State<OrderScreen> {
           for (final i in v.items)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(line == '${i['order_item_id']}' ? LucideIcons.circleCheck : LucideIcons.circle, color: kGreenText, size: 20),
-              title: Text('${i['name']}', style: inter(14, 500)),
+              leading: Icon(line == '${i['order_item_id'] ?? ''}' ? LucideIcons.circleCheck : LucideIcons.circle, color: kGreenText, size: 20),
+              title: Text('${i['name'] ?? ''}', style: inter(14, 500)),
               subtitle: Text('${i['qty']} ordered · ${i['picked_qty'] ?? 0} picked', style: inter(12, 400, color: kMuted)),
               onTap: () => set(() {
-                line = '${i['order_item_id']}';
+                line = '${i['order_item_id'] ?? ''}';
                 qty = 1;
               }),
             ),
@@ -402,13 +428,13 @@ class _OrderScreenState extends State<OrderScreen> {
 
   Future<void> _deliveryInfoSheet() async {
     final d = _v!.delivery ?? const {};
-    final name = TextEditingController(text: '${d['name'] ?? ''}'), phone = TextEditingController(text: '${d['phone'] ?? ''}'), address = TextEditingController(text: '${d['address'] ?? ''}');
+    final name = TextEditingController(text: '${d['name'] ?? ''}'), phone = TextEditingController(text: localMobile('${d['phone'] ?? ''}')), address = TextEditingController(text: '${d['address'] ?? ''}');
     final save = await showOrderSheet<bool>(
       context,
       title: 'Delivery information',
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         TextField(controller: name, decoration: const InputDecoration(labelText: 'Name (optional)')),
-        TextField(key: const ValueKey('delivery-phone'), controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone')),
+        TextField(key: const ValueKey('delivery-phone'), controller: phone, keyboardType: TextInputType.phone, inputFormatters: mobileFormatters, decoration: const InputDecoration(labelText: 'Mobile number', prefixText: kMobilePrefix)),
         TextField(key: const ValueKey('delivery-address'), controller: address, minLines: 1, maxLines: 3, decoration: const InputDecoration(labelText: 'Delivery address')),
         const SizedBox(height: 16),
         DarkCta(label: 'Save', onPressed: () => Navigator.pop(ctx, true)),

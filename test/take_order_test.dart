@@ -112,6 +112,77 @@ void main() {
       expect(total.data, '₹340');
     });
 
+    testWidgets('a dish with sizes has a line per size, each with its price and counter; the size goes with the dish', (t) async {
+      final menu = jsonDecode(jsonEncode(fx['menu'])) as Map<String, dynamic>;
+      for (final i in menu['items'] as List) {
+        if (i['id'] == naan) {
+          i['variants'] = [
+            {'id': 'v-s', 'name': 'Small', 'price': 60, 'is_default': true},
+            {'id': 'v-l', 'name': 'Large', 'price': 90, 'is_default': false},
+          ];
+        }
+      }
+      final f = Fake((r) => fnOf(r) == 'pos_sell_catalog' ? ok(menu) : fnOf(r) == 'tbl_order_view' ? err(404, 'no order yet') : null);
+      await showPushed(t, AddDishesScreen(env: f.env, tableId: table4, tableLabel: 'Table 4'));
+      expect(find.text('Small · ₹60'), findsOneWidget);
+      expect(find.text('Large · ₹90'), findsOneWidget);
+      await t.tap(find.byKey(ValueKey('plus-$naan-Large')));
+      await t.pump();
+      await t.tap(find.byKey(ValueKey('plus-$naan-Large')));
+      await t.pump();
+      expect(find.byKey(ValueKey('qty-$naan-Large')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('send-to-kitchen')));
+      await t.pumpAndSettle();
+      expect(argsOf(f.calls('tbl_order_add').single)['lines'], [{'menu_item_id': naan, 'qty': 2, 'variant_id': 'v-l'}]);
+    });
+
+    testWidgets('a dish with add-ons and combos (0624) opens one pop-up; what is chosen is priced on its own line and sent with the dish', (t) async {
+      final menu = jsonDecode(jsonEncode(fx['menu'])) as Map<String, dynamic>;
+      for (final i in menu['items'] as List) {
+        if (i['id'] == naan) {
+          i['price'] = 199;
+          i['options'] = {
+            'addon_groups': [
+              {'id': 'g1', 'name': 'Extra dips', 'min': 0, 'max': 3, 'addons': [{'id': 'a-cheese', 'name': 'Cheese slices', 'price': 50, 'food_type': 'veg'}]},
+              {'id': 'g2', 'name': 'Choose a dip', 'min': 1, 'max': 1, 'addons': [{'id': 'a-mint', 'name': 'Mint', 'price': 0, 'food_type': 'veg'}, {'id': 'a-mayo', 'name': 'Mayo', 'price': 10, 'food_type': 'veg'}]},
+            ],
+            'combo_groups': [
+              {'id': 'cg1', 'name': 'Make it a meal', 'min': 0, 'max': 1, 'combos': [{'id': 'c1', 'name': 'fries & Cole', 'price': 325, 'items': 'Ice Blue, Salted Fries'}]},
+            ],
+          };
+        }
+      }
+      final f = Fake((r) => fnOf(r) == 'pos_sell_catalog' ? ok(menu) : fnOf(r) == 'tbl_order_view' ? err(404, 'no order yet') : null);
+      await showPushed(t, AddDishesScreen(env: f.env, tableId: table4, tableLabel: 'Table 4'));
+      await t.tap(find.byKey(const ValueKey('options-$naan')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('opt-title')), findsOneWidget);
+      expect(find.text('Optional · up to 3'), findsOneWidget);
+      expect(find.byKey(const ValueKey('opt-missing')), findsOneWidget, reason: 'Choose a dip needs one');
+      expect(t.widget<FilledButton>(find.byKey(const ValueKey('opt-add'))).onPressed, isNull);
+      await t.tap(find.byKey(const ValueKey('opt-addon-plus-Cheese slices')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('opt-addon-plus-Cheese slices')));
+      await t.pump();
+      expect(find.byKey(const ValueKey('opt-addon-qty-Cheese slices')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('opt-addon-check-Mayo')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('opt-combo-fries & Cole')));
+      await t.pump();
+      expect(find.text('Add · ₹634'), findsOneWidget, reason: '199 + 2 × 50 + 10 + 325');
+      await t.tap(find.byKey(const ValueKey('opt-add')));
+      await t.pumpAndSettle();
+      expect(find.textContaining('2 × Cheese slices · Mayo · fries & Cole (combo)'), findsOneWidget);
+      expect(t.widget<Text>(find.byKey(const ValueKey('total-so-far'))).data, '₹634');
+      await t.tap(find.byKey(const ValueKey('send-to-kitchen')));
+      await t.pumpAndSettle();
+      final line = (argsOf(f.calls('tbl_order_add').single)['lines'] as List).single as Map;
+      expect(line['menu_item_id'], naan);
+      expect(line['qty'], 1);
+      expect(line['addons'], unorderedEquals(['a-cheese', 'a-cheese', 'a-mayo']));
+      expect(line['combos'], ['c1']);
+    });
+
     testWidgets('Send to kitchen sends the dishes once, with a key, and shows the KOT (Figma 18:467)', (t) async {
       final f = freeTable();
       await showPushed(t, AddDishesScreen(env: f.env, tableId: table4, tableLabel: 'Table 4'));
@@ -177,7 +248,7 @@ void main() {
     testWidgets('Add Items opens Add dishes; Send KOT sends the held dishes as a new KOT', (t) async {
       final f = Fake();
       await show(t, TableOrderScreen(env: f.env, tableId: table4));
-      expect(find.text('Not sent'), findsWidgets);
+      expect(t.widget<Opacity>(find.ancestor(of: find.text('Send KOT'), matching: find.byType(Opacity)).first).opacity, 1, reason: 'held dishes: Send KOT is on');
       await t.tap(find.text('Send KOT'));
       await t.pumpAndSettle();
       expect(f.calls('tbl_kot_send').single.headers['Idempotency-Key'] ?? f.calls('tbl_kot_send').single.headers['idempotency-key'], isNotNull);

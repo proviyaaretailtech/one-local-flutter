@@ -77,14 +77,39 @@ String money(num? v) {
 }
 
 /// The plain-text bill / receipt (Print Bill, Print, WhatsApp, SMS, email). [bill] is one order as `rst_bill_view` or `rst_receipt_view` return it.
+/// The bill's lines (0625): a combo's dishes (₹0 rows that are there for the kitchen) are left out; the combo is listed under its dish.
+List<Facts> billItems(Facts order) => order.l('items').where((i) => !i.b('in_combo')).toList();
+
+/// What was chosen with a bill line (0625), each priced for one dish: ("+ Cheese slice", 50), ("+ fries & Cole combo: Ice Blue, Salted Fries", 325).
+List<(String, num)> billAddOns(Facts i) => [
+      for (final a in i.l('add_ons'))
+        (
+          '+ ${a.n('qty') > 1 ? '${a.n('qty').toInt()} × ' : ''}${a.s('name')}'
+              '${a.s('kind') == 'combo' ? ' combo${(a.so('items') ?? '').isEmpty ? '' : ': ${a.s('items')}'}' : ''}',
+          a.n('price') * (a.n('qty') == 0 ? 1 : a.n('qty')),
+        ),
+    ];
+
 String billText(Facts bill, {String? business, String? table, bool receipt = false}) {
   final out = <String>[
     if (business != null && business.isNotEmpty) business,
     '${receipt ? 'Receipt' : 'Bill'} ${bill.s('display_no')}${table == null ? '' : ' · Table $table'}',
     '',
   ];
-  for (final i in bill.l('items')) {
-    out.add('${i.n('qty')} x ${i.s('name')}  ${money(i.n('line_total'))}');
+  for (final i in billItems(bill).where((i) => !i.b('takeaway'))) {
+    out.add('${i.n('qty')} x ${i.s('name')}${(i.so('variant') ?? '').isEmpty ? '' : ' (${i.s('variant')})'}  ${money(i.n('line_total'))}');
+    for (final (what, price) in billAddOns(i)) {
+      out.add('   $what  ${money(price)} each');
+    }
+  }
+  // takeaway dishes on the same dine-in bill (0606), under their own heading
+  final away = billItems(bill).where((i) => i.b('takeaway')).toList();
+  if (away.isNotEmpty) out.add('-- Takeaway --');
+  for (final i in away) {
+    out.add('${i.n('qty')} x ${i.s('name')}${(i.so('variant') ?? '').isEmpty ? '' : ' (${i.s('variant')})'} (Takeaway)  ${money(i.n('line_total'))}');
+    for (final (what, price) in billAddOns(i)) {
+      out.add('   $what  ${money(price)} each');
+    }
   }
   out.addAll(['', 'Subtotal ${money(bill.n('subtotal'))}']);
   if (bill.n('discount') != 0) out.add('Discount${bill.so('coupon_code') == null ? '' : ' ${bill.s('coupon_code')}'} -${money(bill.n('discount'))}');

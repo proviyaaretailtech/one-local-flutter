@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../api/net_guard.dart';
 import '../home/home_widgets.dart' show kLime, rupees;
 import '../ui/theme.dart';
 import 'customer_widgets.dart';
@@ -108,7 +109,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     } catch (e) {
       if (!mounted || mine != _seq) return;
       setState(() {
-        _error = e.toString();
+        _error = errorSentence(e);
         _loading = false;
       });
     }
@@ -221,7 +222,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       final c = await _api.view(widget.id);
       if (mounted) setState(() => _c = c);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = errorSentence(e));
     }
   }
 
@@ -385,7 +386,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       if (s.duplicate) showToast(context, '${s.customer.name} already has this number. Using that customer.');
       Navigator.of(context).pop(s.customer);
     } catch (e) {
-      if (mounted) showToast(context, e.toString());
+      if (mounted) showToast(context, errorSentence(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -404,7 +405,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
             CwaField(label: 'First name *', controller: _first, fieldKey: const ValueKey('cust-first')),
             CwaField(label: 'Last name', controller: _last, fieldKey: const ValueKey('cust-last')),
-            CwaField(label: 'Mobile number *', controller: _phone, keyboardType: TextInputType.phone, hint: '10-digit mobile', enabled: full, fieldKey: const ValueKey('cust-phone')),
+            CwaField(label: 'Mobile number *', controller: _phone, mobile: true, hint: '10-digit mobile', enabled: full, fieldKey: const ValueKey('cust-phone')),
             CwaField(label: 'Email', controller: _email, keyboardType: TextInputType.emailAddress, enabled: full),
             CwaField(label: 'GSTIN (for business bills)', controller: _gst, hint: '22AAAAA0000A1Z5', enabled: full),
             Row(children: [

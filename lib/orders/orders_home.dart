@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../api/net_guard.dart';
 import '../ui/theme.dart';
 import 'cart_screen.dart';
 import 'order_screen.dart';
@@ -56,7 +57,7 @@ class _OrdersHomeState extends State<OrdersHome> {
       });
     } catch (e) {
       if (!mounted || mine != _seq) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = errorSentence(e));
     }
   }
 

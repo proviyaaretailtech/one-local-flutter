@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../inventory/inventory_api.dart';
+import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import 'bill_api.dart';
 import 'bill_widgets.dart';
@@ -57,7 +58,14 @@ class _BillReceiptScreenState extends State<BillReceiptScreen> {
       context: context,
       builder: (d) => AlertDialog(
         title: Text(title, style: inter(18, 700)),
-        content: TextField(key: const ValueKey('receipt-to'), controller: c, keyboardType: type, autofocus: true, decoration: InputDecoration(hintText: hint)),
+        content: TextField(
+          key: const ValueKey('receipt-to'),
+          controller: c,
+          keyboardType: type,
+          inputFormatters: type == TextInputType.phone ? mobileFormatters : null,
+          autofocus: true,
+          decoration: InputDecoration(hintText: hint, prefixText: type == TextInputType.phone ? kMobilePrefix : null),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
           TextButton(key: const ValueKey('receipt-send'), onPressed: () => Navigator.pop(d, c.text.trim()), child: const Text('Send')),
@@ -76,7 +84,7 @@ class _BillReceiptScreenState extends State<BillReceiptScreen> {
       case 'print':
         to = r.so('receipt_printer') ?? 'counter printer';
       case 'whatsapp' || 'sms':
-        to = await _ask(channel == 'whatsapp' ? 'Send on WhatsApp' : 'Send by SMS', 'Mobile number', TextInputType.phone, r.s('customer_phone'));
+        to = await _ask(channel == 'whatsapp' ? 'Send on WhatsApp' : 'Send by SMS', 'Mobile number', TextInputType.phone, localMobile(r.s('customer_phone')));
         if (to == null || to.isEmpty) return;
         var digits = to.replaceAll(RegExp(r'\D'), '');
         if (digits.length == 10) digits = '91$digits';

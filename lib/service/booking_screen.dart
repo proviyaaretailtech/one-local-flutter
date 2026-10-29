@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart' show rupees;
+import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import 'service_api.dart';
 import 'service_widgets.dart';
@@ -92,8 +93,8 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
             key: const ValueKey('customer-phone'),
             controller: phone,
             keyboardType: TextInputType.phone,
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ]')), LengthLimitingTextInputFormatter(16)],
-            decoration: const InputDecoration(hintText: 'Mobile number'),
+            inputFormatters: mobileFormatters,
+            decoration: const InputDecoration(hintText: 'Mobile number', prefixText: kMobilePrefix),
           ),
           const SizedBox(height: 16),
           DarkCta(label: 'Done', onPressed: () => Navigator.pop(ctx, true)),
