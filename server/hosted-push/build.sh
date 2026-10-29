@@ -1,65 +1,36 @@
 #!/usr/bin/env bash
-# Builds the two one-time hosted push files from this repo and the LOCAL test DB (reads only; never connects to hosted).
-#   01a_logic_0600_0613.sql, 01b_logic_0614_0628.sql   migrations 0600-0628 in order, in two transactions
-#   02_niks_cafe_data.sql    Niks Cafe's menu set-up, ingredients, recipes, add-ons, combos, sizes, tables, suppliers and purchase
-#                            orders (copied by id from the local DB), dish photo links moved to hosted, and opening stock for 100 of
-#                            each dish (posted as receipts, worked out on hosted from the recipes)
+# Builds the one-time hosted push from this repo and the LOCAL test DB (reads only; never connects to hosted), as numbered pieces in
+# hosted-push/run/: the Supabase SQL editor keeps only the first 65,536 characters of a script, so no piece is over 62,000.
+# Each piece is one transaction; run them in number order.
+#   logic: 0630 first (fixes stock coming in on hosted), then 0600-0611, 0629 (pos_order_view merged, right after the last migration
+#          that replaces it), 0612-0628. Whole migrations only: a migration is never split across two pieces.
+#   data:  Niks Cafe's menu set-up, ingredients, recipes, add-ons, combos, sizes, tables, suppliers and purchase orders (copied by id
+#          from the local DB, one statement per table), dish photo links moved to hosted, then opening stock for 100 of each dish.
 # Usage (Git Bash, from one-local-flutter/server): bash hosted-push/build.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 DB=supabase_db_onelocal-local-db
-OUT=hosted-push
+OUT=hosted-push/run
+CAP=62000
+UNITS=$(mktemp -d)
+trap 'rm -rf "$UNITS"' EXIT
+rm -rf "$OUT" && mkdir -p "$OUT"
+rm -f hosted-push/01a_logic_0600_0613.sql hosted-push/01b_logic_0614_0628.sql hosted-push/02_niks_cafe_data.sql hosted-push/01_logic_0600_0628.sql
 
-# the logic in two halves (the SQL editor refuses one 370 KB script): part A 0600-0613, part B 0614-0628, each one transaction
-logic_part() { # name first last label
-  {
-    cat <<EOF
--- ============================================================================================================================
--- HOSTED PUSH $4: LOGIC, migrations $2-$3 in order, as ONE transaction: all of it applies, or none of it.
--- Built from server/migrations by hosted-push/build.sh. Run in the Supabase SQL editor of project ywylhzcxuoeilygzdonx, in order:
--- 01a_logic_0600_0613.sql, then 01b_logic_0614_0628.sql, then 02_niks_cafe_data.sql; all before the server is deployed.
--- Checked on a copy of the hosted DB (dump of 26 Oct 2026): A then B apply without errors and leave the same tables, functions,
--- triggers, indexes and policies as the local test DB. Run it once. If it stops with an error, nothing in it has changed.
--- ============================================================================================================================
-begin;
-EOF
-    for f in migrations/06*.sql; do
-      n=$(basename "$f" | cut -c1-4)
-      # $5: migrations added at the end of this part: 0629 merges pos_order_view right after A replaced it, 0630 fixes stock coming in
-      [[ " ${5:-} " != *" $n "* && ( "$n" < "$2" || "$n" > "$3" ) ]] && continue
-      printf '\n-- ----------------------------------------------------------------------------------------------------------------------------\n-- %s\n-- ----------------------------------------------------------------------------------------------------------------------------\n' "$(basename "$f")"
-      grep -viE '^\s*(begin|commit)\s*;\s*$' "$f"
-    done
-    cat <<'EOF'
-
--- tell the API about the new functions and tables
-notify pgrst, 'reload schema';
-commit;
-EOF
-  } > "$OUT/$1"
-}
-logic_part 01a_logic_0600_0613.sql 0600 0613 '1a of 3' "0629 0630"
-logic_part 01b_logic_0614_0628.sql 0614 0628 '1b of 3'
-rm -f "$OUT/01_logic_0600_0628.sql"
-
-docker cp "$OUT/gen_niks_data.sql" "$DB:/tmp/gen_niks_data.sql" > /dev/null
-{
-  cat <<'EOF'
--- ============================================================================================================================
--- HOSTED PUSH 3 of 3: NIKS CAFE DATA (organization bd4d8ee9-5885-41e4-b6a1-ba2b9cb873dd), as ONE transaction.
--- Run AFTER 01a and 01b (the logic), in the Supabase SQL editor of project ywylhzcxuoeilygzdonx.
--- Copied by id from the local test DB (hosted-push/build.sh): categories, dishes (descriptions, sizes, photo links on hosted
--- storage), ingredients, recipes, add-ons, add-on recipes, combos, channel prices, the five tables, suppliers and purchase orders.
--- Not copied: orders, KOTs, payments, bills, test logins, closing-stock test counts, notifications.
--- Then opening stock: enough for 100 of each dish (with wastage), less what is on hand, posted as receipts.
--- The 11 dish photo FILES are uploaded separately (hosted-push/item-images/, see README.md).
--- Running it twice is safe: rows are matched by id and the opening stock only tops up what is missing.
--- ============================================================================================================================
-begin;
-
-EOF
-  MSYS_NO_PATHCONV=1 docker exec "$DB" psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -q -f /tmp/gen_niks_data.sql
-  cat <<'EOF'
+# ---- units: one file each, in the order they must run; the name says logic or data
+n=0
+unit() { n=$((n + 1)); printf -v id '%03d' "$n"; cat > "$UNITS/$id-$1"; }
+for m in 0630 0600 0601 0602 0603 0604 0605 0606 0607 0608 0609 0610 0611 0629 0612 0613 0614 0615 0616 0617 0618 0619 0620 0621 0622 0623 0624 0625 0626 0627 0628; do
+  f=$(ls migrations/${m}_*.sql)
+  unit "logic-$m" < <(printf '\n-- ---- %s\n' "$(basename "$f")"; grep -viE '^\s*(begin|commit)\s*;\s*$' "$f")
+done
+docker cp hosted-push/gen_niks_data.sql "$DB:/tmp/gen_niks_data.sql" > /dev/null
+MSYS_NO_PATHCONV=1 docker exec "$DB" psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -q -f /tmp/gen_niks_data.sql > "$UNITS/data.sql"
+# one statement per table: each starts at its "-- <table>: ..." line
+awk -v dir="$UNITS" -v start="$n" '/^-- [a-z_]+: /{k++; t=$2; sub(/:$/, "", t); f=sprintf("%s/%03d-data-%s", dir, start + k, t)} k{print > f}' "$UNITS/data.sql"
+rm "$UNITS/data.sql"
+n=$(ls "$UNITS" | wc -l)
+unit "data-opening_stock" <<'EOF'
 
 -- opening stock: what 100 of every dish needs (with wastage), less what is on hand, at the main outlet
 insert into public.stock_movements (organization_id, location_id, inventory_item_id, kind, quantity, unit_cost_minor, ref_type, ref_id, note)
@@ -74,10 +45,37 @@ select n.org, (select l.id from public.locations l where l.organization_id = n.o
  where n.need - n.on_hand > 0;
 
 set constraints all immediate; -- place the new stock in its bins now
-
-notify pgrst, 'reload schema';
-commit;
 EOF
-} > "$OUT/02_niks_cafe_data.sql"
 
-wc -c "$OUT"/0*.sql
+# ---- pack the units into pieces: in order, logic and data never share a piece, each piece under CAP characters
+piece=0; kind=""; size=0; files=()
+flush() {
+  [ ${#files[@]} -eq 0 ] && return
+  piece=$((piece + 1)); printf -v pn '%02d' "$piece"
+  local first last name
+  first=$(basename "${files[0]}" | cut -d- -f3-); last=$(basename "${files[-1]}" | cut -d- -f3-)
+  name="${pn}_${kind}_${first}"; [ "$first" != "$last" ] && name="${name}_to_${last}"; name="$name.sql"
+  {
+    printf -- '-- ==========================================================================================================================\n'
+    printf -- '-- HOSTED PUSH piece %s (%s): run the pieces in number order, each whole file in its own SQL editor run.\n' "$pn" "$kind"
+    printf -- '-- One transaction: if it stops with an error, nothing in this piece has changed; send the error back and stop.\n'
+    printf -- '-- Project ywylhzcxuoeilygzdonx. Built by server/hosted-push/build.sh; checked on a copy of hosted (29 Oct 2026).\n'
+    printf -- '-- ==========================================================================================================================\n'
+    echo 'begin;'
+    cat "${files[@]}"
+    printf '\nnotify pgrst, %s;\ncommit;\n' "'reload schema'"
+  } > "$OUT/$name"
+  files=(); size=0
+}
+for u in "$UNITS"/*; do
+  k=$(basename "$u" | cut -d- -f2); s=$(wc -m < "$u")
+  if [ "$k" != "$kind" ] || [ $((size + s + 900)) -gt $CAP ]; then flush; kind=$k; fi
+  files+=("$u"); size=$((size + s))
+done
+flush
+
+for f in "$OUT"/*.sql; do
+  c=$(wc -m < "$f")
+  [ "$c" -gt 65000 ] && { echo "TOO LONG: $f ($c)"; exit 1; }
+  printf '%6d  %s\n' "$c" "$(basename "$f")"
+done
