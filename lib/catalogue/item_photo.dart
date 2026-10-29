@@ -1,11 +1,16 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/widgets.dart' show BuildContext;
+import 'package:google_mlkit_subject_segmentation/google_mlkit_subject_segmentation.dart';
 import 'package:http/http.dart' as http;
 
 import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
+import 'photo_capture_screen.dart';
 
 /// A product photo chosen on the item form, before it is saved.
 class ItemPhoto {
@@ -28,6 +33,10 @@ class ItemPhotoUnavailable implements Exception {
 abstract class ItemPhotoService {
   const ItemPhotoService();
   Future<ItemPhoto?> pick();
+
+  /// A new photo, camera first (founder, 26 Oct 2026): the camera opens at once, the latest gallery photo sits in its corner, and
+  /// after the shot the background can be removed before it is used. Null when closed.
+  Future<ItemPhoto?> capture(BuildContext context) => showPhotoCapture(context, this);
   /// The photo cut out by AI: on transparency, or set on [bgColor] (hex, no #) for a clean studio backdrop.
   Future<ItemPhoto> removeBackground(ItemPhoto photo, {String? bgColor});
   Future<void> attach(String itemId, ItemPhoto photo);
@@ -61,10 +70,12 @@ class DeviceItemPhotos extends ItemPhotoService {
     return ItemPhoto(bytes: bytes, contentType: ext == 'png' ? 'image/png' : ext == 'webp' ? 'image/webp' : 'image/jpeg');
   }
 
-  // The server sends the photo to remove.bg (its key stays on the server) and answers a transparent PNG; nothing is saved there.
-  // The server's own sentence is shown when it cannot (not set up, out of credits, busy, no product found in the photo).
+  // On the phone (founder, 26 Oct 2026): Google's on-device subject segmentation cuts the product out — free, offline, nothing leaves
+  // the phone — and answers a transparent PNG. In the browser the server sends it to remove.bg instead (its key stays on the server);
+  // the server's own sentence is shown when it cannot (not set up, out of credits, busy, no product found in the photo).
   @override
   Future<ItemPhoto> removeBackground(ItemPhoto photo, {String? bgColor}) async {
+    if (bgColor == null && !kIsWeb && Platform.isAndroid) return _cutOutOnPhone(photo);
     try {
       final r = await (rpc ?? RpcClient())
           .callMap('cat_image_remove_bg', {'image_b64': base64Encode(photo.bytes), 'content_type': photo.contentType, 'bg_color': ?bgColor});
@@ -73,6 +84,34 @@ class DeviceItemPhotos extends ItemPhotoService {
       return ItemPhoto(bytes: base64Decode(b64), contentType: r['content_type'] == 'image/jpeg' ? 'image/jpeg' : 'image/png', backgroundRemoved: true);
     } on PartnerApiException catch (e) {
       throw ItemPhotoUnavailable(e.message);
+    }
+  }
+
+  static Future<ItemPhoto> _cutOutOnPhone(ItemPhoto photo) async {
+    final dir = await Directory.systemTemp.createTemp('cutout');
+    final file = File('${dir.path}/photo.${photo.contentType == 'image/png' ? 'png' : 'jpg'}');
+    final segmenter = SubjectSegmenter(options: SubjectSegmenterOptions(
+      enableForegroundBitmap: true,
+      enableForegroundConfidenceMask: false,
+      enableMultipleSubjects: SubjectResultOptions(enableConfidenceMask: false, enableSubjectBitmap: false),
+    ));
+    try {
+      await file.writeAsBytes(photo.bytes);
+      final r = await segmenter.processImage(InputImage.fromFilePath(file.path));
+      final png = r.foregroundBitmap;
+      if (png == null || png.isEmpty) throw const ItemPhotoUnavailable('No product was found in the photo. Try again with the product in the middle.');
+      if (png.length > maxBytes) throw const ItemPhotoUnavailable('The cut-out is too large to save. Take the photo a little further away.');
+      return ItemPhoto(bytes: png, contentType: 'image/png', backgroundRemoved: true);
+    } on ItemPhotoUnavailable {
+      rethrow;
+    } catch (_) {
+      // the first time, the phone downloads the cut-out tool from Google Play; it needs a moment and the internet once
+      throw const ItemPhotoUnavailable('The background could not be removed right now. Try again in a minute.');
+    } finally {
+      await segmenter.close();
+      try {
+        await dir.delete(recursive: true);
+      } catch (_) {}
     }
   }
 

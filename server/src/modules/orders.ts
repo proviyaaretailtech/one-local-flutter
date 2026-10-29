@@ -180,7 +180,14 @@ export function shapeView(v: Row) {
     order_status: orderStatus,
     fulfilment,
     payment_chip: paymentChip,
-    note: noteFor(stage, { f, ol, paid, methodName, missing, reason: v.cancel_reason ?? ol?.cancel_reason }),
+    note: noteFor(stage, { f, ol, paid, methodName, missing, reason: v.cancel_reason ?? ol?.cancel_reason, photo: v.photo_required !== false }),
+    // where the order is, as four simple steps (founder, 29 Oct 2026: "the current way is a bit confusing"): Accept · Pack · Hand over · Done.
+    // current = the step to do now; 4 = all done. Null for a counter bill and a cancelled order.
+    steps: (f || ol) && stage !== 'cancelled' && stage !== 'checkout'
+      ? { labels: ['Accept', 'Pack', ol ? 'Rider' : 'Hand over', 'Done'], current: STEP[stage] ?? 0 } : null,
+    // the photo of the packed bag (returns spec §6): has_photo, or skip_reason when there is none; photo_required: the store asks for one
+    packed_photo: v.packed_photo ?? null,
+    photo_required: v.photo_required !== false,
     // Fulfilment moves carry the fulfilment version; a held bill (pay / cancel) carries the order's updated_at.
     version: f ? f.version : o.updated_at,
     online: !!ol,
@@ -214,17 +221,17 @@ export function shapeView(v: Row) {
   };
 }
 
-function noteFor(stage: Stage, c: { f: Row | null; ol: Row | null; paid: number; methodName: string; missing: number; reason?: string | null }) {
+const STEP: Partial<Record<Stage, number>> = { pending: 0, preparing: 1, picked: 1, ready: 2, exception: 2, in_transit: 3, completed: 4 };
+
+function noteFor(stage: Stage, c: { f: Row | null; ol: Row | null; paid: number; methodName: string; missing: number; reason?: string | null; photo: boolean }) {
   const n = (tone: 'info' | 'warn' | 'bad', title: string, body: string) => ({ tone, title, body });
   switch (stage) {
     case 'checkout': return n('info', 'Bill on hold', 'No payment has been collected. Complete the payment or cancel this bill.');
-    case 'pending': return c.ol ? n('info', 'New online order', 'Accept it to start preparing. The customer is waiting for your answer.')
-      : n('info', 'Order placed · receipt available', `${rupees(c.paid)} settled ${c.methodName === 'Cash' ? 'in cash' : `by ${c.methodName}`}. This receipt is not store acceptance.`);
-    case 'preparing': return c.ol ? n('warn', 'Preparation in progress', 'Mark the order ready when it is packed.')
-      : n('warn', 'Preparation in progress', `Check quantities against this bill. Record any missing units before packing.${c.missing ? ` ${plural(c.missing, 'unit')} reported missing.` : ''}`);
-    case 'picked': return n('info', 'Items picked from stock', 'Picking is complete. This is not customer or courier handover.');
-    case 'ready': return c.ol ? n('info', 'Order is ready', 'Hand it to the rider when they arrive.')
-      : n('info', 'Order is ready', 'Verify the recipient and all items before handover. No courier is assigned.');
+    case 'pending': return n('info', 'New order', c.ol ? 'Accept it to start packing. The customer is waiting for your answer.' : 'Accept it, then pack the items.');
+    case 'preparing': case 'picked': return n('warn', 'Pack the order',
+      `Tick each item as it goes in the bag${c.photo ? ', then take a photo of the packed bag' : ''}.${c.missing ? ` ${plural(c.missing, 'unit')} reported missing.` : ''}`);
+    case 'ready': return c.ol ? n('info', 'Packed and ready', 'Hand it to the rider when they arrive.')
+      : n('info', 'Packed and ready', 'Give it to the customer, or send it for delivery.');
     case 'in_transit': return n('info', 'Awaiting delivery confirmation', c.ol ? 'The rider confirms delivery with the customer.' : 'Tracking and ETA are unavailable. Verify delivery before completing the order.');
     case 'exception': return c.f?.exception === 'delivery_issue'
       ? n('bad', 'Delivery issue reported', `${c.f.exception_note ?? 'An issue was reported'}. Confirm delivery or bring the order back to the store.`)
@@ -240,7 +247,8 @@ function actionsFor(stage: Stage, c: { f: Row | null; ol: Row | null; next: stri
   if (c.ol) {
     switch (stage) {
       case 'pending': return [a('online_accept', 'Accept order', 'primary'), a('online_reject', 'Reject order', 'secondary'), a('receipt', 'View receipt', 'link')];
-      case 'preparing': return [a('online_ready', 'Mark ready', 'primary'), a('receipt', 'View receipt', 'link')];
+      // packing screen first (it marks the order ready); then the delivery status page (0619)
+      case 'preparing': return [a('pack_order', 'Pack order', 'primary'), a('receipt', 'View receipt', 'link')];
       case 'ready': return [a('online_delivery', 'Check rider status', 'primary'), a('receipt', 'View receipt', 'link')];
       case 'in_transit': return [a('online_delivery', 'Check delivery status', 'primary'), a('receipt', 'View receipt', 'link')];
       default: return [a('receipt', 'View receipt', 'link')];
@@ -248,11 +256,11 @@ function actionsFor(stage: Stage, c: { f: Row | null; ol: Row | null; next: stri
   }
   switch (stage) {
     case 'checkout': return [a('pay', 'Complete Payment', 'primary'), a('cancel', 'Cancel bill', 'secondary')];
-    case 'pending': return [a('print', 'Print receipt', 'primary'), a('whatsapp', 'Send by WhatsApp', 'secondary'), a('acceptance', 'View acceptance status', 'link')];
-    case 'preparing': return [a('picking', 'Open picking checklist', 'primary'), a('report_missing', 'Report missing item', 'secondary'), a('receipt', 'View receipt', 'link')];
-    case 'picked': return [c.next.includes('pack') ? a('pack', 'Start packing', 'primary') : a('picking', 'Open picking checklist', 'primary'), a('picking', 'Review picked quantities', 'secondary'), a('receipt', 'View receipt', 'link')];
-    case 'ready': return [a('handover', 'Record handover', 'primary'), a('dispatch', 'Arrange dispatch', 'secondary'), a('receipt', 'View receipt', 'link')];
-    case 'in_transit': return [a('delivery_status', 'Check delivery status', 'primary'), a('report_delivery_issue', 'Report delivery issue', 'secondary'), a('receipt', 'View receipt', 'link')];
+    // one clear next step per stage (founder, 29 Oct 2026); packing is one screen: tick the items, photo of the bag, packed
+    case 'pending': return [a('accept', 'Accept order', 'primary'), a('whatsapp', 'Send receipt on WhatsApp', 'link')];
+    case 'preparing': case 'picked': return [a('pack_order', 'Pack order', 'primary'), a('report_missing', 'Something missing?', 'link')];
+    case 'ready': return [a('handover', 'Customer collected it', 'primary'), a('dispatch', 'Send for delivery', 'secondary'), a('receipt', 'View receipt', 'link')];
+    case 'in_transit': return [a('delivery_status', 'Mark delivered', 'primary'), a('report_delivery_issue', 'Report a delivery problem', 'secondary'), a('receipt', 'View receipt', 'link')];
     case 'exception': return c.f?.exception === 'delivery_issue'
       ? [a('delivery_status', 'Check delivery status', 'primary'), a('return_to_store', 'Return to store', 'secondary'), a('exception_details', 'Review exception details', 'link')]
       : [a('set_delivery_info', 'Resolve missing information', 'primary'), a('choose_collection', 'Arrange store collection', 'secondary'), a('exception_details', 'Review exception details', 'link')];
@@ -299,6 +307,18 @@ export function shapeCard(r: Row) {
     delivery = ({ placed: 'Awaiting acceptance', accepted: 'Preparing', packed: 'Packed · waiting for rider', out: 'Out for delivery' } as Row)[ol.status] ?? 'In progress';
     when = 'Not delivered';
   } else { delivery = 'Not started · bill unpaid'; when = 'Not delivered'; }
+  // where the order is, in the words of the Online order tab (founder, 27 Oct 2026):
+  //   new (waiting to be accepted) · ongoing (being packed, or on the way) · ready (packed, waiting for a delivery partner)
+  //   · delivered · return (delivered, and the customer asked for a return) · cancelled · counter (a bill at the counter: not an online order)
+  const asked = r.return_status === 'requested' || r.return_status === 'approved';
+  const fs_ = f?.stage as string | undefined, os = ol?.status as string | undefined;
+  const state = cancelled ? 'cancelled'
+    : asked ? 'return'
+    : completed ? (f || ol ? 'delivered' : 'counter')
+    : fs_ === 'awaiting_acceptance' || os === 'placed' ? 'new'
+    : (fs_ === 'ready' && !f?.exception) || os === 'packed' ? 'ready'
+    : f || ol ? 'ongoing'
+    : 'counter';
   const missing = Number(f?.units_missing ?? 0);
   const damages = [refunded > 0 ? `${rupees(refunded)} issued` : null, missing ? plural(missing, 'missing unit') : null].filter(Boolean).join(' · ') || 'None';
   return {
@@ -306,6 +326,7 @@ export function shapeCard(r: Row) {
     status: cancelled ? 'cancelled' : completed ? 'completed' : 'pending', status_label: cancelled ? 'Cancelled' : completed ? 'Completed' : 'Pending',
     total, items: `${plural(Number(r.lines), 'line')} · ${plural(units, 'unit')}`, payment_status: payStatus, payment_mode: mode,
     delivery_status: delivery, delivery_time: when, refund_damages: damages,
+    state, return_status: r.return_status ?? null,
   };
 }
 
@@ -388,6 +409,11 @@ export async function actOn(request: Request, id: string) {
   const body = await readBody(request);
   const action = text(body.action, 40);
   const client = asCaller(request);
+  // No "packed" without a photo of the packed bag, or a reason there is none, when the store asks for one (returns spec §6).
+  if (action === 'pack' || action === 'online_ready') {
+    const ok = await call<Row>(client, 'pos_packed_photo_ok', { order_id: id });
+    if (!ok?.ok) throw new HttpError(409, 'Add a photo of the packed order first.', undefined, 'photo_needed');
+  }
   if (ONLINE[action]) {
     // One Local orders keep their own state machine (ol_orders). The database function gw_online_order_act (0361) checks the order is the
     // caller's, that it is an online order and that their role may move orders, then runs ol_partner_act and records the delivery follow-up

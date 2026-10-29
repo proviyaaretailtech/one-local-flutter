@@ -94,7 +94,6 @@ void main() {
     });
     await frame(t, 'item_creation', ItemFormScreen(api: _api()), height: 2700);
     await frame(t, 'grn_dashboard', GrnDashboardScreen(receiptId: 'r1', api: _api()), height: 1900);
-    await frame(t, 'grn_matching', GrnMatchingScreen(receiptId: 'r1', api: _api()), height: 1100);
     await frame(t, 'grn_home', GrnQueueScreen(api: _api()), height: 1300);
     await frame(t, 'grn_home_empty', GrnQueueScreen(api: _api(grnList: const [])), height: 844);
   }, skip: !on);

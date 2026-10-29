@@ -5,6 +5,7 @@ import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'notices_api.dart';
 import 'notices_widgets.dart';
+import '../ui/i18n.dart';
 
 /// A suggestion shown above the notices ("Add images to items": 10/11 items complete). Worked out from live data each time the centre
 /// loads, so it is never "read" and disappears by itself once done.
@@ -122,7 +123,7 @@ class _NotificationCentreState extends State<NotificationCentre> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
-              Text('Notification Centre', style: inter(26, 700)),
+              Text(tr('Notification Centre'), style: inter(26, 700)),
               const SizedBox(height: 6),
               Text(
                 'Orders, payments and updates for your store.',
@@ -263,7 +264,7 @@ class _NotificationCentreState extends State<NotificationCentre> {
                 onTap: _markAll,
                 child: Padding(
                   padding: const EdgeInsets.all(4),
-                  child: Text('Mark all as read', style: inter(14, 700)),
+                  child: Text(tr('Mark all as read'), style: inter(14, 700)),
                 ),
               ),
           ],

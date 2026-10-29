@@ -156,6 +156,10 @@ void main() {
       final api = SetupApi(client: MockClient((_) async => fail('must not call')), baseUrl: 'http://x', accessToken: () => null);
       await expectLater(api.get(), throwsA(isA<PartnerApiException>().having((e) => e.status, 'status', 401)));
     });
+    test('Purchase POS: no OneLocal listing or delivery step', () {
+      final s = sampleSetup(extra: {'plan': {'selected_code': null, 'available': [], 'sell_plan': 'pos_only'}});
+      expect(setupSequence(s), ['plan', 'payment', 'tax', 'catalogue', 'pos', 'staff']);
+    });
     test('state helpers', () {
       final s = sampleSetup(posRequired: false);
       expect(s.total, 7);
@@ -255,10 +259,25 @@ void main() {
     testWidgets('with no published plan it shows the selling choice and sends no code', (t) async {
       final api = FakeSetup(initial: sampleSetup(extra: {'plan': {'selected_code': null, 'available': [], 'sell_plan': 'pos_and_onelocal'}}));
       await show(t, PlanScreen(api: api, state: api.state));
-      expect(find.text('Current plan · POS + OneLocal'), findsOneWidget);
-      expect(find.text('Not set yet'), findsOneWidget);
+      expect(find.text('Current plan · Sell on OneLocal and Purchase POS'), findsOneWidget);
+      expect(find.text('₹799/month'), findsOneWidget); // the plan's price, from the founder's price list
       await tap(t, 'Continue');
       expect(api.calls, ['plan null']);
+    });
+    testWidgets('POS only: shows what is included and what is not', (t) async {
+      final api = FakeSetup(initial: sampleSetup(extra: {'plan': {'selected_code': null, 'available': [], 'sell_plan': 'pos_only'}}));
+      await show(t, PlanScreen(api: api, state: api.state));
+      expect(find.text('POS billing'), findsOneWidget);
+      final not = find.byKey(const ValueKey('plan-not-included'));
+      for (final m in ['OneLocal listing', 'Online orders', 'Delivery & pickup']) {
+        expect(find.descendant(of: not, matching: find.text(m)), findsOneWidget);
+      }
+      expect(find.descendant(of: not, matching: find.text('POS billing')), findsNothing);
+    });
+    testWidgets('selling and POS: everything included, no Not included list', (t) async {
+      final api = FakeSetup(initial: sampleSetup(extra: {'plan': {'selected_code': null, 'available': [], 'sell_plan': 'pos_and_onelocal'}}));
+      await show(t, PlanScreen(api: api, state: api.state));
+      expect(find.byKey(const ValueKey('plan-not-included')), findsNothing);
     });
     testWidgets('tip 2 shows inline', (t) async {
       final api = FakeSetup(initial: sampleSetup(seen: const []));
@@ -398,6 +417,28 @@ void main() {
       expect(api.bodies['item'], {'name': 'Tata Salt 1kg', 'category': 'Staples', 'price': '28.50'});
       expect(find.text('2 items added'), findsOneWidget);
       expect(find.text('Continue'), findsOneWidget);
+    });
+  });
+
+  group('Catalogue later', () {
+    testWidgets('the before-your-first-sale lines are progress, not checkboxes', (t) async {
+      final api = FakeSetup();
+      await show(t, CatalogueScreen(api: api, state: api.state));
+      final box = find.byKey(const ValueKey('catalogue-progress'));
+      expect(find.descendant(of: box, matching: find.byType(Checkbox)), findsNothing);
+      expect(find.descendant(of: box, matching: find.text('Not yet')), findsWidgets);
+    });
+    testWidgets('with no items: Add later moves on without adding anything', (t) async {
+      final api = FakeSetup();
+      StepResult? result;
+      await t.pumpWidget(MaterialApp(home: Builder(builder: (c) => TextButton(onPressed: () async => result = await Navigator.of(c).push<StepResult>(MaterialPageRoute(builder: (_) => CatalogueScreen(api: api, state: api.state))), child: const Text('open')))));
+      await t.tap(find.text('open'));
+      await t.pumpAndSettle();
+      await t.ensureVisible(find.byKey(const ValueKey('catalogue-later')));
+      await t.tap(find.byKey(const ValueKey('catalogue-later')));
+      await t.pumpAndSettle();
+      expect(result?.advance, isTrue);
+      expect(api.bodies['item'], isNull);
     });
   });
 

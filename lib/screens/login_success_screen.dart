@@ -4,11 +4,13 @@ import '../auth/auth_repository.dart';
 import '../auth/partner_api.dart';
 import '../app_routes.dart';
 import '../onboarding/checklist_screen.dart';
+import '../ui/i18n.dart';
 import '../ui/mask.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
 
-/// Figma "Login Success". Name and restaurant come from the One Local server (`GET /api/partner/me`).
+/// Figma "Login Success". Name and restaurant come from the One Local server (`GET /api/partner/me`). The language is chosen just
+/// before this, on its own screen (LanguageGate).
 class LoginSuccessScreen extends StatefulWidget {
   const LoginSuccessScreen({super.key, this.api, this.auth});
   final PartnerApi? api;
@@ -49,7 +51,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
                 PageIntro(
                   title: noStore ? 'Your account is ready.' : offline ? 'We could not reach OneLocal.' : 'Something went wrong.',
                   subtitle: noStore
-                      ? 'You are signed in, but no store is set up on this account yet. OneLocal will open your store once onboarding is complete.'
+                      ? 'Your application is saved. Continue it any time; OneLocal opens your store once it is approved.'
                       : offline
                           ? 'Check your internet connection and try again.'
                           : err.toString(),
@@ -59,7 +61,7 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
             actions: [
               if (!noStore) ...[PrimaryAction(label: 'Try again', onPressed: _retry), const SizedBox(height: 12)],
               if (noStore) ...[
-                PrimaryAction(label: 'Set up your business', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OnboardingEntry(auth: _auth)))),
+                PrimaryAction(label: 'Continue your application', onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => OnboardingEntry(auth: _auth, phone: _auth.currentPhone, name: _auth.currentName)))),
                 const SizedBox(height: 12),
               ],
               SecondaryAction(label: 'Switch account', onPressed: () => _auth.signOut()),
@@ -92,10 +94,10 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
                       child: const Ico(lucideCircleCheck, size: 32),
                     ),
                     const SizedBox(height: 24),
-                    Text('Welcome back, ${first.isEmpty ? 'there' : first}.', textAlign: TextAlign.center, style: inter(24, 700)),
+                    Text(first.isEmpty ? '${tr('Welcome back')}.' : '${tr('Welcome back')}, $first.', textAlign: TextAlign.center, style: inter(24, 700)), // no name on record: no stand-in
                     const SizedBox(height: 12),
                     Text(
-                      'You’re signed in to ${me.outlet.isEmpty ? 'OneLocal' : me.outlet}. Your ${_kindLabel(me.kind)} is ready to open.',
+                      'You’re signed in to ${me.outlet.isEmpty ? 'OneLocal' : me.outlet}. Your ${_kindLabel(me.advertising ? 'advertising' : me.kind)} is ready to open.',
                       textAlign: TextAlign.center,
                       style: inter(14, 400, color: kMuted, height: 1.5),
                     ),
@@ -113,10 +115,10 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    PrimaryAction(label: 'Continue to ${_kindLabel(me.kind)}', onPressed: () => openWorkspace(context, auth: _auth)),
+                    const SizedBox(height: 20),
+                    PrimaryAction(label: '${tr('Continue to')} ${tr(_kindLabel(me.advertising ? 'advertising' : me.kind))}', onPressed: () => openWorkspace(context, auth: _auth)),
                     const SizedBox(height: 12),
-                    SecondaryAction(label: 'Switch account', onPressed: () => _auth.signOut()),
+                    SecondaryAction(label: tr('Switch account'), onPressed: () => _auth.signOut()),
                   ],
                 ),
               ),
@@ -131,4 +133,4 @@ class _LoginSuccessScreenState extends State<LoginSuccessScreen> {
 }
 
 /// The words for the business on the sign-in screens: Restaurant POS, Store POS or Service POS.
-String _kindLabel(String kind) => switch (kind) { 'restaurant' => 'Restaurant POS', 'service' => 'Service POS', _ => 'Store POS' };
+String _kindLabel(String kind) => switch (kind) { 'restaurant' => 'Restaurant POS', 'service' => 'Service POS', 'advertising' => 'Ads', _ => 'Store POS' };

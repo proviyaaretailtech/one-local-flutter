@@ -3,20 +3,28 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../auth/auth_repository.dart';
+import '../ui/language_step.dart';
+import 'create_password_screen.dart';
 import '../ui/mask.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
-import 'register_account_type_screen.dart';
+import '../onboarding/checklist_screen.dart' show OnboardingEntry;
 
 /// Figma "OTP Verification". Exactly one of [phone] (+91XXXXXXXXXX) or [email] is set.
 /// [registering] sends the person on to the account-type screen instead of the signed-in home.
 class OtpVerifyScreen extends StatefulWidget {
-  const OtpVerifyScreen({super.key, this.phone, this.email, this.registering = false, this.auth, this.resendSeconds = 30});
+  const OtpVerifyScreen({super.key, this.phone, this.email, this.registering = false, this.auth, this.resendSeconds = 30, this.name, this.passwordStep = true});
   final String? phone;
   final String? email;
   final bool registering;
+
+  /// After registering: set a password before the application (tests turn it off to go straight on).
+  final bool passwordStep;
   final AuthRepository? auth;
   final int resendSeconds;
+
+  /// The name typed on Create account, for the shop owner on the application.
+  final String? name;
 
   @override
   State<OtpVerifyScreen> createState() => _OtpVerifyScreenState();
@@ -86,7 +94,9 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
       }
       if (!mounted) return;
       if (widget.registering) {
-        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const RegisterAccountTypeScreen()), (r) => r.isFirst);
+        // a password first (founder, 28 Oct 2026), then straight into the application
+        final application = LanguageGate(userId: _auth.currentUserId, child: OnboardingEntry(auth: _auth, phone: widget.phone, name: widget.name));
+        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => widget.passwordStep ? CreatePasswordScreen(next: application) : application), (r) => r.isFirst);
       } else {
         Navigator.of(context).popUntil((r) => r.isFirst);
       }

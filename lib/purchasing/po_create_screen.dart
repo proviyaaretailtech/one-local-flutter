@@ -5,11 +5,13 @@ import '../api/net_guard.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
+import '../stock/stock_env.dart' show OrderWant;
 import '../ui/theme.dart';
-import 'po_grn_screen.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
 import 'supplier_price_screen.dart';
+import '../ui/i18n.dart';
+import '../ui/purchase_steps.dart';
 
 /// One item on the order being built. Only ids, quantities and prices in paise go to the server, which checks every one again.
 class PoDraftLine {
@@ -24,10 +26,14 @@ class PoDraftLine {
   Map<String, Object?> toJson() => {'inventory_item_id': itemId, 'qty': qty, 'unit_cost_minor': unitCostMinor, 'gst_pct': gstPct};
 }
 
-/// Figma "Restaurant Purchase": supplier, the items to buy with their prices, the estimated total (before GST) and "Create purchase order".
+/// A new purchase order (Figma "Restaurant Purchase", used by every business): supplier, the items to buy with their prices, the estimated total (before GST) and "Generate PO" (live at once, no approval).
 class PoCreateScreen extends StatefulWidget {
-  const PoCreateScreen({super.key, required this.env});
+  const PoCreateScreen({super.key, required this.env, this.want = const []});
   final PurEnv env;
+
+  /// Items to put on the order straight away (from Reorder or Purchase's "Need to order"): the supplier who has prices for most of
+  /// them is chosen, and each line takes that supplier's price.
+  final List<OrderWant> want;
   @override
   State<PoCreateScreen> createState() => _PoCreateScreenState();
 }
@@ -54,11 +60,42 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
       setState(() {
         _o = o;
         _error = null;
+        if (_lines.isEmpty && widget.want.isNotEmpty) _fill(o);
       });
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = errorSentence(e));
     }
+  }
+
+  void _fill(Facts o) {
+    final ids = {for (final w in widget.want) w.itemId};
+    final count = <String, int>{};
+    for (final p in o.l('prices')) {
+      if (ids.contains(p.s('material_id'))) count[p.s('supplier_id')] = (count[p.s('supplier_id')] ?? 0) + 1;
+    }
+    if (count.isNotEmpty) _supplierId = (count.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).first.key;
+    for (final w in widget.want) {
+      final p = _price(o, w.itemId);
+      _lines.add(PoDraftLine(itemId: w.itemId, name: w.name, unit: w.unit.isEmpty ? 'unit' : w.unit, qty: w.qty, unitCostMinor: p?.n('price_minor').toInt() ?? 0, priceId: p?.so('price_id')));
+    }
+  }
+
+  /// A new supplier: lines without a price take this supplier's.
+  void _repriceLines(Facts o) {
+    for (final (i, l) in _lines.indexed) {
+      final p = _price(o, l.itemId);
+      if (p != null && (l.unitCostMinor == 0 || l.priceId != null)) {
+        _lines[i] = PoDraftLine(itemId: l.itemId, name: l.name, unit: l.unit, qty: l.qty, unitCostMinor: p.n('price_minor').toInt(), gstPct: l.gstPct, priceId: p.so('price_id'));
+      }
+    }
+  }
+
+  /// A line on the order: change its quantity or price.
+  Future<void> _editLine(int i) async {
+    final l = _lines[i];
+    final line = await _lineSheet(Facts({'id': l.itemId, 'name': l.name, 'unit': l.unit}), l.unitCostMinor, l.priceId, qty: l.qty);
+    if (line != null && mounted) setState(() => _lines[i] = line);
   }
 
   int get _estimate => _lines.fold(0, (a, l) => a + l.totalMinor);
@@ -79,7 +116,12 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
 
   Future<void> _pickSupplier(Facts o) async {
     final id = await pickOne<String>(context, 'Supplier', [for (final s in o.l('suppliers')) (s.s('id'), s.s('name'), s.s('payment_terms'))], current: _supplierId);
-    if (id != null && id != _supplierId) setState(() => _supplierId = id);
+    if (id != null && id != _supplierId) {
+      setState(() {
+        _supplierId = id;
+        _repriceLines(o);
+      });
+    }
   }
 
   Future<void> _addItem(Facts o) async {
@@ -93,12 +135,12 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
     if (line != null) setState(() => _lines.add(line));
   }
 
-  Future<PoDraftLine?> _lineSheet(Facts item, int priceMinor, String? priceId) {
-    final qtyC = TextEditingController();
+  Future<PoDraftLine?> _lineSheet(Facts item, int priceMinor, String? priceId, {num? qty}) {
+    final qtyC = TextEditingController(text: qty == null ? '' : qty1(qty).replaceFirst(RegExp(r'\.0$'), ''));
     final priceC = TextEditingController(text: priceMinor > 0 ? (priceMinor / 100).toString().replaceFirst(RegExp(r'\.0$'), '') : '');
-    final gstC = TextEditingController(text: '0');
     return showModalBottomSheet<PoDraftLine>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -110,16 +152,15 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
           InvInput(controller: qtyC, number: true, hint: '0'),
           InvLabel('Price per ${item.s('unit')} (₹)'),
           InvInput(controller: priceC, number: true, hint: '0'),
-          InvLabel('GST (%)'),
-          InvInput(controller: gstC, number: true, hint: '0'),
+          // no GST here (founder, 26 Oct 2026): the tax is taken from the supplier's bill and the product when goods are matched
           const SizedBox(height: 12),
-          InvPrimary('Add to order', onPressed: () {
-            final q = num.tryParse(qtyC.text.trim()), p = num.tryParse(priceC.text.trim()), g = num.tryParse(gstC.text.trim()) ?? 0;
-            if (q == null || q <= 0 || p == null || p < 0 || g < 0 || g > 100) {
-              showToast(ctx, 'Enter a quantity above zero, a price and a GST rate from 0 to 100.');
+          InvPrimary(tr(qty == null ? 'Add to order' : 'Update'), key: const ValueKey('po-line-save'), onPressed: () {
+            final q = num.tryParse(qtyC.text.trim()), p = num.tryParse(priceC.text.trim());
+            if (q == null || q <= 0 || p == null || p < 0) {
+              showToast(ctx, 'Enter a quantity above zero and a price.');
               return;
             }
-            Navigator.pop(ctx, PoDraftLine(itemId: item.s('id'), name: item.s('name'), unit: item.s('unit'), qty: q, unitCostMinor: (p * 100).round(), gstPct: g, priceId: priceId));
+            Navigator.pop(ctx, PoDraftLine(itemId: item.s('id'), name: item.s('name'), unit: item.s('unit'), qty: q, unitCostMinor: (p * 100).round(), priceId: priceId));
           }),
         ]),
       ),
@@ -129,11 +170,12 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
   Future<void> _create() async {
     setState(() => _busy = true);
     try {
+      // one step (founder, 28 Oct 2026): the order is live at once, no approval; back to the list, where it waits with its day counter
       final po = await env.api.create(supplierId: _supplierId!, lines: _lines.map((l) => l.toJson()).toList(), key: _key);
       _key = PurchasingApi.newKey();
       if (!mounted) return;
-      showToast(context, '${po.number} created.');
-      await Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => PoGrnScreen(env: env, orderId: po.id)));
+      showToast(context, '${po.number} ${tr('generated')}. ${tr('Mark it Received when the goods come.')}');
+      Navigator.of(context).maybePop(po);
     } catch (e) {
       if (mounted) showToast(context, errorSentence(e));
     } finally {
@@ -143,7 +185,8 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
 
   @override
   Widget build(BuildContext context) => InvScaffold(env: env.inv, onRefresh: _load, children: [
-        const InvTitle('Restaurant Purchase'),
+        const PurchaseSteps(1),
+        InvTitle(tr('New purchase order')),
         InvLoad<Facts>(data: _o, error: _error, onRetry: _load, builder: _body),
       ]);
 
@@ -152,20 +195,20 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
     final name = _supplierName(o);
     final canRecord = o.b('can_record');
     return [
-      Padding(padding: const EdgeInsets.only(bottom: 10), child: Align(alignment: Alignment.centerLeft, child: PoChip('Open $open ${open == 1 ? 'order' : 'orders'}', bg: kMintBg, fg: kPostedText))),
-      const InvLabel('SUPPLIER'),
+      Padding(padding: const EdgeInsets.only(bottom: 10), child: Align(alignment: Alignment.centerLeft, child: PoChip('$open open ${open == 1 ? 'order' : 'orders'} already', bg: kMintBg, fg: kPostedText))),
+      InvLabel(tr('SUPPLIER')),
       InvPickBox(value: name ?? 'Choose a supplier', semantic: 'Supplier', onTap: canRecord ? () => _pickSupplier(o) : null),
       const SizedBox(height: 10),
       InvCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Purchase items', style: inter(20, 700)),
+          Text(tr('Purchase items'), style: inter(20, 700)),
           const SizedBox(height: 8),
-          if (_lines.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text('No items yet.', style: inter(14.5, 400, color: kMuted))),
+          if (_lines.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(tr('No items yet.'), style: inter(14.5, 400, color: kMuted))),
           for (var i = 0; i < _lines.length; i++) ...[
             if (i > 0) const Divider(height: 18, color: kCardLine),
             _lineRow(_lines[i], i),
           ],
-          if (canRecord) Padding(padding: const EdgeInsets.only(top: 8), child: InvSecondary('Add item', onPressed: _supplierId == null ? () => showToast(context, 'Choose a supplier first.') : () => _addItem(o))),
+          if (canRecord) Padding(padding: const EdgeInsets.only(top: 8), child: InvSecondary(tr('Add item'), onPressed: _supplierId == null ? () => showToast(context, 'Choose a supplier first.') : () => _addItem(o))),
         ]),
       ),
       Container(
@@ -173,23 +216,30 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
         padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
         decoration: BoxDecoration(color: const Color(0xFFE8F5DC), borderRadius: BorderRadius.circular(22)),
         child: Row(children: [
-          Expanded(child: Text('Estimated total', style: inter(17, 600))),
+          Expanded(child: Text(tr('Estimated total'), style: inter(17, 600))),
           Text(money(_estimate), style: inter(28, 700, color: kPostedText)),
         ]),
       ),
-      InvPrimary('Create purchase order', busy: _busy, onPressed: (!canRecord || _supplierId == null || _lines.isEmpty) ? null : _create),
-      if (!canRecord) const InvNote('Your role can look at purchase orders but not create them.'),
+      InvPrimary(tr('Generate PO'), key: const ValueKey('po-place'), busy: _busy, onPressed: (!canRecord || _supplierId == null || _lines.isEmpty) ? null : _create),
+      if (!canRecord) InvNote(tr('Your role can look at purchase orders but not create them.')),
     ];
   }
 
   Widget _lineRow(PoDraftLine l, int i) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Expanded(
           child: InkWell(
-            onTap: l.priceId == null ? null : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SupplierPriceScreen(env: env, priceId: l.priceId!))),
+            key: ValueKey('po-line-${l.itemId}'),
+            onTap: () => _editLine(i),
+            onLongPress: l.priceId == null ? null : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SupplierPriceScreen(env: env, priceId: l.priceId!))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(l.name, style: inter(18, 600)),
               const SizedBox(height: 3),
-              Text('${qty1(l.qty).replaceFirst(RegExp(r'\.0$'), '')} ${l.unit == 'unit' ? 'units' : l.unit} · ${money(l.unitCostMinor)}/${l.unit}', style: inter(14.5, 400, color: kMuted)),
+              Text(
+                l.unitCostMinor == 0
+                    ? '${qty1(l.qty).replaceFirst(RegExp(r'\.0$'), '')} ${l.unit == 'unit' ? 'units' : l.unit} · ${tr('tap to add the price')}'
+                    : '${qty1(l.qty).replaceFirst(RegExp(r'\.0$'), '')} ${l.unit == 'unit' ? 'units' : l.unit} · ${money(l.unitCostMinor)}/${l.unit}',
+                style: inter(14.5, 400, color: l.unitCostMinor == 0 ? kAmberText : kMuted),
+              ),
             ]),
           ),
         ),

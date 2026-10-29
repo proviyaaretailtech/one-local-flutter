@@ -6,6 +6,7 @@ import '../ui/theme.dart';
 import 'money_api.dart';
 import 'money_env.dart';
 import 'money_widgets.dart';
+import '../ui/i18n.dart';
 
 // Overview, Payments, Transactions, Invoices: the money that came in. Figma frames "Money – Overview", "Money – Payments", "Transactions", "Invoices".
 
@@ -16,7 +17,7 @@ class MoneyOverview extends StatelessWidget {
   Widget build(BuildContext context) => MoneyScreen(
         env: env,
         screen: 'overview',
-        title: 'Overview',
+        title: tr('Overview'),
         defaults: const {'period': 'week'},
         load: env.api.overview,
         body: (c, d) {
@@ -39,7 +40,7 @@ class MoneyOverview extends StatelessWidget {
             InvCard(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Expanded(child: Text('Payments trend', style: inter(15, 700))),
+                  Expanded(child: Text(tr('Payments trend'), style: inter(15, 700))),
                   if (change != null) Text('${change >= 0 ? '+' : '−'}${change.abs()}%', style: inter(13, 600, color: change >= 0 ? kPostedText : kRedText)),
                 ]),
                 const SizedBox(height: 10),
@@ -53,14 +54,14 @@ class MoneyOverview extends StatelessWidget {
             ),
             MoneyHeading('Money summary', pill: '${pay.n('count')} payments'),
             MoneyRow(
-              title: 'Payments received',
+              title: tr('Payments received'),
               amount: money(pay.no('minor')),
               sub: '${rangeLabel(w.so('from'), w.so('to'))} • ${pay.n('count')} payments',
               trailing: const InvDotChip('Received', bg: kGreenIconBg, fg: kPostedText),
             ),
             if (com != null)
               MoneyRow(
-                title: 'Commission earned',
+                title: tr('Commission earned'),
                 amount: money(com.no('minor')),
                 sub: '${com.no('rate_bps') == null ? 'Commission' : '${(com.n('rate_bps') / 100).toStringAsFixed(com.n('rate_bps') % 100 == 0 ? 0 : 1)}% of net order value'} • this period',
                 trailing: const InvDotChip('Earned', bg: kGreenIconBg, fg: kPostedText),
@@ -102,7 +103,7 @@ class PaymentsScreen extends StatelessWidget {
   Widget build(BuildContext context) => MoneyScreen(
         env: env,
         screen: 'payments',
-        title: 'Payments',
+        title: tr('Payments'),
         defaults: const {'period': 'week', 'method': 'all', 'status': 'all'},
         load: env.api.payments,
         body: (c, d) {
@@ -161,7 +162,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       key: ValueKey(_bump),
       env: env,
       screen: 'transactions',
-      title: 'Transactions',
+      title: tr('Transactions'),
       defaults: const {'period': 'all', 'type': 'all'},
       load: env.api.transactions,
       body: (c, d) {
@@ -176,7 +177,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             onSubmitted: (v) => c.set({'q': v.trim()}),
             style: inter(15, 400),
             decoration: InputDecoration(
-              hintText: 'Transaction ID or description',
+              hintText: tr('Transaction ID or description'),
               hintStyle: inter(15, 400, color: kMuted),
               prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
               filled: true,
@@ -212,7 +213,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           MoneyMore(shown: rows.length, total: d.n('total').toInt(), ctx: c),
           if (env.may('record'))
             MoneyCta('Add party entry', onPressed: () async {
-              final done = await showMoneyForm(c.context, title: 'Party entry', action: 'Save', note: 'Money you gave to or got from a person. It is a ledger balance, not cash on hand.', fields: const [
+              final done = await showMoneyForm(c.context, title: tr('Party entry'), action: tr('Save'), note: tr('Money you gave to or got from a person. It is a ledger balance, not cash on hand.'), fields: const [
                 FormFieldSpec('party_name', 'Name'),
                 FormFieldSpec('direction', 'You gave or got', kind: FieldKind.pick, options: [('gave', 'You gave'), ('got', 'You got')], initial: 'gave'),
                 FormFieldSpec('amount', 'Amount (₹)', kind: FieldKind.amount),
@@ -239,8 +240,8 @@ class InvoicesScreen extends StatelessWidget {
     return MoneyScreen(
       env: env,
       screen: 'invoices',
-      title: 'Invoices',
-      subtitle: 'Sales and purchase invoices in one place',
+      title: tr('Invoices'),
+      subtitle: tr('Sales and purchase invoices in one place'),
       defaults: const {'period': 'all', 'kind': 'all', 'payment': 'all'},
       load: env.api.invoices,
       body: (c, d) {
@@ -252,7 +253,7 @@ class InvoicesScreen extends StatelessWidget {
             onSubmitted: (v) => c.set({'q': v.trim()}),
             style: inter(15, 400),
             decoration: InputDecoration(
-              hintText: 'Invoice number, customer or supplier',
+              hintText: tr('Invoice number, customer or supplier'),
               hintStyle: inter(15, 400, color: kMuted),
               prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
               filled: true,
@@ -287,23 +288,23 @@ class InvoicesScreen extends StatelessWidget {
                 const Divider(height: 22, color: kCardLine),
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Total amount', style: inter(12, 400, color: kMuted)),
+                    Text(tr('Total amount'), style: inter(12, 400, color: kMuted)),
                     Text(money(r.no('total_minor'), whole: true), style: inter(21, 700)),
                     if (r.s('status') == 'partial' || r.s('status') == 'overdue') Text('Paid ${money(r.no('paid_minor'), whole: true)}', style: inter(12, 400, color: kMuted)),
                   ])),
                   if (r.s('kind') == 'purchases' && r.s('status') != 'paid' && env.may('record'))
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: SizedBox(width: 132, child: InvSecondary('Record payment', textSize: 13.5, onPressed: () async {
+                      child: SizedBox(width: 132, child: InvSecondary(tr('Record payment'), textSize: 13.5, onPressed: () async {
                         final left = r.n('total_minor') - r.n('paid_minor');
-                        final done = await showMoneyForm(c.context, title: 'Pay ${r.s('party')}', action: 'Record payment', note: 'Still owed on ${r.s('ref')}: ${money(left)}', fields: [
+                        final done = await showMoneyForm(c.context, title: 'Pay ${r.s('party')}', action: tr('Record payment'), note: 'Still owed on ${r.s('ref')}: ${money(left)}', fields: [
                           FormFieldSpec('amount', 'Amount (₹)', kind: FieldKind.amount, initial: (left / 100).toStringAsFixed(left % 100 == 0 ? 0 : 2)),
                           const FormFieldSpec('method', 'Method', kind: FieldKind.pick, options: [('bank', 'Bank'), ('cash', 'Cash'), ('upi', 'UPI'), ('card', 'Card'), ('other', 'Other')], initial: 'bank'),
                         ], onSubmit: (v, key) => env.api.payInvoice({'invoice_id': r.s('id'), ...v}, key));
                         if (done) await c.reload();
                       })),
                     ),
-                  SizedBox(width: 120, child: InvSecondary('Download', color: kPostedText, onPressed: () => env.later(c.context, 'PDF download'))),
+                  SizedBox(width: 120, child: InvSecondary(tr('Download'), color: kPostedText, onPressed: () => env.later(c.context, 'PDF download'))),
                 ]),
               ]),
             ),

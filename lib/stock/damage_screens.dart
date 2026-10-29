@@ -5,6 +5,7 @@ import '../ui/theme.dart';
 import 'damage_flow.dart';
 import 'stock_env.dart';
 import 'stock_kit.dart';
+import '../ui/i18n.dart';
 
 enum AdjustKind { damage, throwAway }
 
@@ -119,7 +120,7 @@ class _AdjustFormState extends State<AdjustForm> {
         InvCardHead(_damage ? 'Record damage' : 'Throw away ${d?.m('item').s('name') ?? ''}'.trim(),
             subtitle: _damage ? 'Keeps it off the shelf. An owner or manager approves it.' : 'Removes it for good. An owner or manager approves it.'),
         if (_damage || widget.itemId == null) ...[
-          const InvLabel('Product'),
+          InvLabel(tr('Product')),
           InvPickBox(value: d == null ? 'Choose a product' : '${d.m('item').s('name')} · ${d.m('item').s('sku')}', onTap: _busy ? null : _pickItem, semantic: 'Product'),
         ],
         if (d != null) ...[
@@ -131,15 +132,15 @@ class _AdjustFormState extends State<AdjustForm> {
             semantic: 'Place',
           ),
         ],
-        const InvLabel('How many?'),
+        InvLabel(tr('How many?')),
         InvInput(key: const ValueKey('adjust-qty'), controller: _qty, number: true, hint: _place == null ? 'Units' : 'Up to ${qty(_place!.onHand)}'),
-        const InvLabel('Why?'),
+        InvLabel(tr('Why?')),
         InvPickBox(value: _reason.isEmpty ? 'Choose why' : _reason, onTap: _busy || widget.reasons.isEmpty ? null : _pickReason, semantic: 'Reason'),
-        const InvLabel('Note (optional)'),
+        InvLabel(tr('Note (optional)')),
         InvInput(controller: _note, hint: _damage ? 'For example: bottle cap leaking' : 'For example: returned to supplier'),
         const SizedBox(height: 12),
-        InvPrimary('Send for approval', busy: _busy, onPressed: _busy ? null : _send),
-        InvSecondary('Cancel', onPressed: _busy ? null : widget.onCancel),
+        InvPrimary(tr('Send for approval'), busy: _busy, onPressed: _busy ? null : _send),
+        InvSecondary(tr('Cancel'), onPressed: _busy ? null : widget.onCancel),
       ]),
     );
   }

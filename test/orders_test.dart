@@ -9,6 +9,7 @@ import 'package:vinii_pos/orders/order_screen.dart';
 import 'package:vinii_pos/orders/orders_api.dart';
 import 'package:vinii_pos/orders/orders_home.dart';
 import 'package:vinii_pos/ui/theme.dart';
+import 'package:vinii_pos/ui/wallet.dart';
 
 import 'helpers.dart';
 import 'order_fixtures.dart';
@@ -85,24 +86,71 @@ void main() {
   });
 
   group('OrdersHome (Orders History)', () {
-    testWidgets('lists the server cards and refilters', (t) async {
+    testWidgets('online orders sit in piles by where they are; counter bills are not here; cancelled is a small link', (t) async {
       final s = FakeServer((r) => ok({
-            'orders': r.url.queryParameters['filter'] == 'cancelled'
-                ? [card('2', 'cancelled', 'Cancelled')]
-                : [card('1', 'pending', 'Pending'), card('3', 'completed', 'Completed')]
+            'orders': [
+              card('1', 'pending', 'Pending', state: 'new', delivery: 'Awaiting acceptance · not dispatched'),
+              card('2', 'pending', 'Pending', state: 'new', delivery: 'Awaiting acceptance · not dispatched'),
+              card('3', 'pending', 'Pending', state: 'ongoing', delivery: 'Picking · 2 of 5 units'),
+              card('4', 'pending', 'Pending', state: 'ready', delivery: 'Ready · not handed over'),
+              card('5', 'completed', 'Completed', state: 'delivered', delivery: 'Delivered · 5 of 5 units'),
+              card('6', 'completed', 'Completed', state: 'return', delivery: 'Delivered · 5 of 5 units'),
+              card('7', 'cancelled', 'Cancelled', state: 'cancelled'),
+              card('8', 'pending', 'Pending', state: 'counter'), // a held counter bill
+            ]
           }));
       await showTall(t, OrdersHome(api: s.api));
-      expect(find.text('Orders History'), findsOneWidget);
-      expect(find.text('Order #P-1'), findsOneWidget);
-      expect(find.text('Order #P-3'), findsOneWidget);
-      expect(find.text('2 orders'), findsOneWidget);
-      expect(find.text('Unpaid · ₹980 due'), findsNWidgets(2));
-      expect(find.text('View details'), findsNWidgets(2));
-      await t.tap(find.text('Cancelled').first);
+      expect(find.text('7 orders'), findsOneWidget); // the counter bill is not an online order
+      for (final p in ['New orders · 2', 'In progress · 1', 'Packed · waiting for rider · 1', 'Return requested · 1', 'Delivered · 1']) {
+        expect(find.text(p), findsOneWidget, reason: p);
+      }
+      expect(find.text('Cancelled · 1'), findsOneWidget);
+      // the New orders pile comes first and fans out
+      expect(t.getTopLeft(find.byKey(const ValueKey('orders-pile-new'))).dy, lessThan(t.getTopLeft(find.byKey(const ValueKey('orders-pile-delivered'))).dy));
+      await t.tap(find.byKey(const ValueKey('orders-pile-new')));
       await t.pumpAndSettle();
-      expect(s.requests.last.url.queryParameters['filter'], 'cancelled');
-      expect(find.text('Order #P-2'), findsOneWidget);
-      expect(find.text('Order #P-1'), findsNothing);
+      expect(find.byKey(const ValueKey('order-card-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('order-card-2')), findsOneWidget);
+      expect(find.byKey(const ValueKey('order-card-3')), findsNothing);
+      expect(find.text('Awaiting acceptance · not dispatched'), findsNWidgets(2));
+      // cards one after another, none covering the next; a back arrow with the pile's name
+      expect(t.getRect(find.byKey(const ValueKey('order-card-2'))).top, greaterThanOrEqualTo(t.getRect(find.byKey(const ValueKey('order-card-1'))).bottom));
+      expect(find.text('New orders · 2'), findsOneWidget);
+      // the customer leads, in the pile's colour; the order number is small
+      final name = t.widget<Text>(find.descendant(of: find.byKey(const ValueKey('order-card-1')), matching: find.text('Rahul Mehta')));
+      expect(name.style?.color, WalletColors.orange.first);
+      expect(find.descendant(of: find.byKey(const ValueKey('order-card-1')), matching: find.textContaining('#P-1 ·')), findsOneWidget);
+      expect(find.text('Waiting for you to accept'), findsOneWidget);
+      // the phone's back button closes the pile first
+      await t.binding.handlePopRoute();
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('orders-piles')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('orders-pile-new')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('order-card-1')));
+      await t.pumpAndSettle();
+      expect(find.text('View details'), findsOneWidget);
+      // another pile from the tabs on top
+      await t.ensureVisible(find.byKey(const ValueKey('orders-tab-return')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('orders-tab-return')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('order-card-6')), findsOneWidget);
+      expect(find.textContaining('Return requested ·'), findsWidgets);
+      // back, then the cancelled link
+      await t.tap(find.byKey(const ValueKey('orders-all-piles')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('orders-cancelled')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('order-card-7')), findsOneWidget);
+      expect(find.byKey(const ValueKey('order-card-8')), findsNothing);
+    });
+
+    testWidgets('an older server without states: orders are still placed (completed → Delivered, otherwise In progress)', (t) async {
+      final s = FakeServer((r) => ok({'orders': [card('1', 'pending', 'Pending'), card('3', 'completed', 'Completed')]}));
+      await showTall(t, OrdersHome(api: s.api));
+      expect(find.text('In progress · 1'), findsOneWidget);
+      expect(find.text('Delivered · 1'), findsOneWidget);
     });
 
     testWidgets('search waits for typing to stop', (t) async {
@@ -118,6 +166,10 @@ void main() {
     testWidgets('View details opens the order', (t) async {
       final s = FakeServer((r) => r.url.path.endsWith('/pos-orders') ? ok({'orders': [card(orderId, 'pending', 'Pending')]}) : ok(view('preparing')));
       await showTall(t, OrdersHome(api: s.api));
+      await t.tap(find.byKey(const ValueKey('orders-pile-ongoing')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(ValueKey('order-card-$orderId')));
+      await t.pumpAndSettle();
       await t.tap(find.text('View details'));
       await t.pumpAndSettle();
       expect(find.text('Order Preparing'), findsOneWidget);
@@ -210,11 +262,11 @@ void main() {
   group('OrderScreen', () {
     for (final (stage, title, primary, secondary) in const [
       ('checkout', 'Checkout', 'Complete Payment', 'Cancel bill'),
-      ('pending', 'Order Confirmation', 'Print receipt', 'Send by WhatsApp'),
-      ('preparing', 'Order Preparing', 'Open picking checklist', 'Report missing item'),
-      ('picked', 'Order Picked', 'Start packing', 'Review picked quantities'),
-      ('ready', 'Order Ready', 'Record handover', 'Arrange dispatch'),
-      ('in_transit', 'Order In Transit', 'Check delivery status', 'Report delivery issue'),
+      ('pending', 'Order Confirmation', 'Accept order', 'Send receipt on WhatsApp'),
+      ('preparing', 'Order Preparing', 'Pack order', 'Something missing?'),
+      ('picked', 'Order Picked', 'Pack order', 'Something missing?'),
+      ('ready', 'Order Ready', 'Customer collected it', 'Send for delivery'),
+      ('in_transit', 'Order In Transit', 'Mark delivered', 'Report a delivery problem'),
       ('exception', 'Order Exception', 'Resolve missing information', 'Arrange store collection'),
       ('cancelled', 'Order Cancelled', 'Review cancellation', 'Create new cart from items'),
     ]) {
@@ -235,30 +287,17 @@ void main() {
       });
     }
 
-    testWidgets('Start packing sends the version and a key, then shows the new state', (t) async {
-      final s = FakeServer((r) => r.method == 'GET' ? ok(view('picked', version: 4)) : ok(view('ready', version: 5)));
+    testWidgets('a new order: Accept order accepts it straight away, with the steps on top', (t) async {
+      final s = FakeServer((r) => r.method == 'GET' ? ok(view('pending', version: 1)) : ok(view('preparing', version: 2)));
       await showTall(t, OrderScreen(api: s.api, orderId: orderId));
-      await t.tap(find.text('Start packing'));
+      expect(find.byKey(const ValueKey('order-step-0')), findsOneWidget);
+      expect(find.text('Hand over'), findsOneWidget);
+      await t.tap(find.text('Accept order'));
       await t.pumpAndSettle();
       final post = s.where('POST', '/act').single;
-      expect(jsonDecode(post.body), {'action': 'pack', 'version': 4});
+      expect(jsonDecode(post.body), {'action': 'accept', 'version': 1});
       expect(post.headers['Idempotency-Key'], startsWith('pos-'));
-      expect(find.text('Order Ready'), findsOneWidget);
-    });
-
-    testWidgets('picking checklist sends every line with its picked quantity', (t) async {
-      final s = FakeServer((r) => r.method == 'GET' ? ok(view('preparing')) : ok(view('picked', version: 3)));
-      await showTall(t, OrderScreen(api: s.api, orderId: orderId));
-      await t.tap(find.text('Open picking checklist'));
-      await t.pumpAndSettle();
-      await t.tap(find.byType(Checkbox).first);
-      await t.pump();
-      await t.tap(find.text('Save picked quantities'));
-      await t.pumpAndSettle();
-      final body = jsonDecode(s.where('POST', '/act').single.body) as Map;
-      expect(body['action'], 'pick');
-      expect((body['lines'] as List).first, {'order_item_id': '00000001-0000-0000-0000-000000000000', 'qty': 2});
-      expect((body['lines'] as List), hasLength(5));
+      expect(find.text('Pack order'), findsOneWidget);
     });
 
     testWidgets('a version conflict reloads the order and says why', (t) async {
@@ -268,7 +307,7 @@ void main() {
         return err(409, 'This order was changed on another device.', 'version_conflict');
       });
       await showTall(t, OrderScreen(api: s.api, orderId: orderId));
-      await t.tap(find.text('Record handover'));
+      await t.tap(find.text('Customer collected it'));
       await t.pumpAndSettle();
       expect(toast('This order was changed on another device.'), findsOneWidget);
       expect(find.text('Order In Transit'), findsOneWidget);
@@ -306,7 +345,7 @@ void main() {
     });
 
     testWidgets('print says honestly that no printer is connected', (t) async {
-      final s = FakeServer((_) => ok(view('pending')));
+      final s = FakeServer((_) => ok(view('completed')));
       await showTall(t, OrderScreen(api: s.api, orderId: orderId));
       await t.tap(find.text('Print receipt'));
       await t.pump();

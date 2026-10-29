@@ -14,13 +14,19 @@ class PartnerApi {
 }
 
 class PartnerMe {
-  PartnerMe({required this.name, required this.email, required this.outlet, this.kind = 'store'});
+  PartnerMe({required this.name, required this.email, required this.outlet, this.kind = 'store', this.sellPlan, this.advertising = false});
+
+  /// An advertising-only partner (no store): its app is Ads.
+  final bool advertising;
   final String name;
 
   /// store | restaurant | service, from the server.
   final String kind;
   final String email;
   final String outlet;
+
+  /// pos_only | pos_and_onelocal | onelocal_app (the plan on the application), or null.
+  final String? sellPlan;
 
   factory PartnerMe.fromJson(Map<String, dynamic> j) {
     final person = (j['person'] as Map?) ?? {};
@@ -30,6 +36,8 @@ class PartnerMe {
       email: (person['email'] ?? '') as String,
       outlet: (outlet['name'] ?? '') as String,
       kind: (j['business_kind'] ?? 'store') as String,
+      sellPlan: j['sell_plan'] as String?,
+      advertising: j['advertising_only'] == true,
     );
   }
 }

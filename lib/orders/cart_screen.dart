@@ -11,6 +11,7 @@ import '../ui/theme.dart';
 import 'order_screen.dart';
 import 'order_widgets.dart';
 import 'orders_api.dart';
+import '../ui/i18n.dart';
 
 /// A held bill reopened from the Hold orders tab (Resume POS). The cart edits THAT order: changed lines are written to it with
 /// `pos_hold_update`, and payment goes through `pay` on the same order id — a held bill is never placed again as a new order.
@@ -115,7 +116,7 @@ class _CartScreenState extends State<CartScreen> {
   num? get _tendered => num.tryParse(_tender.text.replaceAll(',', '').trim());
 
   Future<void> _addItems() async {
-    final picked = await showOrderSheet<CatalogItem>(context, title: 'Add items', body: (ctx) => _CatalogPicker(api: _api));
+    final picked = await showOrderSheet<CatalogItem>(context, title: tr('Add items'), body: (ctx) => _CatalogPicker(api: _api));
     if (picked == null) return;
     final existing = _lines.where((l) => l.menuItemId == picked.id).firstOrNull;
     if (existing != null) {
@@ -130,11 +131,11 @@ class _CartScreenState extends State<CartScreen> {
     final code = TextEditingController();
     final entered = await showOrderSheet<String>(
       context,
-      title: 'Apply coupon',
+      title: tr('Apply coupon'),
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        TextField(controller: code, textCapitalization: TextCapitalization.characters, decoration: const InputDecoration(hintText: 'Coupon code')),
+        TextField(controller: code, textCapitalization: TextCapitalization.characters, decoration: InputDecoration(hintText: tr('Coupon code'))),
         const SizedBox(height: 16),
-        DarkCta(label: 'Apply', onPressed: () => Navigator.pop(ctx, code.text.trim())),
+        DarkCta(label: tr('Apply'), onPressed: () => Navigator.pop(ctx, code.text.trim())),
       ]),
     );
     if (entered == null || entered.isEmpty || !mounted) return;
@@ -231,11 +232,11 @@ class _CartScreenState extends State<CartScreen> {
     final c = TextEditingController(text: widget.resume?.reason ?? '');
     return showOrderSheet<String>(
       context,
-      title: 'Save & Hold',
+      title: tr('Save & Hold'),
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        TextField(key: const ValueKey('hold-reason'), controller: c, maxLength: 200, decoration: const InputDecoration(hintText: 'Why is it on hold? (optional)')),
+        TextField(key: const ValueKey('hold-reason'), controller: c, maxLength: 200, decoration: InputDecoration(hintText: tr('Why is it on hold? (optional)'))),
         const SizedBox(height: 8),
-        DarkCta(label: 'Hold bill', onPressed: () => Navigator.pop(ctx, c.text.trim())),
+        DarkCta(label: tr('Hold bill'), onPressed: () => Navigator.pop(ctx, c.text.trim())),
       ]),
     );
   }
@@ -297,7 +298,7 @@ class _CartScreenState extends State<CartScreen> {
             if (!_checkout) ...[
               DarkCta(label: 'Proceed to Checkout ${rupees(total)}', onPressed: q == null ? null : () => setState(() => _checkout = true)),
               const SizedBox(height: 10),
-              LightCta(label: 'Edit cart items', onPressed: _addItems),
+              LightCta(label: tr('Edit cart items'), onPressed: _addItems),
             ] else
               DarkCta(label: 'Complete Payment ${rupees(total)}', busy: _busy, onPressed: q == null ? null : _complete),
             const SizedBox(height: 8),
@@ -310,17 +311,17 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Widget _note(num total) {
-    if (!_checkout) return const StateNote(tone: 'info', title: 'Review this individual cart', body: 'Quantities and coupon are editable. No payment has been collected.');
+    if (!_checkout) return StateNote(tone: 'info', title: tr('Review this individual cart'), body: tr('Quantities and coupon are editable. No payment has been collected.'));
     final t = _tendered;
     if (_method == 'cash' && t != null && t > 0) {
       final change = t - total;
       return StateNote(
         tone: change < 0 ? 'warn' : 'info',
-        title: 'Cash tender entered',
+        title: tr('Cash tender entered'),
         body: change < 0 ? '${rupees(t)} is less than the ${rupees(total)} due.' : 'Confirm ${rupees(t)} received, settle ${rupees(total)} and return ${rupees(change)} change.',
       );
     }
-    return StateNote(tone: 'info', title: 'Ready for payment', body: _method == 'cash' ? 'Enter the cash received to work out the change.' : 'Confirm the ${_methods.firstWhere((m) => m.$1 == _method).$2} payment, then complete.');
+    return StateNote(tone: 'info', title: tr('Ready for payment'), body: _method == 'cash' ? 'Enter the cash received to work out the change.' : 'Confirm the ${_methods.firstWhere((m) => m.$1 == _method).$2} payment, then complete.');
   }
 
   Widget _itemsCard(int units) {
@@ -332,7 +333,7 @@ class _CartScreenState extends State<CartScreen> {
           Text('${_lines.length} ${_lines.length == 1 ? 'line' : 'lines'} · $units ${units == 1 ? 'unit' : 'units'}', style: inter(11.5, 400, color: kMuted)),
         ]),
         const SizedBox(height: 8),
-        if (_lines.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('No items yet.', style: inter(13, 400, color: kMuted))),
+        if (_lines.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(tr('No items yet.'), style: inter(13, 400, color: kMuted))),
         for (final l in _lines)
           ItemLine(
             name: l.name,
@@ -397,7 +398,7 @@ class _CartScreenState extends State<CartScreen> {
   Widget _tenderBlock(num total) {
     if (!_checkout) {
       return TenderBlock(
-        label: 'Amount Received · not collected',
+        label: tr('Amount Received · not collected'),
         amountText: '₹0',
         chips: ['${rupees(total)} due', _methods.firstWhere((m) => m.$1 == _method).$2, 'Draft'],
         selectedChip: 'Draft',
@@ -408,7 +409,7 @@ class _CartScreenState extends State<CartScreen> {
     }
     if (_method != 'cash') {
       return TenderBlock(
-        label: 'Amount to collect · not yet captured',
+        label: tr('Amount to collect · not yet captured'),
         amountText: rupees(total),
         chips: ['${rupees(total)} (Exact)'],
         changeLabel: 'Change Due · none',
@@ -421,7 +422,7 @@ class _CartScreenState extends State<CartScreen> {
     final options = <num>{total, if (round100 > total) round100, if (round500 > round100) round500}.toList();
     final change = t == null ? 0 : (t - total);
     return TenderBlock(
-      label: 'Amount Received · not yet captured',
+      label: tr('Amount Received · not yet captured'),
       amountText: '',
       field: Container(
         height: 46,
@@ -534,7 +535,7 @@ class _CatalogPickerState extends State<_CatalogPicker> {
   Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(
           controller: _q,
-          decoration: const InputDecoration(hintText: 'Search items', prefixIcon: Icon(LucideIcons.search, size: 18)),
+          decoration: InputDecoration(hintText: tr('Search items'), prefixIcon: Icon(LucideIcons.search, size: 18)),
           onChanged: (_) {
             _debounce?.cancel();
             _debounce = Timer(const Duration(milliseconds: 300), _load);
@@ -543,7 +544,7 @@ class _CatalogPickerState extends State<_CatalogPicker> {
         const SizedBox(height: 8),
         if (_error != null) Text(_error!, style: inter(13, 400, color: kMuted)),
         if (_items == null && _error == null) const Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: kGreenText)),
-        if (_items != null && _items!.isEmpty) Padding(padding: const EdgeInsets.all(20), child: Text('No items found.', style: inter(13, 400, color: kMuted))),
+        if (_items != null && _items!.isEmpty) Padding(padding: const EdgeInsets.all(20), child: Text(tr('No items found.'), style: inter(13, 400, color: kMuted))),
         if (_items != null)
           ConstrainedBox(
             constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.5),

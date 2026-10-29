@@ -187,24 +187,47 @@ class SelectField extends StatelessWidget {
       backgroundColor: Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        maxChildSize: 0.9,
-        builder: (_, scroll) => Column(children: [
-          Padding(padding: const EdgeInsets.all(20), child: Text(label, style: inter(18, 600))),
-          Expanded(
-            child: ListView(controller: scroll, children: [
-              for (final o in options)
-                ListTile(
-                  title: Text(o, style: inter(15, o == value ? 600 : 400)),
-                  trailing: o == value ? const Ico(lucideCircleCheck, size: 20) : null,
-                  onTap: () => Navigator.pop(context, o),
+      builder: (_) {
+        var query = '';
+        return StatefulBuilder(
+          builder: (context, set) => DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.6,
+            maxChildSize: 0.9,
+            builder: (_, scroll) => Column(children: [
+              Padding(padding: const EdgeInsets.all(20), child: Text(label, style: inter(18, 600))),
+              if (options.length > 12) // long lists (states, cities): type to find
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: TextField(
+                    key: const ValueKey('select-search'),
+                    onChanged: (v) => set(() => query = v.trim().toLowerCase()),
+                    style: inter(15, 400),
+                    decoration: InputDecoration(
+                      hintText: 'Search',
+                      prefixIcon: const Icon(Icons.search, size: 20, color: kMuted),
+                      filled: true,
+                      fillColor: kField,
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(kRadius), borderSide: const BorderSide(color: kFieldBorder)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(kRadius), borderSide: const BorderSide(color: kFieldBorder)),
+                    ),
+                  ),
                 ),
+              Expanded(
+                child: ListView(controller: scroll, children: [
+                  for (final o in options.where((o) => query.isEmpty || o.toLowerCase().contains(query) || o == options.last && o.startsWith('Other')))
+                    ListTile(
+                      title: Text(o, style: inter(15, o == value ? 600 : 400)),
+                      trailing: o == value ? const Ico(lucideCircleCheck, size: 20) : null,
+                      onTap: () => Navigator.pop(context, o),
+                    ),
+                ]),
+              ),
             ]),
           ),
-        ]),
-      ),
+        );
+      },
     );
     if (picked != null) onChanged(picked);
   }
@@ -358,6 +381,10 @@ String niceDate(String? iso) {
   const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return '${d.day.toString().padLeft(2, '0')} ${m[d.month - 1]} ${d.year}';
 }
+
+/// Closes the application and stays signed in (founder, 28 Oct 2026): everything is saved, and the welcome screen offers to continue.
+/// Signing out here locked out a person who signed up with only a code.
+void exitOnboarding(BuildContext context) => Navigator.of(context).popUntil((r) => r.isFirst);
 
 /// Signs out and drops every onboarding screen, so the sign-in screen the gate shows is what the person sees.
 Future<void> leaveOnboarding(BuildContext context, AuthRepository? auth) async {

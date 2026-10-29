@@ -14,12 +14,11 @@ import '../ui/theme.dart';
 import 'label_pdf.dart';
 import 'stock_env.dart';
 import 'stock_kit.dart';
+import '../ui/i18n.dart';
 
 /// Where finished label PDFs go: the phone / PC print screen (it lists every printer the device can use) and the share sheet.
-/// Tests replace them to catch the PDF instead.
-@visibleForTesting
+/// Product and shelf labels both use them; tests replace them to catch the PDF instead.
 Future<void> Function(Uint8List pdf, String name) printLabelPdf = (pdf, name) => Printing.layoutPdf(onLayout: (_) async => pdf, name: name);
-@visibleForTesting
 Future<void> Function(Uint8List pdf, String name) shareLabelPdf = (pdf, name) => Printing.sharePdf(bytes: pdf, filename: name);
 
 /// Figma "Product Label Printing": price + barcode stickers for chosen products, printed through the device's print screen.
@@ -166,18 +165,18 @@ class _LabelsPageState extends State<_LabelsPage> {
         line: _shelf ? 'Big, clear price strips for the shelf edge.' : 'Price and barcode stickers for your products.',
         children: [
           InvCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            InvCardHead('Products', subtitle: _entries.isEmpty ? 'Choose what to print labels for' : '$_total label${_total == 1 ? '' : 's'} for ${_entries.length} product${_entries.length == 1 ? '' : 's'}'),
+            InvCardHead(tr('Products'), subtitle: _entries.isEmpty ? 'Choose what to print labels for' : '$_total label${_total == 1 ? '' : 's'} for ${_entries.length} product${_entries.length == 1 ? '' : 's'}'),
             for (final e in _entries) _entry(e),
-            if (_entries.isEmpty) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text('No products yet. Add one to see its label.', style: inter(13.5, 400, color: kMuted))),
+            if (_entries.isEmpty) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(tr('No products yet. Add one to see its label.'), style: inter(13.5, 400, color: kMuted))),
             InvSecondary(_adding ? 'Adding…' : (_entries.isEmpty ? 'Add a product' : 'Add another product'), onPressed: _adding ? null : _pick),
           ])),
           InvCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const InvCardHead('Label size'),
-            StockRow('Size', widget.size.title),
-            const StockRow('Barcode', 'Product barcode, or its System Code'),
-            const StockRow('Price', 'Current selling price'),
+            InvCardHead(tr('Label size')),
+            StockRow(tr('Size'), widget.size.title),
+            StockRow(tr('Barcode'), 'Product barcode, or its System Code'),
+            StockRow(tr('Price'), 'Current selling price'),
             const SizedBox(height: 4),
-            Text('When you print, your phone or computer shows its print screen. Choose your label printer and paper there.', style: inter(12.5, 400, color: kMuted, height: 1.4)),
+            Text(tr('When you print, your phone or computer shows its print screen. Choose your label printer and paper there.'), style: inter(12.5, 400, color: kMuted, height: 1.4)),
           ])),
           if (_entries.isNotEmpty) ...[
             const InvSection('Preview'),
@@ -185,7 +184,7 @@ class _LabelsPageState extends State<_LabelsPage> {
             const SizedBox(height: 14),
           ],
           InvPrimary(_entries.isEmpty ? 'Print labels' : 'Print $_total label${_total == 1 ? '' : 's'}', busy: _busy, onPressed: _busy ? null : () => _out(printLabelPdf)),
-          InvSecondary('Share PDF', onPressed: _busy ? null : () => _out(shareLabelPdf)),
+          InvSecondary(tr('Share PDF'), onPressed: _busy ? null : () => _out(shareLabelPdf)),
           const SizedBox(height: 8),
         ],
       );
@@ -210,7 +209,7 @@ class _LabelsPageState extends State<_LabelsPage> {
           ]),
           const SizedBox(height: 6),
           Row(children: [
-            Text('Labels', style: inter(13, 600)),
+            Text(tr('Labels'), style: inter(13, 600)),
             const SizedBox(width: 12),
             InvStepper(value: e.copies, min: 1, label: 'labels for ${e.label.name}', onChanged: (v) => setState(() => e.copies = v.toInt().clamp(1, 500))),
           ]),

@@ -22,9 +22,11 @@ void popWith(BuildContext context, SetupState s, {bool advance = true}) => Navig
 
 /// The order "Save & Continue" walks through: what is required first (get paid, then start selling), the optional
 /// extras last so a partner can stop once they are ready to sell. POS is left out for partners who sell only on the
-/// OneLocal app.
-List<String> setupSequence(SetupState s) =>
-    ['plan', 'payment', 'tax', 'catalogue', if (s.posRequired) 'pos', 'listing', ..._optionalSteps];
+/// OneLocal app; the OneLocal listing and delivery for Purchase POS, which is not on the app (founder, 28 Oct 2026).
+List<String> setupSequence(SetupState s) => [
+      'plan', 'payment', 'tax', 'catalogue', if (s.posRequired) 'pos', if (s.sellsOnline) 'listing',
+      ..._optionalSteps.where((o) => s.sellsOnline || o != 'delivery'),
+    ];
 
 /// Steps that can be skipped ("Skip for now"); they stay on the checklist to do later.
 const _optionalSteps = ['staff', 'delivery'];

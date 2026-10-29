@@ -13,6 +13,7 @@ import 'package:vinii_pos/settings/settings_api.dart';
 import 'package:vinii_pos/settings/settings_screen.dart';
 import 'package:vinii_pos/settings/settings_widgets.dart' show SettingRow;
 import 'package:vinii_pos/settings/support_screens.dart';
+import 'package:vinii_pos/ui/i18n.dart';
 
 import 'helpers.dart';
 
@@ -124,7 +125,35 @@ Future<void> see(WidgetTester t, Finder f) async {
   await t.pump();
 }
 
+/// Which Settings section card holds each row (Settings opens on the five cards).
+const _partOf = {
+  'Location': 'store', 'Opening & closing timings': 'store', 'Payment QR': 'store',
+  'Delivery area & charges': 'orders', 'Delivery time / readiness': 'orders', 'Online self-pickup orders': 'orders', 'QR self-checkout': 'orders',
+  'Manage store access': 'team', 'Add users': 'team', 'Owner': 'team', 'Staff number': 'team', 'Help / replacements': 'team',
+  'Bank details': 'money', 'Documents': 'money', 'Verify': 'money',
+  'Language': 'me', 'Support & Help': 'me', 'Feedback': 'me',
+};
+
+/// Opens the section card [part] (from the cards, or from another section by going back first).
+Future<void> section(WidgetTester t, String part) async {
+  final card = find.byKey(ValueKey('settings-part-$part'));
+  if (card.evaluate().isEmpty && find.byKey(const ValueKey('app-header-back')).evaluate().isNotEmpty) {
+    await t.tap(find.byKey(const ValueKey('app-header-back')));
+    await settle(t);
+  }
+  await see(t, card);
+  await t.tap(card);
+  await settle(t);
+}
+
+/// Opens the section that holds the row titled [text], unless it is already on screen.
+Future<void> reach(WidgetTester t, String text) async {
+  final part = _partOf[text];
+  if (part != null && find.text(text).evaluate().isEmpty) await section(t, part);
+}
+
 Future<void> tapText(WidgetTester t, String text, {bool last = false}) async {
+  await reach(t, text);
   final f = last ? find.text(text).last : find.text(text).first;
   await see(t, find.text(text));
   await t.tap(f, warnIfMissed: false);
@@ -136,6 +165,7 @@ Finder rowAction(String title, [String label = 'Edit']) =>
     find.descendant(of: find.ancestor(of: find.text(title), matching: find.byType(SettingRow)), matching: find.text(label));
 
 Future<void> tapEdit(WidgetTester t, String title, [String label = 'Edit']) async {
+  await reach(t, title);
   await see(t, find.text(title));
   await t.tap(rowAction(title, label));
   await settle(t);
@@ -150,26 +180,54 @@ Finder field(String hint) => find.widgetWithText(TextField, hint).first;
 
 void main() {
   setUp(() => _docs = []);
-  tearDown(HomeNav.reset);
+  tearDown(() {
+    HomeNav.reset();
+    setAppLanguage('en'); // the language test switches the whole app
+  });
 
   group('Settings page', () {
+    testWidgets('Settings opens on six section cards, each with a one-line summary; a card opens its rows and back returns', (t) async {
+      final f = Fake()..page = fx['full'] as Map<String, dynamic>;
+      await openSettings(t, f);
+      for (final p in ['Store', 'Orders & delivery', 'Team & access', 'Money & documents', 'Returns & refunds', 'Me & app']) {
+        expect(find.text(p), findsOneWidget, reason: p);
+      }
+      expect(find.text('9:00 AM – 10:30 PM · location set'), findsOneWidget);
+      expect(find.textContaining('Ready in 20 min · pickup'), findsOneWidget);
+      expect(find.textContaining('Bank ••4321'), findsOneWidget);
+      expect(find.text('Opening & closing timings'), findsNothing); // the rows sit one tap in
+      await section(t, 'store');
+      expect(find.text('Opening & closing timings'), findsOneWidget);
+      expect(find.text('Store'), findsWidgets); // the banner names the section
+      expect(find.text('Orders & delivery'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('app-header-back')));
+      await settle(t);
+      expect(find.text('Orders & delivery'), findsOneWidget);
+    });
+
     testWidgets('a business with nothing set sees "Not set" / "Not added" and the switches off, all from the server', (t) async {
       final f = Fake();
       await openSettings(t, f);
+      await section(t, 'store');
       expect(find.text('Opening: Not set · Closing: Not set'), findsOneWidget);
+      expect(find.text('Not added'), findsOneWidget); // location
+      await section(t, 'orders');
       expect(find.text('Delivery time / readiness'), findsOneWidget);
-      expect(find.text('Not added'), findsNWidgets(4)); // help, owner, staff, location; the bank row says "Account ending"
       expect(find.text('Off · Accept orders for store pickup'), findsOneWidget);
       expect(find.text('Off · Let customers scan and pay'), findsOneWidget);
+      await section(t, 'team');
+      expect(find.text('Not added'), findsNWidgets(3)); // help, owner, staff
+      expect(find.text('Add users'), findsOneWidget);
+      await section(t, 'money');
       expect(find.text('Account ending 4321 · Unverified'), findsOneWidget);
       expect(find.text('Bank details must match the Shop Act.'), findsOneWidget);
+      await section(t, 'me');
       expect(find.text('English'), findsOneWidget);
-      expect(find.text('Add users'), findsOneWidget);
       expect(f.calls('pos_settings_get'), hasLength(1));
       expect(f.requests.first.headers['Authorization'], 'Bearer token-123');
     });
 
-    testWidgets('a More tile opens only its own part: timings, phone numbers or outlet info, under the tile name', (t) async {
+    testWidgets('a section opened on its own (the side bar\'s Business profile): only its rows, no section cards', (t) async {
       final f = Fake()..page = fx['full'] as Map<String, dynamic>;
       Future<void> openPart(SettingsPart part) async {
         await show(t, SettingsScreen(env: SettingsEnv(api: f.api, picker: FakePicker(_png), pickTime: null), part: part));
@@ -177,29 +235,18 @@ void main() {
       }
 
       await openPart(SettingsPart.timings);
-      expect(find.text('Outlet timings'), findsOneWidget);
       expect(find.text('Opening: 9:00 AM · Closing: 10:30 PM'), findsOneWidget);
-      expect(find.text('20 min'), findsOneWidget);
-      for (final other in ['Owner', 'Staff number', 'Online self-pickup orders', 'Location', 'Support & Help', 'Feedback']) {
-        expect(find.text(other), findsNothing, reason: other);
-      }
+      expect(find.text('12 Station Road, Latur 413512'), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-part-team')), findsNothing, reason: 'no section cards');
+      expect(find.text('Asha · +91 9876543210'), findsNothing);
 
       await openPart(SettingsPart.phones);
-      expect(find.text('Phone numbers'), findsOneWidget);
       expect(find.text('Asha · +91 9876543210'), findsOneWidget);
-      expect(find.text('Rohan Shah · +91 9123456780'), findsOneWidget);
       expect(find.text('+91 9000011111'), findsOneWidget);
-      for (final other in ['Opening & closing timings', 'Manage store access', 'QR self-checkout', 'Documents']) {
-        expect(find.text(other), findsNothing, reason: other);
-      }
+      expect(find.text('Opening: 9:00 AM · Closing: 10:30 PM'), findsNothing);
 
       await openPart(SettingsPart.outletInfo);
-      expect(find.text('Outlet info'), findsOneWidget);
-      expect(find.text('Documents'), findsOneWidget);
       expect(find.text('12 Station Road, Latur 413512'), findsOneWidget);
-      for (final other in ['Opening & closing timings', 'Owner', 'Online self-pickup orders', 'Support & Help']) {
-        expect(find.text(other), findsNothing, reason: other);
-      }
     });
 
     testWidgets('Outlet timings: Edit saves the hours from the focused page', (t) async {
@@ -214,32 +261,48 @@ void main() {
     testWidgets('a saved business shows its times, readiness, contacts, address and an open QR switch', (t) async {
       final f = Fake()..page = fx['full'] as Map<String, dynamic>;
       await openSettings(t, f);
+      await section(t, 'store');
       expect(find.text('Opening: 9:00 AM · Closing: 10:30 PM'), findsOneWidget);
+      expect(find.text('12 Station Road, Latur 413512'), findsOneWidget);
+      await section(t, 'orders');
       expect(find.text('20 min'), findsOneWidget);
+      expect(find.text('On · Let customers scan and pay'), findsOneWidget);
+      await section(t, 'team');
       expect(find.text('Asha · +91 9876543210'), findsOneWidget);
       expect(find.text('Rohan Shah · +91 9123456780'), findsOneWidget);
       expect(find.text('+91 9000011111'), findsOneWidget);
-      expect(find.text('12 Station Road, Latur 413512'), findsOneWidget);
-      expect(find.text('On · Let customers scan and pay'), findsOneWidget);
+    });
+
+    testWidgets('delivery distance and charges sit in Orders & delivery (moved from the online store)', (t) async {
+      final f = Fake();
+      var opened = 0;
+      HomeNav.deliverySettings = (_) async => opened++;
+      await openSettings(t, f);
+      await tapText(t, 'Delivery area & charges');
+      expect(opened, 1);
     });
 
     testWidgets('no number of any bank account is ever drawn: only the last four digits', (t) async {
       final f = Fake()..page = fx['full'] as Map<String, dynamic>;
       await openSettings(t, f);
+      await section(t, 'money');
       expect(find.textContaining('ending 4321'), findsOneWidget);
       expect(find.textContaining('deadbeef'), findsNothing);
       expect(jsonEncode(fx['full']), isNot(contains('account_enc')));
     });
 
-    testWidgets('a person who may not edit sees the page read-only, no bank and no Edit buttons', (t) async {
+    testWidgets('a person who may not edit sees the page read-only: no bank details and no Edit buttons', (t) async {
       final f = Fake()..page = readOnly();
       await openSettings(t, f);
       expect(find.text('Only the owner or a manager can change these settings.'), findsOneWidget);
-      expect(rowAction('Documents'), findsOneWidget); // Documents and Upload your QR open read-only views
-      expect(rowAction('Upload your QR'), findsOneWidget);
-      expect(rowAction('Opening & closing timings'), findsNothing);
+      expect(find.textContaining('Bank'), findsNothing); // bank details are the owner's
+      await section(t, 'money');
       expect(find.text('Bank details'), findsNothing);
-      expect(find.text('Verify'), findsNothing);
+      expect(rowAction('Documents'), findsOneWidget); // documents open a read-only view
+      await section(t, 'store');
+      expect(rowAction('Payment QR'), findsOneWidget); // the QR opens a read-only view
+      expect(rowAction('Opening & closing timings'), findsNothing);
+      await section(t, 'orders');
       final sw = t.widget<Switch>(find.byType(Switch).first);
       expect(sw.onChanged, isNull);
     });
@@ -254,7 +317,7 @@ void main() {
       expect(find.text('You’re offline'), findsOneWidget);
       fail = false;
       await tapText(t, 'Try again');
-      expect(find.text('Opening & closing timings'), findsOneWidget);
+      expect(find.text('Orders & delivery'), findsOneWidget);
     });
 
     testWidgets('the server fails (500): the page still shows, every row empty, under a warning with Try again', (t) async {
@@ -262,9 +325,11 @@ void main() {
       await openSettings(t, f);
       expect(find.text('Could not open Settings'), findsNothing);
       expect(find.textContaining('Your saved settings could not be loaded'), findsOneWidget);
-      expect(find.text('Opening & closing timings'), findsOneWidget);
-      expect(find.text('Owner'), findsOneWidget);
       expect(find.text('Try again'), findsOneWidget);
+      await section(t, 'store');
+      expect(find.text('Opening & closing timings'), findsOneWidget);
+      await section(t, 'team');
+      expect(find.text('Owner'), findsOneWidget);
     });
 
     testWidgets('the server refuses the page (403): its own sentence is shown, not "offline"', (t) async {
@@ -286,13 +351,11 @@ void main() {
       expect(team, 1);
     });
 
-    testWidgets('Store Delivery opens the orders screens through the shared hook', (t) async {
+    testWidgets('Orders & delivery holds settings only: no shortcut to the orders screens', (t) async {
       final f = Fake();
-      var orders = 0;
-      HomeNav.orders = (_) => orders++;
       await openSettings(t, f);
-      await tapText(t, 'Store Delivery');
-      expect(orders, 1);
+      await section(t, 'orders');
+      expect(find.text('Store Delivery'), findsNothing);
     });
 
     testWidgets('a restaurant\'s Settings holds Purchase orders, Menu link and Delivery settings (off the side bar), not Store Delivery', (t) async {
@@ -303,6 +366,7 @@ void main() {
       HomeNav.shell = _Shell('restaurant');
       addTearDown(() => HomeNav.shell = null);
       await openSettings(t, Fake());
+      await section(t, 'restaurant'); // the restaurant's own section card
       expect(find.text('Store Delivery'), findsNothing);
       await tapText(t, 'Purchase orders');
       await tapText(t, 'Menu link');
@@ -423,15 +487,33 @@ void main() {
       expect(argsOf(f.calls('pos_settings_save_location').single), {'address': '12 Station Road, Latur 413512'});
     });
 
-    testWidgets('language: choose one of the listed languages and save its code', (t) async {
-      final f = Fake();
+    testWidgets('language: English · हिन्दी · Hinglish right on the row; one tap saves it, no sheet', (t) async {
+      final f = Fake((r) => fnOf(r) == 'pos_settings_save_language' ? ok({...(fx['fresh'] as Map<String, dynamic>), 'language': argsOf(r)['language']}) : null);
       await openSettings(t, f);
-      await tapText(t, 'Language');
-      expect(find.text('Choose App’s primary language'), findsOneWidget);
-      await tapText(t, 'English', last: true);
-      await tapText(t, 'हिन्दी (Hindi)');
-      await tapText(t, 'Save');
-      expect(argsOf(f.calls('pos_settings_save_language').single), {'language': 'hi'});
+      await section(t, 'me');
+      for (final code in ['en', 'hi', 'hi-en']) {
+        expect(find.byKey(ValueKey('language-$code')), findsOneWidget, reason: code);
+      }
+      expect(find.textContaining('Marathi'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('language-hi-en')));
+      await settle(t);
+      expect(find.text('Choose App’s primary language'), findsNothing); // no sheet
+      expect(argsOf(f.calls('pos_settings_save_language').single), {'language': 'hi-en'});
+      expect(toast('Language: Hinglish.'), findsOneWidget);
+      // the chosen one is marked, and tapping it again sends nothing
+      expect(t.widget<Semantics>(find.ancestor(of: find.byKey(const ValueKey('language-hi-en')), matching: find.byType(Semantics)).first).properties.selected, isTrue);
+      await t.tap(find.byKey(const ValueKey('language-hi-en')));
+      await settle(t);
+      expect(f.calls('pos_settings_save_language'), hasLength(1));
+    });
+
+    testWidgets('language: a person who may not edit sees it but cannot change it', (t) async {
+      final f = Fake()..page = readOnly();
+      await openSettings(t, f);
+      await section(t, 'me');
+      await t.tap(find.byKey(const ValueKey('language-hi')));
+      await settle(t);
+      expect(f.calls('pos_settings_save_language'), isEmpty);
     });
   });
 
@@ -439,6 +521,7 @@ void main() {
     testWidgets('the switch on the page saves straight away', (t) async {
       final f = Fake();
       await openSettings(t, f);
+      await section(t, 'orders');
       await see(t, find.byType(Switch));
       await t.tap(find.byType(Switch).first);
       await settle(t);
@@ -448,6 +531,7 @@ void main() {
     testWidgets('a refusal (pickup is the only way to receive orders) keeps the switch where it was and shows the sentence', (t) async {
       final f = Fake((r) => fnOf(r) == 'pos_settings_set_pickup' ? err(400, 'Pickup is your only way to receive orders. Turn on delivery first, then switch pickup off.') : null)..page = {...(fx['full'] as Map<String, dynamic>), 'pickup': true};
       await openSettings(t, f);
+      await section(t, 'orders');
       await see(t, find.byType(Switch));
       await t.tap(find.byType(Switch).first);
       await settle(t);
@@ -575,7 +659,7 @@ void main() {
     testWidgets('QR: Upload sends the file as store_qr; once uploaded, Replace and Remove appear and Remove calls the server', (t) async {
       final f = Fake();
       await openSettings(t, f);
-      await tapEdit(t, 'Upload your QR');
+      await tapEdit(t, 'Payment QR');
       expect(find.text('No QR uploaded'), findsOneWidget);
       expect(find.text('Supported formats: JPG / PNG / PDF'), findsOneWidget);
       f.page = {...(fx['full'] as Map<String, dynamic>), 'qr': {'uploaded': true}};

@@ -55,6 +55,11 @@ class HomeNav {
   static ItemRoute? stockItem;
   // Stock management: one stock page by its id (lib/stock/stock_env.dart StockPage), for one stock item when [itemId] is given.
   static void Function(BuildContext context, String page, {String? itemId})? stockPage;
+  // The Bill's own pages by id ('carts', 'history', 'returns', 'receipts', 'shift'), and Quick add (the side menu's search opens them).
+  static void Function(BuildContext context, String page)? billPage;
+  static HomeRoute? quickAdd;
+  // Reads the store's language when the app opens (the app sets it; tests leave it unset).
+  static Future<void> Function()? loadLanguage;
   // Section H kitchen: stations setup and the Kitchen Display System.
   static HomeRoute? kitchenSetup;
   static HomeRoute? kitchenDisplay;
@@ -72,6 +77,9 @@ class HomeNav {
   static String? partnerType;
   // Section M: the storefront page builder and its settings.
   static HomeRoute? storefront;
+
+  /// Page Manager (founder, 28 Oct 2026; was Business profile, 27 Oct): how the shop looks to customers, every storefront screen in one place.
+  static HomeRoute? businessProfile;
   static HomeRoute? money;
   // Section K: one Money screen by its key ('payouts', 'invoices', 'settlements', ...), for links that name a screen.
   static void Function(BuildContext context, String screen)? moneyScreen;
@@ -101,6 +109,9 @@ class HomeNav {
   // Side nav: customers, the One Local Wallet and Manage account (plugged by lib/account/routes.dart).
   static HomeRoute? customers;
   static HomeRoute? wallet;
+
+  /// Side menu → Subscription plans (founder, 28 Oct 2026).
+  static HomeRoute? plans;
   static HomeRoute? account;
 
   /// Opens [route], or tells the person that [what] is not available yet.
@@ -116,9 +127,12 @@ class HomeNav {
   static void reset() {
     stockItem = null;
     stockPage = null;
+    billPage = null;
+    quickAdd = null;
+    loadLanguage = null;
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
-    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = kotView = team = storefront = settings = customers = wallet = account = menu = null;
+    home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = kotView = team = storefront = businessProfile = settings = customers = wallet = account = menu = plans = null;
     tableQr = menuLink = null;
     outletTimings = phoneNumbers = outletInfo = null;
     newPurchase = purchases = null;

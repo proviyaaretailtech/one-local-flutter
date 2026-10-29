@@ -64,29 +64,33 @@ class VerificationScreen extends StatelessWidget {
   }
 }
 
-/// Figma "Agreement". Section 7, first half: read the overview, acknowledge, then continue to consent.
+/// Figma "Agreement" and "Terms & Consent" on one screen (founder, 27 Oct 2026). The service terms and privacy notice were accepted
+/// on Create account, so they are recorded with this step rather than ticked again; marketing updates stay optional. When this is
+/// the last section ([last]) the button submits the application too.
 class AgreementScreen extends StatefulWidget {
-  const AgreementScreen({super.key, required this.api, required this.app});
+  const AgreementScreen({super.key, required this.api, required this.app, this.last = false});
   final OnboardingApi api;
   final Application app;
+  final bool last;
   @override
   State<AgreementScreen> createState() => _AgreementScreenState();
 }
 
 class _AgreementScreenState extends State<AgreementScreen> {
   late bool _ack = widget.app.consents['merchant_agreement'] == true;
+  late bool _marketing = widget.app.consents['marketing_updates'] == true;
   bool _saving = false;
 
   Future<void> _accept() async {
     if (_saving) return;
     if (!_ack) return showToast(context, 'Please acknowledge that you have reviewed the agreement.');
     setState(() => _saving = true);
-    final saved = await guarded(context, () => widget.api.acceptAgreement(kAgreementVersion));
+    // the terms and privacy notice accepted on Create account, and the marketing choice made here
+    final consents = await guarded(context, () => widget.api.saveConsents({'service_terms': true, 'privacy_notice': true, 'marketing_updates': _marketing}));
+    final saved = consents == null || !mounted ? null : await guarded(context, () => widget.api.acceptAgreement(kAgreementVersion));
     if (!mounted) return;
     setState(() => _saving = false);
-    if (saved == null) return;
-    final after = await Navigator.of(context).push<Application>(MaterialPageRoute(builder: (_) => ConsentScreen(api: widget.api, app: saved)));
-    if (mounted) Navigator.of(context).pop(after ?? saved);
+    if (saved != null) Navigator.of(context).pop(saved);
   }
 
   @override
@@ -109,9 +113,13 @@ class _AgreementScreenState extends State<AgreementScreen> {
         ]),
         const NoteCard(title: 'Preview, not legal terms', body: 'This overview does not set fees or binding clauses. Review the actual agreement presented to you before accepting.'),
         CheckRow(value: _ack, onChanged: (v) => setState(() => _ack = v), text: 'I have reviewed this agreement preview and acknowledge the acceptance step.'),
+        Text('You accepted the OneLocal service terms and privacy notice when you created your account.', style: inter(14, 400, color: kMuted, height: 1.4)),
+        LinkText('Review service terms ↗', align: TextAlign.left, onTap: () => showLegalSheet(context, 'Service terms')),
+        LinkText('Review privacy notice ↗', align: TextAlign.left, onTap: () => showLegalSheet(context, 'Privacy notice')),
+        CheckRow(value: _marketing, onChanged: (v) => setState(() => _marketing = v), text: 'Send me OneLocal news and marketing updates.', sub: 'Optional.'),
       ],
       actions: [
-        PrimaryAction(label: _saving ? 'Saving…' : 'Accept & continue', onPressed: _saving ? null : _accept),
+        PrimaryAction(label: _saving ? 'Saving…' : widget.last ? 'Accept & submit application' : 'Accept & continue', onPressed: _saving ? null : _accept),
         const SizedBox(height: 12),
         const FooterNote('Your acknowledgement is recorded with the date and version.'),
       ],

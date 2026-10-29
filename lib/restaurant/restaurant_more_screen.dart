@@ -107,6 +107,7 @@ class RestaurantMoreScreen {
         email: email,
         line: outletName,
         entries: links(context, onReports: onReports, reopen: reopen, reopenPlain: reopenPlain),
+        onReports: onReports,
         onSignOut: onLogout,
         openGroups: openGroups);
   }

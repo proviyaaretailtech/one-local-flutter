@@ -62,6 +62,8 @@ Map<String, dynamic> intentRow({String status = 'pending', String method = 'upi'
 
 /// A fake POS server for the till screens: answers section E's and section F's routes and records every request.
 class Till {
+  /// What the till asked "bought together" for, call by call (the cart's product ids).
+  final basketAsked = <List<String>>[];
   Map<String, dynamic> shift = shiftCurrent(shift: shiftRow());
   final calls = <http.Request>[];
   http.Response? Function(http.Request r)? override;
@@ -88,6 +90,10 @@ class Till {
       if (cat.isNotEmpty) list = list.where((i) => i['category'] == cat).toList();
       if (b['available'] == true) list = list.where((i) => i['available'] == true).toList();
       return ok({'items': list, 'categories': ['Beverages', 'Dairy', 'Snacks']});
+    }
+    if (p.endsWith('/rpc/pos_basket_suggest')) {
+      basketAsked.add(((body()['item_ids'] as List?) ?? const []).map((e) => '$e').toList());
+      return ok({'items': [{'menu_item_id': 'm2'}], 'mode': 'together'});
     }
     if (p.endsWith('/pos-orders/quote')) {
       final b = body();
@@ -129,6 +135,7 @@ class Till {
       return ok(intentRow(status: st == 'cancelled' ? 'cancelled' : 'failed', attempt: {'status': st, 'code': '', 'message': 'Not received'}));
     }
     if (p.endsWith('/rpc/pos_refund_check')) return ok({'allowed': true, 'purpose': body()['purpose'] ?? 'refund', 'reasons': [], 'display_no': 'P-00087', 'total': 630, 'taken': 630, 'refunded': 0, 'refundable_left': 630, 'return_days': 7, 'days_since_paid': 0});
+    if (p.endsWith('/rpc/pos_hold_update')) return ok({'order_id': orderId, 'updated_at': '2026-10-27T10:00:00Z', 'changed': false, 'replayed': false});
     if (p.contains('/pos-orders/') && m == 'GET') return ok(view('checkout'));
     return err(404, 'unexpected ${r.method} $p');
   });

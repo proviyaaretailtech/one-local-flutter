@@ -7,10 +7,13 @@ import '../api/net_guard.dart';
 import '../home/home_nav.dart';
 import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
+import '../ui/whatsapp.dart';
 import 'cart_screen.dart';
 import 'order_widgets.dart';
 import 'orders_api.dart';
 import 'orders_board_screen.dart' show OrdersBoardScreen;
+import 'pack_order_screen.dart';
+import '../ui/i18n.dart';
 
 /// Every placed order state from Figma section E: Checkout (held bill), Order Confirmation, Preparing, Picked, Ready, In Transit,
 /// Exception, Cancelled, and Completed. What the screen says and which buttons it shows come from the server's view of the order.
@@ -80,8 +83,17 @@ class _OrderScreenState extends State<OrderScreen> {
   Future<void> _onAction(String id) async {
     final v = _v!;
     switch (id) {
-      case 'pack' || 'handover' || 'dispatch' || 'choose_collection' || 'return_to_store' || 'online_accept' || 'online_ready':
+      case 'accept' || 'handover' || 'dispatch' || 'choose_collection' || 'return_to_store' || 'online_accept':
         await _act(id);
+      // packing is one screen: tick the items, photo of the packed bag, then packed (founder, 29 Oct 2026)
+      case 'pack_order' || 'pack' || 'online_ready':
+        final packed = await Navigator.of(context).push<OrderView>(MaterialPageRoute(builder: (_) => PackOrderScreen(api: _api, order: v)));
+        if (packed != null && mounted) {
+          setState(() => _v = packed);
+          showToast(context, packed.online ? 'Packed. Hand it to the rider when they arrive.' : 'Packed. Ready to hand over.');
+        } else {
+          await _load(); // a photo may have been saved before something failed
+        }
       case 'refresh':
         await _load();
       case 'pay':
@@ -95,7 +107,7 @@ class _OrderScreenState extends State<OrderScreen> {
       case 'print':
         showToast(context, 'No receipt printer is connected to this device yet.');
       case 'whatsapp':
-        final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(v.receiptText)}');
+        final uri = whatsAppLink('', v.receiptText);
         if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) showToast(context, 'WhatsApp could not be opened.');
       case 'acceptance':
         await _acceptanceSheet();
@@ -185,16 +197,26 @@ class _OrderScreenState extends State<OrderScreen> {
     final primary = v.action('primary'), secondary = v.action('secondary'), links = v.actionsOf('link');
     final checkout = v.stage == 'checkout';
     final cancelled = v.stage == 'cancelled';
+    // An order still moving (accept, pack, hand over) shows its next step right under the note, not below the bill (founder, 29 Oct 2026).
+    final upTop = v.steps != null && (v.steps!.current) < 4;
+    final buttons = [
+      if (primary != null) _button(primary, dark: true),
+      if (secondary != null) ...[const SizedBox(height: 10), _button(secondary, dark: false)],
+      for (final l in links) ...[const SizedBox(height: 8), UnderLink('${l['label'] ?? ''}', onTap: _busy ? null : () => _onAction('${l['id'] ?? ''}'))],
+    ];
     return ListView(padding: const EdgeInsets.fromLTRB(12, 14, 12, 16), children: [
       OrderHeaderCard(
         number: 'Order #${v.displayNo}${v.placeLabel != null ? ' - ${v.placeLabel}' : ''}',
         channel: v.channelLabel,
         subtitle: 'Customer: ${v.customer} · ${v.placedAt}',
       ),
+      if (v.steps case final s?) ...[const SizedBox(height: 12), OrderSteps(labels: s.labels, current: s.current)],
       const SizedBox(height: 14),
       StateHeader(title: v.title, chip: v.paymentChip, orderStatus: v.orderStatus, fulfilment: v.fulfilment, danger: v.danger),
       const SizedBox(height: 10),
       StateNote(tone: '${v.note['tone'] ?? 'info'}', title: '${v.note['title'] ?? ''}', body: '${v.note['body'] ?? ''}'),
+      if (v.packedPhoto != null) ...[const SizedBox(height: 12), PackedPhotoCard(key: ValueKey('packed-${v.packedPhoto!['id']}'), api: _api, order: v)],
+      if (upTop) ...[const SizedBox(height: 14), ...buttons],
       const SizedBox(height: 12),
       OrderCardBox(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -247,10 +269,7 @@ class _OrderScreenState extends State<OrderScreen> {
           changeValue: rupees(n(pay['change'])),
         ),
       ),
-      const SizedBox(height: 16),
-      if (primary != null) _button(primary, dark: true),
-      if (secondary != null) ...[const SizedBox(height: 10), _button(secondary, dark: false)],
-      for (final l in links) ...[const SizedBox(height: 8), UnderLink('${l['label'] ?? ''}', onTap: _busy ? null : () => _onAction('${l['id'] ?? ''}'))],
+      if (!upTop) ...[const SizedBox(height: 16), ...buttons],
     ]);
   }
 
@@ -321,12 +340,12 @@ class _OrderScreenState extends State<OrderScreen> {
     final v = _v!;
     final accept = await showOrderSheet<bool>(
       context,
-      title: 'Acceptance status',
+      title: tr('Acceptance status'),
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         KeyValue('Order status', v.orderStatus, size: 14),
         KeyValue('Fulfillment', v.fulfilment, size: 14),
         const SizedBox(height: 16),
-        DarkCta(label: 'Accept order', onPressed: () => Navigator.pop(ctx, true)),
+        DarkCta(label: tr('Accept order'), onPressed: () => Navigator.pop(ctx, true)),
       ]),
     );
     if (accept == true) await _act('accept');
@@ -337,7 +356,7 @@ class _OrderScreenState extends State<OrderScreen> {
     final counts = {for (final i in v.items) '${i['order_item_id'] ?? ''}': (i['picked_qty'] ?? 0) as int};
     final save = await showOrderSheet<bool>(
       context,
-      title: 'Picking checklist',
+      title: tr('Picking checklist'),
       body: (ctx) => StatefulBuilder(
         builder: (ctx, set) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Flexible(
@@ -364,7 +383,7 @@ class _OrderScreenState extends State<OrderScreen> {
             ]),
           ),
           const SizedBox(height: 12),
-          DarkCta(label: 'Save picked quantities', onPressed: () => Navigator.pop(ctx, true)),
+          DarkCta(label: tr('Save picked quantities'), onPressed: () => Navigator.pop(ctx, true)),
         ]),
       ),
     );
@@ -377,7 +396,7 @@ class _OrderScreenState extends State<OrderScreen> {
     var qty = 1;
     final save = await showOrderSheet<bool>(
       context,
-      title: 'Report missing item',
+      title: tr('Report missing item'),
       body: (ctx) => StatefulBuilder(
         builder: (ctx, set) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           for (final i in v.items)
@@ -393,12 +412,12 @@ class _OrderScreenState extends State<OrderScreen> {
             ),
           if (line != null)
             Row(children: [
-              Text('Units missing', style: inter(14, 500)),
+              Text(tr('Units missing'), style: inter(14, 500)),
               const Spacer(),
               QtyStepper(qty: qty, name: 'missing', onMinus: () => set(() => qty = qty > 1 ? qty - 1 : 1), onPlus: () => set(() => qty = qty < 99 ? qty + 1 : 99)),
             ]),
           const SizedBox(height: 12),
-          DarkCta(label: 'Report missing', onPressed: line == null ? null : () => Navigator.pop(ctx, true)),
+          DarkCta(label: tr('Report missing'), onPressed: line == null ? null : () => Navigator.pop(ctx, true)),
         ]),
       ),
     );
@@ -410,17 +429,17 @@ class _OrderScreenState extends State<OrderScreen> {
     final d = v.delivery;
     final choice = await showOrderSheet<String>(
       context,
-      title: 'Delivery status',
+      title: tr('Delivery status'),
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         KeyValue('Status', v.fulfilment, size: 14),
         if (d?['address'] != null) KeyValue('Address', '${d!['address']}', size: 14),
         if (d?['phone'] != null) KeyValue('Phone', '${d!['phone']}', size: 14),
         const SizedBox(height: 8),
-        Text('No courier tracking is connected. Confirm with the customer before closing the order.', style: inter(12.5, 400, color: kMuted)),
+        Text(tr('No courier tracking is connected. Confirm with the customer before closing the order.'), style: inter(12.5, 400, color: kMuted)),
         const SizedBox(height: 16),
-        DarkCta(label: 'Confirm delivered', onPressed: () => Navigator.pop(ctx, 'confirm_delivery')),
+        DarkCta(label: tr('Confirm delivered'), onPressed: () => Navigator.pop(ctx, 'confirm_delivery')),
         const SizedBox(height: 10),
-        LightCta(label: 'Return to store', onPressed: () => Navigator.pop(ctx, 'return_to_store')),
+        LightCta(label: tr('Return to store'), onPressed: () => Navigator.pop(ctx, 'return_to_store')),
       ]),
     );
     if (choice != null) await _act(choice);
@@ -431,13 +450,13 @@ class _OrderScreenState extends State<OrderScreen> {
     final name = TextEditingController(text: '${d['name'] ?? ''}'), phone = TextEditingController(text: localMobile('${d['phone'] ?? ''}')), address = TextEditingController(text: '${d['address'] ?? ''}');
     final save = await showOrderSheet<bool>(
       context,
-      title: 'Delivery information',
+      title: tr('Delivery information'),
       body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         TextField(controller: name, decoration: const InputDecoration(labelText: 'Name (optional)')),
         TextField(key: const ValueKey('delivery-phone'), controller: phone, keyboardType: TextInputType.phone, inputFormatters: mobileFormatters, decoration: const InputDecoration(labelText: 'Mobile number', prefixText: kMobilePrefix)),
         TextField(key: const ValueKey('delivery-address'), controller: address, minLines: 1, maxLines: 3, decoration: const InputDecoration(labelText: 'Delivery address')),
         const SizedBox(height: 16),
-        DarkCta(label: 'Save', onPressed: () => Navigator.pop(ctx, true)),
+        DarkCta(label: tr('Save'), onPressed: () => Navigator.pop(ctx, true)),
       ]),
     );
     if (save == true) await _act('set_delivery_info', delivery: {'name': name.text.trim(), 'phone': phone.text.trim(), 'address': address.text.trim()});

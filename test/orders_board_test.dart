@@ -511,7 +511,7 @@ void main() {
       final s = FakeServer((r) => r.method == 'GET' ? ok(view('in_transit')) : err(404, 'not in this fake'));
       var asked = 0;
       await showTall(t, OrderScreen(api: s.api, orderId: 'o2', onDeliveryStatus: (_) => asked++));
-      await t.tap(find.text('Check delivery status'));
+      await t.tap(find.text('Mark delivered')); // a restaurant moves delivery orders on from the delivery list
       await t.pumpAndSettle();
       expect(asked, 1);
       expect(find.text('No courier tracking is connected. Confirm with the customer before closing the order.'), findsNothing);

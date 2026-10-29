@@ -5,6 +5,7 @@ import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'catalogue_api.dart';
 import 'catalogue_format.dart';
+import '../ui/i18n.dart';
 
 /// The pastel tile behind an item. Shows the item's photo when it has one, otherwise a package mark (no stock photos are invented).
 class ItemTile extends StatelessWidget {
@@ -257,7 +258,7 @@ Future<T?> showCatSheet<T>(BuildContext context, {required String title, String?
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: Text(title, style: inter(20, 700))),
-            IconButton(tooltip: 'Close', onPressed: () => Navigator.of(ctx).pop(), icon: const Icon(LucideIcons.x, size: 20)),
+            IconButton(tooltip: tr('Close'), onPressed: () => Navigator.of(ctx).pop(), icon: const Icon(LucideIcons.x, size: 20)),
           ]),
           if (subtitle != null) ...[const SizedBox(height: 2), Text(subtitle, style: inter(13, 400, color: kMuted))],
           const SizedBox(height: 14),
@@ -315,11 +316,14 @@ class AddPhotoBox extends StatelessWidget {
             width: double.infinity,
             decoration: BoxDecoration(color: const Color(0xFFF8F9F6), borderRadius: BorderRadius.circular(16)),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Icon(LucideIcons.camera, size: 26, color: kMuted),
-              const SizedBox(height: 8),
-              Text('Tap to add photo', style: inter(14, 500, color: kMuted)),
-              const SizedBox(height: 2),
-              Text('JPG, PNG or WebP · up to 5 MB', style: inter(11.5, 400, color: const Color(0xFF9CA3AF))),
+              Icon(LucideIcons.camera, size: height < 110 ? 22 : 26, color: kMuted),
+              SizedBox(height: height < 110 ? 4 : 8),
+              Text(tr('Tap to add photo'), textAlign: TextAlign.center, style: inter(height < 110 ? 12 : 14, 500, color: kMuted)),
+              // a small square (Quick add) keeps just the camera and the words
+              if (height >= 110) ...[
+                const SizedBox(height: 2),
+                Text(tr('JPG, PNG or WebP · up to 5 MB'), style: inter(11.5, 400, color: const Color(0xFF9CA3AF))),
+              ],
             ]),
           ),
         ),

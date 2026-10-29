@@ -24,7 +24,8 @@ List<Map<String, dynamic>> _items(String state, {int picked = 0}) => [
     ];
 
 /// One order view shaped like the server's (server/partner-orders-pos.ts shapeView), per stage.
-Map<String, dynamic> view(String stage, {int version = 2}) {
+/// [photo]: the packed-bag photo ({id, has_photo, skip_reason, at}); [photoRequired]: the store asks for one.
+Map<String, dynamic> view(String stage, {int version = 2, Map<String, dynamic>? photo, bool photoRequired = true, bool online = false}) {
   const titles = {
     'checkout': 'Checkout', 'pending': 'Order Confirmation', 'preparing': 'Order Preparing', 'picked': 'Order Picked', 'ready': 'Order Ready',
     'in_transit': 'Order In Transit', 'exception': 'Order Exception', 'cancelled': 'Order Cancelled', 'completed': 'Order Completed',
@@ -40,11 +41,11 @@ Map<String, dynamic> view(String stage, {int version = 2}) {
   };
   const actions = {
     'checkout': [['pay', 'Complete Payment', 'primary'], ['cancel', 'Cancel bill', 'secondary']],
-    'pending': [['print', 'Print receipt', 'primary'], ['whatsapp', 'Send by WhatsApp', 'secondary'], ['acceptance', 'View acceptance status', 'link']],
-    'preparing': [['picking', 'Open picking checklist', 'primary'], ['report_missing', 'Report missing item', 'secondary'], ['receipt', 'View receipt', 'link']],
-    'picked': [['pack', 'Start packing', 'primary'], ['picking', 'Review picked quantities', 'secondary'], ['receipt', 'View receipt', 'link']],
-    'ready': [['handover', 'Record handover', 'primary'], ['dispatch', 'Arrange dispatch', 'secondary'], ['receipt', 'View receipt', 'link']],
-    'in_transit': [['delivery_status', 'Check delivery status', 'primary'], ['report_delivery_issue', 'Report delivery issue', 'secondary'], ['receipt', 'View receipt', 'link']],
+    'pending': [['accept', 'Accept order', 'primary'], ['whatsapp', 'Send receipt on WhatsApp', 'link']],
+    'preparing': [['pack_order', 'Pack order', 'primary'], ['report_missing', 'Something missing?', 'link']],
+    'picked': [['pack_order', 'Pack order', 'primary'], ['report_missing', 'Something missing?', 'link']],
+    'ready': [['handover', 'Customer collected it', 'primary'], ['dispatch', 'Send for delivery', 'secondary'], ['receipt', 'View receipt', 'link']],
+    'in_transit': [['delivery_status', 'Mark delivered', 'primary'], ['report_delivery_issue', 'Report a delivery problem', 'secondary'], ['receipt', 'View receipt', 'link']],
     'exception': [['set_delivery_info', 'Resolve missing information', 'primary'], ['choose_collection', 'Arrange store collection', 'secondary'], ['exception_details', 'Review exception details', 'link']],
     'cancelled': [['review_cancellation', 'Review cancellation', 'primary'], ['new_cart', 'Create new cart from items', 'secondary'], ['receipt', 'View original bill', 'link']],
     'completed': [['print', 'Print receipt', 'primary'], ['whatsapp', 'Send by WhatsApp', 'secondary'], ['receipt', 'View receipt', 'link']],
@@ -69,7 +70,12 @@ Map<String, dynamic> view(String stage, {int version = 2}) {
         ? {'tone': 'bad', 'title': 'Delivery information is missing', 'body': 'Address and contact details unavailable. Confirm the handover method to proceed.'}
         : {'tone': stage == 'preparing' ? 'warn' : 'info', 'title': 'Note for $stage', 'body': 'Body for $stage'},
     'version': stage == 'checkout' || stage == 'cancelled' ? '2026-10-16T12:53:00.000Z' : version,
-    'online': false,
+    'online': online,
+    'steps': const {'pending': 0, 'preparing': 1, 'picked': 1, 'ready': 2, 'exception': 2, 'in_transit': 3, 'completed': 4}[stage] == null
+        ? null
+        : {'labels': ['Accept', 'Pack', online ? 'Rider' : 'Hand over', 'Done'], 'current': const {'pending': 0, 'preparing': 1, 'picked': 1, 'ready': 2, 'exception': 2, 'in_transit': 3, 'completed': 4}[stage]},
+    'packed_photo': photo,
+    'photo_required': photoRequired,
     'items': _items(states[stage]!, picked: stage == 'picked' ? 1 : 0),
     'summary': '5 lines · 9 units',
     'adjustments': 'No coupon · No tip added',
@@ -92,9 +98,9 @@ Map<String, dynamic> view(String stage, {int version = 2}) {
   };
 }
 
-Map<String, dynamic> card(String id, String status, String label) => {
+Map<String, dynamic> card(String id, String status, String label, {String? state, String delivery = 'Not started · bill unpaid'}) => {
       'id': id, 'display_no': 'P-$id', 'channel_label': 'Store Checkout', 'customer': 'Rahul Mehta', 'placed_at': '09 Oct 2026 · 5:15 PM',
       'status': status, 'status_label': label, 'total': 980, 'items': '3 lines · 5 units', 'payment_status': 'Unpaid · ₹980 due', 'payment_mode': 'Not chosen',
-      'delivery_status': 'Not started · bill unpaid', 'delivery_time': 'Not delivered', 'refund_damages': 'None',
+      'delivery_status': delivery, 'delivery_time': 'Not delivered', 'refund_damages': 'None', 'state': ?state,
     };
 

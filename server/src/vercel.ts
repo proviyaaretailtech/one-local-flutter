@@ -13,4 +13,4 @@ const run = (request: Request) => {
   return handle(new Request(request.url, { method: request.method, headers, body: hasBody ? request.body : undefined, duplex: hasBody ? 'half' : undefined } as RequestInit));
 };
 export default { fetch: run };
-export const GET = run, POST = run, PUT = run, OPTIONS = run;
+export const GET = run, POST = run, PUT = run, PATCH = run, DELETE = run, HEAD = run, OPTIONS = run;

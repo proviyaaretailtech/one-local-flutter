@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'catalogue_widgets.dart' show OutlineButton;
 import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
+import '../ui/i18n.dart';
 
 /// Step 1 of "+ New" category on the Bill: name it (or tap a common one). Answers the trimmed name, or null when cancelled.
 /// Step 2, adding its first product, is the caller's (a category only exists once a product is in it).
@@ -42,12 +43,12 @@ class _NewCategoryState extends State<_NewCategory> {
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
-            Expanded(child: Text('New category', style: inter(20, 700))),
-            IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(LucideIcons.x, size: 20, color: kMuted)),
+            Expanded(child: Text(tr('New category'), style: inter(20, 700))),
+            IconButton(tooltip: tr('Close'), onPressed: () => Navigator.of(context).pop(), icon: const Icon(LucideIcons.x, size: 20, color: kMuted)),
           ]),
-          Text('Group similar products so they are quick to find on the Bill. Next you add its first product.', style: inter(13, 400, color: kMuted, height: 1.35)),
+          Text(tr('Group similar products so they are quick to find on the Bill. Next you add its first product.'), style: inter(13, 400, color: kMuted, height: 1.35)),
           const SizedBox(height: 16),
-          Text('Category name', style: inter(13, 600)),
+          Text(tr('Category name'), style: inter(13, 600)),
           const SizedBox(height: 6),
           Container(
             height: 46,
@@ -63,12 +64,12 @@ class _NewCategoryState extends State<_NewCategory> {
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _ready ? Navigator.of(context).pop(_value) : null,
               style: inter(14, 400),
-              decoration: plainInput.copyWith(counterText: '', hintText: 'For example Snacks', hintStyle: inter(14, 400, color: kMuted)),
+              decoration: plainInput.copyWith(counterText: '', hintText: tr('For example Snacks'), hintStyle: inter(14, 400, color: kMuted)),
             ),
           ),
           if (ideas.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text('Or tap one', style: inter(12, 500, color: kMuted)),
+            Text(tr('Or tap one'), style: inter(12, 500, color: kMuted)),
             const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final e in ideas)
@@ -89,7 +90,7 @@ class _NewCategoryState extends State<_NewCategory> {
           ],
           const SizedBox(height: 18),
           Row(children: [
-            Expanded(child: OutlineButton('Cancel', onPressed: () => Navigator.of(context).pop(), height: 48)),
+            Expanded(child: OutlineButton(tr('Cancel'), onPressed: () => Navigator.of(context).pop(), height: 48)),
             const SizedBox(width: 10),
             Expanded(
               child: Material(
@@ -99,7 +100,7 @@ class _NewCategoryState extends State<_NewCategory> {
                   key: const ValueKey('new-category-next'),
                   borderRadius: BorderRadius.circular(24),
                   onTap: _ready ? () => Navigator.of(context).pop(_value) : null,
-                  child: SizedBox(height: 48, child: Center(child: Text('Next: add product', style: inter(14, 700, color: _ready ? kLime : kMuted)))),
+                  child: SizedBox(height: 48, child: Center(child: Text(tr('Next: add product'), style: inter(14, 700, color: _ready ? kLime : kMuted)))),
                 ),
               ),
             ),

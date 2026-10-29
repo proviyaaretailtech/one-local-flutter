@@ -5,6 +5,7 @@ import '../setup/setup_widgets.dart' show SetupSelect;
 import '../ui/theme.dart';
 import 'settings_api.dart';
 import 'settings_widgets.dart';
+import '../ui/i18n.dart';
 
 // The edit sheets of the Settings page (Figma section P). Each one asks the server to save and shows the database's own sentence when it
 // refuses; the only checks here are "is it empty". A sheet that saves answers with the new page state.
@@ -95,10 +96,10 @@ Future<String?> _defaultPickTime(BuildContext context, String? current) async {
 
 Future<SettingsState?> openHoursSheet(BuildContext context, SettingsEnv env, SettingsState s) => showSettingsSheet<SettingsState>(
       context,
-      title: 'Opening & closing timings',
-      subtitle: 'Set when your store opens and closes.',
+      title: tr('Opening & closing timings'),
+      subtitle: tr('Set when your store opens and closes.'),
       body: (_) => FormSheet(
-        button: 'Save',
+        button: tr('Save'),
         values: {'opens': s.opensAt, 'closes': s.closesAt},
         validate: (f) => f.values['opens'] == null || f.values['closes'] == null ? 'Choose both an opening and a closing time.' : null,
         submit: (f) => env.api.saveHours(f.values['opens'] as String, f.values['closes'] as String),
@@ -123,18 +124,18 @@ Future<SettingsState?> openHoursSheet(BuildContext context, SettingsEnv env, Set
 
 Future<SettingsState?> openReadinessSheet(BuildContext context, SettingsEnv env, SettingsState s) => showSettingsSheet<SettingsState>(
       context,
-      title: 'Delivery time / readiness',
-      subtitle: 'Set how long orders take to be ready.',
+      title: tr('Delivery time / readiness'),
+      subtitle: tr('Set how long orders take to be ready.'),
       body: (_) => FormSheet(
-        button: 'Save',
+        button: tr('Save'),
         initial: {'min': s.prepMinutes?.toString() ?? ''},
         validate: (f) => int.tryParse(f.text('min')) == null ? 'Enter the preparation time in minutes.' : null,
         submit: (f) => env.api.saveReadiness(int.parse(f.text('min'))),
         children: (f) => [
           SheetField(
-            label: 'Preparation / readiness time',
+            label: tr('Preparation / readiness time'),
             controller: f.ctl('min'),
-            hint: 'Enter time in minutes',
+            hint: tr('Enter time in minutes'),
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(3)],
             helper: s.prepMinutes == null ? 'Not set' : null,
@@ -145,47 +146,47 @@ Future<SettingsState?> openReadinessSheet(BuildContext context, SettingsEnv env,
 
 Future<SettingsState?> openHelpSheet(BuildContext context, SettingsEnv env, SettingsState s) => showSettingsSheet<SettingsState>(
       context,
-      title: 'Help / replacements',
-      subtitle: 'Add a contact and guidance for customer help.',
+      title: tr('Help / replacements'),
+      subtitle: tr('Add a contact and guidance for customer help.'),
       body: (_) => FormSheet(
-        button: 'Save',
+        button: tr('Save'),
         initial: {'name': s.helpName ?? '', 'phone': s.helpPhone ?? '', 'info': s.helpInfo ?? ''},
         validate: (f) => f.text('name').isEmpty || f.text('phone').isEmpty ? 'Enter a contact name and a mobile number.' : null,
         submit: (f) => env.api.saveHelp(name: f.text('name'), phone: f.text('phone'), info: f.text('info')),
         children: (f) => [
-          SheetField(label: 'Contact name', controller: f.ctl('name'), hint: 'Enter contact name', maxLength: 120),
-          SheetField(label: 'Contact number', controller: f.ctl('phone'), hint: 'Enter mobile number', prefix: '+91', keyboardType: TextInputType.phone, inputFormatters: _digits),
-          SheetField(label: 'Help / replacement information', controller: f.ctl('info'), hint: 'Enter help or replacement instructions', maxLines: 4, maxLength: 500),
+          SheetField(label: tr('Contact name'), controller: f.ctl('name'), hint: tr('Enter contact name'), maxLength: 120),
+          SheetField(label: tr('Contact number'), controller: f.ctl('phone'), hint: tr('Enter mobile number'), prefix: '+91', keyboardType: TextInputType.phone, inputFormatters: _digits),
+          SheetField(label: tr('Help / replacement information'), controller: f.ctl('info'), hint: tr('Enter help or replacement instructions'), maxLines: 4, maxLength: 500),
         ],
       ),
     );
 
 Future<SettingsState?> openOwnerSheet(BuildContext context, SettingsEnv env, SettingsState s) => showSettingsSheet<SettingsState>(
       context,
-      title: 'Owner',
-      subtitle: 'Add the store owner’s contact details.',
+      title: tr('Owner'),
+      subtitle: tr('Add the store owner’s contact details.'),
       body: (_) => FormSheet(
-        button: 'Save',
+        button: tr('Save'),
         initial: {'name': s.ownerName ?? '', 'phone': s.ownerPhone ?? ''},
         validate: (f) => f.text('name').isEmpty || f.text('phone').isEmpty ? 'Enter the owner’s name and mobile number.' : null,
         submit: (f) => env.api.saveOwner(name: f.text('name'), phone: f.text('phone')),
         children: (f) => [
-          SheetField(label: 'Owner name', controller: f.ctl('name'), hint: 'Enter owner name', maxLength: 120),
-          SheetField(label: 'Mobile number', controller: f.ctl('phone'), hint: 'Enter mobile number', prefix: '+91', keyboardType: TextInputType.phone, inputFormatters: _digits),
+          SheetField(label: tr('Owner name'), controller: f.ctl('name'), hint: tr('Enter owner name'), maxLength: 120),
+          SheetField(label: tr('Mobile number'), controller: f.ctl('phone'), hint: tr('Enter mobile number'), prefix: '+91', keyboardType: TextInputType.phone, inputFormatters: _digits),
         ],
       ),
     );
 
 Future<SettingsState?> openStaffPhoneSheet(BuildContext context, SettingsEnv env, SettingsState s) => showSettingsSheet<SettingsState>(
       context,
-      title: 'Staff number',
-      subtitle: 'Add a phone number for your store staff.',
+      title: tr('Staff number'),
+      subtitle: tr('Add a phone number for your store staff.'),
       body: (_) => FormSheet(
-        button: 'Save',
+        button: tr('Save'),
         initial: {'phone': s.staffPhone ?? ''},
         validate: (f) => f.text('phone').isEmpty ? 'Enter a mobile number.' : null,
         submit: (f) => env.api.saveStaffPhone(f.text('phone')),
-        children: (f) => [SheetField(label: 'Phone number', controller: f.ctl('phone'), hint: 'Enter staff mobile number', prefix: '+91', keyboardType: TextInputType.phone, inputFormatters: _digits)],
+        children: (f) => [SheetField(label: tr('Phone number'), controller: f.ctl('phone'), hint: tr('Enter staff mobile number'), prefix: '+91', keyboardType: TextInputType.phone, inputFormatters: _digits)],
       ),
     );
 
@@ -196,7 +197,7 @@ Future<SettingsState?> _switchSheet(BuildContext context, {required String title
       title: title,
       subtitle: subtitle,
       body: (_) => FormSheet(
-        button: 'Save',
+        button: tr('Save'),
         values: {'on': current},
         submit: (f) => save(f.values['on'] == true),
         children: (f) => [
@@ -218,43 +219,43 @@ Future<SettingsState?> _switchSheet(BuildContext context, {required String title
     );
 
 Future<SettingsState?> openPickupSheet(BuildContext context, SettingsEnv env, SettingsState s) => _switchSheet(context,
-    title: 'Online self-pickup orders',
-    subtitle: 'Choose whether to accept store pickup orders.',
-    label: 'Accept pickup orders',
-    note: 'When enabled, customers can place orders online and collect them from your store.',
+    title: tr('Online self-pickup orders'),
+    subtitle: tr('Choose whether to accept store pickup orders.'),
+    label: tr('Accept pickup orders'),
+    note: tr('When enabled, customers can place orders online and collect them from your store.'),
     current: s.pickup,
     save: env.api.setPickup);
 
 Future<SettingsState?> openQrCheckoutSheet(BuildContext context, SettingsEnv env, SettingsState s) => _switchSheet(context,
-    title: 'QR self-checkout',
-    subtitle: 'Choose whether customers can scan and pay.',
-    label: 'Enable QR self-checkout',
-    note: 'When enabled, customers can scan your store QR code to check out and pay themselves.',
+    title: tr('QR self-checkout'),
+    subtitle: tr('Choose whether customers can scan and pay.'),
+    label: tr('Enable QR self-checkout'),
+    note: tr('When enabled, customers can scan your store QR code to check out and pay themselves.'),
     current: s.qrCheckout,
     save: env.api.setQrCheckout);
 
 Future<SettingsState?> openLocationSheet(BuildContext context, SettingsEnv env, SettingsState s) => showSettingsSheet<SettingsState>(
       context,
-      title: 'Location',
-      subtitle: 'Add the address customers will visit.',
+      title: tr('Location'),
+      subtitle: tr('Add the address customers will visit.'),
       body: (_) => FormSheet(
-        button: 'Save',
+        button: tr('Save'),
         initial: {'address': s.address ?? ''},
         validate: (f) => f.text('address').isEmpty ? 'Enter the full store address.' : null,
         submit: (f) => env.api.saveLocation(f.text('address')),
         children: (f) => [
           Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [Expanded(child: Text(s.address ?? 'Not added', style: inter(12.5, 400, color: kMuted)))])),
-          SheetField(label: 'Store address', controller: f.ctl('address'), hint: 'Enter full store address', maxLines: 3, maxLength: 250),
+          SheetField(label: tr('Store address'), controller: f.ctl('address'), hint: tr('Enter full store address'), maxLines: 3, maxLength: 250),
         ],
       ),
     );
 
 Future<SettingsState?> openLanguageSheet(BuildContext context, SettingsEnv env, SettingsState s) => showSettingsSheet<SettingsState>(
       context,
-      title: 'Language',
-      subtitle: 'Choose App’s primary language',
+      title: tr('Language'),
+      subtitle: tr('Choose App’s primary language'),
       body: (_) => FormSheet(
-        button: 'Save',
+        button: tr('Save'),
         values: {'lang': s.language},
         submit: (f) => env.api.saveLanguage(f.values['lang'] as String),
         children: (f) => [
@@ -262,7 +263,7 @@ Future<SettingsState?> openLanguageSheet(BuildContext context, SettingsEnv env, 
             padding: const EdgeInsets.only(bottom: 12),
             child: SetupSelect<String>(
               label: '',
-              hint: 'Choose a language',
+              hint: tr('Choose a language'),
               value: f.values['lang'] as String?,
               options: kLanguages.keys.toList(),
               display: (c) => kLanguages[c] ?? c,
@@ -280,10 +281,10 @@ Future<SettingsState?> openLanguageSheet(BuildContext context, SettingsEnv env, 
 /// server's secure handler; it is never shown again (only the last four digits come back). Verify saves it and leaves the status Unverified.
 Future<SettingsState?> openBankSheet(BuildContext context, SettingsEnv env, SettingsState s) => showSettingsSheet<SettingsState>(
       context,
-      title: 'Bank details',
-      subtitle: 'Add bank details for your store payouts.',
+      title: tr('Bank details'),
+      subtitle: tr('Add bank details for your store payouts.'),
       body: (_) => FormSheet(
-        button: 'Verify',
+        button: tr('Verify'),
         initial: {'holder': s.bankHolder ?? '', 'account': '', 'ifsc': s.bankIfsc ?? ''},
         validate: (f) {
           if (f.text('holder').isEmpty) return 'Enter the account holder name.';
@@ -301,18 +302,18 @@ Future<SettingsState?> openBankSheet(BuildContext context, SettingsEnv env, Sett
             StatusPill(s.bankStatus == 'verified' ? 'Verified' : 'Unverified', good: s.bankStatus == 'verified'),
           ]),
           const SizedBox(height: 10),
-          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFFFF9E6), borderRadius: BorderRadius.circular(10)), child: Text('Bank details must match the Shop Act.', style: inter(12, 500, color: const Color(0xFF92400E)))),
+          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFFFF9E6), borderRadius: BorderRadius.circular(10)), child: Text(tr('Bank details must match the Shop Act.'), style: inter(12, 500, color: const Color(0xFF92400E)))),
           const SizedBox(height: 14),
-          SheetField(label: 'Account holder name', controller: f.ctl('holder'), hint: 'Enter name as per Shop Act', maxLength: 120),
+          SheetField(label: tr('Account holder name'), controller: f.ctl('holder'), hint: tr('Enter name as per Shop Act'), maxLength: 120),
           SheetField(
-            label: 'Account number',
+            label: tr('Account number'),
             controller: f.ctl('account'),
-            hint: 'Enter account number',
+            hint: tr('Enter account number'),
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(18)],
             helper: s.bankLast4 == null ? null : 'Saved account ending ${s.bankLast4}. Leave blank to keep it.',
           ),
-          SheetField(label: 'IFSC code', controller: f.ctl('ifsc'), hint: 'Enter IFSC code', maxLength: 11),
+          SheetField(label: tr('IFSC code'), controller: f.ctl('ifsc'), hint: tr('Enter IFSC code'), maxLength: 11),
         ],
       ),
     );
@@ -321,7 +322,7 @@ Future<SettingsState?> openBankSheet(BuildContext context, SettingsEnv env, Sett
 
 /// Documents: the list, Upload document (pick a file, name it, send it), Open, Remove.
 Future<void> openDocumentsSheet(BuildContext context, SettingsEnv env, SettingsState s) =>
-    showSettingsSheet<void>(context, title: 'Documents', subtitle: 'Upload and manage your store documents.', body: (_) => _Documents(env: env, canEdit: s.canEdit));
+    showSettingsSheet<void>(context, title: tr('Documents'), subtitle: tr('Upload and manage your store documents.'), body: (_) => _Documents(env: env, canEdit: s.canEdit));
 
 const kDocTypes = <String, String>{'tax': 'Tax', 'food_safety': 'Food safety', 'business': 'Business licence', 'safety': 'Safety', 'liquor': 'Liquor', 'environment': 'Environment', 'other': 'Other'};
 
@@ -358,8 +359,8 @@ class _DocumentsState extends State<_Documents> {
     if (file == null || !mounted) return;
     final details = await showSettingsSheet<Map<String, String>>(
       context,
-      title: 'Document details',
-      subtitle: 'Name the document so you can find it later.',
+      title: tr('Document details'),
+      subtitle: tr('Name the document so you can find it later.'),
       body: (_) => _DocumentDetails(initialName: file.name.replaceAll(RegExp(r'\.[A-Za-z0-9]+$'), '')),
     );
     if (details == null || !mounted) return;
@@ -384,7 +385,7 @@ class _DocumentsState extends State<_Documents> {
   Widget build(BuildContext context) {
     if (_error != null) {
       return EmptyPanel(
-        title: 'Could not load documents',
+        title: tr('Could not load documents'),
         body: _error!,
         child: PanelButton('Try again', onPressed: () {
           setState(() => _error = null);
@@ -396,7 +397,7 @@ class _DocumentsState extends State<_Documents> {
     final docs = _docs!;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (docs.isEmpty)
-        EmptyPanel(title: 'No documents available', body: 'Upload a store document from your device.', child: widget.canEdit ? PanelButton('Upload document', onPressed: _upload, busy: _busy) : null)
+        EmptyPanel(title: tr('No documents available'), body: tr('Upload a store document from your device.'), child: widget.canEdit ? PanelButton('Upload document', onPressed: _upload, busy: _busy) : null)
       else ...[
         for (final d in docs)
           Container(
@@ -411,8 +412,8 @@ class _DocumentsState extends State<_Documents> {
               const SizedBox(height: 2),
               Text([kDocTypes[d['doc_type']] ?? '${d['doc_type']}', if (d['doc_no_masked'] != null) '${d['doc_no_masked']}', if (d['expiry_date'] != null) 'Expires ${d['expiry_date']}'].join(' · '), style: inter(12, 400, color: kMuted)),
               Row(children: [
-                if (d['has_file'] == true) RowAction('Open', onTap: () => _open('${d['id']}')),
-                if (widget.canEdit) RowAction('Remove', onTap: () => _remove('${d['id']}')),
+                if (d['has_file'] == true) RowAction(tr('Open'), onTap: () => _open('${d['id']}')),
+                if (widget.canEdit) RowAction(tr('Remove'), onTap: () => _remove('${d['id']}')),
               ]),
             ]),
           ),
@@ -444,15 +445,15 @@ class _DocumentDetailsState extends State<_DocumentDetails> {
 
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SheetField(label: 'Document name', controller: _name, hint: 'For example FSSAI licence', maxLength: 120),
+        SheetField(label: tr('Document name'), controller: _name, hint: tr('For example FSSAI licence'), maxLength: 120),
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: SetupSelect<String>(label: 'Type', hint: 'Choose a type', value: _type, options: kDocTypes.keys.toList(), display: (k) => kDocTypes[k]!, onChanged: (k) => setState(() => _type = k)),
+          child: SetupSelect<String>(label: tr('Type'), hint: tr('Choose a type'), value: _type, options: kDocTypes.keys.toList(), display: (k) => kDocTypes[k]!, onChanged: (k) => setState(() => _type = k)),
         ),
-        SheetField(label: 'Document number (optional)', controller: _number, hint: 'Enter number', maxLength: 60),
+        SheetField(label: tr('Document number (optional)'), controller: _number, hint: tr('Enter number'), maxLength: 60),
         FormError(_error),
         SaveButton(
-          label: 'Upload',
+          label: tr('Upload'),
           onPressed: () {
             if (_name.text.trim().length < 2) return setState(() => _error = 'Name the document, 2 to 120 characters.');
             Navigator.of(context).pop({'name': _name.text.trim(), 'type': _type, 'number': _number.text.trim()});
@@ -463,7 +464,7 @@ class _DocumentDetailsState extends State<_DocumentDetails> {
 
 /// Upload your QR: upload, view, replace, remove. The file goes to a private bucket; Save just closes (the upload saves itself).
 Future<SettingsState?> openQrSheet(BuildContext context, SettingsEnv env, SettingsState s) =>
-    showSettingsSheet<SettingsState>(context, title: 'Upload your QR', subtitle: 'Upload or manage your store QR code.', body: (_) => _QrSheet(env: env, state: s));
+    showSettingsSheet<SettingsState>(context, title: tr('Upload your QR'), subtitle: tr('Upload or manage your store QR code.'), body: (_) => _QrSheet(env: env, state: s));
 
 class _QrSheet extends StatefulWidget {
   const _QrSheet({required this.env, required this.state});
@@ -516,15 +517,15 @@ class _QrSheetState extends State<_QrSheet> {
         child: can ? PanelButton(up ? 'Replace' : 'Upload', onPressed: _upload, busy: _busy) : null,
       ),
       const SizedBox(height: 14),
-      Text('Supported formats: JPG / PNG / PDF', style: inter(12.5, 400, color: kMuted)),
+      Text(tr('Supported formats: JPG / PNG / PDF'), style: inter(12.5, 400, color: kMuted)),
       const SizedBox(height: 10),
-      Text('Once uploaded, you can replace or remove your QR.', style: inter(12.5, 400, color: kMuted)),
+      Text(tr('Once uploaded, you can replace or remove your QR.'), style: inter(12.5, 400, color: kMuted)),
       Row(children: [
-        if (up) RowAction('View', onTap: _view),
-        if (up && can) RowAction('Remove', onTap: _remove),
+        if (up) RowAction(tr('View'), onTap: _view),
+        if (up && can) RowAction(tr('Remove'), onTap: _remove),
       ]),
       const SizedBox(height: 8),
-      SaveButton(label: 'Save', onPressed: () => Navigator.of(context).pop(_s)),
+      SaveButton(label: tr('Save'), onPressed: () => Navigator.of(context).pop(_s)),
     ]);
   }
 }

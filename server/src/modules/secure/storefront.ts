@@ -3,6 +3,7 @@
 // says the verified caller may manage (sf_image_org: an active owner / admin / manager / marketing role). The file is recorded by the
 // service-only registrar sf_image_register after the storage service confirms it exists and is small enough. Bucket: partner-listing-media.
 import { db, rpc } from '../../db.ts';
+import { viaProxy } from '../../config.ts';
 import { HttpError } from '../../http.ts';
 import { parse } from '../../validate.ts';
 import { IMAGE_EXT, IMAGE_MAX_BYTES, ImageAsk, ImageAttach } from '../../schemas/storefront.ts';
@@ -16,7 +17,7 @@ export async function imageSlot({ userId, args }: SecureCtx) {
   const path = `${org}/sf-${b.kind}/${crypto.randomUUID()}.${IMAGE_EXT[b.content_type]}`;
   const signed = await db().storage.from(BUCKET).createSignedUploadUrl(path);
   if (signed.error || !signed.data) { console.error('[secure] signed upload failed', signed.error?.message); throw new HttpError(502, 'Uploads are not available right now.'); }
-  return { path, upload_url: signed.data.signedUrl, max_bytes: IMAGE_MAX_BYTES };
+  return { path, upload_url: viaProxy(signed.data.signedUrl), max_bytes: IMAGE_MAX_BYTES };
 }
 
 export async function imageAttach({ userId, args }: SecureCtx) {
@@ -52,7 +53,7 @@ export async function withStorefrontLinks<T>(result: T): Promise<T> {
   const paths = [...new Set(holders.map(h => h.path))];
   const signed = await db().storage.from(BUCKET).createSignedUrls(paths, 600);
   const byPath = new Map<string, string>();
-  for (const s of signed.data ?? []) if (s.path && s.signedUrl && !s.error) byPath.set(s.path, s.signedUrl);
+  for (const s of signed.data ?? []) if (s.path && s.signedUrl && !s.error) byPath.set(s.path, viaProxy(s.signedUrl));
   for (const h of holders) { delete h.o[h.key]; h.o[h.key.replace(/_path$/, '_url')] = byPath.get(h.path) ?? null; }
   return result;
 }

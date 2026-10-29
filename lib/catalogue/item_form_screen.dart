@@ -10,6 +10,7 @@ import 'catalogue_format.dart';
 import 'catalogue_widgets.dart';
 import 'item_photo.dart';
 import 'item_sheets.dart' show parsePriceMinor;
+import '../ui/i18n.dart';
 
 /// Figma "Item Creation" (Store Standard / Screens): identity, units and storage, tax and pricing, then a save checklist.
 /// Also used to change an existing item (Quick edit, Edit catalogue details): [item] pre-fills the form and carries its version.
@@ -149,9 +150,9 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
 
   Future<void> _save({required bool draft}) async {
     final price = parsePriceMinor(_price.text);
-    if (_name.text.trim().isEmpty) return showToast(context, 'Enter the product name.');
+    if (_name.text.trim().isEmpty) return showToast(context, tr('Enter the product name.'));
     if (_sku.text.trim().isEmpty) return showToast(context, 'Enter the System Code.');
-    if (price == null) return showToast(context, 'Enter the selling price.');
+    if (price == null) return showToast(context, tr('Enter the selling price.'));
     final mrp = _mrp.text.trim().isEmpty ? null : parsePriceMinor(_mrp.text);
     final cost = _cost.text.trim().isEmpty ? null : parsePriceMinor(_cost.text);
     if (_mrp.text.trim().isNotEmpty && mrp == null) return showToast(context, 'The MRP is not a price.');
@@ -220,7 +221,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   // ---------------------------------------------------------------- photo
   Future<void> _pickPhoto() async {
     try {
-      final p = await widget.photos.pick();
+      final p = await widget.photos.capture(context);
       if (p != null && mounted) setState(() => _photo = p);
     } catch (e) {
       if (mounted) showToast(context, e is ItemPhotoUnavailable ? e.message : 'That photo could not be opened.');
@@ -368,7 +369,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
 
   Widget _scanButton() => IconButton(
         key: const ValueKey('item-barcode-scan'),
-        tooltip: 'Scan barcode with camera',
+        tooltip: tr('Scan barcode with camera'),
         onPressed: _busy ? null : _scanBarcode,
         style: IconButton.styleFrom(backgroundColor: kDark, minimumSize: const Size(38, 38), fixedSize: const Size(38, 38), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
         icon: const Icon(LucideIcons.scanBarcode, size: 20, color: Color(0xFFA1FE2F)),
@@ -432,7 +433,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: 'Item', onBack: () => Navigator.of(context).maybePop()),
+        OrdersTopBar(title: tr('Item'), onBack: () => Navigator.of(context).maybePop()),
         // The steps stay in view: where you are, what is done, a tap jumps to it.
         Container(
           color: kBg,
@@ -479,7 +480,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                 _field('Selling unit *', _dropdown<String>(value: _unit, items: sellingUnits, onChanged: (v) => setState(() => _unit = v ?? 'pc'))),
                 _field('Storage', _dropdown<String>(value: _storage.isEmpty ? null : _storage, items: [for (final s in _storages) (s, s)], hint: 'Dry shelf', onChanged: (v) => setState(() => _storage = v ?? ''))),
               ),
-              _label('Net quantity *'),
+              _label(tr('Net quantity *')),
               Row(children: [
                 Expanded(flex: 3, child: _input(_netQty, '200', type: _decimal, formatters: _money)),
                 const SizedBox(width: 10),
@@ -491,7 +492,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                 const SizedBox(width: 10),
                 SizedBox(width: 84, child: _input(_packUnits, '1', type: _decimal, formatters: _money)),
                 const SizedBox(width: 10),
-                Text('selling unit', style: inter(14, 400)),
+                Text(tr('selling unit'), style: inter(14, 400)),
               ]),
               const SizedBox(height: 6),
               _kv('Opening stock', 'Not added · 0 units'),
@@ -501,7 +502,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                 _field('HSN / tax category *',
                     _input(_hsn, 'Tax category', bad: taxOpen && _hsn.text.trim().isEmpty && _error != null, type: TextInputType.number, formatters: [FilteringTextInputFormatter.digitsOnly])),
                 _field('GST rate *',
-                    _dropdown<num>(value: _gst, items: [for (final g in gstSlabs) (g, '${qty(g)}%')], hint: 'Required', bad: _gst == null && _error != null, onChanged: (v) => setState(() => _gst = v))),
+                    _dropdown<num>(value: _gst, items: [for (final g in gstSlabs) (g, '${qty(g)}%')], hint: tr('Required'), bad: _gst == null && _error != null, onChanged: (v) => setState(() => _gst = v))),
               ),
               _pair(_field('Purchase cost · ex tax (₹)', _input(_cost, '₹24.00', type: _decimal, formatters: _money)), _field('MRP (₹)', _input(_mrp, '₹45.00', type: _decimal, formatters: _money))),
               _field('Selling price · tax inclusive (₹) *', _input(_price, '₹40.00', type: _decimal, formatters: _money)),
@@ -527,7 +528,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                       Text(_error!, style: inter(13, 400, color: const Color(0xFF9A6B68), height: 1.35)),
                     ]),
                   ),
-                  IconButton(tooltip: 'Dismiss', onPressed: () => setState(() => _bannerOpen = false), icon: const Icon(LucideIcons.x, size: 16, color: kMuted)),
+                  IconButton(tooltip: tr('Dismiss'), onPressed: () => setState(() => _bannerOpen = false), icon: const Icon(LucideIcons.x, size: 16, color: kMuted)),
                 ]),
               ),
             _section(_keyReview, 4, 'Save checklist', 'What is still needed before this item can be sold', identityDone && unitsDone && pricingDone, [
@@ -538,7 +539,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
               _check(_photo != null || _savedUrl != null, 'Product photo added (optional)'),
               _check(_editing, 'Save item before receiving or printing labels'),
             ]),
-            Text('A draft is not sold and does not change stock. Stock is received in Stock.', style: inter(12, 400, color: kMuted, height: 1.35)),
+            Text(tr('A draft is not sold and does not change stock. Stock is received in Stock.'), style: inter(12, 400, color: kMuted, height: 1.35)),
           ]),
           ),
         ),
@@ -547,9 +548,9 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
           decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFE3E5DF)))),
           child: Row(children: [
-            Expanded(child: OutlineButton('Save draft only', onPressed: _busy ? null : () => _save(draft: true), height: 48)),
+            Expanded(child: OutlineButton(tr('Save draft only'), onPressed: _busy ? null : () => _save(draft: true), height: 48)),
             const SizedBox(width: 10),
-            Expanded(child: DarkButton('Save item', busy: _busy, onPressed: () => _save(draft: false))),
+            Expanded(child: DarkButton(tr('Save item'), busy: _busy, onPressed: () => _save(draft: false))),
           ]),
         ),
         PosBottomNav(active: 'item', onTap: _tab),

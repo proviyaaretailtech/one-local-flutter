@@ -6,6 +6,7 @@ import '../inventory/inventory_api.dart';
 import '../ui/theme.dart';
 import 'stock_env.dart';
 import 'stock_kit.dart';
+import '../ui/i18n.dart';
 
 /// Runs one stock save or action: a refusal from the server shows as a toast with its own words. Returns whether it worked.
 Future<bool> stockJob(BuildContext context, Future<void> Function() job, {String? done}) async {
@@ -229,8 +230,8 @@ class _MoveStockScreenState extends State<MoveStockScreen> {
   @override
   Widget build(BuildContext context) => StockScaffold(
         env: widget.env,
-        title: 'Transfer stock',
-        line: 'Move units from one place to another, like backroom to shelf. Moving inside the store never changes its total.',
+        title: tr('Transfer stock'),
+        line: tr('Move units from one place to another, like backroom to shelf. Moving inside the store never changes its total.'),
         onRefresh: _init,
         children: [
           InvLoad<Facts>(data: _options, error: _error, onRetry: _init, builder: (_) => _body()),
@@ -250,52 +251,52 @@ class _MoveStockScreenState extends State<MoveStockScreen> {
           }), items: const [('here', 'Within this store', null), ('other', 'To another store', null)]),
       const SizedBox(height: 12),
       if (other && stores.isEmpty)
-        const StockEmpty('Only one store', 'Your business has one store. Add another store to send stock between them.', icon: LucideIcons.store)
+        StockEmpty(tr('Only one store'), 'Your business has one store. Add another store to send stock between them.', icon: LucideIcons.store)
       else ...[
         InvCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const InvLabel('Product'),
+          InvLabel(tr('Product')),
           InvPickBox(value: d?.m('item').s('name') ?? 'Choose a product', onTap: _busy ? null : _pickProduct),
           if (d != null) ...[
             if (_fromBins(d).isEmpty)
-              const InvNote('There is no stock of this product in the store to move.', color: kRedText)
+              InvNote(tr('There is no stock of this product in the store to move.'), color: kRedText)
             else ...[
-              const InvLabel('Take from'),
+              InvLabel(tr('Take from')),
               InvPickBox(value: '${_binName(_fromBin)} · ${qty(from)} $_unit', onTap: _pickFrom),
               if (lots.isNotEmpty) ...[
-                const InvLabel('Batch'),
+                InvLabel(tr('Batch')),
                 InvPickBox(value: _lotId == null ? 'Any batch (oldest first)' : 'Batch ${lots.where((l) => l.s('id') == _lotId).firstOrNull?.s('lot_code') ?? ''}', onTap: _pickLot),
               ],
               InvLabel(other ? 'Send to' : 'Put in'),
               other
                   ? InvPickBox(value: _toStore == null ? 'Choose a store' : _storeName(_toStore), onTap: _pickStore)
                   : InvPickBox(value: _toBin == null ? 'Choose a place' : '${_binName(_toBin)} · ${qty(to)} $_unit now', onTap: _pickTo),
-              const InvLabel('How many?'),
+              InvLabel(tr('How many?')),
               InvStepper(value: _qty, min: 1, label: 'units to move', onChanged: (v) => setState(() {
                 _qty = v > _max ? _max : v;
                 _key = null;
               })),
               InvNote('Up to ${qty(_max)} $_unit can be moved from here.'),
-              const InvLabel('Reason'),
+              InvLabel(tr('Reason')),
               InvPickBox(value: _reason ?? (other ? 'Rebalance between stores' : 'Refill sales shelf'), onTap: _pickReason),
             ],
           ],
         ])),
         if (d != null && _fromBin != null && (other ? _toStore != null : _toBin != null))
           InvCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const InvCardHead('After the move', subtitle: 'Before → after'),
+            InvCardHead(tr('After the move'), subtitle: tr('Before → after')),
             StockRow(_binName(_fromBin), '${qty(from)} − ${qty(_qty)} → ${qty(from - _qty)}'),
             if (!other) StockRow(_binName(_toBin), '${qty(to)} + ${qty(_qty)} → ${qty(to + _qty)}'),
-            if (other) StockRow('This store, ready to sell', '${qty(d.n('available'))} → ${qty(d.n('available') - _qty)}'),
+            if (other) StockRow(tr('This store, ready to sell'), '${qty(d.n('available'))} → ${qty(d.n('available') - _qty)}'),
             if (other) StockRow(_storeName(_toStore), '+${qty(_qty)} when received'),
-            if (!other) StockRow('Store total', '${qty(d.n('available'))} · no change', strong: true),
+            if (!other) StockRow(tr('Store total'), '${qty(d.n('available'))} · no change', strong: true),
           ])),
         InvPrimary(other ? 'Send stock' : 'Move stock', busy: _busy, onPressed: () => _go(now: true)),
         const SizedBox(height: 10),
-        InvSecondary('Save as draft', onPressed: _busy ? null : () => _go(now: false)),
+        InvSecondary(tr('Save as draft'), onPressed: _busy ? null : () => _go(now: false)),
       ],
       if (_open.isNotEmpty) ...[
         const SizedBox(height: 18),
-        Text('Drafts and stock on the way', style: inter(16, 700)),
+        Text(tr('Drafts and stock on the way'), style: inter(16, 700)),
         const SizedBox(height: 8),
         for (final r in _open) _openRow(r),
       ],
@@ -316,7 +317,7 @@ class _MoveStockScreenState extends State<MoveStockScreen> {
       const SizedBox(height: 8),
       Row(children: [
         Expanded(child: InvSecondary(onTheWay ? 'Mark received' : 'Move now', onPressed: _busy ? null : () => _finishOpen(r))),
-        if (!onTheWay) ...[const SizedBox(width: 10), Expanded(child: InvSecondary('Remove', color: kRedText, onPressed: _busy ? null : () => _cancelOpen(r)))],
+        if (!onTheWay) ...[const SizedBox(width: 10), Expanded(child: InvSecondary(tr('Remove'), color: kRedText, onPressed: _busy ? null : () => _cancelOpen(r)))],
       ]),
     ]));
   }

@@ -14,6 +14,8 @@ const obj = <T extends z.ZodRawShape>(shape: T) => z.object(shape).loose();
 export const Catalog = obj({
   q: text(60).optional(), category: text(60).optional(), available: z.boolean().optional(), sort: z.enum(['name', 'price_asc', 'price_desc'], { message: 'Unknown sort.' }).optional(),
 });
+// bought together (27 Oct 2026): the products in the cart; the database ranks what is bought with them
+export const Basket = obj({ item_ids: z.array(id).max(50, 'Too many items.').optional(), limit: z.number().int().min(1).max(40).optional() });
 export const SplitPay = obj({
   order_id: id, expected_updated_at: z.string().max(40).optional(),
   payments: z.array(obj({ method: z.enum(['cash', 'card', 'upi'], { message: 'Each part is cash, card or UPI.' }), amount: money, tendered: money.nullish(), reference: text(80).nullish() }))

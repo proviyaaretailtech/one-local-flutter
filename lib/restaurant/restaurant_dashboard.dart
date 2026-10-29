@@ -131,8 +131,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
     padding: const EdgeInsets.symmetric(horizontal: 16),
     child: Row(
       children: [
-        // Funnel and Service Quality are off for now (founder, 27 Oct 2026): nothing records them yet
-        for (final (i, t) in const ['My Feed', 'Sales'].indexed)
+        for (final (i, t) in const ['My Feed', 'Sales'].indexed) // Funnel and Service Quality removed (founder, 28 Oct 2026)
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: InkWell(
@@ -175,7 +174,6 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
     ],
   );
 
-  // Sales: today's sales, then the last 7 days (compare with the 7 before, on or off). "Today so far" said the same as Sales today.
   List<Widget> _salesTab(RestaurantDashboardData d) => [
     _salesToday(d),
     const SizedBox(height: 16),

@@ -18,10 +18,18 @@ export async function me({ userId }: SecureCtx) {
   const outlet = ch
     ? { accepting: ch.accepting, back_at: ch.back_at, default_prep_minutes: ch.default_prep_minutes, accept_window_seconds: ch.accept_window_seconds, missed_in_a_row: ch.missed_in_a_row, address: ch.address, set_up: true }
     : { accepting: false, back_at: null, default_prep_minutes: 20, accept_window_seconds: 60, missed_in_a_row: 0, address: null, set_up: false };
+  // The plan chosen on the application (pos_only | pos_and_onelocal | onelocal_app); null for a store made another way.
+  const { data: app, error: e3 } = await db().from('ol_partner_applications').select('sell_plan')
+    .eq('organization_id', org.id).eq('status', 'approved').order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (e3) fromDbError(e3);
   return {
     person: { id: userId, email: data.email ?? '', name: data.full_name ?? '', role: (data.role as { slug?: string } | null)?.slug ?? '', organization_id: org.id },
     restaurant: { id: org.id, name: org.name ?? '', ...outlet },
     // store | restaurant | service: decides the wording on the sign-in screens and which home opens.
     business_kind: kindOf(org.business_domain, null),
+    // POS only: no online orders until the store upgrades (founder, 28 Oct 2026).
+    sell_plan: (app?.sell_plan as string | null | undefined) ?? null,
+    // An advertising-only partner (hosted_advertisers_2026-10-29.sql): no store; the app opens Ads.
+    advertising_only: (org.business_domain ?? '') === 'Advertising',
   };
 }

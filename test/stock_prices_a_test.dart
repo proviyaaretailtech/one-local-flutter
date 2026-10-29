@@ -8,7 +8,6 @@ import 'package:vinii_pos/api/rpc_client.dart';
 import 'package:vinii_pos/catalogue/catalogue_api.dart';
 import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart';
-import 'package:vinii_pos/stock/low_stock_view_screen.dart';
 import 'package:vinii_pos/stock/reorder_screen.dart';
 import 'package:vinii_pos/stock/stock_env.dart';
 import 'package:vinii_pos/stock/update_stock_screen.dart';
@@ -102,7 +101,7 @@ class Fake {
     catalogue: CatalogueApi(baseUrl: 'http://pos.test', accessToken: () => 't', client: client),
     rpc: RpcClient(baseUrl: 'http://pos.test', accessToken: () => 't', client: client),
     open: (context, page, {itemId}) async => opened.add(itemId == null ? page : '$page:$itemId'),
-    onOpenPurchase: (_) => purchases++,
+    onOpenPurchase: (_, [_ = const []]) => purchases++,
   );
 
   List<http.Request> calls(String fn) => requests.where((r) => fnOf(r) == fn).toList();
@@ -285,28 +284,6 @@ void main() {
       expect(find.byKey(const ValueKey('chip-Beverages')), findsOneWidget);
       await tap(t, find.byKey(const ValueKey('chip-')));
       expect(f.body(f.calls('cat_item_list').last).containsKey('category'), isFalse);
-    });
-  });
-
-  group('Low stock', () {
-    testWidgets('most urgent first, with what is on the way; the buttons open incoming, reorder and purchase', (t) async {
-      final f = Fake();
-      await show(t, LowStockViewScreen(env: f.env));
-      expect(find.text('Low stock'), findsWidgets);
-      final milk = t.getRect(find.byKey(const ValueKey('low-i-milk'))).top;
-      final parle = t.getRect(find.byKey(const ValueKey('low-i-parle'))).top;
-      expect(milk, lessThan(parle)); // out of stock before low
-      expect(find.byKey(const ValueKey('low-i-butter')), findsNothing); // healthy
-      expect(find.text('System Code: M001'), findsOneWidget);
-      await tap(t, find.descendant(of: find.byKey(const ValueKey('low-i-milk')), matching: find.text('See incoming')));
-      await tap(t, find.descendant(of: find.byKey(const ValueKey('low-i-parle')), matching: find.text('Reorder')));
-      await tap(t, find.text('Create purchase order'));
-      expect(f.opened, ['movements:i-milk', 'reorder:i-parle']);
-      expect(f.purchases, 1);
-      await tap(t, find.byKey(const ValueKey('chip-critical')));
-      expect(find.byKey(const ValueKey('low-i-parle')), findsNothing);
-      await tap(t, find.byKey(const ValueKey('low-i-milk')));
-      expect(f.opened.last, 'item:i-milk');
     });
   });
 

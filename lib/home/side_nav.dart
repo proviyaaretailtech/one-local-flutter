@@ -3,8 +3,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../ui/theme.dart';
 import 'control_centre_screen.dart' show initials;
+import 'app_actions.dart';
 import 'home_nav.dart';
 import 'home_widgets.dart';
+import '../ui/i18n.dart';
 
 /// One row of the side nav. [open] is null when the screen is not built yet: the row is then
 /// greyed with a "Soon" tag instead of looking live and answering with a toast (control rule).
@@ -36,14 +38,18 @@ Future<void> showStoreSideNav(
     SideNavEntry(LucideIcons.qrCode, 'All Orders', hook(HomeNav.orderHistory ?? HomeNav.orders)),
     SideNavEntry(LucideIcons.indianRupee, 'Money', hook(HomeNav.money)),
     SideNavEntry(LucideIcons.circleUser, 'Customer', hook(HomeNav.customers)),
+    // how the shop looks to customers (founder, 27 Oct 2026): next to the customers it is for
+    // Page Manager (founder, 28 Oct 2026; was Business profile): the shop's OneLocal page, ads and offers from one dashboard
+    SideNavEntry(LucideIcons.layoutDashboard, 'Page Manager', hook(HomeNav.businessProfile ?? HomeNav.storefront)),
     SideNavEntry(LucideIcons.fileText, 'Reports', onReports),
     SideNavEntry(LucideIcons.users, 'Team', hook(HomeNav.team)),
     SideNavEntry(LucideIcons.settings, 'Settings', hook(HomeNav.settings ?? HomeNav.setup)),
-    SideNavEntry(LucideIcons.globe, 'OneLocal page', hook(HomeNav.storefront)),
     SideNavEntry(LucideIcons.wallet, 'One Local Wallet', hook(HomeNav.wallet)),
     SideNavEntry(LucideIcons.circleQuestionMark, 'Help & support', hook(HomeNav.support)),
+    // the OneLocal plans and prices (founder, 28 Oct 2026), last
+    SideNavEntry(LucideIcons.crown, 'Subscription plans', hook(HomeNav.plans)),
   ];
-  return showSideNav(context, name: name, email: email, entries: entries, onSignOut: onSignOut);
+  return showSideNav(context, name: name, email: email, entries: entries, onSignOut: onSignOut, onReports: onReports);
 }
 
 /// The side nav with any list of rows: the store's (above) and the restaurant's (founder, 29 Oct 2026: the restaurant side bar looks like
@@ -56,6 +62,7 @@ Future<void> showSideNav(
   required List<SideNavEntry> entries,
   required VoidCallback onSignOut,
   Set<String> openGroups = const {},
+  VoidCallback? onReports,
 }) {
   return showGeneralDialog<void>(
     context: context,
@@ -71,6 +78,7 @@ Future<void> showSideNav(
         line: line,
         entries: entries,
         openGroups: openGroups,
+        actions: appActions(context, onReports: onReports),
         onAccount: HomeNav.account == null ? null : () => HomeNav.account!(context),
         onSignOut: onSignOut,
       ),
@@ -83,7 +91,7 @@ Future<void> showSideNav(
 }
 
 class _StoreSideNav extends StatefulWidget {
-  const _StoreSideNav({required this.name, required this.email, required this.entries, required this.onSignOut, this.onAccount, this.line, this.openGroups = const {}});
+  const _StoreSideNav({required this.name, required this.email, required this.entries, required this.onSignOut, this.onAccount, this.line, this.openGroups = const {}, this.actions = const []});
 
   /// The folding rows open from the start (back from an Inventory page: Inventory).
   final Set<String> openGroups;
@@ -96,17 +104,25 @@ class _StoreSideNav extends StatefulWidget {
   final VoidCallback onSignOut;
   final VoidCallback? onAccount;
 
+  /// Everything the search finds ([appActions]).
+  final List<AppAction> actions;
+
   @override
   State<_StoreSideNav> createState() => _StoreSideNavState();
 }
 
 class _StoreSideNavState extends State<_StoreSideNav> {
-  final _q = TextEditingController();
+  final _search = TextEditingController();
   late final _openGroups = <String>{...widget.openGroups}; // the folding rows now open
+
+  String get name => widget.name;
+  String? get email => widget.email;
+  List<SideNavEntry> get entries => widget.entries;
+  VoidCallback? get onAccount => widget.onAccount;
 
   @override
   void dispose() {
-    _q.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -116,16 +132,83 @@ class _StoreSideNavState extends State<_StoreSideNav> {
     open();
   }
 
+  /// "Search the app" (founder, 26 Oct 2026): any place or action, by its name or the words people use for it.
+  Widget _searchField() => Container(
+        height: 44,
+        decoration: BoxDecoration(color: const Color(0xFFF4F5F1), borderRadius: BorderRadius.circular(14), border: Border.all(color: kLine)),
+        child: Row(children: [
+          const SizedBox(width: 12),
+          const Icon(LucideIcons.search, size: 18, color: kMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              key: const ValueKey('side-nav-search'),
+              controller: _search,
+              textInputAction: TextInputAction.search,
+              style: inter(14, 400),
+              decoration: InputDecoration.collapsed(hintText: tr('Search the app'), hintStyle: inter(14, 400, color: kMuted)),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (q) {
+                final hits = searchActions(widget.actions, q);
+                if (hits.isNotEmpty) _go(context, hits.first.open);
+              },
+            ),
+          ),
+          if (_search.text.isNotEmpty)
+            IconButton(
+              tooltip: tr('Clear'),
+              visualDensity: VisualDensity.compact,
+              onPressed: () => setState(_search.clear),
+              icon: const Icon(LucideIcons.x, size: 16, color: kMuted),
+            ),
+        ]),
+      );
+
+  Widget _results() {
+    final hits = searchActions(widget.actions, _search.text);
+    if (hits.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text('Nothing matches "${_search.text.trim()}". Try another word, like stock, bill or supplier.', style: inter(13.5, 400, color: kMuted, height: 1.4)),
+      );
+    }
+    return ListView.separated(
+      key: const ValueKey('side-nav-results'),
+      padding: EdgeInsets.zero,
+      itemCount: hits.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 6),
+      itemBuilder: (context, i) {
+        final a = hits[i];
+        return Material(
+          color: const Color(0xFFF4F5F1),
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            key: ValueKey('side-nav-result-${a.title}'),
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => _go(context, a.open),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(children: [
+                Icon(a.icon, size: 19, color: kInk),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(tr(a.title), style: inter(14.5, 600)),
+                    Text(tr(a.where), style: inter(11.5, 400, color: kMuted)),
+                  ]),
+                ),
+                const Icon(LucideIcons.chevronRight, size: 16, color: kMuted),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final name = widget.name, email = widget.email, onAccount = widget.onAccount, onSignOut = widget.onSignOut;
-    // "Search the app": the rows whose name (or a sub-row's) has the words typed
-    final q = _q.text.trim().toLowerCase();
-    // rows whose name starts with the words first ("settings" → Settings, then Delivery settings)
-    final entries = q.isEmpty
-        ? widget.entries
-        : ([for (final e in widget.entries) if (e.label.toLowerCase().contains(q) || e.children.any((c) => c.label.toLowerCase().contains(q))) e]
-          ..sort((a, b) => (a.label.toLowerCase().startsWith(q) ? 0 : 1).compareTo(b.label.toLowerCase().startsWith(q) ? 0 : 1)));
+    final searching = _search.text.trim().isNotEmpty;
     final width = (MediaQuery.sizeOf(context).width * 0.78).clamp(260.0, 320.0);
     return Material(
       key: const ValueKey('side-nav'),
@@ -144,11 +227,11 @@ class _StoreSideNavState extends State<_StoreSideNav> {
               // (founder, 20 Oct 2026: one place for the account, not a separate row at the foot).
               Semantics(
                 button: onAccount != null,
-                label: 'Manage account',
+                label: tr('Manage account'),
                 excludeSemantics: true,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(14),
-                  onTap: onAccount == null ? null : () => _go(context, onAccount),
+                  onTap: onAccount == null ? null : () => _go(context, onAccount!),
                   child: Padding(
                     padding: const EdgeInsets.all(4),
                     child: Row(children: [
@@ -163,9 +246,9 @@ class _StoreSideNavState extends State<_StoreSideNav> {
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           name.trim().isEmpty
-                              ? Text('Add your name', style: inter(15, 700, color: kLink))   // no name on the account yet: Manage account sets it
+                              ? Text(tr('Add your name'), style: inter(15, 700, color: kLink))   // no name on the account yet: Manage account sets it
                               : Text(name, style: inter(15, 700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          if (email != null && email.isNotEmpty) Text(email, style: inter(12, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if ((email ?? '').isNotEmpty) Text(email!, style: inter(12, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
                           if ((widget.line ?? '').isNotEmpty) Text(widget.line!, key: const ValueKey('side-nav-line'), style: inter(12, 600, color: kLink), maxLines: 1, overflow: TextOverflow.ellipsis),
                         ]),
                       ),
@@ -173,29 +256,11 @@ class _StoreSideNavState extends State<_StoreSideNav> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
-              // Search the app: narrows the rows below as you type
-              TextField(
-                key: const ValueKey('side-nav-search'),
-                controller: _q,
-                onChanged: (_) => setState(() {}),
-                style: inter(14, 500),
-                decoration: InputDecoration(
-                  hintText: 'Search the app',
-                  hintStyle: inter(14, 400, color: kMuted),
-                  prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
-                  filled: true,
-                  fillColor: const Color(0xFFF3F4EE),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDDE0D6))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFDDE0D6))),
-                ),
-              ),
               const SizedBox(height: 12),
-              if (entries.isEmpty) Padding(padding: const EdgeInsets.all(16), child: Text('Nothing called "${_q.text.trim()}".', style: inter(13, 500, color: kMuted))),
+              _searchField(),
+              const SizedBox(height: 12),
               Expanded(
-                child: ListView.separated(
+                child: searching ? _results() : ListView.separated(
                   padding: EdgeInsets.zero,
                   itemCount: entries.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
@@ -204,7 +269,7 @@ class _StoreSideNavState extends State<_StoreSideNav> {
                     // a row with sub-rows and no page of its own folds open and shut (Inventory, founder 29 Oct 2026); a search for a
                     // sub-row opens its group
                     final group = e.children.isNotEmpty && e.open == null;
-                    final open = group && (_openGroups.contains(e.label) || (q.isNotEmpty && e.children.any((c) => c.label.toLowerCase().contains(q))));
+                    final open = group && _openGroups.contains(e.label);
                     final row = _NavRow(
                       key: group ? ValueKey('side-nav-group-${e.label}') : null,
                       icon: e.icon,
@@ -230,7 +295,7 @@ class _StoreSideNavState extends State<_StoreSideNav> {
                 ),
               ),
               const SizedBox(height: 8),
-              _NavRow(icon: LucideIcons.logOut, label: 'Sign out', danger: true, onTap: () => _go(context, onSignOut)),
+              _NavRow(icon: LucideIcons.logOut, label: tr('Sign out'), danger: true, onTap: () => _go(context, widget.onSignOut)),
             ]),
           ),
         ),
@@ -273,7 +338,7 @@ class _NavRow extends StatelessWidget {
               child: Row(children: [
                 Icon(icon, size: 17, color: fg),
                 const SizedBox(width: 12),
-                Expanded(child: Text(label, style: inter(12.5, 600, color: fg))),
+                Expanded(child: Text(tr(label), style: inter(12.5, 600, color: fg))),
                 Icon(LucideIcons.chevronRight, size: 15, color: kMuted),
               ]),
             ),
@@ -296,12 +361,12 @@ class _NavRow extends StatelessWidget {
             child: Row(children: [
               Icon(icon, size: 20, color: fg),
               const SizedBox(width: 14),
-              Expanded(child: Text(label, style: inter(13, 600, color: fg))),
+              Expanded(child: Text(tr(label), style: inter(13, 600, color: fg))),
               if (soon)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(color: const Color(0xFFFEF0C7), borderRadius: BorderRadius.circular(10)),
-                  child: Text('Soon', style: inter(10, 700, color: const Color(0xFFB54708))),
+                  child: Text(tr('Soon'), style: inter(10, 700, color: const Color(0xFFB54708))),
                 ),
               if (expanded != null) Icon(expanded! ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18, color: kMuted),
             ]),

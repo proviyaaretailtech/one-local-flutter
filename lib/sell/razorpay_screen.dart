@@ -7,6 +7,7 @@ import '../ui/theme.dart';
 import 'result_screens.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Razorpay checkout mobile": the hosted online checkout for a held bill (UPI, card, net banking, wallets).
 /// The call goes to the POS server, which answers 503 `provider_not_configured` until a payment provider is set up there (test mode first);
@@ -72,7 +73,7 @@ class _RazorpayScreenState extends State<RazorpayScreen> {
               const Spacer(),
               const Icon(LucideIcons.shieldCheck, size: 18, color: Color(0xFF3DB800)),
               const SizedBox(width: 6),
-              Text('Secure checkout', style: inter(13, 600, color: kMuted)),
+              Text(tr('Secure checkout'), style: inter(13, 600, color: kMuted)),
             ]),
             const SizedBox(height: 16),
             OrderCardBox(
@@ -81,13 +82,13 @@ class _RazorpayScreenState extends State<RazorpayScreen> {
                 Row(children: [Expanded(child: Text(widget.env.storeLine, style: inter(20, 800))), const TagChip('Store Checkout')]),
                 Text('Order ${o.displayNo} · ${o.customer}', style: inter(14, 400, color: kMuted)),
                 const Divider(height: 24, color: kLine),
-                Row(children: [Text('Amount to pay', style: inter(15, 400, color: kMuted)), const Spacer(), Text('${rupees(total)}${total == total.roundToDouble() ? '.00' : ''}', style: inter(30, 800))]),
+                Row(children: [Text(tr('Amount to pay'), style: inter(15, 400, color: kMuted)), const Spacer(), Text('${rupees(total)}${total == total.roundToDouble() ? '.00' : ''}', style: inter(30, 800))]),
                 const SizedBox(height: 6),
                 Row(children: [Text('Subtotal ${rupees((o.bill['subtotal'] as num?) ?? 0)}', style: inter(13, 400, color: kMuted)), const Spacer(), Text('GST (${o.bill['gst_pct']}%) ${rupees((o.bill['gst'] as num?) ?? 0)}', style: inter(13, 400, color: kMuted))]),
               ]),
             ),
             const SizedBox(height: 18),
-            Text('Choose payment method', style: inter(20, 800)),
+            Text(tr('Choose payment method'), style: inter(20, 800)),
             const SizedBox(height: 10),
             for (final (id, title, sub, icon) in const [
               ('upi', 'UPI', 'Google Pay, PhonePe, Paytm & more', LucideIcons.smartphone),
@@ -119,11 +120,11 @@ class _RazorpayScreenState extends State<RazorpayScreen> {
                         ]),
                         if (_method == id && id == 'upi') ...[
                           const SizedBox(height: 12),
-                          Text('UPI ID', style: inter(13, 600, color: kMuted)),
+                          Text(tr('UPI ID'), style: inter(13, 600, color: kMuted)),
                           const SizedBox(height: 6),
                           TextField(controller: _upi, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(hintText: 'customer@okaxis')),
                           const SizedBox(height: 6),
-                          Text('Approve the payment request in your UPI app.', style: inter(12.5, 400, color: kMuted)),
+                          Text(tr('Approve the payment request in your UPI app.'), style: inter(12.5, 400, color: kMuted)),
                         ],
                       ]),
                     ),

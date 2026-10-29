@@ -1,18 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../catalogue/catalogue_api.dart';
+import '../catalogue/quick_add_screen.dart';
+import '../catalogue/grn_screens.dart' show GrnDashboardScreen;
+import '../stock/lot_labels_screen.dart' show offerLotLabels;
+import '../ui/purchase_steps.dart';
 import '../ui/theme.dart';
 import 'document_flow.dart';
 import 'inv_env.dart';
 import 'inventory_api.dart';
 import 'inventory_widgets.dart';
+import '../ui/i18n.dart';
 
-/// Figma "Receiving": verify a delivery before the goods-received note is approved. Counts, rejects with a reason, the supplier lot and expiry,
-/// and a reconciliation. Drafts never change stock; "Send to Purchase Review" then the approver posting it does.
+/// Step 3 after counting: the supplier's bill is matched on its own page (it replaces this one). Tests replace it.
+void Function(BuildContext context, String receiptId) openMatchBill = (context, receiptId) =>
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => GrnDashboardScreen(receiptId: receiptId)));
+
+/// A product that is not in the shop yet, made while receiving (founder, 26 Oct 2026): Quick add without "In stock now", since the
+/// receipt note counts it. Answers the new stock item (id, name, System Code), or null when closed. Tests replace it.
+Future<Facts?> Function(BuildContext context) newItemForReceiving = (context) async {
+  final made = await Navigator.of(context).push<CatItem>(MaterialPageRoute(builder: (_) => QuickAddScreen(api: CatalogueApi(), receiving: true)));
+  final inv = made?.raw['inventory_item_id']?.toString();
+  if (made == null || inv == null) return null;
+  return Facts({'id': inv, 'name': made.name, 'sku': made.sku});
+};
+
+/// A receipt note (Figma "Receiving", founder's receiving rules of 26 Oct 2026): count a delivery, with or without a purchase order.
+/// Items can be added that were not ordered, or that are not in the shop yet (+ New item); damaged units are marked per line; lines
+/// that differ from the order are flagged. Drafts never change stock; "Send to check" then the approver posting it does, and the
+/// whole lot's labels come next.
 class ReceivingScreen extends StatefulWidget {
-  const ReceivingScreen({super.key, required this.env, this.documentId});
+  const ReceivingScreen({super.key, required this.env, this.documentId, this.startNew = false});
   final InvEnv env;
   final String? documentId;
+
+  /// + Add Purchase: a new receipt note, even when another one is still being counted.
+  final bool startNew;
   @override
   State<ReceivingScreen> createState() => _ReceivingScreenState();
 }
@@ -27,8 +51,8 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
   final _search = TextEditingController();
   List<DraftLine> _lines = [];
   int _sel = 0;
-  String _tab = 'receiving';
   bool _loaded = false;
+  bool _new = false; // a new receipt note, not saved yet
 
   @override
   void initState() {
@@ -37,8 +61,9 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
   }
 
   Future<void> _init() async {
-    await _f.load(id: widget.documentId, open: const ['draft', 'review']);
+    await _f.load(id: widget.documentId, open: widget.startNew ? const [] : const ['draft', 'review']);
     if (!mounted) return;
+    if (widget.startNew && _f.doc == null) _new = true;
     _adopt();
     setState(() => _loaded = true);
   }
@@ -51,7 +76,6 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
     _supplier.text = d.s('supplier_name');
     _po.text = d.s('po_ref');
     _invoice.text = d.s('invoice_ref');
-    _tab = d.status == 'draft' ? 'receiving' : 'grn';
   }
 
   bool get _editable => _f.doc == null || _f.doc!.status == 'draft';
@@ -69,8 +93,11 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
       await _f.save(fields: _fields, lines: _lines);
       await _f.act('submit');
       _adopt();
-    }, done: 'Sent to purchase review. Stock changes when the receipt is posted.');
-    if (ok && mounted) setState(() {});
+    }, done: 'Counted. Now match the supplier bill.');
+    if (!ok || !mounted) return;
+    setState(() {});
+    final id = _f.doc?.id;
+    if (id != null) openMatchBill(context, id); // step 3
   }
 
   Future<void> _addItem({String? query}) async {
@@ -84,16 +111,48 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
     item ??= await pickItem(context, env.api);
     if (item == null) return;
     setState(() {
-      _lines.add(DraftLine(itemId: item!.s('id'), itemName: item.s('name'), sku: item.s('sku'), qty: 1, rejectedQty: 0));
-      _sel = _lines.length - 1;
+      final at = _lines.indexWhere((l) => l.itemId == item!.s('id'));
+      if (at >= 0) {
+        _lines[at].qty = (_lines[at].qty ?? 0) + 1; // scanned again: one more
+        _sel = at;
+      } else {
+        _lines.add(DraftLine(itemId: item!.s('id'), itemName: item.s('name'), sku: item.s('sku'), qty: 1, rejectedQty: 0));
+        _sel = _lines.length - 1;
+      }
       _scan.clear();
     });
   }
 
+  /// + New item: a product the shop does not have yet, added to the lot.
+  Future<void> _newItem() async {
+    final item = await newItemForReceiving(context);
+    if (item == null || !mounted) return;
+    setState(() {
+      _lines.add(DraftLine(itemId: item.s('id'), itemName: item.s('name'), sku: item.s('sku'), qty: 1, rejectedQty: 0));
+      _sel = _lines.length - 1;
+    });
+    showToast(context, '${item.s('name')} added to the shop and to this receipt note.');
+  }
+
+  /// This note came from a purchase order: its lines carry what was ordered.
+  bool get _fromOrder => _lines.any((l) => l.expectedQty != null);
+
+  /// How a line differs from the order: not ordered, short or extra (null when it matches, or there is no order).
+  String? _vsOrder(DraftLine l) {
+    if (!_fromOrder) return null;
+    final e = l.expectedQty, q = l.qty ?? 0;
+    if (e == null) return tr('Not on order');
+    if (q < e) return '${tr('Short')} ${qty(e - q)}';
+    if (q > e) return '${tr('Extra')} ${qty(q - e)}';
+    return null;
+  }
+
+  String _flags(DraftLine l) => [if (_vsOrder(l) != null) _vsOrder(l)!, if ((l.rejectedQty ?? 0) > 0) '${qty(l.rejectedQty)} ${tr('damaged')}'].join(' · ');
+
   Future<void> _rejects(DraftLine l) async {
-    final reasons = _f.options?.m('reasons').ls('reject') ?? const <String>[];
+    final reasons = ['Damaged', ...?_f.options?.m('reasons').ls('reject').where((x) => x != 'Damaged')];
     num q = l.rejectedQty ?? 0;
-    String? reason = l.rejectReason;
+    String? reason = l.rejectReason ?? 'Damaged';
     final r = await showModalBottomSheet<(num, String?)>(
       context: context,
       isScrollControlled: true,
@@ -103,23 +162,23 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
         builder: (ctx, set) => Padding(
           padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.viewInsetsOf(ctx).bottom),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Rejected quantity / reason', style: inter(18, 700)),
-            const InvLabel('Rejected units'),
-            InvStepper(value: q, label: 'rejected quantity', onChanged: (v) => set(() => q = v.clamp(0, l.qty ?? 0))),
-            const InvLabel('Reason'),
+            Text(tr('Damaged'), style: inter(18, 700)),
+            InvLabel(tr('Damaged units')),
+            InvStepper(value: q, label: 'damaged quantity', onChanged: (v) => set(() => q = v.clamp(0, l.qty ?? 0))),
+            InvLabel(tr('Reason')),
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final x in reasons)
                 ChoiceChip(label: Text(x, style: inter(13, 500)), selected: reason == x, selectedColor: kLimeH, onSelected: (_) => set(() => reason = x)),
             ]),
             const SizedBox(height: 14),
-            InvPrimary('Done', onPressed: () => Navigator.pop(ctx, (q, q > 0 ? reason : null))),
+            InvPrimary(tr('Done'), onPressed: () => Navigator.pop(ctx, (q, q > 0 ? reason : null))),
           ]),
         ),
       ),
     );
     if (r == null) return;
     if (r.$1 > 0 && r.$2 == null) {
-      if (mounted) showToast(context, 'Choose a reason for the rejected units.');
+      if (mounted) showToast(context, 'Choose what is wrong with the damaged units.');
       return;
     }
     setState(() {
@@ -140,10 +199,10 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
         builder: (ctx, set) => Padding(
           padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.viewInsetsOf(ctx).bottom),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('New supplier lot / expiry', style: inter(18, 700)),
-            const InvLabel('Lot code'),
+            Text(tr('New supplier lot / expiry'), style: inter(18, 700)),
+            InvLabel(tr('Lot code')),
             InvInput(controller: code, hint: 'CC-C'),
-            const InvLabel('Expiry date'),
+            InvLabel(tr('Expiry date')),
             InvPickBox(
               value: exp == null ? 'Choose a date' : dayMonth(exp!, year: true),
               semantic: 'Expiry date',
@@ -154,7 +213,7 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
               },
             ),
             const SizedBox(height: 14),
-            InvPrimary('Done', onPressed: () => Navigator.pop(ctx, true)),
+            InvPrimary(tr('Done'), onPressed: () => Navigator.pop(ctx, true)),
           ]),
         ),
       ),
@@ -169,22 +228,18 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
 
   @override
   Widget build(BuildContext context) => InvScaffold(env: env, onRefresh: _init, children: [
-        const InvTitle('Receiving', subtitle: 'Verify physical deliveries before goods received note approval'),
-        InvChips(active: _tab, onTap: _setTab, items: const [('receiving', 'Receiving', null), ('grn', 'Purchase', null), ('putaway', 'Putaway', null)]),
-        InvInput(controller: _search, hint: 'Search supplier, batch, invoice…', prefixIcon: LucideIcons.search, onChanged: (_) => setState(() {})),
+        // no tab strip (founder, 26 Oct 2026): checking, putaway and labels are buttons on the delivery once it is counted
+        const PurchaseSteps(2),
+        InvTitle(tr('Receive goods'), subtitle: tr('Count what arrived, mark anything damaged, then match the supplier bill.')),
+        InvInput(controller: _search, hint: tr('Search supplier, batch, invoice…'), prefixIcon: LucideIcons.search, onChanged: (_) => setState(() {})),
         const SizedBox(height: 10),
         if (!_loaded && _f.error == null) const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(color: kInk))),
         if (_f.error != null) ...[
           InvCard(child: Text(_f.error!, style: inter(13.5, 400, color: kRedText))),
-          InvSecondary('Try again', onPressed: _init),
+          InvSecondary(tr('Try again'), onPressed: _init),
         ],
         if (_loaded && _f.error == null) ..._body(),
       ]);
-
-  void _setTab(String id) {
-    if (id == 'putaway') return env.later(context, 'Putaway');
-    setState(() => _tab = id);
-  }
 
   List<Widget> _body() {
     final d = _f.doc;
@@ -193,20 +248,20 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
         h.s('status') != 'posted' && h.s('status') != 'cancelled' && h.s('id') != d?.id &&
         (q.isEmpty || '${h.s('doc_no')} ${h.s('supplier_name')} ${h.s('invoice_ref')} ${h.s('po_ref')}'.toLowerCase().contains(q)));
     final prev = _f.history.where((h) => h.s('status') == 'posted' && (q.isEmpty || '${h.s('doc_no')} ${h.s('supplier_name')} ${h.s('invoice_ref')}'.toLowerCase().contains(q)));
-    final inReview = d != null && d.status == 'review';
-    final tabMatches = d == null ? true : (_tab == 'grn') == inReview;
     return [
-      if (d == null || !tabMatches) ...docEmpty(_tab == 'grn' ? 'No receipt is waiting in purchase review.' : 'No receipt is open. Start one when a delivery arrives.',
-          action: 'Scan / Enter Items', onAction: () async {
+      if (d == null && _new) ..._receipt(null),
+      if (d == null && !_new) ...docEmpty('No delivery is open. Start one when a delivery arrives.',
+          action: tr('Scan / Enter Items'), onAction: () async {
         _f.startNew();
         _lines = [];
         await _addItem();
         if (mounted) setState(() {});
       }),
-      if (d != null && tabMatches) ..._receipt(d),
-      for (final h in shown) DocHistoryCard(row: h, subtitle: h.s('supplier_name'), trailing: h.s('invoice_ref'), action: 'Open', onTap: () => _openOther(h.s('id'))),
-      if (prev.isNotEmpty) const InvSection('Previous completed receipt'),
-      for (final h in prev.take(3))
+      if (d != null) ..._receipt(d),
+      // the other receipt notes are listed on Purchase; this only shows them when opened on its own
+      if (!_listed) for (final h in shown) DocHistoryCard(row: h, subtitle: h.s('supplier_name'), trailing: h.s('invoice_ref'), action: tr('Open'), onTap: () => _openOther(h.s('id'))),
+      if (!_listed && prev.isNotEmpty) const InvSection('Previous completed receipt'),
+      if (!_listed) for (final h in prev.take(3))
         InvCard(
           onTap: () => _openOther(h.s('id')),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -217,13 +272,15 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
             const SizedBox(height: 6),
             Row(children: [
               Expanded(child: Text('Expected: ${qty(h.m('totals').n('expected'))} u | Received: ${qty(h.m('totals').n('received'))} u', style: inter(13, 400, color: kMuted))),
-              Text('View Receipt', style: inter(13.5, 700, color: kLink)),
+              Text(tr('View Receipt'), style: inter(13.5, 700, color: kLink)),
             ]),
           ]),
         ),
       InvFootnote(at: DateTime.now()),
     ];
   }
+
+  bool get _listed => widget.startNew || widget.documentId != null;
 
   Future<void> _openOther(String id) async {
     await _f.run(context, () => setState(() {}), () async {
@@ -232,37 +289,45 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
     });
   }
 
-  List<Widget> _receipt(InvDocument d) {
+  List<Widget> _receipt(InvDocument? d) {
     final editable = _editable;
     final expected = _lines.fold<num>(0, (a, l) => a + (l.expectedQty ?? 0));
     final hasExpected = _lines.any((l) => l.expectedQty != null);
     final received = _lines.fold<num>(0, (a, l) => a + (l.qty ?? 0));
     final rejected = _lines.fold<num>(0, (a, l) => a + (l.rejectedQty ?? 0));
     final accepted = received - rejected;
-    final totals = d.raw['lines'] == null ? null : d;
+    final totals = d?.raw['lines'] == null ? null : d;
     final cur = _lines.isEmpty ? null : _lines[_sel.clamp(0, _lines.length - 1)];
-    final unit = cur == null ? 'unit' : (d.lines.where((x) => x.m('item').s('id') == cur.itemId).firstOrNull?.m('item').s('unit') ?? 'unit');
+    final unit = cur == null || d == null ? 'unit' : (d.lines.where((x) => x.m('item').s('id') == cur.itemId).firstOrNull?.m('item').s('unit') ?? 'unit');
     return [
       InvCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${d.number}${_supplier.text.trim().isEmpty ? '' : ' · ${_supplier.text.trim()}'}', style: inter(16.5, 700)),
-              Text([if (_po.text.isNotEmpty) _po.text, if (_invoice.text.isNotEmpty) _invoice.text, if (d.t('created_at') != null) 'Today, ${hm(d.t('created_at')!)}'].join(' • '),
+              Text('${d?.number ?? tr('New receipt note')}${_supplier.text.trim().isEmpty ? '' : ' · ${_supplier.text.trim()}'}', style: inter(16.5, 700)),
+              Text([if (_po.text.isNotEmpty) _po.text, if (_invoice.text.isNotEmpty) _invoice.text, if (d?.t('created_at') != null) 'Today, ${hm(d!.t('created_at')!)}'].join(' • '),
                   style: inter(12.5, 400, color: kMuted)),
             ]),
           ),
-          InvDotChip.doc('receipt', d.status),
+          InvDotChip.doc('receipt', d?.status ?? 'draft'),
         ]),
+        if (editable) ...[
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: InvInput(key: const ValueKey('receiving-supplier'), controller: _supplier, hint: tr('Supplier'), onChanged: (_) => setState(() {}))),
+            const SizedBox(width: 8),
+            Expanded(child: InvInput(key: const ValueKey('receiving-invoice'), controller: _invoice, hint: tr('Invoice no.'), onChanged: (_) => setState(() {}))),
+          ]),
+        ],
         const SizedBox(height: 8),
         InvKV('Expected shipment', hasExpected ? units(expected) : '–'),
         InvKV('Received physical count', units(received)),
-        InvKV('Accepted / rejected quarantine', '${qty(accepted)} / ${units(rejected)}'),
+        InvKV('Good / damaged', '${qty(accepted)} / ${units(rejected)}'),
         InvKV('Quantity still to receive', hasExpected ? units((expected - received).clamp(0, double.infinity)) : '–'),
         if (_lines.isNotEmpty)
           InvNote(received >= expected && hasExpected
-              ? 'Receipt complete.${rejected > 0 ? ' ${qty(rejected)} ${rejected == 1 ? 'unit is' : 'units are'} rejected; keep ${rejected == 1 ? 'it' : 'them'} in inbound quarantine, separate from current damaged stock.' : ''}'
-              : 'Count what arrived, then send the receipt to purchase review.'),
+              ? 'Receipt complete.${rejected > 0 ? ' ${qty(rejected)} ${rejected == 1 ? 'unit is' : 'units are'} damaged; keep ${rejected == 1 ? 'it' : 'them'} aside, separate from the stock you sell.' : ''}'
+              : 'Count what arrived, then send it to be checked.'),
       ])),
       if (editable) ...[
         if (_lines.length > 1)
@@ -276,8 +341,8 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
         if (cur != null) _inspect(cur, unit),
       ],
       InvCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const InvCardHead('Receipt reconciliation'),
-        Row(children: [Expanded(child: Text('Product', style: inter(12.5, 400))), Text('Received / Accepted', style: inter(12.5, 400))]),
+        InvCardHead(tr('Receipt reconciliation')),
+        Row(children: [Expanded(child: Text(tr('Product'), style: inter(12.5, 400))), Text(tr('Received / Good'), style: inter(12.5, 400))]),
         const SizedBox(height: 6),
         for (final l in _lines)
           Container(
@@ -285,54 +350,66 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(color: kGreyBg, borderRadius: BorderRadius.circular(14)),
             child: Row(children: [
-              Expanded(child: Text(l.itemName, style: inter(14.5, 700, color: kAmberText))),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(l.itemName, style: inter(14.5, 700, color: kAmberText)),
+                  if (_flags(l).isNotEmpty) Text(_flags(l), key: ValueKey('receiving-flag-${l.itemId}'), style: inter(12, 600, color: kRedText)),
+                ]),
+              ),
               Text(units(l.qty), style: inter(14, 700, color: kAmberText)),
               const SizedBox(width: 14),
               Text(units((l.qty ?? 0) - (l.rejectedQty ?? 0)), style: inter(14, 700, color: kAmberText)),
             ]),
           ),
-        if (_lines.isEmpty) Text('Nothing counted yet.', style: inter(13.5, 400, color: kMuted)),
+        if (_lines.isEmpty) Text(tr('Nothing counted yet.'), style: inter(13.5, 400, color: kMuted)),
         if (_lines.isNotEmpty)
-          InvNote('Do not sell these goods yet. Current available stock does not change until posting.'),
+          InvNote(tr('Do not sell these goods yet. Current available stock does not change until posting.')),
       ])),
-      if (totals != null && d.status == 'review' && d.can('post'))
-        InvPrimary('Post Receipt', busy: _f.busy, onPressed: () => _f.run(context, () => setState(() {}), () async {
+      if (totals != null && totals.status == 'review' && totals.can('post'))
+        InvPrimary(tr('Post Receipt'), busy: _f.busy, onPressed: () => _f.run(context, () => setState(() {}), () async {
               await _f.act('post');
               _adopt();
-            }, done: 'Receipt posted. The accepted units are now in stock.')),
-      if (d.status == 'review' && d.can('return')) InvSecondary('Return to Draft', onPressed: () => _f.run(context, () => setState(() {}), () async {
+            }, done: 'Receipt posted. The good units are now in stock.').then((ok) {
+              if (ok && mounted && _f.doc != null) offerLotLabels(context, _f.doc!.id);
+            })),
+      if (d != null && d.status == 'review' && d.can('return')) InvSecondary(tr('Return to Draft'), onPressed: () => _f.run(context, () => setState(() {}), () async {
             await _f.act('return');
             _adopt();
           })),
       if (editable) ...[
-        InvPrimary('Send to Purchase Review', busy: _f.busy, onPressed: _submit),
-        InvSecondary('Scan / Enter Items', onPressed: _addItem),
-        InvSecondary('Review Discrepancies · ${qty(rejected)} ${rejected == 1 ? 'reject' : 'rejects'}', onPressed: () => _discrepancies(rejected)),
-        InvSecondary('Save Draft', onPressed: () => _save(done: 'Draft saved.')),
+        Row(children: [
+          Expanded(child: InvSecondary(tr('Scan / add item'), key: const ValueKey('receiving-add'), onPressed: _addItem)),
+          const SizedBox(width: 8),
+          Expanded(child: InvSecondary(tr('+ New item'), key: const ValueKey('receiving-new-item'), onPressed: _newItem)),
+        ]),
+        InvPrimary(tr('Done counting · Match bill'), key: const ValueKey('receiving-done'), busy: _f.busy, onPressed: _submit),
+        if (_lines.isNotEmpty) InvSecondary('${tr('Differences')} · ${_lines.where((l) => _flags(l).isNotEmpty).length}', onPressed: () => _discrepancies(rejected)),
+        InvSecondary(tr('Save Draft'), onPressed: () => _save(done: 'Draft saved.')),
       ],
     ];
   }
 
   void _discrepancies(num rejected) {
-    final rows = _lines.where((l) => (l.rejectedQty ?? 0) > 0 || (l.expectedQty != null && l.expectedQty != l.qty)).toList();
+    final rows = _lines.where((l) => _flags(l).isNotEmpty).toList();
     showOrderlessSheet(
       context,
       'Discrepancies',
       rows.isEmpty
-          ? [Text('Everything counted matches what was expected.', style: inter(14, 400, color: kMuted))]
+          ? [Text(tr('Everything counted matches the order.'), style: inter(14, 400, color: kMuted))]
           : [
               for (final l in rows)
                 InvKV(l.itemName, [
-                  if ((l.rejectedQty ?? 0) > 0) '${qty(l.rejectedQty)} rejected · ${l.rejectReason ?? ''}',
-                  if (l.expectedQty != null && l.expectedQty != l.qty) 'expected ${qty(l.expectedQty)}, got ${qty(l.qty)}',
+                  if ((l.rejectedQty ?? 0) > 0) '${qty(l.rejectedQty)} damaged · ${l.rejectReason ?? ''}',
+                  if (_fromOrder && l.expectedQty == null) 'not on the order',
+                  if (l.expectedQty != null && l.expectedQty != l.qty) 'ordered ${qty(l.expectedQty)}, got ${qty(l.qty)}',
                 ].join(' · ')),
             ],
     );
   }
 
   Widget _inspect(DraftLine l, String unit) => InvCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        InvCardHead('Count and inspect', subtitle: '${l.itemName} • ${l.sku}'),
-        const InvLabel('Scan barcode / System Code'),
+        InvCardHead(tr('Count and inspect'), subtitle: '${l.itemName} • ${l.sku}'),
+        InvLabel(tr('Scan barcode / System Code')),
         SizedBox(
           height: 46,
           child: TextField(
@@ -351,21 +428,21 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
             ),
           ),
         ),
-        const InvLabel('Received quantity (units)'),
+        InvLabel(tr('Received quantity (units)')),
         InvStepper(value: l.qty ?? 0, label: 'received quantity', onChanged: (v) => setState(() {
           l.qty = v;
           if ((l.rejectedQty ?? 0) > v) l.rejectedQty = v;
         })),
-        const InvLabel('Rejected quantity / reason'),
-        InvPickBox(value: (l.rejectedQty ?? 0) > 0 ? '${qty(l.rejectedQty)} · ${l.rejectReason ?? 'Choose a reason'}' : 'None rejected', onTap: () => _rejects(l)),
-        const InvLabel('New supplier lot / expiry'),
+        InvLabel(tr('Damaged')),
+        InvPickBox(key: const ValueKey('receiving-damaged'), value: (l.rejectedQty ?? 0) > 0 ? '${qty(l.rejectedQty)} · ${l.rejectReason ?? 'Damaged'}' : tr('None damaged'), onTap: () => _rejects(l)),
+        InvLabel(tr('New supplier lot / expiry')),
         InvPickBox(
             value: l.lotCode == null && l.expiryDate == null ? 'Add lot and expiry' : '${l.lotCode ?? '–'} / ${l.expiryDate == null ? '–' : dayMonth(l.expiryDate!, year: true)}',
             chevron: false,
             onTap: () => _lot(l)),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: Text('Accepted = received − rejected', style: inter(13.5, 400, color: kMuted))),
+          Expanded(child: Text(tr('Good = received − damaged'), style: inter(13.5, 400, color: kMuted))),
           Text('${qty(l.qty)} − ${qty(l.rejectedQty ?? 0)} = ${qty((l.qty ?? 0) - (l.rejectedQty ?? 0))}', style: inter(14, 700)),
         ]),
       ]));
@@ -386,7 +463,7 @@ void showOrderlessSheet(BuildContext context, String title, List<Widget> rows) {
           const SizedBox(height: 10),
           ...rows,
           const SizedBox(height: 10),
-          InvPrimary('Close', onPressed: () => Navigator.pop(ctx)),
+          InvPrimary(tr('Close'), onPressed: () => Navigator.pop(ctx)),
         ]),
       ),
     ),

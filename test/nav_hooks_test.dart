@@ -63,6 +63,7 @@ void main() {
     HomeNav.moneyScreen = (_, screen) => opened.add('money:$screen');
     HomeNav.team = rec('team');
     HomeNav.storefront = rec('storefront');
+    HomeNav.businessProfile = rec('business-profile');
     HomeNav.deliverySettings = rec('delivery');
     HomeNav.kitchen = rec('kitchen');
     HomeNav.tableQr = rec('tableQr');
@@ -101,8 +102,8 @@ void main() {
       await t.pumpAndSettle();
     }
 
-    testWidgets('Money, Team, OneLocal page, Settings and Help open their screens', (t) async {
-      for (final (label, hook) in [('Money', 'money'), ('Team', 'team'), ('OneLocal page', 'storefront'), ('Settings', 'settings'), ('Help & support', 'support')]) {
+    testWidgets('Money, Team, Business profile, Settings and Help open their screens', (t) async {
+      for (final (label, hook) in [('Money', 'money'), ('Team', 'team'), ('Page Manager', 'business-profile'), ('Settings', 'settings'), ('Help & support', 'support')]) {
         final opened = fakeHooks();
         await openSideNav(t);
         expect(soonOn(label), findsNothing, reason: label);
@@ -118,7 +119,7 @@ void main() {
       await openSideNav(t);
       expect(soonOn('One Local Wallet'), findsOneWidget);
       expect(soonOn('Customer'), findsOneWidget);
-      expect(find.text('Soon'), findsNWidgets(2)); // wallet, customer
+      expect(find.text('Soon'), findsNWidgets(3)); // wallet, customer, subscription plans (not plugged in this test)
       expect(find.bySemanticsLabel('Manage account'), findsOneWidget); // the profile block now
       await t.tap(find.text('One Local Wallet'));
       await t.pumpAndSettle();
@@ -271,17 +272,6 @@ void main() {
       await t.tap(find.byType(BackButton));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('side-nav')), findsOneWidget);
-    });
-
-    testWidgets('searching for an Inventory page opens its group', (t) async {
-      fakeHooks();
-      HomeNav.inventory = (_, _) async => false;
-      addTearDown(() => HomeNav.inventory = null);
-      await showMore(t, onReports: () {});
-      await t.enterText(find.byKey(const ValueKey('side-nav-search')), 'recipe');
-      await t.pump();
-      expect(find.text('Recipe'), findsOneWidget);
-      expect(find.text('Money'), findsNothing);
     });
 
     testWidgets('each option with a built screen opens it; Reports opens the reports', (t) async {

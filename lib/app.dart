@@ -1,10 +1,12 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/email_verify_pending_screen.dart';
 import 'screens/login_success_screen.dart';
 import 'screens/splash_screen.dart';
+import 'orders/online_locked.dart';
+import 'settings/settings_api.dart';
+import 'ui/language_step.dart';
 import 'ui/theme.dart';
 
 class PosApp extends StatelessWidget {
@@ -13,17 +15,10 @@ class PosApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'One Local POS',
+      title: 'OneLocal Partner',
       debugShowCheckedModeBanner: false,
       theme: posTheme(),
-      // On a wide desktop browser the app sits in a phone-width column, as it would on a phone.
-      builder: (context, child) {
-        if (!kIsWeb || MediaQuery.sizeOf(context).width <= 600) return child!;
-        return ColoredBox(
-          color: const Color(0xFF1B1F1C),
-          child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 430), child: child)),
-        );
-      },
+      // No fixed column: every screen fills the device's own width and height (phone, tablet or browser) and follows rotation.
       home: const AuthGate(),
     );
   }
@@ -41,13 +36,24 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   bool _introDone = false;
 
+  /// The login that signed in while the app was open (not one kept from last time): only then is the language asked.
+  String? _signedInNow;
+
+  /// Whose plan is known: a different login (or none) reads it again.
+  String? _planFor;
+
   @override
   Widget build(BuildContext context) {
     final auth = Supabase.instance.client.auth;
     return StreamBuilder<AuthState>(
       stream: auth.onAuthStateChange,
-      builder: (context, _) {
+      builder: (context, snap) {
         final user = auth.currentSession?.user;
+        if (user?.id != _planFor) {
+          _planFor = user?.id;
+          StorePlan.reset();
+        }
+        if (snap.data?.event == AuthChangeEvent.signedIn && user != null) _signedInNow = user.id;
         final Widget page;
         if (user == null) {
           // One screen for both splash frames: the first build plays the intro (logo, then the buttons glide in); coming back to it
@@ -57,7 +63,11 @@ class _AuthGateState extends State<AuthGate> {
         } else if (user.email != null && user.email!.isNotEmpty && user.emailConfirmedAt == null && (user.phone ?? '').isEmpty) {
           page = EmailVerifyPendingScreen(key: const ValueKey('pending'), email: user.email!);
         } else {
-          page = const LoginSuccessScreen(key: ValueKey('success'));
+          // right after signing in: the language, then the welcome (founder, 27 Oct 2026). Opening the app already signed in goes
+          // straight on, in the language kept on this phone.
+          page = _signedInNow == user.id
+              ? LanguageGate(key: ValueKey('success-${user.id}'), userId: user.id, saveToStore: (c) => SettingsApi().saveLanguage(c), child: const LoginSuccessScreen())
+              : const LoginSuccessScreen(key: ValueKey('success'));
         }
         return AnimatedSwitcher(duration: const Duration(milliseconds: 350), child: page);
       },

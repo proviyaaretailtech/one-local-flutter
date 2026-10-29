@@ -6,6 +6,7 @@ import '../inventory/inventory_api.dart';
 import '../ui/theme.dart';
 import 'stock_env.dart';
 import 'stock_kit.dart';
+import '../ui/i18n.dart';
 
 /// The plain words for each kind of stock movement the server records.
 String movementLabel(String kind) => switch (kind) {
@@ -118,14 +119,14 @@ class _StockMovementsScreenState extends State<StockMovementsScreen> {
   @override
   Widget build(BuildContext context) => StockScaffold(
         env: widget.env,
-        title: 'Stock movements',
-        line: 'Every sale, delivery, move and correction, newest first. Tap one to see what it changed.',
+        title: tr('Stock movements'),
+        line: tr('Every sale, delivery, move and correction, newest first. Tap one to see what it changed.'),
         onRefresh: _load,
         children: [
-          const InvLabel('Product'),
+          InvLabel(tr('Product')),
           Row(children: [
             Expanded(child: InvPickBox(value: _itemName ?? 'All products', onTap: _pickProduct, semantic: 'Choose a product')),
-            if (_itemId != null) IconButton(tooltip: 'Show all products', onPressed: _allProducts, icon: const Icon(LucideIcons.x, size: 18, color: kMuted)),
+            if (_itemId != null) IconButton(tooltip: tr('Show all products'), onPressed: _allProducts, icon: const Icon(LucideIcons.x, size: 18, color: kMuted)),
           ]),
           const SizedBox(height: 12),
           if (_position != null) ...[
@@ -152,7 +153,7 @@ class _StockMovementsScreenState extends State<StockMovementsScreen> {
     final shown = _kind == 'all' ? all : all.where((m) => _filters[_kind]!.contains(m.s('kind'))).toList();
     return [
       if (shown.isEmpty)
-        StockEmpty('No movements here', _kind == 'all' ? 'Sales, deliveries and corrections show here as they happen.' : 'Nothing of this kind in the movements loaded so far.', icon: LucideIcons.history),
+        StockEmpty(tr('No movements here'), _kind == 'all' ? 'Sales, deliveries and corrections show here as they happen.' : 'Nothing of this kind in the movements loaded so far.', icon: LucideIcons.history),
       for (final m in shown) _card(m),
       if (_more) InvSecondary(_loadingMore ? 'Loading…' : 'Show older movements', onPressed: _loadingMore ? null : _older),
       InvFootnote(at: _position?.t('snapshot_at')),
@@ -174,11 +175,11 @@ class _StockMovementsScreenState extends State<StockMovementsScreen> {
         ]),
         if (_itemId == null) ...[const SizedBox(height: 2), Text(item.s('name'), style: inter(13.5, 600))],
         const SizedBox(height: 6),
-        if (ref.s('label').isNotEmpty) StockRow('Reference', [ref.s('label'), ref.s('method')].where((s) => s.isNotEmpty).join(' · ')),
-        StockRow('By', m.m('actor').s('name').isEmpty ? '—' : m.m('actor').s('name')),
-        StockRow('When', when == null ? '—' : stamp(when)),
+        if (ref.s('label').isNotEmpty) StockRow(tr('Reference'), [ref.s('label'), ref.s('method')].where((s) => s.isNotEmpty).join(' · ')),
+        StockRow(tr('By'), m.m('actor').s('name').isEmpty ? '—' : m.m('actor').s('name')),
+        StockRow(tr('When'), when == null ? '—' : stamp(when)),
         const SizedBox(height: 4),
-        Text('See details ›', style: inter(13, 700, color: kLink)),
+        Text(tr('See details ›'), style: inter(13, 700, color: kLink)),
       ]),
     );
   }
@@ -209,7 +210,7 @@ Future<void> showMovement(BuildContext context, StockEnv env, int id) => showMod
               return ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(20, 20, 20, 20), children: [
                 Row(children: [
                   Expanded(child: Text(movementLabel(m.s('kind')), style: inter(20, 800))),
-                  IconButton(tooltip: 'Close', onPressed: () => Navigator.pop(ctx), icon: const Icon(LucideIcons.x, size: 20, color: kMuted)),
+                  IconButton(tooltip: tr('Close'), onPressed: () => Navigator.pop(ctx), icon: const Icon(LucideIcons.x, size: 20, color: kMuted)),
                 ]),
                 InkWell(
                   onTap: () {
@@ -230,14 +231,14 @@ Future<void> showMovement(BuildContext context, StockEnv env, int id) => showMod
                     '${a.m('bin').s('name')}${a.mo('lot') == null || a.m('lot').s('lot_code').isEmpty ? '' : ' · batch ${a.m('lot').s('lot_code')}'}',
                     '${qty(a.n('bin_before'))} → ${qty(a.n('bin_after'))} $unit',
                   ),
-                if (ref.s('label').isNotEmpty) StockRow('Reference', [ref.s('label'), ref.s('method')].where((s) => s.isNotEmpty).join(' · ')),
-                if (ref.m('recorded_by').s('name').isNotEmpty) StockRow('Recorded by', ref.m('recorded_by').s('name')),
-                StockRow('Store', m.m('location').s('name')),
-                StockRow('When', when == null ? '—' : stamp(when)),
-                if (m.s('note').isNotEmpty) StockRow('Note', m.s('note')),
+                if (ref.s('label').isNotEmpty) StockRow(tr('Reference'), [ref.s('label'), ref.s('method')].where((s) => s.isNotEmpty).join(' · ')),
+                if (ref.m('recorded_by').s('name').isNotEmpty) StockRow(tr('Recorded by'), ref.m('recorded_by').s('name')),
+                StockRow(tr('Store'), m.m('location').s('name')),
+                StockRow(tr('When'), when == null ? '—' : stamp(when)),
+                if (m.s('note').isNotEmpty) StockRow(tr('Note'), m.s('note')),
                 if (m.l('trail').isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  Text('What happened', style: inter(15, 700)),
+                  Text(tr('What happened'), style: inter(15, 700)),
                   const SizedBox(height: 6),
                   for (final t in m.l('trail'))
                     Padding(

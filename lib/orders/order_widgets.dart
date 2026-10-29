@@ -6,6 +6,7 @@ import '../ui/app_tab_bar.dart';
 import '../ui/theme.dart';
 import '../outlets/outlet_header.dart';
 import 'orders_api.dart';
+import '../ui/i18n.dart';
 
 // Section E colours, sampled from the exported frames (assets/figma_ref_e). Shared tokens (kBg, kInk, kMuted, kLine) come from ui/theme.dart.
 const kDark = Color(0xFF111827);
@@ -275,7 +276,7 @@ class BillSummary extends StatelessWidget {
           if (roundOff != 0) KeyValue('Round off', rupees(roundOff), size: 13.5, bold: false),
           const Divider(height: 18, color: kLine),
           Row(children: [
-            Expanded(child: Text('Total Amount', style: inter(14.5, 700))),
+            Expanded(child: Text(tr('Total Amount'), style: inter(14.5, 700))),
             Text(rupees(total), style: inter(22, 800, color: kGreenText)),
           ]),
           if (footer != null) ...[const SizedBox(height: 10), footer!],
@@ -328,10 +329,16 @@ class TenderBlock extends StatelessWidget {
 
 /// Dark rounded CTA with lime text (Figma "Proceed to Checkout", "Complete Payment").
 class DarkCta extends StatelessWidget {
-  const DarkCta({super.key, required this.label, required this.onPressed, this.busy = false});
+  const DarkCta({super.key, required this.label, required this.onPressed, this.busy = false, this.amount, this.labelStart = false});
   final String label;
   final VoidCallback? onPressed;
   final bool busy;
+
+  /// A changing amount (the till's total): shown on the right and faded in when it changes, so [label] never moves (founder, 28 Oct 2026).
+  final String? amount;
+
+  /// The label in the left corner instead of the middle (the till's PAY, founder 28 Oct 2026), so it stays put with or without an amount.
+  final bool labelStart;
   @override
   Widget build(BuildContext context) => Opacity(
         opacity: onPressed == null ? 0.55 : 1,
@@ -344,11 +351,22 @@ class DarkCta extends StatelessWidget {
             child: SizedBox(
               height: 50,
               width: double.infinity,
-              child: Center(
-                child: busy
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: kLime))
-                    : Text(label, style: inter(16, 600, color: kLime)),
-              ),
+              child: Stack(alignment: Alignment.center, children: [
+                if (busy)
+                  const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: kLime))
+                else if (labelStart)
+                  Positioned(left: 22, child: Text(label, style: inter(17, 800, color: kLime)))
+                else
+                  Text(label, style: inter(16, 600, color: kLime)),
+                if (amount != null && !busy)
+                  Positioned(
+                    right: labelStart ? 22 : 16,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: Text(amount!, key: ValueKey(amount), style: inter(labelStart ? 20 : 15, 800, color: kLime).copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+                    ),
+                  ),
+              ]),
             ),
           ),
         ),
@@ -424,6 +442,8 @@ class PosBottomNav extends StatelessWidget {
 Future<T?> showOrderSheet<T>(BuildContext context, {required String title, required Widget Function(BuildContext) body}) {
   return showModalBottomSheet<T>(
     context: context,
+    // above the tab bar: inside the app's tabs a sheet on the tab's own navigator never shows (same rule as every other sheet)
+    useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.white,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),

@@ -2,6 +2,7 @@
 // then confirms. The slot and every signed link are made here with the service role, but only for a path the DATABASE says belongs
 // to the verified caller (their own application folder / their own business folder). Buckets: partner-documents, partner-listing-media.
 import { db, rpc } from '../../db.ts';
+import { viaProxy } from '../../config.ts';
 import { HttpError } from '../../http.ts';
 import { parse } from '../../validate.ts';
 import { Attach, EXT, KINDS, MAX_BYTES, PreviewAsk, UploadAsk } from '../../schemas/onboarding.ts';
@@ -25,7 +26,7 @@ export async function documentSlot({ userId, args }: SecureCtx) {
   const path = `${await applicationId(userId)}/${b.kind}/${crypto.randomUUID()}.${EXT[b.content_type]}`;
   const signed = await db().storage.from(DOCS).createSignedUploadUrl(path);
   if (signed.error || !signed.data) { console.error('[secure] signed upload failed', signed.error?.message); throw new HttpError(502, 'Uploads are not available right now.'); }
-  return { path, upload_url: signed.data.signedUrl, max_bytes: MAX_BYTES };
+  return { path, upload_url: viaProxy(signed.data.signedUrl), max_bytes: MAX_BYTES };
 }
 
 export async function documentAttach({ userId, args }: SecureCtx) {
@@ -51,7 +52,17 @@ export async function documentPreview({ userId, args }: SecureCtx) {
   const path = await rpc<string>('partner_app_document_path', { p_user_id: userId, p_kind: b.kind });
   const signed = await db().storage.from(DOCS).createSignedUrl(path, 300);
   if (signed.error || !signed.data) throw new HttpError(502, 'The preview is not available right now.');
-  return { url: signed.data.signedUrl, expires_in: 300 };
+  return { url: viaProxy(signed.data.signedUrl), expires_in: 300 };
+}
+
+/** Takes an uploaded document off the application and deletes the stored file (only while it is a draft). */
+export async function documentRemove({ userId, args }: SecureCtx) {
+  const b = parse(PreviewAsk, args);
+  const res = await rpc<Record<string, unknown>>('partner_app_remove_document', { p_user_id: userId, p_kind: b.kind });
+  const removed = res.removed_path as string | null | undefined;
+  if (removed) await db().storage.from(DOCS).remove([removed]);
+  delete res.removed_path;
+  return res;
 }
 
 // ---------- setup listing images ----------
@@ -68,7 +79,7 @@ export async function withImageLinks<T>(s: T): Promise<T> {
     l[`${kind}_url`] = null;
     if (path) {
       const signed = await db().storage.from(IMAGES).createSignedUrl(path, 600);
-      l[`${kind}_url`] = signed.error ? null : signed.data?.signedUrl ?? null;
+      l[`${kind}_url`] = signed.error ? null : viaProxy(signed.data?.signedUrl) ?? null;
     }
   }
   return s;
@@ -86,7 +97,7 @@ export async function imageSlot({ userId, args }: SecureCtx) {
   const path = `${await organizationId(userId)}/${b.kind}/${crypto.randomUUID()}.${IMAGE_EXT[b.content_type]}`;
   const signed = await db().storage.from(IMAGES).createSignedUploadUrl(path);
   if (signed.error || !signed.data) { console.error('[secure] signed upload failed', signed.error?.message); throw new HttpError(502, 'Uploads are not available right now.'); }
-  return { path, upload_url: signed.data.signedUrl, max_bytes: IMAGE_MAX_BYTES };
+  return { path, upload_url: viaProxy(signed.data.signedUrl), max_bytes: IMAGE_MAX_BYTES };
 }
 
 export async function imageAttach({ userId, args }: SecureCtx) {

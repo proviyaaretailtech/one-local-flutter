@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_repository.dart';
 import '../ui/splash_backdrop.dart';
+import '../ui/language_step.dart';
 import '../ui/theme.dart';
 import 'register_personal_screen.dart';
 import 'signin_chooser_screen.dart';
@@ -55,18 +56,22 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final auth = AuthRepository();
+    // A phone (taller than the 402:874 design) is covered edge to edge; a tablet or a landscape screen is wider than the
+    // design, where covering would cut the buttons off the bottom, so there the whole design fits, centred on white.
+    final size = MediaQuery.sizeOf(context);
+    final wide = size.width / size.height > SplashScreen._w / SplashScreen._h;
     return Scaffold(
       backgroundColor: Colors.white,
       // SizedBox.expand: the Scaffold body is loosely constrained, so without it the FittedBox shrinks to the design's
-      // aspect ratio and sits top-left (white band on the right on any screen wider than 402:874) instead of covering.
+      // aspect ratio and sits top-left instead of filling the screen.
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: _c.value == 0 ? _go : null,
         child: SizedBox.expand(
           child: ClipRect(
             child: FittedBox(
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
+              fit: wide ? BoxFit.contain : BoxFit.cover,
+              alignment: wide ? Alignment.center : Alignment.topCenter,
               child: SizedBox(
                 width: SplashScreen._w,
                 height: SplashScreen._h,
@@ -125,13 +130,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                                     label: 'Sign In',
                                     color: kMuted,
                                     top: 469,
-                                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SigninChooserScreen())),
+                                    onTap: () => Navigator.push(context, languageThen(const SigninChooserScreen())), // the language, then how to sign in
                                   ),
                                   _primary(
                                     label: 'Become a seller',
                                     color: const Color(0xFFA1FE2F),
                                     top: 539,
-                                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterPersonalScreen())),
+                                    onTap: () => Navigator.push(context, languageThen(const RegisterPersonalScreen())), // the language, then name and mobile
                                   ),
                                   // Google and Apple pills: the Figma columns (34 and 208, 161 wide), but one height, one text style and the
                                   // icon + label centred together, so the pair reads as a matched set.
@@ -200,10 +205,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: onTap,
+            // the label reads on its button: dark on a light one (the lime "Become a seller"), white on a dark one
             child: Center(
               child: Text(
                 label,
-                style: inter(16, 600, color: Colors.white, shadows: kSplashTextShadow),
+                style: color.computeLuminance() > 0.5
+                    ? inter(16, 700, color: const Color(0xFF0C1F15))
+                    : inter(16, 600, color: Colors.white, shadows: kSplashTextShadow),
               ),
             ),
           ),

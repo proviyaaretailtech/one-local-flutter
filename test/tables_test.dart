@@ -253,8 +253,8 @@ void main() {
       await t.pumpAndSettle();
       expect(find.descendant(of: find.byType(AppHeader), matching: find.text('Manage tables')), findsOneWidget);
       expect(find.descendant(of: find.byType(AppHeader), matching: find.text('2 tables · 6 seats')), findsOneWidget);
-      expect(find.byKey(const ValueKey('tbl-back')), findsNothing, reason: 'not the old plain back row');
-      await t.tap(find.byKey(const ValueKey('app-header-back')));
+      expect(find.byKey(const ValueKey('tbl-back')), findsOneWidget, reason: 'the one round ← under the banner');
+      await t.tap(find.byKey(const ValueKey('tbl-back')));
       await t.pumpAndSettle();
       expect(find.text('go'), findsOneWidget);
     });

@@ -2,10 +2,14 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/auth/partner_api.dart';
 import 'package:vinii_pos/onboarding/agreement_screens.dart';
+import 'package:vinii_pos/onboarding/pan_scan.dart';
+import 'package:vinii_pos/onboarding/pan_camera_screen.dart' show cropToCard, kCardAspect;
+import 'package:image/image.dart' as img;
 import 'package:vinii_pos/onboarding/checklist_screen.dart';
 import 'package:vinii_pos/onboarding/document_picker.dart';
 import 'package:vinii_pos/onboarding/onboarding_api.dart';
@@ -90,7 +94,19 @@ class FakeOnb extends OnboardingApi {
   @override
   Future<Application> uploadDocument({required String kind, required Uint8List bytes, required String fileName, required String contentType}) =>
       _do('upload $kind $fileName $contentType');
+  @override
+  Future<Application> removeDocument(String kind) => _do('remove $kind');
 }
+
+class FakeScanner extends PanScanner {
+  FakeScanner(this.result);
+  final PanScan? result;
+  @override
+  Future<PanScan?> scan(BuildContext context) async => result;
+}
+
+PanScan panScan({String? pan = 'ABCDE0123F', bool looks = true}) =>
+    PanScan(file: PickedDocument(name: 'pan_card_scan.jpg', bytes: Uint8List(10), contentType: 'image/jpeg'), panNumber: pan, looksLikePan: looks);
 
 class FakePicker extends DocumentPicker {
   FakePicker(this.file);
@@ -121,28 +137,33 @@ void main() {
       await show(t, MerchantProfileScreen(api: api, type: 'store'));
       await t.pumpAndSettle();
       expect(find.text('Register as a Store'), findsOneWidget);
-      await tapText(t, 'Continue to business details');
+      await tapText(t, 'Save & continue');
       expect(toast('Enter your shop name.'), findsOneWidget);
       expect(api.calls, isNot(contains('profile')));
     });
 
-    testWidgets('store: a full form is saved and leads to "How do you want to sell?"', (t) async {
+    testWidgets('store: owner from sign-up; a full form saves the profile and the plan in one tap, then opens the next section', (t) async {
       final api = FakeOnb(initial: sample(done: 2, plan: null));
-      await show(t, MerchantProfileScreen(api: api, type: 'store', phone: '+919876543210'));
+      await show(t, MerchantProfileScreen(api: api, type: 'store', phone: '+919876543210', name: 'Riya Sharma'));
       await t.pumpAndSettle();
+      expect(find.text('Riya Sharma'), findsOneWidget); // the owner, from sign-up: not typed again
       await t.enterText(find.byType(TextField).at(0), 'Sharma General Store');
       await tapText(t, 'Choose'); // category
       await tapText(t, 'Grocery & essentials');
       await tapText(t, 'Choose'); // subcategory
       await tapText(t, 'General store');
-      await t.enterText(find.byType(TextField).at(1), 'Riya Sharma');
       await tapText(t, 'Online or both');
-      await tapText(t, 'Continue to business details');
+      await tapText(t, 'Save & continue');
+      expect(toast('Choose your OneLocal plan.'), findsOneWidget); // the plan is on this screen now
+      await tapText(t, 'Purchase POS');
+      await tapText(t, 'Save & continue');
       expect(api.bodies['profile'], {
         'partner_type': 'store', 'business_name': 'Sharma General Store', 'owner_name': 'Riya Sharma', 'phone': '9876543210',
         'selling_mode': 'online_or_both', 'category': 'Grocery & essentials', 'subcategory': 'General store',
       });
-      expect(find.text('How do you want to sell?'), findsOneWidget);
+      expect(api.calls, contains('plan pos_only'));
+      expect(find.text('How do you want to sell?'), findsNothing); // no separate plan screen
+      expect(find.text('Let’s finish your setup.'), findsNothing); // straight on to the next section, not the checklist
     });
 
     testWidgets('restaurant has no subcategory; service says "Services"', (t) async {
@@ -168,12 +189,13 @@ void main() {
       await t.enterText(find.byType(TextField).at(0), 'Demo Spice');
       await t.enterText(find.byType(TextField).at(1), 'Asha Rao');
       await tapText(t, 'Dine-in & takeaway');
-      await tapText(t, 'Continue to business details');
+      await tapText(t, 'Save & continue');
       expect(toast('Choose the cuisines you serve.'), findsOneWidget);
       expect(api.calls, isNot(contains('profile')));
       await tapText(t, 'Cafe');
       await tapText(t, 'Bakery');
-      await tapText(t, 'Continue to business details');
+      await tapText(t, 'Purchase POS');
+      await tapText(t, 'Save & continue');
       expect(api.bodies['profile'], {
         'partner_type': 'restaurant', 'business_name': 'Demo Spice', 'owner_name': 'Asha Rao', 'phone': '9876543210',
         'selling_mode': 'physical', 'categories': ['Cafe', 'Bakery'],
@@ -184,7 +206,7 @@ void main() {
       final api = FakeOnb()..failWith = const PartnerApiException(400, 'Enter a 10-digit mobile number.');
       await show(t, MerchantProfileScreen(api: api, type: 'restaurant', app: sample(), phone: '9876543210'));
       await t.pumpAndSettle();
-      await tapText(t, 'Continue to business details');
+      await tapText(t, 'Save & continue');
       expect(toast('Enter a 10-digit mobile number.'), findsOneWidget);
     });
   });
@@ -233,6 +255,19 @@ void main() {
     });
   });
 
+  group('Save & exit', () {
+    testWidgets('closes the application but stays signed in', (t) async {
+      final auth = FakeAuth();
+      await t.pumpWidget(MaterialApp(home: Builder(builder: (c) => TextButton(onPressed: () => Navigator.of(c).push(MaterialPageRoute(builder: (_) => ChecklistScreen(api: FakeOnb(), app: sample(done: 2), auth: auth))), child: const Text('open')))));
+      await t.tap(find.text('open'));
+      await t.pumpAndSettle();
+      await tapText(t, 'Save & exit');
+      expect(find.byType(ChecklistScreen), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+      expect(auth.calls, isNot(contains('signOut')));
+    });
+  });
+
   group('Address', () {
     testWidgets('needs the confirmation, then saves every part', (t) async {
       final api = FakeOnb();
@@ -243,6 +278,43 @@ void main() {
       await tapIt(t, find.text('The address and map pin identify my business location.'));
       await tapText(t, 'Confirm address');
       expect(api.bodies['address'], {'address_line': '12, 2nd Main Road', 'locality': 'Indiranagar', 'city': 'Bengaluru', 'state': 'Karnataka', 'pin_code': '560038', 'confirmed': true});
+    });
+    testWidgets('the state first, then a city from that state (search, or Other to type it)', (t) async {
+      SharedPreferences.setMockInitialValues({});
+      final api = FakeOnb();
+      await show(t, AddressScreen(api: api, app: sample(done: 1, extra: {'address': <String, dynamic>{}})));
+      await t.pumpAndSettle();
+      expect(t.getTopLeft(find.byKey(const ValueKey('address-state'))).dy, lessThan(t.getTopLeft(find.byKey(const ValueKey('address-city'))).dy));
+      expect(find.text('Choose your state first'), findsOneWidget);
+      await tapIt(t, find.byKey(const ValueKey('address-state')));
+      await tapIt(t, find.text('Karnataka'));
+      await tapIt(t, find.byKey(const ValueKey('address-city')));
+      await t.enterText(find.byKey(const ValueKey('select-search')), 'mys');
+      await t.pumpAndSettle();
+      expect(find.text('Bengaluru'), findsNothing);
+      await tapIt(t, find.text('Mysuru'));
+      expect(find.descendant(of: find.byKey(const ValueKey('address-city')), matching: find.text('Mysuru')), findsOneWidget);
+      // a town not in the list
+      await tapIt(t, find.byKey(const ValueKey('address-city')));
+      await t.enterText(find.byKey(const ValueKey('select-search')), 'ausa road'); // not in the list: Other stays
+      await t.pumpAndSettle();
+      await tapIt(t, find.text('Other (type your city)'));
+      expect(find.text('Your city or town'), findsOneWidget);
+    });
+    testWidgets('a PIN code from another state is flagged as it is typed and refused on save', (t) async {
+      final api = FakeOnb();
+      await show(t, AddressScreen(api: api, app: sample(done: 2))); // Karnataka
+      await t.pumpAndSettle();
+      await tapIt(t, find.text('The address and map pin identify my business location.'));
+      await t.enterText(find.byType(TextField).last, '413512'); // Latur, Maharashtra
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pin-error')), findsOneWidget);
+      await tapText(t, 'Confirm address');
+      expect(toast('This PIN code is not in Karnataka. Check the PIN code or the state.'), findsOneWidget);
+      expect(api.calls, isNot(contains('address')));
+      await t.enterText(find.byType(TextField).last, '560038');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('pin-error')), findsNothing);
     });
     testWidgets('a short PIN code is refused before any call', (t) async {
       final api = FakeOnb();
@@ -298,7 +370,9 @@ void main() {
     testWidgets('upload sends kind, name and type; an oversize file never leaves the phone', (t) async {
       final api = FakeOnb();
       await show(t, DocumentsScreen(api: api, app: sample(), picker: FakePicker(PickedDocument(name: 'pan.pdf', bytes: Uint8List(10), contentType: 'application/pdf'))));
-      await tapText(t, 'Upload PAN copy');
+      await t.pumpAndSettle();
+      await tapIt(t, find.byKey(const ValueKey('docs-needed-ok'))); // the "keep these handy" sheet
+      await tapText(t, 'Upload file');
       expect(api.calls, contains('upload pan_copy pan.pdf application/pdf'));
       final api2 = FakeOnb();
       await show(t, DocumentsScreen(api: api2, app: sample(), picker: FakePicker(PickedDocument(name: 'big.png', bytes: Uint8List(5 * 1024 * 1024 + 1), contentType: 'image/png'))));
@@ -312,11 +386,72 @@ void main() {
         {'kind': 'business_proof', 'file_name': 'shop.jpg', 'mime_type': 'image/jpeg', 'size_bytes': 2048, 'status': 'uploaded'},
       ];
       await show(t, DocumentsScreen(api: FakeOnb(), app: sample(extra: {'documents': docs})));
-      expect(find.text('PAN copy uploaded'), findsOneWidget);
+      expect(find.text('PAN card'), findsOneWidget);
       expect(find.textContaining('1.2 MB'), findsWidgets);
-      expect(find.text('Preview PAN copy'), findsOneWidget);
+      for (final k in ['pan-view', 'pan-replace', 'pan-remove']) {
+        expect(find.byKey(ValueKey(k)), findsOneWidget);
+      }
       await tapText(t, 'Save & continue');
       expect(toast('Add your PAN copy and business proof to continue.'), findsNothing);
+    });
+  });
+
+  group('PAN card scan', () {
+    testWidgets('before the first upload: what to keep handy; it can be opened again', (t) async {
+      await show(t, DocumentsScreen(api: FakeOnb(), app: sample()));
+      await t.pumpAndSettle();
+      expect(find.text('Keep these handy'), findsOneWidget);
+      expect(find.text('PAN card'), findsWidgets);
+      expect(find.textContaining('Gumasta'), findsOneWidget);
+      await tapIt(t, find.byKey(const ValueKey('docs-needed-ok')));
+      expect(find.text('Keep these handy'), findsNothing);
+      await tapIt(t, find.byKey(const ValueKey('docs-needed')));
+      expect(find.text('Keep these handy'), findsOneWidget);
+    });
+    test('reads the PAN and knows a PAN card', () {
+      expect(readPanText('INCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number\nABCDE1234F'), (pan: 'ABCDE1234F', looksLikePan: true));
+      expect(readPanText('Electricity bill 12345'), (pan: null, looksLikePan: false));
+    });
+    test('the camera photo is cropped to the card frame (card shaped, centred)', () {
+      final photo = img.Image(width: 1000, height: 1500);
+      final out = img.decodeJpg(cropToCard(Uint8List.fromList(img.encodeJpg(photo))))!;
+      expect(out.width / out.height, closeTo(kCardAspect, 0.15));
+      expect(out.width, lessThan(1000));
+    });
+    testWidgets('the camera scan is uploaded as a JPG', (t) async {
+      final api = FakeOnb();
+      await show(t, DocumentsScreen(api: api, app: sample(), scanner: FakeScanner(panScan())));
+      await t.pumpAndSettle();
+      await tapIt(t, find.byKey(const ValueKey('docs-needed-ok'))); // the "keep these handy" sheet
+      await tapIt(t, find.byKey(const ValueKey('pan-scan')));
+      expect(api.calls, contains('upload pan_copy pan_card_scan.jpg image/jpeg'));
+    });
+    testWidgets('a photo that is not a PAN card is questioned before upload', (t) async {
+      final api = FakeOnb();
+      await show(t, DocumentsScreen(api: api, app: sample(), scanner: FakeScanner(panScan(pan: null, looks: false))));
+      await t.pumpAndSettle();
+      await tapIt(t, find.byKey(const ValueKey('docs-needed-ok'))); // the "keep these handy" sheet
+      await tapIt(t, find.byKey(const ValueKey('pan-scan')));
+      expect(find.textContaining('This does not look like a PAN card'), findsOneWidget);
+      await tapText(t, 'Use it anyway');
+      expect(api.calls, contains('upload pan_copy pan_card_scan.jpg image/jpeg'));
+    });
+    testWidgets('a card with a different PAN from tax details is questioned', (t) async {
+      final api = FakeOnb();
+      await show(t, DocumentsScreen(api: api, app: sample(extra: {'tax': {'pan_masked': '••••••999Z'}}), scanner: FakeScanner(panScan())));
+      await t.pumpAndSettle();
+      await tapIt(t, find.byKey(const ValueKey('docs-needed-ok'))); // the "keep these handy" sheet
+      await tapIt(t, find.byKey(const ValueKey('pan-scan')));
+      expect(find.textContaining('is not the one in your tax details'), findsOneWidget);
+    });
+    testWidgets('remove asks first, then takes the PAN copy off', (t) async {
+      final api = FakeOnb();
+      final docs = [{'kind': 'pan_copy', 'file_name': 'pan.pdf', 'mime_type': 'application/pdf', 'size_bytes': 2048, 'status': 'uploaded'}];
+      await show(t, DocumentsScreen(api: api, app: sample(extra: {'documents': docs})));
+      await tapIt(t, find.byKey(const ValueKey('pan-remove')));
+      expect(api.calls, isNot(contains('remove pan_copy')));
+      await tapIt(t, find.byKey(const ValueKey('confirm-remove')));
+      expect(api.calls, contains('remove pan_copy'));
     });
   });
 
@@ -329,13 +464,13 @@ void main() {
       await t.enterText(find.byType(TextField).at(2), '123456789013');
       await tapText(t, 'Choose'); // bank
       await tapText(t, 'HDFC Bank');
-      await tapText(t, 'Save & verify ownership');
+      await tapText(t, 'Save & continue');
       expect(toast('The account numbers do not match.'), findsOneWidget);
       await tapText(t, 'Save for later');
       expect(api.bodies['bank']!['draft'], true);
       expect(api.bodies['bank']!['bank_name'], 'HDFC Bank');
     });
-    testWidgets('a full valid form is saved and the verification overview opens', (t) async {
+    testWidgets('a full valid form is saved and goes straight on (no verification stop)', (t) async {
       final api = FakeOnb();
       await show(t, BankScreen(api: api, app: sample()));
       await t.pumpAndSettle();
@@ -347,13 +482,12 @@ void main() {
       await tapText(t, 'Choose'); // account type
       await tapText(t, 'Current account');
       await tapIt(t, find.text('I confirm that I am authorized to use this account for this business.'));
-      await tapText(t, 'Save & verify ownership');
+      await tapText(t, 'Save & continue');
       expect(api.bodies['bank'], {
         'holder_name': 'Riya Sharma', 'bank_name': 'HDFC Bank', 'account_number': '123456789012', 'confirm_account_number': '123456789012',
         'ifsc': 'HDFC0001234', 'account_type': 'current', 'authorised': true,
       });
-      expect(find.text('Business verification.'), findsOneWidget);
-      expect(find.text('Not checked yet'), findsWidgets);
+      expect(find.text('Business verification.'), findsNothing);
     });
   });
 
@@ -374,15 +508,21 @@ void main() {
   });
 
   group('Agreement and consent', () {
-    testWidgets('the overview must be acknowledged; then consent opens', (t) async {
+    testWidgets('agreement and terms on one screen: acknowledge once; the terms from sign-up are recorded with it', (t) async {
       final api = FakeOnb();
       await show(t, AgreementScreen(api: api, app: sample(done: 6)));
+      expect(find.text('Send me OneLocal news and marketing updates.'), findsOneWidget);
       await tapText(t, 'Accept & continue');
       expect(toast('Please acknowledge that you have reviewed the agreement.'), findsOneWidget);
       await tapIt(t, find.textContaining('I have reviewed this agreement preview'));
       await tapText(t, 'Accept & continue');
+      expect(api.bodies['consents'], {'service_terms': true, 'privacy_notice': true, 'marketing_updates': false});
       expect(api.calls, contains('agreement $kAgreementVersion'));
-      expect(find.text('Your terms. Your choices.'), findsOneWidget);
+      expect(find.text('Your terms. Your choices.'), findsNothing); // no second screen
+    });
+    testWidgets('as the last step it says Accept & submit application', (t) async {
+      await show(t, AgreementScreen(api: FakeOnb(), app: sample(done: 6), last: true));
+      expect(find.text('Accept & submit application'), findsOneWidget);
     });
     testWidgets('terms and privacy are required, marketing is optional', (t) async {
       final api = FakeOnb();
@@ -435,6 +575,27 @@ void main() {
     });
   });
 
+  group('Shorter flow', () {
+    testWidgets('what is typed is kept on the phone if the app closes, and comes back', (t) async {
+      SharedPreferences.setMockInitialValues({});
+      await show(t, MerchantProfileScreen(api: FakeOnb(), type: 'store'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextField).at(0), 'Half Done Store');
+      await t.pump(const Duration(milliseconds: 600)); // kept a moment after typing stops
+      // the app is closed and opened again: a fresh screen
+      await t.pumpWidget(const SizedBox());
+      await show(t, MerchantProfileScreen(api: FakeOnb(), type: 'store'));
+      await t.pumpAndSettle();
+      expect(find.text('Half Done Store'), findsOneWidget);
+    });
+
+    testWidgets('the checklist opens the next section by itself (one section after another)', (t) async {
+      await show(t, ChecklistScreen(api: FakeOnb(), app: sample(done: 2), autoNext: true));
+      await t.pumpAndSettle();
+      expect(find.text('Let’s finish your setup.'), findsNothing);
+    });
+  });
+
   group('Entry', () {
     Future<void> enter(WidgetTester t, Application a) async {
       await show(t, OnboardingEntry(key: UniqueKey(), api: FakeOnb(initial: a), auth: FakeAuth()));
@@ -448,9 +609,9 @@ void main() {
       await tapText(t, 'Continue as merchant');
       expect(find.text('Register as a Store'), findsOneWidget);
     });
-    testWidgets('draft without a plan: how do you want to sell', (t) async {
+    testWidgets('draft without a plan: the business details, which carry the plan now', (t) async {
       await enter(t, sample(done: 2, plan: null));
-      expect(find.text('How do you want to sell?'), findsOneWidget);
+      expect(find.text('Your OneLocal plan'), findsOneWidget);
     });
     testWidgets('draft with a plan: checklist', (t) async {
       await enter(t, sample());

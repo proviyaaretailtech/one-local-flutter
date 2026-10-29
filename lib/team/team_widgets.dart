@@ -6,6 +6,7 @@ import '../inventory/inventory_api.dart' show Facts;
 import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'team_api.dart';
+import '../ui/i18n.dart';
 
 /// Roles that only make sense where food is cooked and served at tables: never offered to a store or a service business.
 const kRestaurantOnlyRoles = {'kitchen', 'captain'};
@@ -77,7 +78,7 @@ Future<String?> pickTeamRole(BuildContext context, {required String title, requi
               child: ListView(shrinkWrap: true, children: [
                 if (common.isNotEmpty) ...[heading('Common roles'), for (final r in common) row(ctx, r)],
                 if (more.isNotEmpty) ...[heading('More roles'), for (final r in more) row(ctx, r)],
-                if (offered.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text('No roles can be given right now.', style: inter(14, 400, color: kMuted))),
+                if (offered.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text(tr('No roles can be given right now.'), style: inter(14, 400, color: kMuted))),
               ]),
             ),
           ]),
@@ -208,7 +209,7 @@ class TeamPage extends StatelessWidget {
       body: Column(
         children: [
           OrdersTopBar(
-            title: 'Team',
+            title: tr('Team'),
             onBack: Navigator.of(context).canPop()
                 ? () => Navigator.of(context).maybePop()
                 : null,
@@ -255,11 +256,11 @@ class TeamLoad<T> extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Could not load this', style: inter(15, 600)),
+            Text(tr('Could not load this'), style: inter(15, 600)),
             const SizedBox(height: 6),
             Text(error!, style: inter(13, 400, color: kMuted)),
             const SizedBox(height: 12),
-            LightCta(label: 'Try again', onPressed: onRetry),
+            LightCta(label: tr('Try again'), onPressed: onRetry),
           ],
         ),
       );

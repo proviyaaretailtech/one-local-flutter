@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../ui/theme.dart';
+import '../ui/i18n.dart';
 
 /// The three parts of the store's Item tab (founder, 25 Oct 2026): products, their stock, and buying them — one place instead of
 /// the separate Item, Stock and Purchase sections.
@@ -48,11 +49,11 @@ class ItemPartSwitcher extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   onTap: () => parts.select(id),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                       Icon(icon, size: 16, color: parts.current == id ? const Color(0xFFA1FE2F) : kMuted),
                       const SizedBox(width: 6),
-                      Text(label, style: inter(13.5, 700, color: parts.current == id ? const Color(0xFFA1FE2F) : kMuted)),
+                      Text(tr(label), style: inter(13.5, 700, color: parts.current == id ? const Color(0xFFA1FE2F) : kMuted)),
                     ]),
                   ),
                 ),

@@ -7,6 +7,7 @@ import 'damage_flow.dart' show PendingCard, problem;
 import 'damage_screens.dart' show AdjustForm, AdjustKind;
 import 'stock_env.dart';
 import 'stock_kit.dart';
+import '../ui/i18n.dart';
 
 /// Adjust (J.101): correct stock in four plain ways — add stock, remove stock, mark damaged, throw away. Each one is sent for
 /// approval (the person who raised it cannot approve it); below the form, everything waiting for approval, with Approve and
@@ -154,10 +155,10 @@ class _AdjustStockScreenState extends State<AdjustStockScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Approve ${d.number}?', style: inter(18, 700)),
-        content: Text('Stock changes as soon as you approve. This cannot be undone; a mistake needs a new adjustment.', style: inter(14, 400, height: 1.4)),
+        content: Text(tr('Stock changes as soon as you approve. This cannot be undone; a mistake needs a new adjustment.'), style: inter(14, 400, height: 1.4)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Approve')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Approve'))),
         ],
       ),
     );
@@ -165,7 +166,7 @@ class _AdjustStockScreenState extends State<AdjustStockScreen> {
   }
 
   Future<void> _sendBack(InvDocument d) async {
-    final note = await askNote(context, 'Why send it back?', hint: 'For example: wrong quantity', action: 'Send back');
+    final note = await askNote(context, 'Why send it back?', hint: tr('For example: wrong quantity'), action: tr('Send back'));
     if (note != null && note.trim().isNotEmpty) await _act(d, 'reject', note: note.trim(), done: '${d.number} sent back. Nothing changed in stock.');
   }
 
@@ -185,8 +186,8 @@ class _AdjustStockScreenState extends State<AdjustStockScreen> {
   @override
   Widget build(BuildContext context) => StockScaffold(
         env: env,
-        title: 'Adjust stock',
-        line: 'Fix stock that is wrong, damaged or to be thrown away. A manager approves each change.',
+        title: tr('Adjust stock'),
+        line: tr('Fix stock that is wrong, damaged or to be thrown away. A manager approves each change.'),
         onRefresh: _load,
         children: [
           Wrap(spacing: 8, runSpacing: 8, children: [
@@ -226,12 +227,12 @@ class _AdjustStockScreenState extends State<AdjustStockScreen> {
           else
             _addRemoveForm(),
           const SizedBox(height: 18),
-          Text('Waiting for approval', style: inter(16, 700)),
+          Text(tr('Waiting for approval'), style: inter(16, 700)),
           const SizedBox(height: 10),
           if (_pending == null)
             const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
           else if (_pending!.isEmpty)
-            const StockEmpty('Nothing waiting', 'Changes you send show here until a manager approves them.', icon: LucideIcons.circleCheck)
+            StockEmpty(tr('Nothing waiting'), 'Changes you send show here until a manager approves them.', icon: LucideIcons.circleCheck)
           else
             for (final d in _pending!)
               PendingCard(
@@ -258,7 +259,7 @@ class _AdjustStockScreenState extends State<AdjustStockScreen> {
         Text(_kind == 'add' ? 'Found more than the app shows, or stock came in without a delivery.' : 'Fewer on the shelf than the app shows (lost, used, miscounted).',
             style: inter(12.5, 400, color: kMuted, height: 1.35)),
         const SizedBox(height: 12),
-        const InvLabel('Product'),
+        InvLabel(tr('Product')),
         InvPickBox(key: const ValueKey('adjust-item'), value: item == null ? 'Choose a product' : item.s('name'), onTap: _pickItem),
         if (item != null && _detail != null)
           Padding(padding: const EdgeInsets.only(top: 6), child: Text('In stock now: ${qty(_detail!.n('available'))}', style: inter(12.5, 500, color: kMuted))),
@@ -274,10 +275,10 @@ class _AdjustStockScreenState extends State<AdjustStockScreen> {
                 },
         ),
         const SizedBox(height: 12),
-        const InvLabel('How many'),
+        InvLabel(tr('How many')),
         InvInput(key: const ValueKey('adjust-qty'), controller: _qty, number: true, hint: '0'),
         const SizedBox(height: 12),
-        const InvLabel('Why'),
+        InvLabel(tr('Why')),
         InvPickBox(
           value: reason ?? 'Choose a reason',
           onTap: _reasons.isEmpty
@@ -288,10 +289,10 @@ class _AdjustStockScreenState extends State<AdjustStockScreen> {
                 },
         ),
         const SizedBox(height: 12),
-        const InvLabel('Note (optional)'),
-        InvInput(controller: _note, hint: 'Anything the approver should know'),
+        InvLabel(tr('Note (optional)')),
+        InvInput(controller: _note, hint: tr('Anything the approver should know')),
         const SizedBox(height: 14),
-        InvPrimary('Send for approval', busy: _sending, onPressed: _sending ? null : _send, key: const ValueKey('adjust-send')),
+        InvPrimary(tr('Send for approval'), busy: _sending, onPressed: _sending ? null : _send, key: const ValueKey('adjust-send')),
       ]),
     );
   }

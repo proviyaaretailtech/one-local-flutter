@@ -7,15 +7,13 @@ import '../ui/theme.dart';
 import 'catalogue_api.dart';
 import 'catalogue_format.dart';
 import 'catalogue_widgets.dart';
+import 'item_sheets.dart' show parsePriceMinor;
+import '../inventory/inventory_widgets.dart' show dayMonth;
+import '../ui/i18n.dart';
+import '../stock/lot_labels_screen.dart' show offerLotLabels;
+import '../ui/purchase_steps.dart';
 
 String _m(num minor) => money(minor, fixed: true);
-/// 2024-09-15 -> 15 Sep 2024 (display only).
-String _date(String iso) {
-  final p = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(iso);
-  if (p == null) return iso;
-  const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return '${int.parse(p.group(3)!)} ${m[int.parse(p.group(2)!) - 1]} ${p.group(1)}';
-}
 
 String _errText(Object e) => e is CatalogueApiException ? e.message : 'Could not reach the server. Check the connection and try again.';
 
@@ -35,171 +33,6 @@ void _tab(BuildContext context, String id, {String active = 'bill'}) {
   }
 }
 
-// ================================================================ GRN Matching (Figma "02 — GRN Matching")
-/// The supplier invoice against what was physically received, row by row. "Review Exceptions" opens the GRN dashboard.
-class GrnMatchingScreen extends StatefulWidget {
-  const GrnMatchingScreen({super.key, required this.receiptId, this.api});
-  final String receiptId;
-  final CatalogueApi? api;
-  @override
-  State<GrnMatchingScreen> createState() => _GrnMatchingState();
-}
-
-class _GrnMatchingState extends State<GrnMatchingScreen> {
-  late final CatalogueApi _api = widget.api ?? CatalogueApi();
-  GrnMatching? _m0;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final d = await _api.grnMatching(widget.receiptId);
-      if (!mounted) return;
-      setState(() {
-        _m0 = d;
-        _error = null;
-      });
-    } catch (e) {
-      if (mounted) setState(() => _error = _errText(e));
-    }
-  }
-
-  Future<void> _review() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => GrnDashboardScreen(receiptId: widget.receiptId, api: _api)));
-    if (mounted) _load();
-  }
-
-  Color _bg(GrnRow r) => switch (r.severity) { 'red' => kBadBg, 'amber' => const Color(0xFFFFF8E1), _ => Colors.white };
-  Color _fg(GrnRow r) => switch (r.severity) { 'red' => kBadText, 'amber' => const Color(0xFFD97706), _ => kInk };
-
-  Widget _head(String title, String right) => Container(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        decoration: const BoxDecoration(color: Color(0xFFF6F8FA), borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        child: Row(children: [Expanded(child: Text(title, style: inter(19, 700))), Text(right, style: inter(16, 400, color: kMuted))]),
-      );
-
-  Widget _cols(String a, String b, String c) => Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        decoration: BoxDecoration(color: const Color(0xFFF1F3F5), borderRadius: BorderRadius.circular(12)),
-        child: Row(children: [
-          Expanded(flex: 5, child: Text(a, style: inter(14, 700, color: kMuted))),
-          Expanded(flex: 3, child: Text(b, textAlign: TextAlign.right, style: inter(14, 700, color: kMuted))),
-          Expanded(flex: 3, child: Text(c, textAlign: TextAlign.right, style: inter(14, 700, color: kMuted))),
-        ]),
-      );
-
-  Widget _line(String name, String q, String price, {Color bg = Colors.white, Color fg = kInk, String? note}) => Container(
-        margin: const EdgeInsets.fromLTRB(8, 2, 8, 0),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14), border: bg == Colors.white ? const Border(bottom: BorderSide(color: Color(0xFFEFF1F3))) : null),
-        child: Row(children: [
-          Expanded(
-            flex: 5,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(name, style: inter(17, fg == kInk ? 400 : 600, color: fg)),
-              if (note != null) Text(note, style: inter(12.5, 700, color: fg)),
-            ]),
-          ),
-          Expanded(flex: 3, child: Text(q, textAlign: TextAlign.right, style: inter(17, fg == kInk ? 400 : 700, color: fg == kInk ? kMuted : fg))),
-          Expanded(flex: 3, child: Text(price, textAlign: TextAlign.right, style: inter(17, 700, color: fg))),
-        ]),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    final d = _m0;
-    return Scaffold(
-      backgroundColor: kBg,
-      body: Column(children: [
-        OrdersTopBar(title: 'Purchase matching', onBack: () => Navigator.of(context).maybePop()),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _load,
-            child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
-              if (_error != null && d == null)
-                Padding(padding: const EdgeInsets.all(24), child: Center(child: Text(_error!, textAlign: TextAlign.center, style: inter(14, 400, color: kMuted))))
-              else if (d == null)
-                const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
-              else ...[
-                OrderCardBox(
-                  radius: 24,
-                  padding: const EdgeInsets.all(18),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${d.docNo} • MATCH INVOICE', style: inter(15, 500, color: kKicker)),
-                    const SizedBox(height: 4),
-                    Text(d.hasInvoice ? '${d.invoiceNo} • ${d.supplier}' : 'No supplier invoice entered yet • ${d.supplier}', style: inter(19, 500)),
-                    const SizedBox(height: 4),
-                    Text('Review exceptions before Confirm Receiving.\nNext: purchase approval and posting • not posted yet.', style: inter(16, 400, color: kMuted, height: 1.35)),
-                  ]),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFE3E5DF))),
-                  child: Column(children: [
-                    _head('Supplier Invoice', _date(d.invoiceDate)),
-                    _cols('Product', 'Qty', 'Unit price'),
-                    for (final l in d.invoiceLines) _line(l['name'].toString(), '${qty(l['qty'] as num)} ${l['unit']}', _m((l['unit_price_minor'] as num))),
-                    if (d.invoiceLines.isEmpty) Padding(padding: const EdgeInsets.all(18), child: Text('The supplier invoice has not been entered for this receipt.', style: inter(15, 400, color: kMuted))),
-                    const SizedBox(height: 8),
-                  ]),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFFE3E5DF))),
-                  child: Column(children: [
-                    _head('Physical Receiving Logs', d.operatorName == null ? '' : 'Op: ${d.operatorName}'),
-                    _cols('Product', 'Received', 'Unit price'),
-                    for (final r in d.rows)
-                      if (r.received != null)
-                        _line(
-                          r.received!['name'].toString(),
-                          '${qty(r.received!['qty'] as num)} ${r.received!['unit']}',
-                          r.received!['unit_cost_minor'] == null ? (r.state == 'not_on_invoice' || r.state == 'missing' ? '—' : _m(invoiceUnitMinor(r.invoice) ?? 0)) : _m(r.received!['unit_cost_minor'] as num),
-                          bg: _bg(r),
-                          fg: _fg(r),
-                          note: r.state == 'not_on_invoice' ? 'NOT ON INVOICE' : null,
-                        )
-                      else
-                        _line(r.name, '0 ${r.invoice?['unit'] ?? ''}', '—', bg: _bg(r), fg: _fg(r)),
-                    const SizedBox(height: 8),
-                  ]),
-                ),
-                const SizedBox(height: 14),
-                OrderCardBox(
-                  radius: 24,
-                  child: Column(children: [
-                    Row(children: [
-                      // No Spacer: it took a share of the row and cut both counts short on a phone.
-                      const Icon(LucideIcons.circleCheck, size: 18, color: kGreenText),
-                      const SizedBox(width: 6),
-                      Expanded(child: Text('${d.matched} matched shown', style: inter(14, 600), overflow: TextOverflow.ellipsis)),
-                      const SizedBox(width: 8),
-                      const Icon(LucideIcons.triangleAlert, size: 16, color: kBadText),
-                      const SizedBox(width: 6),
-                      Text('${d.exceptions} ${d.exceptions == 1 ? 'exception' : 'exceptions'} shown', style: inter(14, 600, color: kBadText)),
-                    ]),
-                    const SizedBox(height: 12),
-                    DarkButton('Review Exceptions', onPressed: _review, height: 58),
-                  ]),
-                ),
-              ],
-            ]),
-          ),
-        ),
-        PosBottomNav(active: 'bill', onTap: (id) => _tab(context, id)),
-      ]),
-    );
-  }
-}
-
 // ================================================================ GRN Dashboard (Figma "01 — GRN Dashboard")
 class GrnDashboardScreen extends StatefulWidget {
   const GrnDashboardScreen({super.key, required this.receiptId, this.api});
@@ -209,7 +42,11 @@ class GrnDashboardScreen extends StatefulWidget {
   State<GrnDashboardScreen> createState() => _GrnDashboardState();
 }
 
+/// The items ticked as received on Check delivery, per delivery, for as long as the app is open.
+final _ticked = <String, Set<String>>{};
+
 class _GrnDashboardState extends State<GrnDashboardScreen> {
+  Set<String> get _ticks => _ticked.putIfAbsent(widget.receiptId, () => <String>{});
   late final CatalogueApi _api = widget.api ?? CatalogueApi();
   GrnView? _v;
   String? _error;
@@ -260,7 +97,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
     }
   }
 
-  Future<void> _do(Future<GrnView> Function() call, {String? done}) async {
+  Future<void> _do(Future<GrnView> Function() call, {String? done, void Function(GrnView v)? then}) async {
     setState(() => _busy = true);
     try {
       final v = await call();
@@ -271,8 +108,9 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
       });
       if (v.voided) {
         showToast(context, 'The receipt or invoice changed after it was resolved. Resolve the exceptions again.');
-      } else if (done != null) {
-        showToast(context, done);
+      } else {
+        if (done != null) showToast(context, done);
+        then?.call(v);
       }
     } catch (e) {
       if (!mounted) return;
@@ -282,34 +120,51 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
     }
   }
 
+  Future<void> _finish(GrnView v, bool self) async {
+    setState(() => _busy = true);
+    try {
+      var cur = v;
+      if (cur.exceptions > 0 && cur.resolution['valid'] != true) {
+        final choice = _choice ?? 'accept_as_received';
+        if (choice == 'accept_claim_credit' && (_claimRef.text.trim().length < 3 || _evidence.text.trim().length < 3)) {
+          throw const CatalogueApiException(0, 'Enter the supplier claim reference and evidence, or accept the goods as received.', null);
+        }
+        // a waived difference needs a word; "as delivered" unless the person wrote one
+        final note = _note.text.trim().length >= 3 ? _note.text : 'Accepted as delivered';
+        cur = await _api.grnResolve(cur.receiptId, version: cur.version, resolution: choice, claimRef: _claimRef.text, evidence: _evidence.text, note: choice == 'accept_as_received' ? note : _note.text);
+      }
+      cur = await _api.grnRequestApproval(cur.receiptId, version: cur.version);
+      if (self) cur = await _api.grnDecide(cur.receiptId, version: cur.version, approve: true);
+      if (!mounted) return;
+      setState(() {
+        _adopt(cur);
+        _busy = false;
+      });
+      showToast(context, self ? 'Bill matched. Stock added.' : 'Sent to the owner for approval.');
+      if (self) _labelsAfterApproval(cur);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      showToast(context, _errText(e));
+      _load();
+    }
+  }
+
+  // after the voucher is matched and the lot received (founder, 26 Oct 2026): ask whether to print its labels
+  void _labelsAfterApproval(GrnView v) {
+    if (v.status == 'approved') offerLotLabels(context, v.receiptId);
+  }
+
   Future<String?> _askNote(String title, String hint) => showDialog<String>(context: context, builder: (_) => _NoteDialog(title: title, hint: hint));
 
   // ---------------------------------------------------------------- pieces
   // Long values (24 × ₹30.00 = ₹720.00) wrap onto a second line instead of shrinking to an unreadable size.
-  Widget _kv(String k, String v, {Color vc = kInk, double size = 14}) => Padding(
+  Widget _kv(String k, String v, {Color vc = kInk, Color kc = kMuted, double size = 14}) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(flex: 5, child: Text(k, style: inter(size, 400, color: kMuted))),
+          Expanded(flex: 5, child: Text(k, style: inter(size, 400, color: kc))),
           const SizedBox(width: 12),
           Expanded(flex: 6, child: Text(v, textAlign: TextAlign.right, style: inter(size, 700, color: vc))),
-        ]),
-      );
-
-  Widget _tabs() => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [
-          for (final (label, on) in [('Receiving', false), ('Purchase', true), ('Putaway', false), ('Shelf Labels', false)]) ...[
-            InkWell(
-              borderRadius: BorderRadius.circular(999),
-              onTap: on ? null : () => label == 'Receiving' ? HomeNav.go(context, HomeNav.stock, 'Receiving') : showToast(context, '$label is not in this release.'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                decoration: BoxDecoration(color: on ? kLime : Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: on ? kLime : const Color(0xFFE3E5DF))),
-                child: Text(label, style: inter(16, on ? 700 : 500, color: kDark)),
-              ),
-            ),
-            const SizedBox(width: 10),
-          ],
         ]),
       );
 
@@ -323,6 +178,270 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
     return DotChip(label, bg: bg, fg: fg, big: true);
   }
 
+  // ---------------------------------------------------------------- the items table (founder, 26 Oct 2026)
+  // One row per item: billed and received quantities, rate and amount, its GST, and a tick to mark it checked on arrival. A row opens
+  // its full comparison. Under the rows: the bill's amount, GST and total, and what was received.
+  static const _cols = [44.0, 44.0, 58.0, 66.0, 34.0]; // bill, rcvd, rate, amount, tick
+
+  Widget _cell(String t, double w, {TextStyle? style, TextAlign align = TextAlign.right}) =>
+      SizedBox(width: w, child: Text(t, textAlign: align, maxLines: 1, overflow: TextOverflow.ellipsis, style: style ?? inter(12.5, 600)));
+
+  Widget _itemsTable(List<GrnRow> rows, GrnView v) {
+    final bill = v.hasInvoice;
+    num billed = 0, tax = 0, received = 0, receivedTax = 0;
+    for (final r in rows) {
+      final amount = bill ? ((r.invoice?['amount_minor'] as num?) ?? 0) : r.acceptedQty * (r.refUnitMinor ?? 0);
+      billed += amount;
+      tax += amount * r.gstPct / 100;
+      final got = bill ? r.acceptedValueMinor : amount;
+      received += got;
+      receivedTax += got * r.gstPct / 100;
+    }
+    final head = inter(11, 700, color: kMuted);
+    final ticked = rows.where((r) => _ticks.contains(r.itemId)).length;
+    return OrderCardBox(
+      radius: 20,
+      padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(child: Text(tr('Items'), style: inter(15, 800))),
+          Text('$ticked / ${rows.length} ${tr('checked')}', key: const ValueKey('check-ticked'), style: inter(12, 700, color: ticked == rows.length && rows.isNotEmpty ? kGreenText : kMuted)),
+          const SizedBox(width: 6),
+        ]),
+        if (!bill) Padding(padding: const EdgeInsets.only(top: 2), child: Text(tr('No supplier bill yet: rates are from the order or the product cost.'), style: inter(11.5, 500, color: kWarnText))),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: Text(tr('Item'), style: head)),
+          _cell(tr('Bill'), _cols[0], style: head),
+          _cell(tr('Rcvd'), _cols[1], style: head),
+          _cell(tr('Rate'), _cols[2], style: head),
+          _cell(tr('Amount'), _cols[3], style: head),
+          SizedBox(width: _cols[4]),
+        ]),
+        const Divider(height: 14, color: Color(0xFFE3E5DF)),
+        for (final r in rows) _itemRow(r, bill),
+        const SizedBox(height: 4),
+        if (bill) ...[
+          _sum(tr('Bill amount (before GST)'), _m(billed)),
+          _sum(tr('GST'), _m(tax.round())),
+          _sum(tr('Bill total'), _m((billed + tax).round()), strong: true),
+          const Divider(height: 14, color: Color(0xFFE3E5DF)),
+          _sum(tr('Received value (with GST)'), _m((received + receivedTax).round()), strong: true, color: received < billed ? kWarnText : kInk),
+        ] else ...[
+          _sum(tr('Estimated value (before GST)'), _m(billed.round())),
+          _sum(tr('GST'), _m(tax.round())),
+          _sum(tr('Estimated total'), _m((billed + tax).round()), strong: true),
+        ],
+        // the supplier's bill: entered here, prefilled from the count; editable until it is sent for approval
+        if (v.status == 'matching') ...[
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: bill
+                ? OutlineButton(tr('Edit supplier bill'), height: 44, key: const ValueKey('check-enter-bill'), onPressed: _busy ? null : () => _enterBill(v, rows))
+                : DarkButton(tr('Enter supplier bill'), height: 46, key: const ValueKey('check-enter-bill'), onPressed: _busy ? null : () => _enterBill(v, rows)),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  Widget _sum(String k, String v, {bool strong = false, Color color = kInk}) => Padding(
+        padding: const EdgeInsets.fromLTRB(0, 3, 6, 3),
+        child: Row(children: [
+          Expanded(child: Text(k, style: inter(12.5, strong ? 700 : 400, color: strong ? color : kMuted))),
+          Text(v, style: inter(strong ? 14 : 12.5, strong ? 800 : 600, color: color)),
+        ]),
+      );
+
+  Widget _itemRow(GrnRow r, bool bill) {
+    final inv = r.invoice, rec = r.received;
+    final price = invoiceUnitMinor(inv) ?? (rec?['unit_cost_minor'] as num?) ?? r.refUnitMinor ?? 0;
+    final billQty = inv?['qty'] as num?, recQty = (rec?['qty'] as num?) ?? 0;
+    final rejected = (rec?['rejected_qty'] as num?) ?? 0;
+    // before the bill there is nothing to differ from; only damaged units are worth a word
+    final differs = bill ? r.state != 'matched' : rejected > 0;
+    final on = _ticks.contains(r.itemId);
+    final tone = r.severity == 'red' ? kBadText : kWarnText;
+    return InkWell(
+      key: ValueKey('check-row-${r.itemId}'),
+      onTap: () => _rowDetail(r),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(r.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(13, 700, height: 1.2)),
+              Text([if (differs) bill ? tr(_stateText(r)) : '${qty(rejected)} ${tr('damaged')}', if (r.gstPct > 0) 'GST ${qty(r.gstPct)}%'].join(' · ').ifEmpty(tr(bill ? 'Matches' : 'Counted')),
+                  maxLines: 2, style: inter(11, 500, color: differs ? tone : kMuted)),
+            ]),
+          ),
+          _cell(billQty == null ? '—' : qty(billQty), _cols[0]),
+          _cell(qty(recQty), _cols[1], style: inter(12.5, 800, color: bill && differs && billQty != recQty ? tone : kInk)),
+          _cell(price == 0 ? '—' : money(price), _cols[2], style: inter(12, 500, color: kMuted)),
+          _cell(inv != null ? money(inv['amount_minor'] as num) : (!bill && price > 0 ? money((r.acceptedQty * price).round()) : '—'), _cols[3], style: inter(12.5, 700, color: bill ? kInk : kMuted)),
+          SizedBox(
+            width: _cols[4],
+            child: Center(
+              child: InkWell(
+                key: ValueKey('check-tick-${r.itemId}'),
+                customBorder: const CircleBorder(),
+                onTap: () => setState(() => on ? _ticks.remove(r.itemId) : _ticks.add(r.itemId)),
+                child: Semantics(
+                  checked: on,
+                  label: '${r.name} received',
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: on ? const Color(0xFF22A355) : Colors.white,
+                      border: Border.all(color: on ? const Color(0xFF22A355) : const Color(0xFFC9CDC4), width: 1.6),
+                    ),
+                    child: on ? const Icon(LucideIcons.check, size: 14, color: Colors.white) : null,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  /// Enter (or correct) the supplier's bill: number, date, and per product the billed quantity and rate, prefilled from the count and
+  /// the order price, so a bill that matches needs no typing beyond its number.
+  Future<void> _enterBill(GrnView v, List<GrnRow> rows) async {
+    final lines = [
+      for (final r in rows)
+        if (r.received != null || r.invoice != null)
+          (
+            r: r,
+            qty: TextEditingController(text: qty((r.invoice?['qty'] as num?) ?? (r.received?['qty'] as num?) ?? 0).replaceAll(',', '')),
+            rate: TextEditingController(text: (() {
+              final p = invoiceUnitMinor(r.invoice) ?? r.refUnitMinor;
+              return p == null ? '' : (p % 100 == 0 ? '${p ~/ 100}' : (p / 100).toStringAsFixed(2));
+            })()),
+          ),
+    ];
+    final supplier = TextEditingController(text: v.supplier), number = TextEditingController(text: v.invoiceNo);
+    var date = DateTime.now();
+    String? problem;
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) {
+          num total = 0;
+          for (final l in lines) {
+            total += (num.tryParse(l.qty.text) ?? 0) * (parsePriceMinor(l.rate.text) ?? 0);
+          }
+          Widget box(TextEditingController c, String hint, {Key? key, bool number = false, double? width}) => SizedBox(
+                width: width,
+                height: 42,
+                child: TextField(
+                  key: key,
+                  controller: c,
+                  keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+                  textAlign: number ? TextAlign.right : TextAlign.start,
+                  onChanged: (_) => set(() {}),
+                  style: inter(14, 600),
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    hintStyle: inter(13, 400, color: kMuted),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFDADCD5))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFDADCD5))),
+                  ),
+                ),
+              );
+          return Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.viewInsetsOf(ctx).bottom),
+            child: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text(tr('Supplier bill'), style: inter(19, 800)),
+                Text(tr('Check each line against the paper bill. Rates are before GST.'), style: inter(12.5, 400, color: kMuted)),
+                const SizedBox(height: 12),
+                box(supplier, tr('Supplier'), key: const ValueKey('bill-supplier')),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(child: box(number, tr('Bill no.'), key: const ValueKey('bill-number'))),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    key: const ValueKey('bill-date'),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(0, 42), side: const BorderSide(color: Color(0xFFDADCD5)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                    onPressed: () async {
+                      final d = await showDatePicker(context: ctx, initialDate: date, firstDate: DateTime.now().subtract(const Duration(days: 365)), lastDate: DateTime.now());
+                      if (d != null) set(() => date = d);
+                    },
+                    icon: const Icon(LucideIcons.calendar, size: 15, color: kInk),
+                    label: Text(dayMonth(date), style: inter(13, 700)),
+                  ),
+                ]),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(child: Text(tr('Item'), style: inter(11, 700, color: kMuted))),
+                  SizedBox(width: 64, child: Text(tr('Qty'), textAlign: TextAlign.right, style: inter(11, 700, color: kMuted))),
+                  const SizedBox(width: 6),
+                  SizedBox(width: 76, child: Text(tr('Rate ₹'), textAlign: TextAlign.right, style: inter(11, 700, color: kMuted))),
+                ]),
+                const SizedBox(height: 6),
+                for (final l in lines)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(children: [
+                      Expanded(child: Text(l.r.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(13, 600))),
+                      box(l.qty, '0', key: ValueKey('bill-qty-${l.r.itemId}'), number: true, width: 64),
+                      const SizedBox(width: 6),
+                      box(l.rate, '0', key: ValueKey('bill-rate-${l.r.itemId}'), number: true, width: 76),
+                    ]),
+                  ),
+                const Divider(height: 18),
+                Row(children: [
+                  Expanded(child: Text(tr('Bill amount (before GST)'), style: inter(13, 600, color: kMuted))),
+                  Text(_m(total.round()), key: const ValueKey('bill-total'), style: inter(15, 800)),
+                ]),
+                if (problem != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(tr(problem!), key: const ValueKey('bill-error'), style: inter(12.5, 600, color: kBadText))),
+                const SizedBox(height: 12),
+                DarkButton(tr('Save bill'), key: const ValueKey('bill-save'), onPressed: () {
+                  if (supplier.text.trim().isEmpty) return set(() => problem = 'Enter the supplier name.');
+                  if (number.text.trim().isEmpty) return set(() => problem = 'Enter the bill number.');
+                  final bad = lines.where((l) => (num.tryParse(l.qty.text) ?? 0) > 0 && parsePriceMinor(l.rate.text) == null);
+                  if (bad.isNotEmpty) return set(() => problem = 'Enter the rate for ${bad.first.r.name}.');
+                  if (!lines.any((l) => (num.tryParse(l.qty.text) ?? 0) > 0)) return set(() => problem = 'Enter at least one billed quantity.');
+                  Navigator.pop(ctx, true);
+                }),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+    if (saved != true || !mounted) return;
+    await _do(
+      () => _api.grnInvoiceSave(v.receiptId, supplier: supplier.text, invoiceNo: number.text, date: date, poRef: v.poRef, lines: [
+        for (final l in lines)
+          if ((num.tryParse(l.qty.text) ?? 0) > 0)
+            (itemId: l.r.raw['item_id']?.toString(), name: l.r.name, qty: num.parse(l.qty.text), unitPriceMinor: parsePriceMinor(l.rate.text)!),
+      ]),
+      done: 'Supplier bill saved. The items are matched against it.',
+    );
+  }
+
+  Future<void> _rowDetail(GrnRow r) => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: kBg,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        useRootNavigator: true,
+        // as tall as the line's details, not the whole screen
+        builder: (ctx) => SafeArea(child: Padding(padding: const EdgeInsets.all(12), child: Column(mainAxisSize: MainAxisSize.min, children: [_lineCard(r)]))),
+      );
+
   Widget _lineCard(GrnRow r) {
     final inv = r.invoice, rec = r.received;
     final price = invoiceUnitMinor(inv) ?? (rec?['unit_cost_minor'] as num?) ?? 0;
@@ -331,7 +450,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
     return OrderCardBox(
       radius: 24,
       padding: const EdgeInsets.all(18),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(r.name, style: inter(19, 700)),
         Text(_stateText(r), style: inter(14, 400, color: r.severity == 'ok' ? kMuted : (r.severity == 'red' ? kBadText : kWarnText))),
         const SizedBox(height: 8),
@@ -381,10 +500,10 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
       radius: 24,
       padding: const EdgeInsets.all(18),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [Expanded(child: Text('Resolve exceptions', style: inter(19, 700))), DotChip(valid ? 'Resolved' : 'Review', bg: valid ? kLimeSoft : const Color(0xFFEEF1EA), fg: valid ? kGreenText : kInk, big: true)]),
+        Row(children: [Expanded(child: Text(tr('Resolve exceptions'), style: inter(19, 700))), DotChip(valid ? 'Resolved' : 'Review', bg: valid ? kLimeSoft : const Color(0xFFEEF1EA), fg: valid ? kGreenText : kInk, big: true)]),
         const SizedBox(height: 10),
         Text('${v.exceptions} ${v.exceptions == 1 ? 'line differs' : 'lines differ'} from the invoice. Choose how to settle ${v.exceptions == 1 ? 'it' : 'them'} before owner approval.', style: inter(16, 400, height: 1.35)),
-        _label('Resolution'),
+        _label(tr('Resolution')),
         Container(
           height: 52,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -401,7 +520,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
           ),
         ),
         if (claim) ...[
-          _label('Supplier claim reference'),
+          _label(tr('Supplier claim reference')),
           _field(_claimRef, 'CLM-105', enabled: open),
           _label('Evidence'),
           _field(_evidence, 'Seal inspection · 2 photos', enabled: open),
@@ -409,10 +528,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
           Text('Claim: ${_m(v.claimMinor)} requested', style: inter(15, 600)),
         ],
         if (waive) ...[_label('Why is the claim of ${_m(v.claimMinor)} waived?'), _field(_note, 'Reason', enabled: open)],
-        if (open) ...[
-          const SizedBox(height: 14),
-          OutlineButton('Save resolution', height: 48, onPressed: _busy || _choice == null ? null : () => _do(() => _api.grnResolve(v.receiptId, version: v.version, resolution: _choice!, claimRef: _claimRef.text, evidence: _evidence.text, note: _note.text), done: 'Resolution saved.')),
-        ],
+
       ]),
     );
   }
@@ -422,15 +538,15 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
         radius: 24,
         padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Posting preview', style: inter(19, 700)),
-          Text('Only on owner approval', style: inter(14, 400, color: kMuted)),
+          Text(tr('Posting preview'), style: inter(19, 700)),
+          Text(tr('Only on owner approval'), style: inter(14, 400, color: kMuted)),
           const SizedBox(height: 8),
           for (final p in v.preview.where((p) => p['name'] != null)) ...[
             Text(p['name'].toString(), style: inter(15, 600)),
             if (p['stock_now'] != null) _kv('Stock', '${qty(p['stock_now'] as num)} → ${qty((p['stock_now'] as num) + (p['accepted_qty'] as num))} ${p['unit'] ?? ''}') else _kv('Added to stock', '+${qty(p['accepted_qty'] as num)} ${p['unit'] ?? ''}'),
             if (((p['rejected_qty'] as num?) ?? 0) > 0) _kv('Rejected · not posted', '${qty(p['rejected_qty'] as num)} ${p['unit'] ?? ''}'),
           ],
-          if (v.preview.every((p) => p['name'] == null)) Text('Nothing counted yet.', style: inter(15, 400, color: kMuted)),
+          if (v.preview.every((p) => p['name'] == null)) Text(tr('Nothing counted yet.'), style: inter(15, 400, color: kMuted)),
           const SizedBox(height: 6),
           Text('Rejected units stay out of stock and are claimed from the supplier. Drafts do not change posted stock.', style: inter(14, 400, color: kMuted, height: 1.35)),
         ]),
@@ -473,23 +589,26 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
   }
 
   Widget _actions(GrnView v) {
-    if (v.status == 'approved') return const DarkButton('Approved · stock posted', onPressed: null);
+    if (v.status == 'approved') return DarkButton(tr('Approved · stock posted'), onPressed: null);
     if (v.status == 'cancelled') return const DarkButton('Receipt cancelled · nothing posted', onPressed: null);
     if (v.status == 'approval_due') {
       return Column(children: [
-        if (v.can('can_approve')) DarkButton('Approve and post stock', busy: _busy, onPressed: () => _do(() => _api.grnDecide(v.receiptId, version: v.version, approve: true), done: 'Approved. Stock posted.')) else const DarkButton('Waiting for owner approval', onPressed: null),
+        if (v.can('can_approve')) DarkButton(tr('Approve and post stock'), busy: _busy, onPressed: () => _do(() => _api.grnDecide(v.receiptId, version: v.version, approve: true), done: 'Approved. Stock posted.', then: _labelsAfterApproval)) else DarkButton(tr('Waiting for owner approval'), onPressed: null),
         if (v.can('can_reject')) ...[
           const SizedBox(height: 10),
-          OutlineButton('Send back', height: 52, onPressed: _busy ? null : () async {
+          OutlineButton(tr('Send back'), height: 52, onPressed: _busy ? null : () async {
             final note = await _askNote('Why is it sent back?', 'Reason');
             if (note != null) await _do(() => _api.grnDecide(v.receiptId, version: v.version, approve: false, note: note), done: 'Sent back to matching.');
           }),
         ],
       ]);
     }
+    // one step (founder, 26 Oct 2026): settle the differences as chosen above, then the owner's tap adds the stock; anyone else's
+    // match goes to the owner
+    final self = v.actions['self_approve'] == true;
     return Column(children: [
-      DarkButton('Request owner approval', busy: _busy, onPressed: v.can('can_request') ? () => _do(() => _api.grnRequestApproval(v.receiptId, version: v.version), done: 'Approval requested.') : null),
-      if (v.blockers.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(v.blockers.join(' '), textAlign: TextAlign.center, style: inter(14, 500, color: kWarnText))),
+      DarkButton(tr(self ? 'Match bill & add stock' : 'Send to owner for approval'), key: const ValueKey('check-finish'), busy: _busy, onPressed: v.hasInvoice && !_busy ? () => _finish(v, self) : null),
+      if (!v.hasInvoice) Padding(padding: const EdgeInsets.only(top: 8), child: Text(tr('Enter the supplier bill first.'), textAlign: TextAlign.center, style: inter(14, 500, color: kWarnText))),
       if (v.decisionNote != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text('Sent back: ${v.decisionNote}', textAlign: TextAlign.center, style: inter(14, 500, color: kBadText))),
     ]);
   }
@@ -497,42 +616,39 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final v = _v;
-    final shown = v == null ? const <GrnRow>[] : (v.rows.where((r) => r.state != 'matched').toList().isEmpty ? v.rows.take(1).toList() : v.rows.where((r) => r.state != 'matched').toList());
+    // every line, the differences first: the whole invoice-against-count comparison is on this one page (no separate matching screen)
+    final shown = v == null ? const <GrnRow>[] : [...v.rows.where((r) => r.state != 'matched'), ...v.rows.where((r) => r.state == 'matched')];
+    final matched = v?.rows.where((r) => r.state == 'matched').length ?? 0;
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: 'Purchase', onBack: () => Navigator.of(context).maybePop()),
+        // "Check delivery" (founder, 26 Oct 2026): one page per delivery, no tab strip
+        OrdersTopBar(title: tr('Match bill'), onBack: () => Navigator.of(context).maybePop()),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
-              Row(children: [
-                Expanded(child: Text('Purchase dashboard', style: inter(28, 800))),
-                InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () => HomeNav.go(context, HomeNav.items, 'Items'),
-                  child: Container(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12), decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(18)), child: Row(children: [const Icon(LucideIcons.camera, size: 18, color: kLime), const SizedBox(width: 10), Text('Items', style: inter(16, 700, color: kLime))])),
-                ),
-              ]),
-              const SizedBox(height: 4),
-              Text('Open receipt → Scan/Enter Products → Match Invoice', style: inter(15, 400, color: kMuted)),
-              const SizedBox(height: 14),
-              _tabs(),
-              const SizedBox(height: 14),
+            child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 16), children: [
               if (_error != null && v == null)
                 Padding(padding: const EdgeInsets.all(24), child: Center(child: Text(_error!, textAlign: TextAlign.center, style: inter(14, 400, color: kMuted))))
               else if (v == null)
                 const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
               else ...[
-                OrderCardBox(
-                  radius: 24,
+                const PurchaseSteps(3),
+                // the purchase card: a soft mint wash, not a solid green block (founder, 29 Oct 2026)
+                Container(
+                  key: const ValueKey('check-header'),
                   padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: const Color(0xFFDDEBD6)),
+                    gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFEAF6E4), Color(0xFFFFFFFF)]),
+                  ),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(v.grnNo, style: inter(21, 800)),
-                          Text([v.docNo, if (v.poRef.isNotEmpty) v.poRef, if (v.invoiceNo.isNotEmpty) v.invoiceNo].join(' / '), style: inter(15, 400, color: kMuted)),
+                          Text([v.docNo, if (v.poRef.isNotEmpty) v.poRef, if (v.invoiceNo.isNotEmpty) v.invoiceNo].join(' / '), style: inter(14, 400, color: kMuted)),
                         ]),
                       ),
                       _statusChip(v),
@@ -540,19 +656,23 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
                     const SizedBox(height: 8),
                     _kv('Supplier', v.supplier.isEmpty ? '—' : v.supplier),
                     _kv('Approver', [v.approver['name'], if (v.approver['role'] == 'org_owner') 'Owner'].whereType<String>().join(' · ').ifEmpty('—')),
-                    _kv('Posting status', v.posted ? 'Posted' : 'Not posted'),
+                    _kv('Posting status', v.posted ? 'Posted' : 'Not posted', vc: v.posted ? kGreenText : kWarnText),
                   ]),
                 ),
                 const SizedBox(height: 12),
-                OutlineButton('Open Receipt', height: 54, onPressed: () => HomeNav.receipt == null ? showToast(context, 'The receipt opens from Stock.') : HomeNav.receipt!(context, v.receiptId)),
+                OutlineButton(tr('Open the count'), height: 50, onPressed: () => HomeNav.receipt == null ? showToast(context, 'The count opens from Item → Purchase.') : HomeNav.receipt!(context, v.receiptId)),
                 const SizedBox(height: 14),
-                OutlineButton('Match against the invoice', height: 48, onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GrnMatchingScreen(receiptId: v.receiptId, api: _api)))),
-                const SizedBox(height: 14),
-                if (!v.hasInvoice)
-                  OrderCardBox(radius: 24, padding: const EdgeInsets.all(18), child: Text('The supplier invoice has not been entered for this receipt yet, so there is nothing to match.', style: inter(16, 400, color: kMuted, height: 1.35)))
-                else ...[
-                  Padding(padding: const EdgeInsets.only(bottom: 4, left: 4), child: Text('Invoice vs physical receiving', style: inter(14, 700, color: kMuted))),
-                  for (final r in shown) Padding(padding: const EdgeInsets.only(bottom: 12), child: _lineCard(r)),
+                // the items are always listed; before the supplier's bill is in, the rate and amount are estimates from the order or the cost
+                if (!v.hasInvoice) ...[
+                  _itemsTable(shown, v),
+                  const SizedBox(height: 12),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6, left: 4),
+                    child: Text('Invoice vs counted · $matched match${v.exceptions > 0 ? ' · ${v.exceptions} ${v.exceptions == 1 ? 'differs' : 'differ'}' : ''}', key: const ValueKey('check-summary'), style: inter(14, 700, color: kMuted)),
+                  ),
+                  _itemsTable(shown, v),
+                  const SizedBox(height: 12),
                   if (v.exceptions > 0) ...[_resolveCard(v), const SizedBox(height: 12)],
                 ],
                 _previewCard(v),
@@ -560,8 +680,17 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
                 _checklistCard(v),
                 const SizedBox(height: 14),
                 _actions(v),
+                // after approval the goods are in stock: the optional next steps, as buttons (founder, 26 Oct 2026)
+                if (v.status == 'approved') ...[
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(child: OutlineButton(tr('Put away'), height: 48, key: const ValueKey('check-putaway'), onPressed: () => _openStep(context, 'putaway', id: v.receiptId))),
+                    const SizedBox(width: 10),
+                    Expanded(child: OutlineButton(tr('Print labels'), height: 48, key: const ValueKey('check-labels'), onPressed: () => _openStep(context, 'lot_labels', id: v.receiptId))),
+                  ]),
+                ],
                 const SizedBox(height: 12),
-                Text('Review Exceptions → Confirm Receiving → Purchase approval and posting\nDrafts do not change posted stock.', style: inter(14, 400, color: kMuted, height: 1.4)),
+                Text(tr('Check against the invoice → owner approves → stock is added. Nothing changes stock before approval.'), style: inter(14, 400, color: kMuted, height: 1.4)),
               ],
             ]),
           ),
@@ -596,12 +725,12 @@ class _NoteDialogState extends State<_NoteDialog> {
         title: Text(widget.title, style: inter(18, 700)),
         content: TextField(controller: _c, autofocus: true, maxLength: 200, style: inter(16, 400), decoration: InputDecoration(hintText: widget.hint, errorText: _empty ? 'Say why it is sent back.' : null)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Cancel', style: inter(15, 600, color: kMuted))),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr('Cancel'), style: inter(15, 600, color: kMuted))),
           TextButton(onPressed: () {
                 if (_c.text.trim().isEmpty) return setState(() => _empty = true);
                 Navigator.of(context).pop(_c.text.trim());
               },
-              child: Text('Send back', style: inter(15, 700, color: kBadText))),
+              child: Text(tr('Send back'), style: inter(15, 700, color: kBadText))),
         ],
       );
 }
@@ -611,13 +740,13 @@ extension on String {
 }
 
 // ================================================================ GRN home (the side menu's GRN entry)
-/// The GRN section's first page, in the style of Figma "01 — GRN Dashboard": the receiving flow, the Receiving · GRN · Putaway · Shelf Labels
-/// tabs, a count of where receipts stand, and one card per receipt shaped like the dashboard's GRN card. Tapping a card opens its dashboard.
+/// "Deliveries to check": a count of where counted deliveries stand and one card per delivery. Tapping a card opens its Check delivery
+/// page (invoice against what was counted, settle differences, owner approval).
 class GrnQueueScreen extends StatefulWidget {
   const GrnQueueScreen({super.key, this.api, this.onReceive});
   final CatalogueApi? api;
 
-  /// Opens Receiving (count a delivery and send it to purchase review). Null: the Stock tab.
+  /// Opens Receiving (count a delivery and send it to be checked). Null: the Stock tab.
   final void Function(BuildContext context)? onReceive;
   @override
   State<GrnQueueScreen> createState() => _GrnQueueState();
@@ -663,24 +792,6 @@ class _GrnQueueState extends State<GrnQueueScreen> {
         'matching' => r.hasInvoice ? ((r.exceptions ?? 0) > 0 ? '${r.exceptions} to review' : 'Matches') : 'Needs invoice',
         _ => 'Not opened',
       };
-
-  Widget _tabs() => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [
-          for (final (label, on) in [('Receiving', false), ('Purchase', true), ('Putaway', false), ('Shelf Labels', false)]) ...[
-            InkWell(
-              borderRadius: BorderRadius.circular(999),
-              onTap: on ? null : () => label == 'Receiving' ? _receive() : showToast(context, '$label is not in this release.'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(color: on ? kLime : Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: on ? kLime : const Color(0xFFE3E5DF))),
-                child: Text(label, style: inter(14, on ? 700 : 500, color: kDark)),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ]),
-      );
 
   Widget _stat(String label, int n, {bool alert = false}) => Expanded(
         child: Container(
@@ -748,9 +859,9 @@ class _GrnQueueState extends State<GrnQueueScreen> {
             child: const Icon(LucideIcons.packageCheck, size: 22, color: kGreenText),
           ),
           const SizedBox(height: 12),
-          Text('No purchases waiting for review', style: inter(18, 700)),
+          Text(tr('No deliveries to check'), style: inter(18, 700)),
           const SizedBox(height: 4),
-          Text('When a delivery arrives, count it in Receiving and send it to purchase review. It shows up here to match against the supplier invoice.',
+          Text(tr('When a delivery arrives, count it in Receiving and send it to be checked. It shows up here to match against the supplier invoice.'),
               style: inter(14, 400, color: kMuted, height: 1.4)),
           const SizedBox(height: 14),
           for (final (i, step) in const ['Count the delivery in Receiving', 'Match it against the supplier invoice', 'Owner approves · stock is posted'].indexed)
@@ -769,7 +880,7 @@ class _GrnQueueState extends State<GrnQueueScreen> {
               ]),
             ),
           const SizedBox(height: 6),
-          DarkButton('Receive stock', onPressed: _receive),
+          DarkButton(tr('Receive stock'), onPressed: _receive),
         ]),
       );
 
@@ -782,17 +893,14 @@ class _GrnQueueState extends State<GrnQueueScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersTopBar(title: 'Purchase', onBack: () => Navigator.of(context).maybePop()),
+        // one list, no tab strip (founder, 26 Oct 2026): each delivery opens its one Check delivery page
+        OrdersTopBar(title: tr('Deliveries to check'), onBack: () => Navigator.of(context).maybePop()),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
-              Text('Purchases', style: inter(24, 800)),
-              const SizedBox(height: 2),
-              Text('Open receipt → Scan/Enter Products → Match Invoice', style: inter(14, 400, color: kMuted)),
-              const SizedBox(height: 14),
-              _tabs(),
-              const SizedBox(height: 14),
+            child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+              Text(tr('Each delivery you counted is checked against the supplier invoice, then the owner approves it.'), style: inter(13.5, 400, color: kMuted, height: 1.35)),
+              const SizedBox(height: 12),
               if (_error != null && rows == null)
                 Padding(padding: const EdgeInsets.all(24), child: Center(child: Text(_error!, textAlign: TextAlign.center, style: inter(14, 400, color: kMuted))))
               else if (rows == null)
@@ -831,4 +939,12 @@ num? invoiceUnitMinor(Map<String, dynamic>? inv) {
   if (p != null) return p;
   final amount = inv['amount_minor'] as num?, q = inv['qty'] as num?;
   return amount == null || q == null || q == 0 ? null : (amount / q).round();
+}
+
+/// The optional steps after an approved delivery, Putaway ([id]: that delivery) and Shelf labels: stock pages, reached through the
+/// shared hook.
+void _openStep(BuildContext context, String page, {String? id}) {
+  final open = HomeNav.stockPage;
+  if (open == null) return showToast(context, 'This opens from Item → Stock.');
+  open(context, page, itemId: id);
 }

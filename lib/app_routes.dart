@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'account/routes.dart';
+import 'ads/advertiser_screens.dart' show AdvertiserApi, AdvertiserHomeScreen;
 import 'auth/auth_repository.dart';
 import 'auth/partner_api.dart';
+import 'catalogue/catalogue_api.dart' show CatalogueApi;
 import 'catalogue/catalogue_screen.dart';
 import 'catalogue/grn_screens.dart';
 import 'catalogue/item_parts.dart';
+import 'catalogue/item_sheets.dart' show showQuickAdd;
 import 'home/app_shell.dart';
 import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
@@ -28,13 +31,17 @@ import 'menu/menu_hub.dart';
 import 'menu/price_control_screen.dart';
 import 'menu/menu_screen.dart';
 import 'notices/notification_centre.dart';
-import 'orders/cart_screen.dart';
 import 'purchasing/po_create_screen.dart';
 import 'purchasing/purchase_hub_screen.dart';
 import 'purchasing/purchasing_api.dart';
+import 'purchasing/simple_purchase.dart' show ReceiveGoodsScreen;
 import 'orders/order_screen.dart';
 import 'orders/orders_board_screen.dart';
+import 'money/store_money.dart';
+import 'team/staff_screen.dart';
+import 'orders/online_locked.dart';
 import 'orders/orders_home.dart';
+import 'plans/subscription_plans.dart';
 import 'stock/product_page.dart';
 import 'stock/stock_env.dart';
 import 'stock/stock_home.dart';
@@ -43,11 +50,14 @@ import 'sell/sell_env.dart';
 import 'sell/sell_screen.dart';
 import 'service/calendar_screen.dart';
 import 'service/service_widgets.dart' show ServiceRoutes;
+import 'settings/settings_api.dart' show SettingsApi;
 import 'settings/settings_screen.dart';
+import 'ui/i18n.dart';
 import 'settings/support_screens.dart';
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 import 'storefront/builder_screen.dart';
+import 'storefront/page_manager_screen.dart';
 import 'storefront/settings_screens.dart';
 import 'storefront/storefront_api.dart';
 import 'tables/floor_screen.dart';
@@ -72,7 +82,7 @@ void installRoutes() {
     if (_inShell('Online order') || _inShell('Orders')) return;
     final restaurant = HomeNav.shell?.kind == 'restaurant';
     Navigator.of(c).push(MaterialPageRoute(
-        builder: (_) => restaurant ? OrdersBoardScreen(onNavigate: (id) => _tab(c, id)) : OrdersHome(onNavigate: (id) => _tab(c, id))));
+        builder: (_) => OnlineOrdersGate(child: restaurant ? OrdersBoardScreen(onNavigate: (id) => _tab(c, id)) : OrdersHome(onNavigate: (id) => _tab(c, id)))));
   };
   HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
   // Section F: the till (sell, search, carts, payment, history, returns, receipts). Section E's cart screen stays reachable from the orders list.
@@ -90,7 +100,7 @@ void installRoutes() {
       ? Navigator.of(c).push(MaterialPageRoute(
           builder: (_) => GrnQueueScreen(onReceive: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(ctx)))))))
       : _itemPart(c, 'purchase');
-  // "Open Receipt" on a purchase review: that delivery's receipt in Receiving.
+  // "Open Receipt" on Check delivery: that delivery's receipt in Receiving.
   HomeNav.receipt = (c, documentId) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(c), documentId: documentId)));
   HomeNav.stock = (c) {
     if (!_restaurant) return _itemPart(c, 'stock');
@@ -99,6 +109,14 @@ void installRoutes() {
   };
   HomeNav.stockItem = (c, itemId) => openStockPage(c, _stockEnv(c), StockPage.item, itemId: itemId);
   HomeNav.stockPage = (c, page, {itemId}) => openStockPage(c, _stockEnv(c), page, itemId: itemId);
+  // the side menu's search: the Bill's own pages, and Quick add (it adds the product, its stock and its supplier in one screen)
+  HomeNav.billPage = (c, page) => SellEnv(onTab: (id) => _tab(c, id)).open(c, page);
+  HomeNav.quickAdd = (c) => showQuickAdd(c, CatalogueApi());
+  HomeNav.loadLanguage = () async {
+    try {
+      setAppLanguage((await SettingsApi().get()).language);
+    } catch (_) {} // English until the settings can be read
+  };
   KitchenEnv kitchenEnv(BuildContext c) => KitchenEnv(onNavigate: (id) => _kitchenTab(c, id));
   HomeNav.kitchenSetup = (c) => Navigator.of(c).push(KitchenSetupScreen.route(kitchenEnv(c)));
   // the KDS view is the kitchen board (founder, 27 Oct 2026); the older list display stays in kds_screen.dart
@@ -147,12 +165,24 @@ void installRoutes() {
     Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
   };
   // Section K: money. The server says which screens this person may open; the bottom bar's other tabs go back through _tab.
-  // a restaurant's Money is the store's design rebuilt on its own records (0622, founder 29 Oct 2026)
-  HomeNav.money = (c) => Navigator.of(c).push(HomeNav.shell?.kind == 'restaurant' ? RstMoneyScreen.route() : MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
-  HomeNav.moneyScreen = (c, screen) => Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id)), start: screen));
-  HomeNav.team = (c) => Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id), kind: HomeNav.shell?.kind)));
+  // A store has its own minimal Money (founder, 28 Oct 2026): accounts, Record transaction, cash register, dues. Restaurants keep section K.
+  HomeNav.money = (c) => _isStore
+      ? Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: '/money'), builder: (_) => const StoreMoneyScreen()))
+      // a restaurant's Money is the store's design rebuilt on its own records (0622, founder 29 Oct 2026)
+      : HomeNav.shell?.kind == 'restaurant'
+          ? Navigator.of(c).push(RstMoneyScreen.route())
+          : Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
+  HomeNav.moneyScreen = (c, screen) => _isStore
+      ? HomeNav.money!(c)
+      : Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id)), start: screen));
+  // A store's Team is its staff (founder, 28 Oct 2026): staff, attendance, salary, advances; app logins and roles one tap away.
+  HomeNav.team = (c) => _isStore
+      ? Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'staff'), builder: (ctx) => StaffScreen(
+            onAppUsers: () => Navigator.of(ctx).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(ctx, id), kind: HomeNav.shell?.kind))))))
+      : Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id), kind: HomeNav.shell?.kind)));
   // Section M: the storefront page builder (profile, hours, delivery, offers, ads and publishing hang off it).
   HomeNav.storefront = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'storefront'), builder: (_) => StorePageBuilder(api: StorefrontApi())));
+  HomeNav.businessProfile = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'business-profile'), builder: (_) => PageManagerScreen(api: StorefrontApi())));
   HomeNav.deliverySettings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => DeliveryScreen(api: StorefrontApi())));
   // Section N: notification and announcement centres, customer messages and feedback.
   HomeNav.notifications = (c) => Navigator.of(c).push(NoticesHome.route());
@@ -188,6 +218,7 @@ void installRoutes() {
   // Setup covers the whole screen, bar included.
   HomeNav.setup = (c) => Navigator.of(c, rootNavigator: true).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
   installAccountRoutes(); // side nav: Customer, One Local Wallet, Manage account
+  HomeNav.plans = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const SubscriptionPlansScreen()));
 }
 
 InvEnv _inventoryEnv(BuildContext c) => InvEnv(
@@ -219,8 +250,10 @@ void _itemPart(BuildContext c, String part) {
 /// Every stock page's environment: the stock API and bottom bar, and the ways to Purchase (new purchase order) and Receiving.
 StockEnv _stockEnv(BuildContext c) => StockEnv(
     inv: _inventoryEnv(c),
-    onOpenPurchase: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => PoCreateScreen(env: PurEnv(inv: _inventoryEnv(ctx))))),
-    onOpenReceiving: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(ctx)))));
+    onOpenPurchase: (ctx, [want = const []]) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => PoCreateScreen(env: PurEnv(inv: _inventoryEnv(ctx)), want: want))),
+    // a store receives in one step, Add purchase (founder, 29 Oct 2026); a restaurant keeps its count
+    onOpenReceiving: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(
+        builder: (_) => _restaurant ? ReceivingScreen(env: _inventoryEnv(ctx)) : ReceiveGoodsScreen(api: PurchasingApi()))));
 
 /// Switches the app shell to the tab with this bar label, when the shell is up and has that tab.
 bool _inShell(String label) => HomeNav.shell?.show(label) ?? false;
@@ -229,6 +262,9 @@ Widget _floor(BuildContext c) => FloorScreen(env: TablesEnv(onNavigate: (id) => 
 
 /// The signed-in app: one bottom bar over a back stack per tab. Each tab's first screen depends on the kind of
 /// business: Bill is the till for a store, the tables floor for a restaurant, the calendar for a service partner.
+/// A store (not a restaurant or a service partner): the business kind the shell knows, a store until it knows.
+bool get _isStore => (HomeNav.shell?.kind ?? 'store') == 'store';
+
 Widget appShell({AuthRepository? auth}) => AppShell(rootFor: (kind, label) => shellTabRoot(kind, label, auth: auth));
 
 /// The first screen of the bar tab [label] for a business of [kind] ('store', 'restaurant', 'service'); null when the tab has none.
@@ -245,7 +281,8 @@ Widget? shellTabRoot(String kind, String label, {AuthRepository? auth}) => switc
           ),
         // A store's Online order tab is section E (Orders History, each order opening its stage screen). The Live | Hold board with
         // dine-in / takeaway / delivery is the restaurant's Orders tab (section H), so a store never sees it.
-        'Online order' => Builder(builder: (c) => OrdersHome(onNavigate: (id) => _tab(c, id))),
+        // POS only: the tab offers the OneLocal subscription instead (founder, 28 Oct 2026)
+        'Online order' => Builder(builder: (c) => OnlineOrdersGate(child: OrdersHome(onNavigate: (id) => _tab(c, id)))),
         'Orders' => Builder(builder: (c) => OrdersBoardScreen(onNavigate: (id) => _tab(c, id))),
         'Stock' => Builder(builder: (c) => StockHomeScreen(env: _stockEnv(c))),
         _ => null,
@@ -273,7 +310,18 @@ void _kitchenTab(BuildContext context, String id) => switch (id) {
 /// "Continue to store": an owner or admin whose workspace setup is not finished goes to setup first
 /// (Figma: finish setup before using the merchant tools); everyone else goes to the control centre.
 /// The server decides who may run setup; a refusal (staff, not yet approved) means "go to the control centre".
-Future<void> openWorkspace(BuildContext context, {AuthRepository? auth, SetupApi? setupApi}) async {
+Future<void> openWorkspace(BuildContext context, {AuthRepository? auth, SetupApi? setupApi, AdvertiserApi? advertiserApi}) async {
+  // an advertising-only partner has no store to set up: its app is Ads (the Advertising & Partner Growth spec, 29 Oct 2026)
+  try {
+    final p = await (advertiserApi ?? AdvertiserApi()).profile();
+    if (p['partner_kind'] == 'advertising') {
+      if (context.mounted) Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdvertiserHomeScreen(auth: auth)));
+      return;
+    }
+  } catch (_) {
+    // not known (offline, or a server without advertisers yet): carry on as a store
+  }
+  if (!context.mounted) return;
   bool needsSetup = false;
   try {
     final setup = await (setupApi ?? SetupApi()).get();

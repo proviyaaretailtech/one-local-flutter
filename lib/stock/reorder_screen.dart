@@ -6,6 +6,7 @@ import '../ui/theme.dart';
 import 'prices_common.dart';
 import 'stock_env.dart';
 import 'stock_kit.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Replenishment", simplified: what to buy again and how much. The suggestions come from the stock dashboard; each item's
 /// recent daily sales and what is already on the way come from its 7-day forecast. The quantities are the person's own to change;
@@ -87,15 +88,19 @@ class _ReorderScreenState extends State<ReorderScreen> {
 
   void _purchase() {
     final open = widget.env.onOpenPurchase;
-    if (open != null) return open(context);
+    final picked = [
+      for (final l in _lines ?? const <_Line>[])
+        if ((num.tryParse(l.qty.text.trim()) ?? 0) > 0) (itemId: l.id, name: l.name, unit: l.unit, qty: num.parse(l.qty.text.trim())),
+    ];
+    if (open != null) return open(context, picked);
     showToast(context, 'Purchase orders open from the Purchase section in the side menu.');
   }
 
   @override
   Widget build(BuildContext context) => StockScaffold(
         env: widget.env,
-        title: 'Reorder',
-        line: 'What to buy again and how much. Change any quantity, then create the purchase order.',
+        title: tr('Reorder'),
+        line: tr('What to buy again and how much. Change any quantity, then create the purchase order.'),
         onRefresh: _load,
         children: [
           InvLoad<List<_Line>>(
@@ -105,23 +110,23 @@ class _ReorderScreenState extends State<ReorderScreen> {
             builder: (lines) {
               final picked = lines.where((l) => (num.tryParse(l.qty.text.trim()) ?? 0) > 0).toList();
               return [
-                const InvInfoBanner(
-                  title: 'These are suggestions',
-                  body: 'They use recent sales and what is already on the way. Nothing is ordered until you create the purchase order.',
+                InvInfoBanner(
+                  title: tr('These are suggestions'),
+                  body: tr('They use recent sales and what is already on the way. Nothing is ordered until you create the purchase order.'),
                 ),
                 const SizedBox(height: 12),
                 if (lines.isEmpty)
-                  const StockEmpty('Nothing to reorder', 'Every item has enough stock for the next few days.', icon: LucideIcons.packageCheck)
+                  StockEmpty(tr('Nothing to reorder'), 'Every item has enough stock for the next few days.', icon: LucideIcons.packageCheck)
                 else
                   for (final l in lines) _card(l),
                 if (lines.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   InvCard(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      Text('Order summary', style: inter(16, 700)),
+                      Text(tr('Order summary'), style: inter(16, 700)),
                       const SizedBox(height: 6),
-                      StockRow('Items to order', '${picked.length}'),
-                      StockRow('Total quantity', qty(_total(lines)), strong: true),
+                      StockRow(tr('Items to order'), '${picked.length}'),
+                      StockRow(tr('Total quantity'), qty(_total(lines)), strong: true),
                       for (final l in picked) StockRow(l.name, '${l.qty.text.trim()} ${l.unit.isEmpty ? 'units' : l.unit}'),
                     ]),
                   ),
@@ -129,7 +134,7 @@ class _ReorderScreenState extends State<ReorderScreen> {
                 const SizedBox(height: 6),
                 InvPrimary(picked.isEmpty ? 'Create purchase order' : 'Create purchase order · ${qty(_total(lines))} units', onPressed: _purchase),
                 const SizedBox(height: 8),
-                InvNote('Note the quantities above: the purchase order screen opens next, where you pick the supplier and add them.'),
+                InvNote(tr('These items and quantities go onto the purchase order; their usual supplier and price fill in.')),
               ];
             },
           ),
@@ -154,10 +159,10 @@ class _ReorderScreenState extends State<ReorderScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        if (s != null) StockRow('Available now', unitsOf(s, 'available'), color: s.n('available') <= 0 ? kRedText : null),
-        StockRow('On the way', '${qty(f?.n('inbound_total') ?? s?.n('in_transit') ?? 0)} $unit'),
-        StockRow('Sells per day', perDay == null || perDay == 0 ? 'No recent sales' : '${perDay.toStringAsFixed(perDay < 10 ? 1 : 0)} $unit'),
-        if (f != null && f.has('end_stock')) StockRow('Left after 7 days', '${qty(f.n('end_stock'))} $unit', color: f.n('end_stock') < 0 ? kRedText : null),
+        if (s != null) StockRow(tr('Available now'), unitsOf(s, 'available'), color: s.n('available') <= 0 ? kRedText : null),
+        StockRow(tr('On the way'), '${qty(f?.n('inbound_total') ?? s?.n('in_transit') ?? 0)} $unit'),
+        StockRow(tr('Sells per day'), perDay == null || perDay == 0 ? 'No recent sales' : '${perDay.toStringAsFixed(perDay < 10 ? 1 : 0)} $unit'),
+        if (f != null && f.has('end_stock')) StockRow(tr('Left after 7 days'), '${qty(f.n('end_stock'))} $unit', color: f.n('end_stock') < 0 ? kRedText : null),
         const SizedBox(height: 10),
         InvLabel('Order quantity ($unit)'),
         const SizedBox(height: 6),

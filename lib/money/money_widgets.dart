@@ -9,6 +9,7 @@ import '../states/state_kit.dart' show InfoBox;
 import '../ui/theme.dart';
 import 'money_api.dart';
 import 'money_env.dart';
+import '../ui/i18n.dart';
 
 export '../inventory/inventory_widgets.dart' show InvCard, InvTiles, InvStatTile, InvPrimary, InvSecondary, InvLabel, InvInput, InvPickBox, pickOne;
 
@@ -121,11 +122,11 @@ class _ErrorBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InvCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Could not load this', style: inter(15, 600)),
+          Text(tr('Could not load this'), style: inter(15, 600)),
           const SizedBox(height: 6),
           Text(message, style: inter(13, 400, color: kMuted)),
           const SizedBox(height: 10),
-          InvSecondary('Try again', onPressed: onRetry),
+          InvSecondary(tr('Try again'), onPressed: onRetry),
         ]),
       );
 }
@@ -146,7 +147,7 @@ class _Switcher extends StatelessWidget {
         Expanded(
           child: Semantics(
             button: true,
-            label: 'Switch money screen',
+            label: tr('Switch money screen'),
             child: InkWell(
               key: const ValueKey('money-switcher'),
               borderRadius: BorderRadius.circular(999),
@@ -527,8 +528,8 @@ class MoneyMore extends StatelessWidget {
   Widget build(BuildContext context) {
     if (shown >= total) return const SizedBox.shrink();
     final size = ((ctx.q['page_size'] as int?) ?? 20);
-    if (size >= 50) return Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Showing the latest 50. Narrow the dates to see older records.', style: inter(12.5, 400, color: kMuted)));
-    return InvSecondary('Show more', onPressed: () => ctx.set({'page_size': 50}));
+    if (size >= 50) return Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(tr('Showing the latest 50. Narrow the dates to see older records.'), style: inter(12.5, 400, color: kMuted)));
+    return InvSecondary(tr('Show more'), onPressed: () => ctx.set({'page_size': 50}));
   }
 }
 

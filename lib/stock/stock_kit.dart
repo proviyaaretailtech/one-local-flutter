@@ -29,11 +29,14 @@ class StockScaffold extends StatelessWidget {
       onItems: env.inv.onItems ?? () => env.tab(context, 'item'),
       onBell: env.inv.onBell,
       children: [
-        // no back arrow here: the page header already has one whenever the page can go back (two arrows looked broken)
-        Text(title, style: inter(24, 800)),
-        if (line != null) ...[const SizedBox(height: 4), Text(line!, style: inter(13.5, 400, color: kMuted, height: 1.35))],
-        if (actions.isNotEmpty) ...[const SizedBox(height: 12), Wrap(spacing: 8, runSpacing: 8, children: actions)],
-        const SizedBox(height: 16),
+        // the back arrow is the banner's, just under it
+        // an empty title: the page draws its own compact heading (Item → Stock)
+        if (title.isNotEmpty) ...[
+          Text(title, style: inter(24, 800)),
+          if (line != null) ...[const SizedBox(height: 4), Text(line!, style: inter(13.5, 400, color: kMuted, height: 1.35))],
+          if (actions.isNotEmpty) ...[const SizedBox(height: 12), Wrap(spacing: 8, runSpacing: 8, children: actions)],
+          const SizedBox(height: 16),
+        ],
         ...children,
       ],
     );

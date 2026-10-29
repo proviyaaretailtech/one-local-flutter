@@ -4,6 +4,7 @@ import '../home/home_widgets.dart' show kLime;
 import '../ui/app_header.dart';
 import '../ui/theme.dart';
 import '../ui/mobile_input.dart';
+import '../ui/i18n.dart';
 
 /// Small building blocks shared by the Customer, One Local Wallet and Manage account screens, in the app's look
 /// (white top band with a round back button, white cards with a hairline, dark full-width action with a lime label).
@@ -116,7 +117,7 @@ class CwaLoadError extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(message, textAlign: TextAlign.center, style: inter(14, 500, color: kMuted)),
           const SizedBox(height: 12),
-          TextButton(onPressed: onRetry, child: Text('Try again', style: inter(14, 600, color: kLink))),
+          TextButton(onPressed: onRetry, child: Text(tr('Try again'), style: inter(14, 600, color: kLink))),
         ]),
       );
 }

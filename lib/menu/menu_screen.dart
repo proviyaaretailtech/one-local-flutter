@@ -107,7 +107,9 @@ class _MenuScreenState extends State<MenuScreen> {
     });
     try {
       await next;
-    } catch (_) {/* drawn by the builder */}
+    } catch (_) {
+      /* drawn by the builder */
+    }
   }
 
   @override

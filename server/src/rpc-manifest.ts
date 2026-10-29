@@ -28,11 +28,15 @@ import * as rst from './schemas/restaurant.ts';
 import * as mb from './schemas/menu_build.ts';
 import * as sell from './schemas/sell.ts';
 import * as pur from './schemas/purchasing.ts';
+import * as staff from './schemas/staff.ts';
 import * as mo from './schemas/money.ts';
+import * as ads from './schemas/ads.ts';
 import * as team from './schemas/team.ts';
 import * as sf from './schemas/storefront.ts';
 import * as nt from './schemas/notices.ts';
 import * as st from './schemas/settings.ts';
+import * as rr from './schemas/returns.ts';
+import * as pk from './schemas/packed.ts';
 import { helpContent } from './modules/help.ts';
 import * as out from './schemas/outlets.ts';
 import * as cu from './schemas/customers.ts';
@@ -82,6 +86,7 @@ export const MANIFEST: Entry[] = [
   sec('partner_app_document_slot', { args: ob.UploadAsk, rate: 'secure', roles: ANY }),
   sec('partner_app_document_attach', { args: ob.Attach, rate: 'secure', roles: ANY }),
   sec('partner_app_document_preview', { args: ob.PreviewAsk, rate: 'secure', roles: ANY }),
+  sec('partner_app_document_remove', { args: ob.PreviewAsk, rate: 'secure', roles: ANY }),
 
   // ---- workspace setup after approval — database: 0350 via 0360. Results carry storage paths for listing images: post turns them into links.
   db('partner_setup_get', { fn: 'gw_partner_setup_get', ...empty, map: () => ({}), post: links, roles: OWNER }),
@@ -110,6 +115,7 @@ export const MANIFEST: Entry[] = [
   // ---- the till on top of the counter bill, section F (0380-0383). Body = the function's `p` object; the database checks organisation,
   //      store, role and every amount. Money calls carry the Idempotency-Key header; manager-only rules answer 403 for anyone else.
   db('pos_sell_catalog', { args: sell.Catalog, map: P, rate: 'read', roles: STAFF }),
+  db('pos_basket_suggest', { args: sell.Basket, map: P, rate: 'read', roles: STAFF }), // bought together, for All items
   db('pos_receipt_list', { args: sell.Receipts, map: P, rate: 'read', roles: STAFF }),
   db('pos_split_pay', { args: sell.SplitPay, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
   db('pos_payment_attempt_record', { args: sell.Attempt, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
@@ -144,6 +150,7 @@ export const MANIFEST: Entry[] = [
   db('inv_forecast', { args: inv.Forecast, map: P, rate: 'read', roles: 'staff with inventory:read' }),
   db('inv_document_save', { args: inv.DocumentSave, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   db('inv_document_act', { args: inv.DocumentAct, map: P, rate: 'write', idem: true, roles: 'inventory:record (inventory:approve to approve or reject)' }),
+  db('inv_opening_stock', { args: inv.OpeningStock, map: P, rate: 'write', idem: true, roles: 'owner or manager (inventory:approve)' }),
   db('inv_audit_to_adjustment', { args: inv.AuditToAdjustment, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
   // ---- kitchen stations and the kitchen display, section H (0480, 0481). Body = the function's `p` object; the database checks organisation,
   //      location and role (kitchen:view / kitchen:configure; order.update_status to act on a ticket). Writes carry the Idempotency-Key header.
@@ -285,14 +292,45 @@ export const MANIFEST: Entry[] = [
   // Item → Purchase → Suppliers (C:\onelocal\hosted_add_supplier.sql): the list with contact details, and add / change one.
   db('pur_supplier_list', { args: pur.Options, map: P, rate: 'read', roles: 'staff with purchasing:read' }),
   db('pur_supplier_save', { args: pur.SupplierSave, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
+  db('pur_item_supplier_set', { args: pur.ItemSupplier, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
   db('pur_po_act', { args: pur.PoAct, map: P, rate: 'write', roles: 'purchasing:record (submit, cancel a draft or pending order); purchasing:approve_po (approve, reject, cancel an approved order)' }),
   db('pur_po_send', { args: pur.PoSend, map: P, rate: 'write', roles: 'purchasing:record (an approved or partly received order)' }),
   db('pur_po_receive', { args: pur.PoReceive, map: P, rate: 'write', idem: true, roles: 'purchasing:record and inventory:record' }),
+  // one-step purchase (founder, 28 Oct 2026): open orders with days waiting, Received (stock with MRP), the bill, past purchases
+  db('pur_po_open', { args: pur.Options, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('pur_item_find', { args: pur.ItemFind, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('pur_receive_post', { args: pur.ReceivePost, map: P, rate: 'write', idem: true, roles: 'staff with inventory:record' }),
+  db('pur_bill_get', { args: pur.BillGet, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('pur_bill_save', { args: pur.BillSave, map: P, rate: 'write', roles: 'staff with inventory:record' }),
+  db('pur_history', { args: pur.History, map: P, rate: 'read', roles: 'staff of the business' }),
   db('pur_sourcing_select', { args: pur.SourcingSelect, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:approve' }),
   db('pur_audit_record', { args: pur.AuditRecord, map: P, rate: 'write', idem: true, roles: 'staff with purchasing:record' }),
   // ---- money, section K (0435). Body = the function's `p` object; the database checks organisation, location and permission (money:read / record /
   //      approve; settlements, payouts and reports need the organisation-level settlements:read / payouts:read). Writes carry the Idempotency-Key header.
   db('money_options', { args: mo.Options, map: P, rate: 'read', roles: ANY }),
+  // the store's Money tab (founder, 28 Oct 2026): accounts fed by sales, Record transaction, cash register with Close day, dues
+  // store staff (founder, 28 Oct 2026): staff, attendance, salary, advances on the web POS's pos_staff tables; owner or manager only (the database checks)
+  db('staff_home', { args: staff.Empty, map: P, rate: 'read', roles: 'owner or manager' }),
+  db('staff_save', { args: staff.Save, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('staff_attendance', { args: staff.Day, map: P, rate: 'read', roles: 'owner or manager' }),
+  db('staff_attendance_save', { args: staff.Mark, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('staff_salary', { args: staff.Month, map: P, rate: 'read', roles: 'owner or manager' }),
+  db('staff_salary_generate', { args: staff.Month, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('staff_salary_adjust', { args: staff.Adjust, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('staff_salary_pay', { args: staff.Pay, map: P, rate: 'money', idem: true, roles: 'owner or manager' }),
+  db('staff_advances', { args: staff.Empty, map: P, rate: 'read', roles: 'owner or manager' }),
+  db('staff_advance_give', { args: staff.Advance, map: P, rate: 'money', idem: true, roles: 'owner or manager' }),
+  db('smoney_home', { args: mo.Options, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('smoney_entries', { args: mo.StoreEntries, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('smoney_record', { args: mo.StoreRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
+  db('smoney_void', { args: mo.StoreVoid, map: P, rate: 'money', roles: 'staff with money:approve' }),
+  db('smoney_register', { args: mo.StoreRegister, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('smoney_close_day', { args: mo.StoreClose, map: P, rate: 'money', roles: 'staff with money:record' }),
+  db('smoney_dues', { args: mo.Options, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('smoney_contacts', { args: mo.StoreContacts, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('smoney_contact_save', { args: mo.StoreContactSave, map: P, rate: 'money', roles: 'staff with money:record' }),
+  sec('smoney_proof_slot', { args: mo.ProofAsk, rate: 'secure', roles: 'staff with money:record' }),
+  sec('smoney_proof_link', { args: mo.ProofLink, rate: 'secure', roles: 'staff with money:read' }),
   db('money_overview', { args: mo.Window, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('money_payments_list', { args: mo.Payments, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('money_transactions_list', { args: mo.Transactions, map: P, rate: 'read', roles: 'staff with money:read' }),
@@ -351,6 +389,26 @@ export const MANIFEST: Entry[] = [
   db('sf_image_library', { args: sf.ImageLibrary, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
   db('sf_offer_list', { args: sf.None, map: P, rate: 'read', roles: STOREFRONT }),
   db('sf_ad_list', { args: sf.None, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  // Ads with OneLocal coins (founder, 29 Oct 2026): dashboard, a new ad, stopping one, topping up coins; the 9:16 photo or video upload
+  db('ads_home', { args: ads.None, map: P, rate: 'read', roles: STOREFRONT }),
+  db('ads_save', { args: ads.Save, map: P, rate: 'write', idem: true, roles: STOREFRONT }),
+  db('ads_stop', { args: ads.Stop, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_quote', { args: ads.Quote, map: P, rate: 'read', roles: STOREFRONT }),
+  db('ads_accept', { args: ads.Accept, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_fund', { args: ads.Fund, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_pause', { args: ads.Pause, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_change_request', { args: ads.ChangeRequest, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_dispute', { args: ads.Dispute, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_report', { args: ads.Report, map: P, rate: 'read', roles: STOREFRONT }),
+  db('ads_track', { args: ads.Track, map: P, rate: 'write', roles: ANY }),
+  db('adv_app_get', { args: ads.None, map: P, rate: 'read', roles: ANY }),
+  db('adv_app_save', { args: ads.AdvSave, map: P, rate: 'write', roles: ANY }),
+  db('adv_app_submit', { args: ads.AdvSubmit, map: P, rate: 'write', roles: ANY }),
+  db('ads_profile', { args: ads.None, map: P, rate: 'read', roles: STAFF }),
+  db('ads_profile_save', { args: ads.ProfileSave, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_topup', { args: ads.TopUp, map: P, rate: 'write', idem: true, roles: STOREFRONT }),
+  sec('ads_media_slot', { args: ads.MediaAsk, rate: 'secure', roles: STOREFRONT }),
+  sec('ads_media_link', { args: ads.MediaLink, rate: 'secure', roles: STOREFRONT }),
   db('sf_draft_save', { args: sf.DraftSave, map: P, rate: 'write', roles: STOREFRONT }),
   db('sf_draft_discard', { args: sf.DraftDiscard, map: P, rate: 'write', roles: STOREFRONT }),
   db('sf_publish', { args: sf.Publish, map: P, rate: 'write', roles: 'staff with storefront:publish' }),
@@ -381,6 +439,13 @@ export const MANIFEST: Entry[] = [
   //      (read: any active person; save: owner, admin, business manager, manager; bank only owner and admin). Bank numbers are saved by the
   //      existing secure handler partner_setup_save_payment and are never returned.
   db('pos_settings_get', { args: st.Empty, map: P, rate: 'read', roles: STAFF }),
+  db('rr_home', { args: rr.None, map: P, rate: 'read', roles: STAFF }),
+  db('rr_policy_save', { args: rr.PolicySave, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('rr_history', { args: rr.History, map: P, rate: 'read', roles: STAFF }),
+  sec('pos_packed_photo_slot', { args: pk.PhotoAsk, rate: 'secure', roles: STAFF }),
+  sec('pos_packed_photo_link', { args: pk.PhotoLink, rate: 'secure', roles: STAFF }),
+  db('pos_packed_photo_save', { args: pk.PhotoSave, map: P, rate: 'write', roles: STAFF }),
+  db('rr_settings_save', { args: rr.SettingsSave, map: P, rate: 'write', roles: 'owner or manager' }),
   db('pos_settings_save_hours', { args: st.Hours, map: P, rate: 'write', roles: 'owner or manager' }),
   db('pos_settings_save_readiness', { args: st.Readiness, map: P, rate: 'write', roles: 'owner or manager' }),
   db('pos_settings_save_help', { args: st.Help, map: P, rate: 'write', roles: 'owner or manager' }),

@@ -49,6 +49,8 @@ class _AppShellState extends State<AppShell> implements TabShell {
   void initState() {
     super.initState();
     HomeNav.shell = this;
+    // the store's language (Settings → Me & app): every screen shows in it from the start
+    HomeNav.loadLanguage?.call();
   }
 
   @override

@@ -6,6 +6,7 @@ import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'notices_api.dart';
 import 'notices_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Announcement Centre": official news from the platform. Important ones sit in an amber card; the rest below. Read only, plus "mark read".
 class AnnouncementCentre extends StatefulWidget {
@@ -72,7 +73,7 @@ class _AnnouncementCentreState extends State<AnnouncementCentre> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
-            Text('Announcement Centre', style: inter(26, 700)),
+            Text(tr('Announcement Centre'), style: inter(26, 700)),
             const SizedBox(height: 6),
             Text(
               'Official news and updates from OneLocal.',
@@ -101,7 +102,7 @@ class _AnnouncementCentreState extends State<AnnouncementCentre> {
             ],
             if (d.l('latest').isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text('Latest from OneLocal', style: inter(17, 700)),
+              Text(tr('Latest from OneLocal'), style: inter(17, 700)),
               const SizedBox(height: 10),
               for (final a in d.l('latest'))
                 Padding(

@@ -32,7 +32,7 @@ class MenuLinkApi {
 
 /// Plain words for each reason the database gives (guest__public_blockers).
 const menuLinkReasons = {
-  'no_store_link': 'Choose your store link in the page builder (Business Profile).',
+  'no_store_link': 'Choose your store link in Page Manager (Shop profile).',
   'not_published': 'Publish your menu in the OneLocal page builder.',
   'not_approved': 'OneLocal has not approved your business yet.',
   'not_active': 'Your business is not active yet.',

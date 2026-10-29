@@ -9,6 +9,7 @@ import 'feedback_screen.dart';
 import 'notices_api.dart';
 import 'notices_widgets.dart';
 import 'notification_centre.dart';
+import '../ui/i18n.dart';
 
 /// Section N home: "Notification Centre" and "Announcement Centre" tabs (Figma), plus a "Customers" tab for messages and feedback.
 class NoticesHome extends StatefulWidget {
@@ -143,7 +144,7 @@ class _CustomersTabState extends State<_CustomersTab> {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
     children: [
-      Text('Customer communication', style: inter(26, 700)),
+      Text(tr('Customer communication'), style: inter(26, 700)),
       const SizedBox(height: 6),
       Text(
         'Message your customers and answer their feedback. Messages are recorded and queued; nothing is sent from the app.',
@@ -151,7 +152,7 @@ class _CustomersTabState extends State<_CustomersTab> {
       ),
       const SizedBox(height: 16),
       DarkCta(
-        label: 'Message customers',
+        label: tr('Message customers'),
         onPressed: () async {
           await Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => ComposeScreen(api: widget.api)),
@@ -161,13 +162,13 @@ class _CustomersTabState extends State<_CustomersTab> {
       ),
       const SizedBox(height: 10),
       LightCta(
-        label: 'Customer feedback',
+        label: tr('Customer feedback'),
         onPressed: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => FeedbackScreen(api: widget.api)),
         ),
       ),
       const SizedBox(height: 22),
-      Text('Recent messages', style: inter(17, 700)),
+      Text(tr('Recent messages'), style: inter(17, 700)),
       const SizedBox(height: 10),
       if (_error != null)
         OrderCardBox(

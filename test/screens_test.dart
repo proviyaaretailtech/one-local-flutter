@@ -3,8 +3,15 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthApiException;
 import 'package:vinii_pos/auth/partner_api.dart';
+import 'package:vinii_pos/screens/create_password_screen.dart';
+import 'package:vinii_pos/account/account_api.dart' show AccountAuth;
+import 'package:vinii_pos/ui/language_step.dart';
+import 'package:vinii_pos/ui/theme.dart' show StepNav;
+import 'package:vinii_pos/onboarding/checklist_screen.dart' show OnboardingEntry;
+import 'package:vinii_pos/ui/i18n.dart';
 import 'package:vinii_pos/home/control_centre_screen.dart';
 import 'package:vinii_pos/screens/email_login_screen.dart';
 import 'package:vinii_pos/screens/email_verify_pending_screen.dart';
@@ -24,9 +31,13 @@ import 'helpers.dart';
 
 void main() {
   group('Splash', () {
+    setUp(() => SharedPreferences.setMockInitialValues({})); // the language step keeps the choice on the phone
     testWidgets('Sign In opens the chooser', (t) async {
       await show(t, const SplashScreen());
       await t.tap(find.text('Sign In'));
+      await t.pumpAndSettle();
+      expect(find.text('Choose your language'), findsOneWidget); // the language first
+      await t.tap(find.byKey(const ValueKey('language-continue')));
       await t.pumpAndSettle();
       expect(find.text('How would you like to sign in?'), findsOneWidget);
     });
@@ -42,6 +53,9 @@ void main() {
       expect(find.text('Easy Selling starts here'), findsOneWidget, reason: 'the taglines stay on the sign-up page');
       await t.tap(find.text('Sign In'));
       await t.pumpAndSettle();
+      expect(find.text('Choose your language'), findsOneWidget); // the language first
+      await t.tap(find.byKey(const ValueKey('language-continue')));
+      await t.pumpAndSettle();
       expect(find.text('How would you like to sign in?'), findsOneWidget);
     });
 
@@ -51,14 +65,30 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Become a seller'));
       await t.pumpAndSettle();
-      expect(find.text('Create your account.'), findsOneWidget);
+      expect(find.text('Choose your language'), findsOneWidget);
     });
 
-    testWidgets('Become a seller opens registration', (t) async {
+    testWidgets('Become a seller: the language first, then name and mobile; not asked again for the new account', (t) async {
+      addTearDown(() => setAppLanguage('en'));
+      SharedPreferences.setMockInitialValues({});
       await show(t, const SplashScreen());
+      // dark text on the lime button, so it is not washed out
+      expect(t.widget<Text>(find.text('Become a seller')).style?.color, const Color(0xFF0C1F15));
       await t.tap(find.text('Become a seller'));
       await t.pumpAndSettle();
+      expect(find.text('Choose your language'), findsOneWidget);
+      expect(find.text('Create your account.'), findsNothing);
+      // a back button returns to the start
+      await t.tap(find.descendant(of: find.byType(StepNav), matching: find.byType(InkWell)));
+      await t.pumpAndSettle();
+      expect(find.text('Choose your language'), findsNothing);
+      await t.tap(find.text('Become a seller'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('language-continue')));
+      await t.pumpAndSettle();
       expect(find.text('Create your account.'), findsOneWidget);
+      expect(await languageStepNeeded('new-user'), isFalse); // after the code: straight into the application
+      expect(await languageStepNeeded('someone-else'), isTrue);
     });
   });
 
@@ -225,7 +255,7 @@ void main() {
       await show(t, PasswordLoginScreen(auth: a));
       await t.tap(find.text('Sign in'));
       await t.pump();
-      expect(toast('Please enter your account email.'), findsOneWidget);
+      expect(toast('Please enter your account email or mobile number.'), findsOneWidget);
       await t.enterText(find.byType(TextField).at(0), 'a@b.co');
       await t.tap(find.text('Sign in'));
       await t.pump();
@@ -240,6 +270,26 @@ void main() {
       await t.tap(find.text('Sign in'));
       await t.pumpAndSettle();
       expect(a.calls, ['signInWithPassword a@b.co']);
+    });
+    testWidgets('a mobile number works too: +91 added, spaces and a leading 0 or 91 are fine', (t) async {
+      final a = FakeAuth();
+      await show(t, PasswordLoginScreen(auth: a));
+      expect(find.text('Email or mobile number'), findsOneWidget);
+      await t.enterText(find.byType(TextField).at(0), '098765 43210');
+      await t.enterText(find.byType(TextField).at(1), 'secret123');
+      await t.tap(find.text('Sign in'));
+      await t.pumpAndSettle();
+      expect(a.calls, ['signInWithPhonePassword +919876543210']);
+    });
+    testWidgets('neither an email nor a mobile number: said so, nothing sent', (t) async {
+      final a = FakeAuth();
+      await show(t, PasswordLoginScreen(auth: a));
+      await t.enterText(find.byType(TextField).at(0), '12345');
+      await t.enterText(find.byType(TextField).at(1), 'secret123');
+      await t.tap(find.text('Sign in'));
+      await t.pump();
+      expect(toast('Enter your account email, or a 10-digit mobile number.'), findsOneWidget);
+      expect(a.calls, isEmpty);
     });
     testWidgets('wrong password says so', (t) async {
       final a = FakeAuth()..failWith = AuthApiException('Invalid login credentials', statusCode: '400', code: 'invalid_credentials');
@@ -342,12 +392,21 @@ void main() {
       expect(find.text('Resend code in 00:03'), findsOneWidget);
       await t.pump(const Duration(seconds: 4));
     });
-    testWidgets('registering goes on to choose an account type', (t) async {
+    testWidgets('registering: set a password first, then the application', (t) async {
       final a = FakeAuth();
-      await show(t, OtpVerifyScreen(phone: '+919876543210', registering: true, auth: a));
+      await show(t, OtpVerifyScreen(phone: '+919876543210', registering: true, auth: a, name: 'Riya Sharma'));
       await t.enterText(find.byType(TextField), '246801');
       await t.pumpAndSettle();
-      expect(find.text('Welcome to OneLocal.'), findsOneWidget);
+      expect(find.byType(CreatePasswordScreen), findsOneWidget);
+      expect(find.text('Set a password.'), findsOneWidget);
+    });
+    testWidgets('registering without the password step goes straight into the application', (t) async {
+      final a = FakeAuth();
+      await show(t, OtpVerifyScreen(phone: '+919876543210', registering: true, auth: a, name: 'Riya Sharma', passwordStep: false));
+      await t.enterText(find.byType(TextField), '246801');
+      await t.pumpAndSettle();
+      expect(find.byType(OnboardingEntry), findsOneWidget);
+      expect(t.widget<OnboardingEntry>(find.byType(OnboardingEntry)).name, 'Riya Sharma');
     });
     testWidgets('Edit mobile number goes back', (t) async {
       await show(t, Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => OtpVerifyScreen(phone: '+919876543210', auth: FakeAuth()))), child: const Text('go')))));
@@ -497,6 +556,31 @@ void main() {
     });
   });
 
+  group('Set a password after sign-up', () {
+    testWidgets('8+ characters with letters and numbers, typed twice; then the next screen', (t) async {
+      final auth = _PwAuth();
+      await show(t, CreatePasswordScreen(auth: auth, next: const Text('the application')));
+      await t.enterText(find.descendant(of: find.byKey(const ValueKey('new-password')), matching: find.byType(TextField)), 'short');
+      await t.tap(find.byKey(const ValueKey('save-password')));
+      await t.pump();
+      expect(find.text('Use at least 8 characters, with letters and numbers.'), findsOneWidget);
+      t.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar(); // the message goes
+      await t.pump();
+      await t.enterText(find.descendant(of: find.byKey(const ValueKey('new-password')), matching: find.byType(TextField)), 'sharma2026');
+      await t.enterText(find.descendant(of: find.byKey(const ValueKey('confirm-password')), matching: find.byType(TextField)), 'sharma2025');
+      await t.tap(find.byKey(const ValueKey('save-password')));
+      await t.pump();
+      expect(find.text('The two passwords do not match.'), findsOneWidget);
+      t.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar(); // the message goes
+      await t.pump();
+      await t.enterText(find.descendant(of: find.byKey(const ValueKey('confirm-password')), matching: find.byType(TextField)), 'sharma2026');
+      await t.tap(find.byKey(const ValueKey('save-password')));
+      await t.pumpAndSettle();
+      expect(auth.set, ['sharma2026']);
+      expect(find.text('the application'), findsOneWidget);
+    });
+  });
+
   group('Login success', () {
     testWidgets('shows the name and restaurant from the server', (t) async {
       final api = FakeApi(() async => PartnerMe(name: 'Riya Sharma', email: 'riya@sharmastore.in', outlet: 'Sharma Store'));
@@ -505,6 +589,39 @@ void main() {
       expect(find.text('Welcome back, Riya.'), findsOneWidget);
       expect(find.textContaining('Sharma Store'), findsOneWidget);
       expect(find.text('r•••@sharmastore.in'), findsOneWidget);
+    });
+    testWidgets('the language comes first after signing in, on its own screen; then the welcome; asked once per account', (t) async {
+      addTearDown(() => setAppLanguage('en'));
+      SharedPreferences.setMockInitialValues({});
+      final saved = <String>[];
+      final api = FakeApi(() async => PartnerMe(name: 'Riya', email: 'r@x.in', outlet: 'S'));
+      Widget gate() => LanguageGate(userId: 'u1', saveToStore: (c) async => saved.add(c), child: LoginSuccessScreen(api: api, auth: FakeAuth()));
+      await show(t, gate());
+      await t.pumpAndSettle();
+      expect(find.text('Choose your language'), findsOneWidget);
+      expect(find.textContaining('Welcome back'), findsNothing); // not yet
+      for (final c in ['en', 'hi', 'hi-en']) {
+        expect(find.byKey(ValueKey('login-language-$c')), findsOneWidget);
+      }
+      await t.tap(find.byKey(const ValueKey('login-language-hi')));
+      await t.pumpAndSettle();
+      expect(find.text('अपनी भाषा चुनें'), findsOneWidget); // switches at once
+      await t.tap(find.byKey(const ValueKey('language-continue')));
+      await t.pumpAndSettle();
+      expect(saved, ['hi']);
+      expect(find.byKey(const ValueKey('language-step')), findsNothing);
+      // signing in again on this phone: straight to the welcome
+      await t.pumpWidget(const SizedBox());
+      await show(t, gate());
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('language-step')), findsNothing);
+    });
+    testWidgets('no name on record: just "Welcome back."', (t) async {
+      final api = FakeApi(() async => PartnerMe(name: '', email: 'a@x.in', outlet: 'ABC General Store'));
+      await show(t, LoginSuccessScreen(api: api, auth: FakeAuth()));
+      await t.pumpAndSettle();
+      expect(find.text('Welcome back.'), findsOneWidget);
+      expect(find.textContaining('there'), findsNothing);
     });
     testWidgets('Continue to store opens the control centre', (t) async {
       final api = FakeApi(() async => PartnerMe(name: 'Riya', email: 'r@x.in', outlet: ''));
@@ -548,4 +665,12 @@ void main() {
       expect(find.text('Welcome back, Riya.'), findsOneWidget);
     });
   });
+}
+
+class _PwAuth implements AccountAuth {
+  final set = <String>[];
+  @override
+  Future<void> setPassword(String password, {String? nonce}) async => set.add(password);
+  @override
+  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }

@@ -42,6 +42,12 @@ class FakeAuth extends AuthRepository {
   }
 
   @override
+  Future<AuthResponse> signInWithPhonePassword(String e164, String password) async {
+    await _do('signInWithPhonePassword $e164');
+    return AuthResponse();
+  }
+
+  @override
   Future<void> sendPasswordReset(String email) => _do('sendPasswordReset $email');
   @override
   Future<void> registerWithPhone({required String e164, required String fullName, required String email}) =>

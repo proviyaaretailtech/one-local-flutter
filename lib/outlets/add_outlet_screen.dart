@@ -6,8 +6,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../auth/partner_api.dart';
 import '../ui/mobile_input.dart';
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
-import 'outlet_header.dart' show kOutletOnline, kOutletSquare;
+import 'outlet_header.dart' show kOutletOnline;
 import 'outlets_api.dart';
 
 /// Reads the phone's position for the map pin. Tests replace it.
@@ -423,31 +424,19 @@ class _AddOutletScreenState extends State<AddOutletScreen> {
       backgroundColor: kBg,
       body: SafeArea(
         child: Column(children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-            child: Row(children: [
-              Semantics(
-                button: true,
-                label: 'Back',
-                child: InkWell(
-                  key: const ValueKey('outlet-form-back'),
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: _busy ? null : _back,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(color: kOutletSquare, borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(LucideIcons.arrowLeft, size: 20, color: kInk),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
+          AppHeader(
+            title: 'Add ${outletNoun()}',
+            safeTop: false,
+            back: true,
+            backKey: const ValueKey('outlet-form-back'),
+            onBack: () {
+              if (!_busy) _back();
+            },
+            under: Row(children: [
               Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Add ${outletNoun()}', style: inter(18, 700)),
-                  if (s != null) Text('Step ${i + 1} of ${_steps.length} · ${_stepTitles[_step]}', key: const ValueKey('outlet-step'), style: inter(12.5, 500, color: kMuted)),
-                ]),
+                child: s == null
+                    ? const SizedBox.shrink()
+                    : Text('Step ${i + 1} of ${_steps.length} · ${_stepTitles[_step]}', key: const ValueKey('outlet-step'), style: inter(12.5, 500, color: kMuted)),
               ),
               if (_draft != null)
                 TextButton(key: const ValueKey('outlet-start-over'), onPressed: _busy ? null : _startOver, child: Text('Start over', style: inter(13, 600, color: kMuted))),

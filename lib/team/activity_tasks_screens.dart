@@ -8,6 +8,7 @@ import '../ui/theme.dart';
 import 'team_api.dart';
 import 'team_screens.dart' show TeamLoader;
 import 'team_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Staff Activity": who did what, newest first. Read only.
 class ActivityScreen extends StatefulWidget {
@@ -52,8 +53,8 @@ class _ActivityState extends State<ActivityScreen>
   @override
   Widget build(BuildContext context) => TeamPage(
     env: env,
-    title: 'Staff activity',
-    subtitle: 'Recent changes across your team',
+    title: tr('Staff activity'),
+    subtitle: tr('Recent changes across your team'),
     onRefresh: load,
     children: [
       Padding(
@@ -251,8 +252,8 @@ class _TasksState extends State<TasksScreen>
     final c = data?.m('counts');
     return TeamPage(
       env: env,
-      title: 'Staff tasks',
-      subtitle: 'Assign, track, and verify team work',
+      title: tr('Staff tasks'),
+      subtitle: tr('Assign, track, and verify team work'),
       onRefresh: load,
       bottom: data != null && data!.b('can_create')
           ? LimeButton(
@@ -431,7 +432,7 @@ class _TaskDetailState extends State<TaskDetailScreen>
             const SizedBox(height: 12),
             TeamField(label: hint, controller: c, action: TextInputAction.done),
             DarkCta(
-              label: 'Continue',
+              label: tr('Continue'),
               onPressed: () {
                 if (required && c.text.trim().isEmpty) return;
                 Navigator.of(ctx).pop(c.text.trim());
@@ -500,8 +501,8 @@ class _TaskDetailState extends State<TaskDetailScreen>
   @override
   Widget build(BuildContext context) => TeamPage(
     env: env,
-    title: 'Task',
-    subtitle: 'Details and history',
+    title: tr('Task'),
+    subtitle: tr('Details and history'),
     onRefresh: load,
     children: [
       TeamLoad<Facts>(data: data, error: error, onRetry: load, builder: _body),
@@ -640,7 +641,7 @@ class _TaskDetailState extends State<TaskDetailScreen>
         ),
       ],
       const SizedBox(height: 18),
-      Text('History', style: inter(17, 600)),
+      Text(tr('History'), style: inter(17, 600)),
       const SizedBox(height: 10),
       for (final e in t.l('events'))
         Padding(
@@ -798,7 +799,7 @@ class _TaskFormState extends State<TaskFormScreen> {
   Widget build(BuildContext context) => TeamPage(
     env: env,
     title: widget.task == null ? 'Create task' : 'Edit task',
-    subtitle: 'Say what needs doing and who does it',
+    subtitle: tr('Say what needs doing and who does it'),
     bottom: LimeButton(
       widget.task == null ? 'Create task' : 'Save task',
       busy: _busy,
@@ -807,20 +808,20 @@ class _TaskFormState extends State<TaskFormScreen> {
     children: [
       if (_error != null)
         TeamBanner(
-          title: 'Task couldn\'t be saved',
+          title: tr('Task couldn\'t be saved'),
           body: _error!,
           onClose: () => setState(() => _error = null),
         ),
-      TeamField(label: 'Task', controller: _title, hint: 'What needs doing'),
-      TeamField(label: 'Details (optional)', controller: _desc),
+      TeamField(label: tr('Task'), controller: _title, hint: tr('What needs doing')),
+      TeamField(label: tr('Details (optional)'), controller: _desc),
       TeamSelect(
-        label: 'Assign to',
+        label: tr('Assign to'),
         value: _staffName,
         placeholder: 'Choose a person',
         onTap: _pickStaff,
       ),
       TeamSelect(
-        label: 'Due',
+        label: tr('Due'),
         value: _due == null
             ? null
             : '${_due!.day.toString().padLeft(2, '0')}/${_due!.month.toString().padLeft(2, '0')} · ${clock12(_due!)}',
@@ -839,7 +840,7 @@ class _TaskFormState extends State<TaskFormScreen> {
       SwitchListTile(
         value: _approval,
         onChanged: (v) => setState(() => _approval = v),
-        title: Text('A manager approves it when done', style: inter(14.5, 500)),
+        title: Text(tr('A manager approves it when done'), style: inter(14.5, 500)),
         activeTrackColor: kGreenDeep,
         contentPadding: EdgeInsets.zero,
       ),

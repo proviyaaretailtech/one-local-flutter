@@ -68,6 +68,18 @@ class CatalogueApi {
         if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
       }));
 
+  /// The supplier's bill for a delivery: its number and date, and one line per product (quantity and unit price before GST).
+  Future<GrnView> grnInvoiceSave(String receiptId, {required String supplier, required String invoiceNo, required DateTime date, String poRef = '',
+          required List<({String? itemId, String name, num qty, int unitPriceMinor})> lines}) async =>
+      GrnView(await _call('grn_invoice_save', {
+        ..._r(receiptId),
+        'supplier_name': supplier.trim(),
+        'invoice_no': invoiceNo.trim(),
+        'invoice_date': '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+        if (poRef.isNotEmpty) 'po_ref': poRef,
+        'lines': [for (final l in lines) {'inventory_item_id': ?l.itemId, 'product_name': l.name, 'qty': l.qty, 'unit_price_minor': l.unitPriceMinor}],
+      }));
+
   Future<GrnView> grnRequestApproval(String receiptId, {required int version}) async =>
       GrnView(await _call('grn_request_approval', {..._r(receiptId), 'version': version}));
 
@@ -164,6 +176,13 @@ class GrnRow {
   int get claimMinor => (raw['claim_minor'] as num?)?.toInt() ?? 0;
   int get acceptedValueMinor => (raw['accepted_value_minor'] as num?)?.toInt() ?? 0;
   String get name => (invoice?['name'] ?? received?['name'] ?? '').toString();
+  String get itemId => (raw['item_id'] ?? name).toString();
+
+  /// The GST rate on this line: the purchase order's, else the product's catalogue rate (0 when neither says).
+  num get gstPct => (raw['gst_pct'] as num?) ?? 0;
+
+  /// What one unit should cost before the bill is in: the purchase order's price, else the product's cost.
+  num? get refUnitMinor => raw['ref_unit_minor'] as num?;
 }
 
 class GrnMatching {

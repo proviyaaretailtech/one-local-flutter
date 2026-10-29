@@ -10,6 +10,7 @@ import '../ui/theme.dart';
 import 'sell_api.dart';
 import 'sell_env.dart';
 import 'sell_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma "Invoices & Receipts": the bills of a date range with search and status, several can be ticked and downloaded together.
 /// Sales only: purchase invoices come from goods receiving (a later section). "Download" puts the receipt text on the clipboard;
@@ -71,7 +72,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
   }
 
   Future<void> _pickStatus() async {
-    final s = await showOrderSheet<String>(context, title: 'Status', body: (ctx) => Column(mainAxisSize: MainAxisSize.min, children: [for (final (id, l) in _statuses) ListTile(contentPadding: EdgeInsets.zero, title: Text(l, style: inter(15, id == _status ? 800 : 500)), onTap: () => Navigator.pop(ctx, id))]));
+    final s = await showOrderSheet<String>(context, title: tr('Status'), body: (ctx) => Column(mainAxisSize: MainAxisSize.min, children: [for (final (id, l) in _statuses) ListTile(contentPadding: EdgeInsets.zero, title: Text(l, style: inter(15, id == _status ? 800 : 500)), onTap: () => Navigator.pop(ctx, id))]));
     if (s != null) {
       _status = s;
       _load();
@@ -90,7 +91,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(title: 'Invoices & receipts', initials: env.initials),
+        SellTopBar(title: tr('Invoices & receipts'), initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), children: [
             SellTitle('Invoices & Receipts', sub: env.storeLine),
@@ -108,10 +109,10 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
               Expanded(child: _drop(_statuses.firstWhere((s) => s.$1 == _status).$2, _pickStatus)),
             ]),
             const SizedBox(height: 12),
-            if (_error != null) StateCard(icon: LucideIcons.database, danger: true, title: 'Receipts could not load', body: _error!, primary: 'Retry', onPrimary: _load),
+            if (_error != null) StateCard(icon: LucideIcons.database, danger: true, title: tr('Receipts could not load'), body: _error!, primary: 'Retry', onPrimary: _load),
             if (_error == null && _rows == null) const SkeletonRows(),
             if (_kind == 'purchases') const StateCard(icon: LucideIcons.truck, title: 'No purchase invoices here yet', body: 'Supplier invoices come from goods receiving, which is a later part of the app.'),
-            if (_error == null && _rows != null && _kind != 'purchases' && rows.isEmpty) const StateCard(icon: LucideIcons.receiptText, title: 'No records', body: 'No bills match these filters.'),
+            if (_error == null && _rows != null && _kind != 'purchases' && rows.isEmpty) StateCard(icon: LucideIcons.receiptText, title: tr('No records'), body: tr('No bills match these filters.')),
             for (final r in rows) ...[_card(r), const SizedBox(height: 10)],
           ]),
         ),
@@ -162,7 +163,7 @@ class _ReceiptsScreenState extends State<ReceiptsScreen> {
         Row(children: [
           DotChip(r.statusLabel, bg: warn ? kWarnBg : kChipGreen, fg: warn ? kWarnText : kGreenText),
           const Spacer(),
-          InkWell(onTap: () => _download([r]), child: Row(children: [Text('Download', style: inter(15, 700)), const SizedBox(width: 6), const Icon(LucideIcons.download, size: 18)])),
+          InkWell(onTap: () => _download([r]), child: Row(children: [Text(tr('Download'), style: inter(15, 700)), const SizedBox(width: 6), const Icon(LucideIcons.download, size: 18)])),
         ]),
       ]),
     );

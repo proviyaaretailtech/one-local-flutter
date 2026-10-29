@@ -5,6 +5,7 @@ import '../ui/theme.dart';
 import 'money_api.dart';
 import 'money_env.dart';
 import 'money_widgets.dart';
+import '../ui/i18n.dart';
 
 // Settlements, Settlement Detail, Payouts, Reports: what the platform owes and has paid the business. Whole-business roles only (settlements:read, payouts:read).
 // Figma frames "Money – Settlements", "Settlement Detail", "Money – Payouts", "Money – Reports".
@@ -37,7 +38,7 @@ class SettlementsScreen extends StatelessWidget {
   Widget build(BuildContext context) => MoneyScreen(
         env: env,
         screen: 'settlements',
-        title: 'Settlements',
+        title: tr('Settlements'),
         defaults: const {'status': 'all'},
         load: env.api.settlements,
         body: (c, d) {
@@ -79,7 +80,7 @@ class SettlementDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) => MoneyScreen(
         env: env,
         screen: 'settlements',
-        title: 'Settlement Detail',
+        title: tr('Settlement Detail'),
         switcher: false,
         load: (_) => env.api.settlement(id),
         body: (c, d) {
@@ -97,7 +98,7 @@ class SettlementDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(color: const Color(0xFFEBFAE0), borderRadius: BorderRadius.circular(22)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Net payable amount', style: inter(15, 600, color: kPostedText)),
+                Text(tr('Net payable amount'), style: inter(15, 600, color: kPostedText)),
                 const SizedBox(height: 6),
                 Text(money(d.no('net_minor'), whole: true), style: inter(34, 700)),
                 const SizedBox(height: 4),
@@ -107,7 +108,7 @@ class SettlementDetailScreen extends StatelessWidget {
             const SizedBox(height: 12),
             InvCard(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('SETTLEMENT BREAKDOWN', style: inter(11.5, 700, color: kMuted)),
+                Text(tr('SETTLEMENT BREAKDOWN'), style: inter(11.5, 700, color: kMuted)),
                 const SizedBox(height: 6),
                 for (final b in d.l('breakdown'))
                   b.s('kind') == 'total'
@@ -127,7 +128,7 @@ class SettlementDetailScreen extends StatelessWidget {
             if (pay != null)
               InvCard(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Payout details', style: inter(15.5, 700)),
+                  Text(tr('Payout details'), style: inter(15.5, 700)),
                   const SizedBox(height: 8),
                   _kv('Status', statusLook(pay.so('status') ?? 'pending').$1),
                   if (pay.so('paid_on') != null) _kv('Payout date', dayMonth(pay.so('paid_on'), year: true)),
@@ -138,9 +139,9 @@ class SettlementDetailScreen extends StatelessWidget {
               ),
             InvCard(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Order / transaction breakdown', style: inter(15.5, 700)),
+                Text(tr('Order / transaction breakdown'), style: inter(15.5, 700)),
                 const SizedBox(height: 8),
-                if (lines.isEmpty) Text('No orders in this settlement.', style: inter(13, 400, color: kMuted)),
+                if (lines.isEmpty) Text(tr('No orders in this settlement.'), style: inter(13, 400, color: kMuted)),
                 for (final l in lines)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
@@ -175,7 +176,7 @@ class PayoutsScreen extends StatelessWidget {
   Widget build(BuildContext context) => MoneyScreen(
         env: env,
         screen: 'payouts',
-        title: 'Payouts',
+        title: tr('Payouts'),
         defaults: const {'recipient': 'all', 'status': 'all'},
         load: env.api.payouts,
         body: (c, d) {
@@ -217,7 +218,7 @@ class ReportsScreen extends StatelessWidget {
   Widget build(BuildContext context) => MoneyScreen(
         env: env,
         screen: 'reports',
-        title: 'Reports',
+        title: tr('Reports'),
         defaults: const {'period': 'week'},
         load: env.api.reports,
         body: (c, d) {

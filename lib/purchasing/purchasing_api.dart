@@ -36,7 +36,7 @@ class PurchasingApi {
     }
   }
 
-  /// Suppliers, stock items, known supplier prices and the open order count: what "Restaurant Purchase" picks from.
+  /// Suppliers, stock items, known supplier prices and the open order count: what a new purchase order picks from.
   Future<Facts> options() async => Facts(await _call('pur_options', {}));
 
   /// Purchase History: [status] all / open / pending / received, [due] all / open / overdue.
@@ -46,7 +46,7 @@ class PurchasingApi {
   Future<PurchaseOrder> order(String id) async => PurchaseOrder(await _call('pur_po_view', {'id': id}));
 
   /// [lines]: `{inventory_item_id, qty, unit_cost_minor, gst_pct}`.
-  /// [submit] true makes it Pending (awaiting approval); otherwise a Draft. Nothing is committed to the supplier until someone approves it.
+  /// The order is live at once (founder, 28 Oct 2026: one step, no approval); [submit] is kept for older servers.
   Future<PurchaseOrder> create({required String supplierId, required List<Map<String, Object?>> lines, String? notes, String? expectedDelivery, bool submit = true, required String key}) async =>
       PurchaseOrder(await _call('pur_po_create', {'supplier_id': supplierId, 'lines': lines, 'notes': notes, 'expected_delivery': expectedDelivery, 'submit': submit}, key: key));
 
@@ -59,6 +59,28 @@ class PurchasingApi {
   /// Starts (or reopens) the receipt draft for an order. The answer names the receipt document ([Facts.s] `document_id`); section H's receiving screen takes it from there.
   Future<Facts> receive(String poId, {String? key}) async => Facts(await _call('pur_po_receive', {'id': poId}, key: key ?? newKey()));
 
+  // ---- one-step purchase (founder, 28 Oct 2026): Generate PO, Received, the bill, past purchases
+
+  /// Orders not received or cancelled yet, oldest first, each with days_waiting and its lines' MRP (mrp_minor).
+  Future<List<PurchaseOrder>> openOrders() async => Facts(await _call('pur_po_open', {})).l('orders').map((f) => PurchaseOrder(f.raw)).toList();
+
+  /// An item by name, code or barcode, with its MRP and price: the extra line on Received.
+  Future<List<Facts>> findItems(String q) async => Facts(await _call('pur_item_find', {'q': q.trim()})).l('items');
+
+  /// Received, in one step: [lines] {inventory_item_id, qty, mrp, cost, ordered_qty}, money in rupees. Stock goes up, the MRP and price are saved on the
+  /// items, the order ([poId]) is closed, and the bill is started. Without an order, [supplierName] says who it came from.
+  Future<Facts> receivePost({String? poId, String? supplierName, String? invoiceNo, String? replaces, required List<Map<String, Object?>> lines, required String key}) async =>
+      Facts(await _call('pur_receive_post', {'po_id': poId, 'supplier_name': supplierName, if (invoiceNo != null && invoiceNo.isNotEmpty) 'invoice_no': invoiceNo, if (replaces != null) 'replaces_receipt_id': replaces, 'lines': lines}, key: key));
+
+  /// A received delivery (receipt) and its bill (bill).
+  Future<Facts> bill(String receiptId) async => Facts(await _call('pur_bill_get', {'receipt_document_id': receiptId}));
+
+  Future<Facts> saveBill(Map<String, Object?> body) async => Facts(await _call('pur_bill_save', body));
+
+  /// Past purchases: [from] / [to] as yyyy-mm-dd, [sort] newest | oldest | amount.
+  Future<List<Facts>> history({String? from, String? to, String q = '', String sort = 'newest'}) async =>
+      Facts(await _call('pur_history', {'from': from, 'to': to, 'q': q.trim().isEmpty ? null : q.trim(), 'sort': sort})).l('purchases');
+
   Future<Facts> price(String priceId) async => Facts(await _call('pur_price_view', {'price_id': priceId}));
 
   /// Makes the supplier of [priceId] the preferred one for its ingredient (the database logs who, when, before and after).
@@ -67,6 +89,13 @@ class PurchasingApi {
 
   /// This business's suppliers with their contact details (`suppliers`: id, name, phone, gstin, city, contact_person, payment_terms).
   Future<List<Facts>> suppliers() async => Facts(await _call('pur_supplier_list', {})).l('suppliers');
+
+  /// An item's usual supplier and its buying price (Quick Add): New order then suggests them.
+  Future<Facts> setItemSupplier(String inventoryItemId, String supplierId, {int? priceMinor, String? key}) async => Facts(await _call('pur_item_supplier_set', {
+        'inventory_item_id': inventoryItemId,
+        'supplier_id': supplierId,
+        'price_minor': ?priceMinor,
+      }, key: key ?? newKey()));
 
   /// Adds a supplier ([id] null) or changes one. Only [name] is required; the database checks phone, GSTIN and duplicates.
   Future<Facts> saveSupplier({String? id, required String name, String? phone, String? gstin, String? city, String? key}) async => Facts(await _call('pur_supplier_save', {

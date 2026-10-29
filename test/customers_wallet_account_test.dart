@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:vinii_pos/settings/settings_api.dart';
 import 'package:vinii_pos/account/account_api.dart';
 import 'package:vinii_pos/account/account_screen.dart';
 import 'package:vinii_pos/account/wallet_api.dart';
@@ -39,6 +40,7 @@ class FakeRpc {
   late final customers = CustomersApi(baseUrl: 'http://pos.test', accessToken: () => 't', client: client);
   late final wallet = WalletApi(baseUrl: 'http://pos.test', accessToken: () => 't', client: client);
   late final account = AccountApi(baseUrl: 'http://pos.test', accessToken: () => 't', client: client);
+  late final settings = SettingsApi(baseUrl: 'http://pos.test', accessToken: () => 't', client: client);
   Iterable<Map<String, dynamic>> bodies(String fn) => calls.where((c) => c.$1 == fn).map((c) => c.$2);
 }
 
@@ -83,6 +85,17 @@ class FakeAccountAuth implements AccountAuth {
   Future<void> confirmPhone(String e164, String code) async => calls.add('confirm $e164 $code');
   @override
   Future<void> signOutEverywhere() async => calls.add('signOutEverywhere');
+
+  /// When true, the first password change is answered "send a code first", like Supabase's secure password change.
+  bool wantsCode = false;
+  @override
+  Future<void> setPassword(String password, {String? nonce}) async {
+    if (wantsCode && nonce == null) throw const PasswordNeedsCode();
+    calls.add('password $password${nonce == null ? '' : ' $nonce'}');
+  }
+
+  @override
+  Future<void> reauthenticate() async => calls.add('reauthenticate');
 }
 
 Map<String, dynamic> wallet({bool owed = false, bool legacy = false}) => {
@@ -271,13 +284,63 @@ void main() {
       expect(find.text('₹700'), findsOneWidget);
       expect(find.text('₹500'), findsOneWidget);
       expect(find.text('1 order · commission ₹120'), findsOneWidget);
-      expect(find.textContaining('Paid · UTR511'), findsOneWidget);
+      expect(find.text('₹1,700'), findsOneWidget); // available: not yet settled + on the way
       expect(find.byKey(const ValueKey('wallet-owed')), findsNothing);
+      // Settlements first; the payout is under Withdrawals, and both are in the Ledger
+      expect(find.textContaining('Paid · UTR511'), findsNothing);
+      await t.ensureVisible(find.byKey(const ValueKey('wallet-tab-withdrawals')));
+      await t.tap(find.byKey(const ValueKey('wallet-tab-withdrawals')));
+      await t.pumpAndSettle();
+      expect(find.textContaining('Paid · UTR511'), findsOneWidget);
+      expect(find.text('Settlement 05 Oct – 11 Oct 2026'), findsNothing);
+      await t.ensureVisible(find.byKey(const ValueKey('wallet-tab-ledger')));
+      await t.tap(find.byKey(const ValueKey('wallet-tab-ledger')));
+      await t.pumpAndSettle();
+      expect(find.text('credit'), findsOneWidget);
+      expect(find.text('debit'), findsOneWidget);
+      await t.ensureVisible(find.byKey(const ValueKey('wallet-tab-settlements')));
+      await t.tap(find.byKey(const ValueKey('wallet-tab-settlements')));
+      await t.pumpAndSettle();
       await t.tap(find.text('Settlement 05 Oct – 11 Oct 2026'));
       await t.pumpAndSettle();
       expect(s.bodies('wallet_settlement_view').single, {'id': 's2'});
       expect(find.text('OL-5111'), findsOneWidget);
       expect(find.text('₹782'), findsWidgets);
+    });
+
+    testWidgets('Request withdrawal asks the One Local team for an early payout of what is available', (t) async {
+      final s = FakeRpc((fn, b) => switch (fn) {
+            'wallet_overview' => ok(wallet()),
+            'pos_support_create' => ok({'reference': 'SR-0042'}),
+            _ => err(404, 'nope'),
+          });
+      await show(t, WalletScreen(api: s.wallet, settings: s.settings));
+      await t.tap(find.byKey(const ValueKey('wallet-withdraw')));
+      await t.pumpAndSettle();
+      expect(find.text('Available: ₹1,700'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('wallet-withdraw-note')), 'Need it for rent');
+      await t.tap(find.byKey(const ValueKey('wallet-withdraw-send')));
+      await t.pumpAndSettle();
+      final b = s.bodies('pos_support_create').single;
+      expect(b['topic'], 'account');
+      expect(b['message'], allOf(contains('₹1,700'), contains('Satya Stores'), contains('Need it for rent')));
+      expect(find.textContaining('SR-0042'), findsOneWidget);
+    });
+
+    testWidgets('the store name shows in full when it fits, as initials when it does not (on a phone)', (t) async {
+      t.view.physicalSize = const Size(390 * 2, 844 * 2);
+      t.view.devicePixelRatio = 2;
+      addTearDown(t.view.reset);
+      var name = 'Sharma General Store';
+      final s = FakeRpc((fn, b) => ok({...wallet(), 'business': name}));
+      await t.pumpWidget(MaterialApp(theme: posTheme(), home: WalletScreen(api: s.wallet)));
+      await t.pumpAndSettle();
+      expect(t.widget<Text>(find.byKey(const ValueKey('wallet-business'))).data, 'Sharma General Store');
+      name = 'Sharma General Store Wholesale and Retail Supermarket Mart';
+      await t.pumpWidget(const SizedBox());
+      await t.pumpWidget(MaterialApp(theme: posTheme(), home: WalletScreen(api: s.wallet)));
+      await t.pumpAndSettle();
+      expect(t.widget<Text>(find.byKey(const ValueKey('wallet-business'))).data, 'SGSWRSM');
     });
 
     testWidgets('debt to One Local and a settlement without a transfer record are said plainly', (t) async {
@@ -351,6 +414,54 @@ void main() {
       await t.tap(find.byKey(const ValueKey('acct-ask-ok')));
       await t.pumpAndSettle();
       expect(auth.calls, ['email new@example.com']);
+    });
+
+    testWidgets('no password yet: Set a password (checked here: 8+ characters, letters and numbers, typed twice the same)', (t) async {
+      final auth = FakeAccountAuth();
+      final noPassword = acct()..['sign_in_methods'] = [{'method': 'password', 'label': 'Email and password', 'enabled': false}];
+      final s = FakeRpc((fn, b) => fn == 'acct_get' ? ok(noPassword) : ok({}));
+      await show(t, ManageAccountScreen(api: s.account, auth: auth));
+      expect(find.text('Set'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('acct-password')));
+      await t.pumpAndSettle();
+      expect(find.text('Set a password'), findsOneWidget);
+      Future<void> tryPassword(String a, String b) async {
+        await t.enterText(find.byKey(const ValueKey('acct-password-new')), a);
+        await t.enterText(find.byKey(const ValueKey('acct-password-again')), b);
+        await t.tap(find.byKey(const ValueKey('acct-password-save')));
+        await t.pumpAndSettle();
+      }
+
+      await tryPassword('short1', 'short1');
+      expect(find.text('Use at least 8 characters.'), findsOneWidget);
+      await tryPassword('onlyletters', 'onlyletters');
+      expect(find.text('Use letters and numbers.'), findsOneWidget);
+      await tryPassword('Sharma2026', 'Sharma2025');
+      expect(find.text('The two passwords are not the same.'), findsOneWidget);
+      expect(auth.calls, isEmpty);
+      await tryPassword('Sharma2026', 'Sharma2026');
+      expect(auth.calls, ['password Sharma2026']);
+      expect(find.text('Password set. You can now sign in with priya@example.com or +919876500512 and this password.'), findsOneWidget);
+    });
+
+    testWidgets('a password: Change; when the server wants proof, a code goes to the email and is asked for', (t) async {
+      final auth = FakeAccountAuth()..wantsCode = true;
+      final s = FakeRpc((fn, b) => fn == 'acct_get' ? ok(acct()) : ok({}));
+      await show(t, ManageAccountScreen(api: s.account, auth: auth));
+      await t.tap(find.byKey(const ValueKey('acct-password')));
+      await t.pumpAndSettle();
+      expect(find.text('Change password'), findsWidgets);
+      await t.enterText(find.byKey(const ValueKey('acct-password-new')), 'NewPass99');
+      await t.enterText(find.byKey(const ValueKey('acct-password-again')), 'NewPass99');
+      await t.tap(find.byKey(const ValueKey('acct-password-save')));
+      await t.pumpAndSettle();
+      expect(auth.calls, ['reauthenticate']);
+      expect(find.text('Code sent to priya@example.com'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('acct-ask')), '123456');
+      await t.tap(find.byKey(const ValueKey('acct-ask-ok')));
+      await t.pumpAndSettle();
+      expect(auth.calls, ['reauthenticate', 'password NewPass99 123456']);
+      expect(find.text('Password changed.'), findsOneWidget);
     });
 
     testWidgets('sign out of all devices: confirm, record, revoke, leave', (t) async {

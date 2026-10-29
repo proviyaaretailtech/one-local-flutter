@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../ui/app_header.dart';
 import '../ui/theme.dart';
+import '../ui/i18n.dart';
 
 /// Figma header of the Orders tab: menu button, outlet name, One Local status (Online / Offline), initials.
 /// Kept on its own on purpose: the shared outlet header (outlets-multi) replaces this widget; it only needs the same four inputs.
@@ -23,7 +24,7 @@ class OrdersOutletHeader extends StatelessWidget {
     final on = accepting == true;
     // The shared banner: back, the outlet's name over "Orders", its One Local status, bell, ☰.
     return AppHeader(
-      title: 'Orders',
+      title: tr('Orders'),
       kicker: name.isEmpty ? null : name,
       onMenu: onMenu,
       subtitle: accepting == null

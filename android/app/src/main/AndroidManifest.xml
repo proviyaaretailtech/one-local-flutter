@@ -2,8 +2,12 @@
         <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <!-- product photos: the camera, and the latest gallery photo shown in the camera's corner -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <application
-        android:label="vinii_pos"
+        android:label="OneLocal Partner"
         android:name="${applicationName}"
         android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher">
@@ -34,6 +38,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Google Play fetches the on-phone background remover when the app is installed, so the first cut-out does not wait -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="subject_segment" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -44,6 +52,31 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Money: pay a contact through a UPI app -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="upi"/>
+        </intent>
+        <!-- Money: pay a contact through a UPI app -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="tez"/>
+        </intent>
+        <!-- Money: pay a contact through a UPI app -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="phonepe"/>
+        </intent>
+        <!-- Money: receipts by SMS -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="sms"/>
+        </intent>
+        <!-- Money: WhatsApp receipts (wa.me) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>

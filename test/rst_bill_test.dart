@@ -459,8 +459,8 @@ void main() {
       await tapKey(t, 'receipt-whatsapp');
       await tapKey(t, 'receipt-send');
       expect(argsOf(s.calls('rst_receipt_log').single), {'order_id': o1, 'channel': 'whatsapp', 'to': '9876543210'});
-      expect(s.opened.single.host, 'wa.me');
-      expect(s.opened.single.path, '/919876543210');
+      expect(s.opened.single.host, 'api.whatsapp.com');
+      expect(s.opened.single.queryParameters['phone'], '919876543210');
       expect(s.opened.single.queryParameters['text'], contains('Receipt R5501'));
     });
 

@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
 import '../ui/app_tab_bar.dart';
+import '../ui/i18n.dart';
 import '../ui/app_header.dart';
 import '../ui/theme.dart';
 import '../ui/mobile_input.dart';
@@ -90,7 +91,7 @@ String stamp(DateTime d) => '${dayMonth(d, year: true)}, ${hm(d)}';
 /// Document status chip ("• Draft", "• Unposted", "• Review", "• Posted").
 (String, Color, Color) docLook(String type, String s) => switch (s) {
       'draft' => (type == 'receipt' ? 'Unposted' : 'Draft', kGreyBg, kMuted),
-      'review' => (type == 'receipt' ? 'Purchase review' : 'Review', kGreyBg, kMuted),
+      'review' => (type == 'receipt' ? 'To check' : 'Review', kGreyBg, kMuted),
       'awaiting_approval' => ('Awaiting approval', kAmberBgH, kAmberText),
       'in_transit' => ('In transit', kBlueIconBg, kBlueIcon),
       'posted' => (type == 'receipt' ? 'Completed' : 'Posted', kMintBg, kPostedText),
@@ -112,7 +113,7 @@ class InvTopBar extends StatelessWidget {
         onBell: onBell,
         trailing: Semantics(
           button: true,
-          label: 'Items',
+          label: tr('Items'),
           excludeSemantics: true,
           child: IconButton(onPressed: onItems, icon: const Icon(LucideIcons.camera, size: 22, color: kInk)),
         ),
@@ -159,7 +160,7 @@ class InvPage extends StatelessWidget {
       backgroundColor: kBg,
       body: Column(children: [
         // the outlet header (specs/outlets-multi) replaces InvTopBar on every section H screen
-        OutletHeader(title: 'Stock', onMenu: onMenu),   // ☰: the screen's menu, else the side menu (AppHeader)
+        OutletHeader(title: tr('Stock'), onMenu: onMenu),   // ☰: the screen's menu, else the side menu (AppHeader)
         Expanded(child: list),
       ]),
       bottomNavigationBar: InvBottomNav(onTap: onTab),
@@ -270,7 +271,7 @@ class InvDotChip extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Container(width: 6, height: 6, decoration: BoxDecoration(color: fg, shape: BoxShape.circle)),
           const SizedBox(width: 7),
-          Text(label, style: inter(12.5, 600, color: fg)),
+          Text(tr(label), style: inter(12.5, 600, color: fg)),
         ]),
       );
 }
@@ -303,7 +304,7 @@ class InvStatTile extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(big ? 27 : 23, 700, color: color)),
           const SizedBox(height: 4),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12.5, 400, color: kMuted)),
+          Text(tr(label), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12.5, 400, color: kMuted)),
         ]),
       );
 }
@@ -377,7 +378,7 @@ class InvChips extends StatelessWidget {
                 border: Border.all(color: id == active ? kLimeH : kLine),
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(label, style: inter(13, id == active ? 700 : 500)),
+                Text(tr(label), style: inter(13, id == active ? 700 : 500)),
                 if (count != null) ...[
                   const SizedBox(width: 6),
                   Container(
@@ -421,7 +422,7 @@ class InvPrimary extends StatelessWidget {
                 alignment: Alignment.center,
                 child: busy
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: kLimeH))
-                    : Text(label, textAlign: TextAlign.center, style: inter(16, 600, color: kLimeH)),
+                    : Text(tr(label), textAlign: TextAlign.center, style: inter(16, 600, color: kLimeH)),
               ),
             ),
           ),
@@ -448,7 +449,7 @@ class InvSecondary extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: onPressed,
-              child: Container(height: 46, alignment: Alignment.center, child: Text(label, textAlign: TextAlign.center, maxLines: 1, style: inter(textSize, 600, color: onPressed == null ? kMuted : color))),
+              child: Container(height: 46, alignment: Alignment.center, child: Text(tr(label), textAlign: TextAlign.center, maxLines: 1, style: inter(textSize, 600, color: onPressed == null ? kMuted : color))),
             ),
           ),
         ),
@@ -588,7 +589,7 @@ class InvInfoBanner extends StatelessWidget {
             ]),
           ),
           if (onClose != null)
-            Semantics(button: true, label: 'Dismiss', child: InkWell(onTap: onClose, child: const Padding(padding: EdgeInsets.all(2), child: Icon(LucideIcons.x, size: 16, color: kMuted)))),
+            Semantics(button: true, label: tr('Dismiss'), child: InkWell(onTap: onClose, child: const Padding(padding: EdgeInsets.all(2), child: Icon(LucideIcons.x, size: 16, color: kMuted)))),
         ]),
       );
 }
@@ -636,11 +637,11 @@ class InvLoad<T> extends StatelessWidget {
     if (error != null) {
       return InvCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Could not load this', style: inter(15, 600)),
+          Text(tr('Could not load this'), style: inter(15, 600)),
           const SizedBox(height: 6),
           Text(error!, style: inter(13, 400, color: kMuted)),
           const SizedBox(height: 10),
-          InvSecondary('Try again', onPressed: onRetry),
+          InvSecondary(tr('Try again'), onPressed: onRetry),
         ]),
       );
     }
@@ -663,7 +664,7 @@ Future<T?> pickOne<T>(BuildContext context, String title, List<(T value, String 
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(title, style: inter(18, 700)),
             const SizedBox(height: 8),
-            if (options.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text('Nothing to choose yet.', style: inter(14, 400, color: kMuted))),
+            if (options.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text(tr('Nothing to choose yet.'), style: inter(14, 400, color: kMuted))),
             Flexible(
               child: ListView(shrinkWrap: true, children: [
                 for (final (v, label, sub) in options)
@@ -674,7 +675,7 @@ Future<T?> pickOne<T>(BuildContext context, String title, List<(T value, String 
                       child: Row(children: [
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(label, style: inter(15, v == current ? 700 : 500)),
+                            Text(tr(label), style: inter(15, v == current ? 700 : 500)),
                             if (sub != null) Text(sub, style: inter(12.5, 400, color: kMuted)),
                           ]),
                         ),
@@ -761,9 +762,9 @@ class _ItemPickerState extends State<_ItemPicker> {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.75),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Choose a product', style: inter(18, 700)),
+            Text(tr('Choose a product'), style: inter(18, 700)),
             const SizedBox(height: 12),
-            InvInput(controller: _q, hint: 'Search product name, System Code, barcode', prefixIcon: LucideIcons.search, onChanged: (_) => _load()),
+            InvInput(controller: _q, hint: tr('Search product name, System Code, barcode'), prefixIcon: LucideIcons.search, onChanged: (_) => _load()),
             const SizedBox(height: 8),
             if (_error != null) Text(_error!, style: inter(13, 400, color: kRedText)),
             Flexible(

@@ -141,6 +141,12 @@ void main() {
       expect(find.text('Add Section'), findsOneWidget);
       expect(find.textContaining('Changes saved as a draft'), findsOneWidget);
       expect(find.text('Profile · Offers · Hours · Delivery'), findsOneWidget);
+      await t.tap(find.text('Profile · Offers · Hours · Delivery'));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('store-settings-delivery')), findsOneWidget); // named on the link, now there
+      expect(find.byKey(const ValueKey('store-settings-profile')), findsOneWidget);
+      Navigator.of(t.element(find.byKey(const ValueKey('store-settings-ads')))).pop();
+      await t.pumpAndSettle();
       expect(find.text('Preview Store'), findsOneWidget);
     });
 
@@ -409,7 +415,7 @@ void main() {
     testWidgets('Delivery Settings: rupees are sent as paise; at least one way is required', (t) async {
       final s = Fake();
       await show(t, DeliveryScreen(api: s.api));
-      expect(find.text('Delivery Settings'), findsOneWidget);
+      expect(find.text('Delivery area & charges'), findsOneWidget);
       expect(find.text('Own Delivery'), findsOneWidget);
       expect(find.text('5 km'), findsOneWidget);
       expect(find.text('30–45 minutes'), findsOneWidget);
@@ -437,20 +443,60 @@ void main() {
     testWidgets('Business Profile: prefilled from the server, a taken store link shows the sentence', (t) async {
       final s = Fake((r) => fnOf(r) == 'sf_profile_save' ? err(409, 'That store link is already taken.', 'conflict') : null);
       await show(t, ProfileScreen(api: s.api, picker: const FakePicker()));
-      expect(find.text('Business Profile'), findsOneWidget);
+      expect(find.text('Shop profile'), findsOneWidget);
       expect(find.text('The NOICE Store'), findsOneWidget);
       expect(find.text('${(fx['settings']['profile']['description'] as String).length}/200'), findsOneWidget);
-      expect(find.text('Edit Banner & Logo'), findsOneWidget);
+      expect(find.byKey(const ValueKey('profile-banner')), findsOneWidget);
+      expect(find.byKey(const ValueKey('profile-logo')), findsOneWidget);
       await tapText(t, 'Save Profile');
       expect(find.text('That store link is already taken.'), findsOneWidget);
       expect(s.last('sf_profile_save')['store_slug'], (fx['settings']['profile']['store_slug']));
     });
 
+    testWidgets('Business Profile as designed: category is a dropdown; the bottom link opens the store page, offers, hours, delivery and ads', (t) async {
+      final s = Fake();
+      await show(t, ProfileScreen(api: s.api, picker: const FakePicker()));
+      expect(find.byKey(const ValueKey('profile-category')), findsOneWidget);
+      expect(find.text('Snacks & Grocery'), findsWidgets); // the shop's category, chosen
+      // it drops down under the box as a short list, not over the whole screen
+      final field = t.getRect(find.byKey(const ValueKey('profile-category')));
+      await t.ensureVisible(find.byKey(const ValueKey('profile-category')));
+      await t.tap(find.byKey(const ValueKey('profile-category')));
+      await t.pumpAndSettle();
+      final menuItem = find.text('Dairy & Bakery').last;
+      expect(menuItem, findsWidgets);
+      final menu = t.getRect(find.ancestor(of: menuItem, matching: find.byType(Material)).first);
+      expect(menu.height, lessThanOrEqualTo(300));
+      expect(t.getRect(menuItem).top, greaterThan(t.getRect(find.byKey(const ValueKey('profile-category'))).top));
+      await t.tap(menuItem);
+      await t.pumpAndSettle();
+      expect(field.height, greaterThan(0));
+      expect(find.text('Store page · Offers & Promotions · Hours · Delivery'), findsOneWidget);
+      await t.ensureVisible(find.byKey(const ValueKey('profile-more')));
+      await t.tap(find.byKey(const ValueKey('profile-more')));
+      await t.pumpAndSettle();
+      for (final k in ['page', 'offers', 'hours', 'delivery', 'ads']) {
+        expect(find.byKey(ValueKey('store-settings-$k')), findsOneWidget, reason: k);
+      }
+      expect(find.byKey(const ValueKey('store-settings-profile')), findsNothing); // already here
+      await t.tap(find.byKey(const ValueKey('store-settings-delivery')));
+      await t.pumpAndSettle();
+      expect(find.byType(DeliveryScreen), findsOneWidget);
+    });
+
+    testWidgets('Business Profile: saving stays on the page (it is the first screen of Business profile)', (t) async {
+      final s = Fake();
+      await show(t, ProfileScreen(api: s.api, picker: const FakePicker()));
+      await tapText(t, 'Save Profile');
+      expect(s.calls('sf_profile_save'), hasLength(1));
+      expect(find.text('Shop profile'), findsOneWidget);
+    });
+
     testWidgets('Business Profile: changing the logo uses the setup picture handlers, then reloads', (t) async {
       final s = Fake((r) => fnOf(r) == 'partner_setup_image_slot' ? ok({'path': 'o/logo/a.png', 'upload_url': 'http://storage.test/up'}) : fnOf(r) == 'partner_setup_image_attach' ? ok({}) : null);
       await show(t, ProfileScreen(api: s.api, picker: const FakePicker()));
-      await tapText(t, 'Edit Banner & Logo');
-      await tapText(t, 'Change logo');
+      await t.tap(find.byKey(const ValueKey('profile-logo')));
+      await t.pumpAndSettle();
       expect(s.requests.map((r) => fnOf(r)), containsAllInOrder(['partner_setup_image_slot', 'up', 'partner_setup_image_attach']));
       expect(s.calls('sf_settings_get').length, 2);
     });

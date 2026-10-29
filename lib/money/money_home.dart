@@ -7,6 +7,7 @@ import 'money_screens_a.dart';
 import 'money_screens_b.dart';
 import 'money_screens_c.dart';
 import 'money_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Builds one Money screen by key.
 Widget moneyScreenFor(MoneyEnv env, String key) => switch (key) {
@@ -75,14 +76,14 @@ class _MoneyHomeState extends State<MoneyHome> {
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: kBg,
-        appBar: AppBar(backgroundColor: kBg, elevation: 0, foregroundColor: kInk, title: Text('Money', style: inter(18, 700))),
+        appBar: AppBar(backgroundColor: kBg, elevation: 0, foregroundColor: kInk, title: Text(tr('Money'), style: inter(18, 700))),
         body: Padding(
           padding: const EdgeInsets.all(24),
           child: Center(
             child: denied
-                ? Text('Your role does not include the money screens. Ask the owner if you need them.', textAlign: TextAlign.center, style: inter(15, 400, color: kMuted))
+                ? Text(tr('Your role does not include the money screens. Ask the owner if you need them.'), textAlign: TextAlign.center, style: inter(15, 400, color: kMuted))
                 : error != null
-                    ? Column(mainAxisSize: MainAxisSize.min, children: [Text(error!, textAlign: TextAlign.center, style: inter(14, 400, color: kMuted)), const SizedBox(height: 12), InvSecondary('Try again', onPressed: _go)])
+                    ? Column(mainAxisSize: MainAxisSize.min, children: [Text(error!, textAlign: TextAlign.center, style: inter(14, 400, color: kMuted)), const SizedBox(height: 12), InvSecondary(tr('Try again'), onPressed: _go)])
                     : const CircularProgressIndicator(color: kInk),
           ),
         ),

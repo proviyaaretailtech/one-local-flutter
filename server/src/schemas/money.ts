@@ -38,16 +38,42 @@ export const InvoicePay = z.object({ invoice_id: id, amount_minor: amount, metho
 export const InvoiceDue = z.object({ invoice_id: id, due_date: day }).loose();
 
 // Restaurant Money in the store's design (0622): the wallet, Money in / out, Transfer, cash register and close, dues, contacts to pay.
-const account = z.enum(['cash', 'upi', 'bank'], { message: 'Choose cash, UPI or bank.' });
+const rmAccount = z.enum(['cash', 'upi', 'bank'], { message: 'Choose cash, UPI or bank.' });
 export const RmEntries = obj({ direction: z.enum(['in', 'out'], { message: 'Choose money in or money out.' }), method: z.enum(['all', 'cash', 'upi', 'card']).optional(),
   from: day.optional(), to: day.optional() });
 export const RmRecord = obj({ direction: z.enum(['in', 'out', 'move'], { message: 'Choose money in, money out or a move.' }), amount_minor: amount,
   kind: z.string().trim().max(40).optional(), category: z.string().max(60).optional(),
   method: z.enum(['cash', 'upi', 'gpay', 'phonepe', 'card', 'bank'], { message: 'Choose how the money moved.' }).optional(),
   party: z.string().max(60).optional(), party_phone: z.string().max(20).optional(), reference: z.string().max(60).optional(), note: z.string().max(300).optional(),
-  from_account: account.optional(), to_account: account.optional(), entry_date: day.optional(), ...key });
+  from_account: rmAccount.optional(), to_account: rmAccount.optional(), entry_date: day.optional(), ...key });
 export const RmVoid = z.object({ id, reason: z.string().trim().min(3, 'Say why (3 to 200 characters).').max(200) }).loose();
 export const RmClose = obj({ day: day.optional(), counted_minor: z.number({ message: 'Enter the cash you counted.' }).int().min(0).max(99_999_999_999) });
 export const RmContacts = z.object({ q: z.string().max(60).optional() }).loose();
 export const RmContactSave = z.object({ id: id.optional(), name: z.string().trim().min(1, 'Enter a name.').max(60), phone: z.string().max(20).optional(),
   upi_id: z.string().max(260).optional() }).loose();
+// Store money, minimal (founder, 28 Oct 2026; C:\\onelocal\\hosted_store_money_2026-10-28.sql): accounts, Record transaction, cash register, dues.
+const account = z.enum(['cash', 'bank', 'upi'], { message: 'Choose the account.' });
+export const StoreEntries = obj({ from: day.nullish(), to: day.nullish(), direction: z.enum(['all', 'in', 'out']).optional(), method: z.enum(['all', 'cash', 'upi', 'card', 'bank']).optional(), q: z.string().max(100).optional() });
+export const StoreRecord = obj({
+  kind: z.enum(['goods_sale', 'sale', 'other_income', 'due_received', 'owner_in', 'partner_topup', 'aggregator_settlement', 'other_in',
+    'expense', 'purchase', 'supplier_payment', 'salary', 'owner_out', 'refund', 'other_out', 'transfer'], { message: 'Choose what kind of money this is.' }),
+  account: account.nullish(), to_account: account.nullish(), amount_minor: amount, entry_date: day.optional(),
+  // how it moved (redesign, 28 Oct 2026): the account follows it when none is named
+  method: z.enum(['cash', 'upi', 'gpay', 'phonepe', 'card', 'bank'], { message: 'Choose how the money moved.' }).optional(),
+  party_phone: z.string().max(20).optional(), proof_path: z.string().max(200).nullish(),
+  category: z.string().max(40).optional(), party: z.string().max(60).optional(), reference: z.string().max(40).optional(), note: z.string().max(300).optional(),
+  bill_receipt_id: id.nullish(), ...key,
+});
+export const StoreVoid = obj({ id, reason: z.string().trim().min(3, 'Say why (3 to 200 characters).').max(200) });
+export const StoreRegister = obj({ day: day.nullish() });
+export const StoreClose = obj({ day: day.nullish(), counted_minor: z.number().int().min(0).max(99_999_999_999) });
+// Money redesign (founder's sketches, 28 Oct 2026; C:\onelocal\hosted_money_redesign_2026-10-28.sql): contacts to pay, proof photos.
+export const StoreContacts = obj({ q: z.string().max(60).optional() });
+export const StoreContactSave = obj({ id: id.nullish(), name: z.string().trim().min(1, 'Enter the name.').max(60), phone: z.string().max(20).optional(), upi_id: z.string().max(100).optional() });
+export const PROOF_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'application/pdf': 'pdf' };
+export const PROOF_MAX_BYTES = 5 * 1024 * 1024;
+export const ProofAsk = z.object({
+  content_type: z.string({ message: 'Upload a JPG, PNG or PDF.' }).refine(t => t in PROOF_EXT, 'Upload a JPG, PNG or PDF.'),
+  size: z.number().int().min(1, 'That file is empty.').max(PROOF_MAX_BYTES, 'Each file can be up to 5 MB.'),
+});
+export const ProofLink = z.object({ id });

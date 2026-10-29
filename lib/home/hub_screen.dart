@@ -9,6 +9,7 @@ import '../ui/theme.dart';
 import 'home_api.dart';
 import 'home_nav.dart';
 import 'home_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Figma section D "split-nav-hub": the owner's feed across their outlets. Figures from
 /// `GET /api/partner/home/feed`. Funnel and Service Quality have no data source yet and say so.
@@ -24,7 +25,7 @@ class HubScreen extends StatefulWidget {
 }
 
 const _ranges = [(1, 'Today'), (7, 'Last 7 days'), (30, 'Last 30 days')];
-const _pills = ['My Feed', 'Sales', 'Funnel', 'Service Quality'];
+const _pills = ['My Feed', 'Sales']; // Funnel and Service Quality removed (founder, 28 Oct 2026)
 
 class _HubScreenState extends State<HubScreen> {
   late final HomeApi _api = widget.api ?? HomeApi();
@@ -52,7 +53,7 @@ class _HubScreenState extends State<HubScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(kPadX, 24, kPadX, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Period', style: inter(15, 600)),
+            Text(tr('Period'), style: inter(15, 600)),
             for (final (d, label) in _ranges)
               _SheetOption(label: label, selected: d == _days, onTap: () => Navigator.pop(ctx, d)),
           ]),
@@ -74,8 +75,8 @@ class _HubScreenState extends State<HubScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(kPadX, 24, kPadX, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Show data for', style: inter(15, 600)),
-            _SheetOption(label: 'All my outlets', selected: _location == null, onTap: () => Navigator.pop(ctx, '')),
+            Text(tr('Show data for'), style: inter(15, 600)),
+            _SheetOption(label: tr('All my outlets'), selected: _location == null, onTap: () => Navigator.pop(ctx, '')),
             for (final o in f.outlets)
               _SheetOption(label: (o['name'] ?? '') as String, selected: _location == o['id'], onTap: () => Navigator.pop(ctx, o['id'] as String)),
           ]),
@@ -118,7 +119,7 @@ class _HubScreenState extends State<HubScreen> {
             final loaded = snap.data;
             // the shared banner (founder, 22 Oct 2026); the scope ("All outlets (5) ▾", the switcher) is the line under "Reports"
             final header = AppHeader(
-              title: 'Reports',
+              title: tr('Reports'),
               safeTop: false,
               subtitle: loaded == null
                   ? null
@@ -157,19 +158,7 @@ class _HubScreenState extends State<HubScreen> {
                   ]),
                 ),
                 const SizedBox(height: 18),
-                if (_pill == 'Funnel' || _pill == 'Service Quality')
-                  HomeCard(
-                    padding: const EdgeInsets.all(20),
-                    radius: 20,
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_pill, style: inter(15, 700)),
-                      const SizedBox(height: 6),
-                      EmptyNote(_pill == 'Funnel'
-                          ? 'Store visits and menu views are not recorded yet, so there is no funnel to show.'
-                          : 'Ratings, complaints and preparation times are not collected yet, so there is no service score to show.'),
-                    ]),
-                  )
-                else ...[
+                ...[
                   Row(children: [
                     InkWell(
                       key: const ValueKey('hub-range'),
@@ -202,8 +191,8 @@ class _HubScreenState extends State<HubScreen> {
                   if (_pill == 'My Feed') ...[
                     _TodayCard(f),
                     const SizedBox(height: 24),
-                    Text('Quick Links', style: inter(16.5, 700)),
-                    Text('Manage daily operations', style: inter(11, 400, color: kMuted)),
+                    Text(tr('Quick Links'), style: inter(16.5, 700)),
+                    Text(tr('Manage daily operations'), style: inter(11, 400, color: kMuted)),
                     const SizedBox(height: 16),
                     const _QuickLinks(),
                     const SizedBox(height: 20),
@@ -243,7 +232,7 @@ class _TodayCard extends StatelessWidget {
         radius: 20,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Text('Today so far', style: inter(11, 500, color: kMuted)),
+            Text(tr('Today so far'), style: inter(11, 500, color: kMuted)),
             const Spacer(),
             Dot(f.isOpen == true ? kUp : f.isOpen == false ? kRed : kMuted, size: 14),
             const SizedBox(width: 6),
@@ -305,16 +294,16 @@ class _AnalyticsCard extends StatelessWidget {
       radius: 20,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Text('Sales Analytics', style: inter(15, 700)),
+          Text(tr('Sales Analytics'), style: inter(15, 700)),
           const Spacer(),
           const Icon(LucideIcons.ellipsis, size: 20, color: kMuted),
         ]),
         const SizedBox(height: 10),
-        _Metric(label: 'Net sales', value: rupees(f.netSales.round()), change: compare ? percentChange(f.netSales, f.prevNetSales) : null),
+        _Metric(label: tr('Net sales'), value: rupees(f.netSales.round()), change: compare ? percentChange(f.netSales, f.prevNetSales) : null),
         const Divider(height: 20, color: kLine),
-        _Metric(label: 'Orders completed', value: count(f.delivered), change: compare ? percentChange(f.delivered, f.prevDelivered) : null),
+        _Metric(label: tr('Orders completed'), value: count(f.delivered), change: compare ? percentChange(f.delivered, f.prevDelivered) : null),
         const Divider(height: 20, color: kLine),
-        _Metric(label: 'Average order value', value: f.aov == null ? '—' : rupees(f.aov!.round()), change: compare ? percentChange(f.aov, f.prevAov) : null),
+        _Metric(label: tr('Average order value'), value: f.aov == null ? '—' : rupees(f.aov!.round()), change: compare ? percentChange(f.aov, f.prevAov) : null),
         const SizedBox(height: 16),
         if (f.daily.length > 1) SalesBars(days: f.daily) else const SizedBox.shrink(),
         const SizedBox(height: 16),
@@ -477,9 +466,9 @@ class _HubError extends StatelessWidget {
             const SizedBox(height: 8),
             Text(error is PartnerApiException ? error.toString() : 'Check your internet connection and try again.', textAlign: TextAlign.center, style: inter(10.5, 400, color: kMuted, height: 1.5)),
             const SizedBox(height: 20),
-            SizedBox(width: 200, child: PrimaryAction(label: 'Try again', onPressed: onRetry)),
+            SizedBox(width: 200, child: PrimaryAction(label: tr('Try again'), onPressed: onRetry)),
             const SizedBox(height: 8),
-            TextButton(onPressed: () => Navigator.maybePop(context), child: Text('Back', style: inter(11, 600, color: kLink))),
+            TextButton(onPressed: () => Navigator.maybePop(context), child: Text(tr('Back'), style: inter(11, 600, color: kLink))),
           ]),
         ),
       );

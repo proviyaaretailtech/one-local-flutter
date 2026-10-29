@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../customers/customer_widgets.dart';
-import '../home/home_widgets.dart' show kLime, rupees;
+import '../home/home_widgets.dart' show rupees;
+import '../ui/app_header.dart' show shortStoreName;
 import '../ui/theme.dart';
+import '../auth/partner_api.dart';
+import '../settings/settings_api.dart';
+import '../money/money_style.dart';
 import 'wallet_api.dart';
 
 String _status(WalletMovement m) {
@@ -22,8 +26,11 @@ String _status(WalletMovement m) {
 /// Side nav "One Local Wallet": what One Local owes the business for its One Local orders, what is on the way to the bank, what has
 /// been paid, and every settlement and payout. Read only; every number is the database's (settlements, payouts, commission ledger).
 class WalletScreen extends StatefulWidget {
-  const WalletScreen({super.key, this.api});
+  const WalletScreen({super.key, this.api, this.settings});
   final WalletApi? api;
+
+  /// Where Request withdrawal goes (tests replace it).
+  final SettingsApi? settings;
   static Route<void> route({WalletApi? api}) => MaterialPageRoute(builder: (_) => WalletScreen(api: api));
   @override
   State<WalletScreen> createState() => _WalletScreenState();
@@ -36,6 +43,7 @@ class _WalletScreenState extends State<WalletScreen> {
   int? _next;
   String? _error;
   bool _more = false;
+  String _tab = 'settlements'; // Settlements | Ledger | Withdrawals
 
   @override
   void initState() {
@@ -77,19 +85,148 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
-  Widget _tile(String label, num amount, {String? foot, Key? key}) => Expanded(
-        child: Container(
-          key: key,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: kLine)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: inter(11.5, 500, color: kMuted)),
-            const SizedBox(height: 4),
-            Text(rupees(amount), style: inter(17, 700)),
-            if (foot != null) ...[const SizedBox(height: 2), Text(foot, style: inter(10.5, 400, color: kMuted))],
+  /// Request withdrawal (founder, 28 Oct 2026, from the restaurant wallet): One Local settles weekly on its own, so this asks the
+  /// One Local team (a support request) to pay out early; nothing is moved from the app.
+  Future<void> _requestWithdrawal(WalletOverview o) async {
+    final available = o.unsettledDue + o.onTheWay;
+    final note = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Request withdrawal', style: inter(18, 800)),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Available: ${rupees(available)}', style: inter(15, 700)),
+          const SizedBox(height: 6),
+          Text('One Local pays your settlement every week. This asks the team to pay it out sooner, to your settlement bank account.', style: inter(13, 400, color: kMuted)),
+          const SizedBox(height: 10),
+          TextField(key: const ValueKey('wallet-withdraw-note'), controller: note, maxLines: 2, decoration: const InputDecoration(labelText: 'Note (optional)')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text('Not now', style: inter(14, 600))),
+          TextButton(key: const ValueKey('wallet-withdraw-send'), onPressed: () => Navigator.pop(c, true), child: Text('Send request', style: inter(14, 800, color: kLink))),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final r = await (widget.settings ?? SettingsApi()).supportCreate(
+        message: 'Payout request from the One Local Wallet: ${rupees(available)} (${o.business}).${note.text.trim().isEmpty ? '' : ' Note: ${note.text.trim()}'}',
+        topic: 'account',
+        idempotencyKey: 'wallet-withdraw-${DateTime.now().millisecondsSinceEpoch}',
+      );
+      if (mounted) showToast(context, 'Request sent (${r['reference'] ?? 'received'}). The One Local team will confirm the payout.');
+    } catch (e) {
+      if (mounted) showToast(context, e is PartnerApiException ? e.message : 'Could not send the request. Try again.');
+    }
+  }
+
+  /// A figure card in Money's look: lime, or dark with rings.
+  Widget _figure(IconData icon, String label, num amount, {required bool dark, String? foot, Key? key}) {
+    final fg = dark ? Colors.white : kMoneyDeep, soft = dark ? const Color(0xFFB8BCC4) : const Color(0xFF3F4A12);
+    return Expanded(
+      child: Container(
+        key: key,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(color: dark ? kMoneyDeep : kMoneyLime, borderRadius: BorderRadius.circular(kMoneyCardRadius)),
+        child: Stack(children: [
+          if (dark) const Positioned.fill(child: MoneyRings(opacity: 0.06)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 14, 14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(color: dark ? kMoneyDeepSoft : kMoneyDeep, borderRadius: BorderRadius.circular(11)),
+                child: Icon(icon, size: 17, color: kMoneyLime),
+              ),
+              const SizedBox(height: 12),
+              Text(label, style: inter(13, 700, color: soft)),
+              const SizedBox(height: 2),
+              FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(rupees(amount), style: inter(24, 800, color: fg))),
+              if (foot != null) ...[const SizedBox(height: 2), Text(foot, maxLines: 2, style: inter(11, 500, color: soft))],
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  /// The rows as a small table: a header line, then one line per movement.
+  Widget _table(List<String> heads, List<WalletMovement> rows, Widget Function(WalletMovement) row, String empty) => Container(
+        decoration: moneyCard(),
+        clipBehavior: Clip.antiAlias,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(
+            color: const Color(0xFFF7F8FA),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(children: [
+              for (final (i, h) in heads.indexed)
+                Expanded(
+                  flex: i == 1 ? 3 : 2,
+                  child: Text(h.toUpperCase(), textAlign: i == heads.length - 1 ? TextAlign.right : TextAlign.left, style: inter(10, 700, color: kMuted).copyWith(letterSpacing: 0.6)),
+                ),
+            ]),
+          ),
+          if (rows.isEmpty)
+            Padding(padding: const EdgeInsets.all(22), child: Text(empty, textAlign: TextAlign.center, style: inter(13, 500, color: kMuted)))
+          else
+            for (final (i, m) in rows.indexed) ...[if (i > 0) const Divider(height: 1, color: kLine), row(m)],
+        ]),
+      );
+
+  Widget _chip(String text, {required bool good, bool bad = false}) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: bad ? const Color(0xFFFDECEC) : good ? const Color(0xFF7ED321) : const Color(0xFFF1F2F4),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10.5, 700, color: bad ? kError : good ? kInk : kMuted)),
+      );
+
+  Widget _line(WalletMovement m, {required Widget middle, required Widget end}) => InkWell(
+        onTap: m.settlementId.isEmpty ? null : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettlementScreen(api: _api, id: m.settlementId))),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Expanded(
+              flex: 2,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(m.at == null ? '—' : '${m.at!.toLocal().day.toString().padLeft(2, '0')} ${_mon[m.at!.toLocal().month - 1]}', style: inter(12.5, 600)),
+                if (m.at != null)
+                  Text('${m.at!.toLocal().hour.toString().padLeft(2, '0')}:${m.at!.toLocal().minute.toString().padLeft(2, '0')}', style: inter(10.5, 400, color: kMuted)),
+              ]),
+            ),
+            Expanded(flex: 3, child: middle),
+            Expanded(flex: 2, child: Align(alignment: Alignment.centerRight, child: end)),
           ]),
         ),
       );
+
+  Widget _amount(WalletMovement m) =>
+      Text('${m.isIn ? '+' : '−'}${rupees(m.amount)}', style: inter(13.5, 800, color: m.isIn ? const Color(0xFF15803D) : kInk));
+
+  Widget _part(List<WalletMovement> moves) => switch (_tab) {
+        'ledger' => _table(['Date', 'Details', 'Amount'], moves, (m) => _line(m,
+            middle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _chip(m.isIn ? 'credit' : 'debit', good: m.isIn),
+              const SizedBox(height: 3),
+              Text(m.label, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(11.5, 500, color: kMuted)),
+            ]),
+            end: _amount(m)), 'No movements yet.'),
+        'withdrawals' => _table(['Date', 'Status', 'Amount'], moves.where((m) => m.kind == 'payout').toList(), (m) => _line(m,
+            middle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Bank transfer', style: inter(12.5, 600)),
+              Text(_status(m), maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(11, 500, color: m.status == 'failed' ? kError : kMuted)),
+            ]),
+            end: Text(rupees(m.amount), style: inter(13.5, 800))), 'No withdrawals yet'),
+        _ => _table(['Date', 'Settlement', 'Payout'], moves.where((m) => m.kind == 'settlement').toList(), (m) => _line(m,
+            middle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(m.label, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(12, 600)),
+              const SizedBox(height: 3),
+              _chip(_status(m), good: m.status == 'paid', bad: m.noTransferRecord || m.status == 'disputed'),
+            ]),
+            end: _amount(m)), 'No settlements yet'),
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -103,33 +240,74 @@ class _WalletScreenState extends State<WalletScreen> {
               ? Center(child: _error != null ? CwaLoadError(message: _error!, onRetry: _load) : const CircularProgressIndicator())
               : RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
-                    // the dark band: money on the way to the bank
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(20)),
+                  child: ListView(padding: const EdgeInsets.fromLTRB(14, 10, 14, 24), children: [
+                    // Money's look (founder, 28 Oct 2026): the dark card with rings for the balance, then a lime and a dark card
+                    MoneyDarkCard(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Row(children: [
-                          const Icon(LucideIcons.wallet, size: 20, color: kLime),
-                          const SizedBox(width: 8),
-                          Text(o.business, style: inter(13, 500, color: Colors.white70)),
+                          const Icon(LucideIcons.wallet, size: 15, color: kMoneyLime),
+                          const SizedBox(width: 6),
+                          // too long for the line: the initials, as on the banner
+                          Expanded(
+                            child: LayoutBuilder(builder: (context, c) {
+                              final style = inter(13, 600, color: const Color(0xFFB8BCC4));
+                              final p = TextPainter(text: TextSpan(text: o.business, style: style), maxLines: 1, textDirection: TextDirection.ltr, textScaler: MediaQuery.textScalerOf(context))
+                                ..layout(maxWidth: double.infinity);
+                              return Text(p.width <= c.maxWidth ? o.business : shortStoreName(o.business),
+                                  key: const ValueKey('wallet-business'), maxLines: 1, overflow: TextOverflow.ellipsis, style: style);
+                            }),
+                          ),
                         ]),
-                        const SizedBox(height: 12),
-                        Text('On the way to your bank', style: inter(12.5, 500, color: Colors.white70)),
+                        const SizedBox(height: 14),
+                        Row(children: [
+                          Expanded(child: Text('Available balance', style: inter(13.5, 500, color: const Color(0xFFB8BCC4)))),
+                          Text('Settled weekly', style: inter(11.5, 600, color: kMoneyLime)),
+                        ]),
                         const SizedBox(height: 2),
-                        Text(rupees(o.onTheWay), key: const ValueKey('wallet-on-the-way'), style: inter(30, 800, color: Colors.white)),
-                        const SizedBox(height: 6),
-                        Text('Approved weekly settlements One Local is transferring to you.', style: inter(11.5, 400, color: Colors.white60)),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(rupees(o.unsettledDue + o.onTheWay), key: const ValueKey('wallet-available'), style: inter(36, 800, color: Colors.white)),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          key: const ValueKey('wallet-on-the-way'),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(color: kMoneyDeepSoft, borderRadius: BorderRadius.circular(40)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(LucideIcons.lock, size: 12, color: kMoneyLime),
+                            const SizedBox(width: 5),
+                            Flexible(child: Text('On the way to your bank  ', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11.5, 600, color: const Color(0xFFB8BCC4)))),
+                            Text(rupees(o.onTheWay), style: inter(11.5, 800, color: Colors.white)),
+                          ]),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            key: const ValueKey('wallet-withdraw'),
+                            onPressed: () => _requestWithdrawal(o),
+                            style: FilledButton.styleFrom(backgroundColor: kMoneyLime, padding: const EdgeInsets.symmetric(vertical: 15), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              Text('Request withdrawal', style: inter(15, 800, color: kMoneyDeep)),
+                              const SizedBox(width: 8),
+                              const Icon(LucideIcons.arrowDownToLine, size: 18, color: kMoneyDeep),
+                            ]),
+                          ),
+                        ),
                       ]),
                     ),
-                    const SizedBox(height: 10),
-                    Row(children: [
-                      _tile('Earned, not yet settled', o.unsettledDue,
-                          key: const ValueKey('wallet-unsettled'),
-                          foot: '${o.unsettledOrders} order${o.unsettledOrders == 1 ? '' : 's'} · commission ${rupees(o.unsettledCommission)}'),
-                      const SizedBox(width: 8),
-                      _tile('Paid to your bank', o.paid, key: const ValueKey('wallet-paid')),
-                    ]),
+                    const SizedBox(height: 12),
+                    IntrinsicHeight(
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        _figure(LucideIcons.trendingUp, 'Not yet settled', o.unsettledDue,
+                            dark: false,
+                            key: const ValueKey('wallet-unsettled'),
+                            foot: '${o.unsettledOrders} order${o.unsettledOrders == 1 ? '' : 's'} · commission ${rupees(o.unsettledCommission)}'),
+                        const SizedBox(width: 12),
+                        _figure(LucideIcons.landmark, 'Paid to your bank', o.paid, dark: true, key: const ValueKey('wallet-paid'), foot: 'All payouts so far'),
+                      ]),
+                    ),
                     if (o.unsettledNote.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(4, 8, 4, 0), child: Text(o.unsettledNote, style: inter(11.5, 400, color: kMuted))),
                     if (o.owedToOneLocal > 0)
                       _Notice(key: const ValueKey('wallet-owed'), tone: kError, text: 'You owe One Local ${rupees(o.owedToOneLocal)}. It is taken from your next settlement.'),
@@ -141,35 +319,15 @@ class _WalletScreenState extends State<WalletScreen> {
                           tone: const Color(0xFFB54708),
                           text: '${o.settledWithoutTransferRecord} settlement${o.settledWithoutTransferRecord == 1 ? ' is' : 's are'} marked paid without a bank transfer record, so '
                               '${o.settledWithoutTransferRecord == 1 ? 'it is' : 'they are'} not counted in "Paid to your bank".'),
-                    const CwaSection('Movements'),
-                    if (_moves.isEmpty) Text('No settlements or payouts yet. Your first One Local orders are settled weekly.', style: inter(13, 400, color: kMuted)),
-                    for (final m in _moves)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: CwaCard(
-                          onTap: m.settlementId.isEmpty
-                              ? null
-                              : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettlementScreen(api: _api, id: m.settlementId))),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                          child: Row(children: [
-                            Container(
-                              width: 34,
-                              height: 34,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(color: m.isIn ? const Color(0xFFEBFAE0) : const Color(0xFFF3F4F6), shape: BoxShape.circle),
-                              child: Icon(m.isIn ? LucideIcons.arrowDownLeft : LucideIcons.landmark, size: 17, color: kInk),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(m.label, style: inter(13.5, 600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                Text('${cwaDate(m.at)} · ${_status(m)}', style: inter(11.5, 400, color: m.noTransferRecord || m.status == 'failed' ? kError : kMuted)),
-                              ]),
-                            ),
-                            Text('${m.isIn ? '+' : '−'}${rupees(m.amount)}', style: inter(14, 700, color: m.isIn ? const Color(0xFF15803D) : kInk)),
-                          ]),
-                        ),
-                      ),
+                    const SizedBox(height: 16),
+                    MoneyPills(
+                      keyPrefix: 'wallet-tab',
+                      options: const [('settlements', 'Settlements'), ('ledger', 'Ledger'), ('withdrawals', 'Withdrawals')],
+                      selected: _tab,
+                      onSelect: (id) => setState(() => _tab = id),
+                    ),
+                    const SizedBox(height: 10),
+                    _part(_moves),
                     if (_next != null)
                       TextButton(onPressed: _more ? null : _loadMore, child: Text('Show more', style: inter(14, 600, color: kLink))),
                   ]),
@@ -179,6 +337,8 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 }
+
+const _mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 class _Notice extends StatelessWidget {
   const _Notice({super.key, required this.tone, required this.text});

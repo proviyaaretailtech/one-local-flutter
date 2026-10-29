@@ -34,5 +34,8 @@ export const HoldUpdate = z.object({
   expected_updated_at: z.string({ message: 'Refresh the held bill and try again.' }).min(10, 'Refresh the held bill and try again.').max(40),
   lines: lines.optional(),
   reason,
+  // a held bill's customer, changed from its card (27 Oct 2026)
+  customer_name: z.string().trim().max(80, 'Keep the customer name under 80 characters.').optional(),
+  customer_phone: z.string().regex(/^\d{0,15}$/, 'The mobile number can only have digits.').optional(),
   idempotency_key: z.string().trim().max(100, 'The idempotency key is too long.').optional(),
 }).loose();

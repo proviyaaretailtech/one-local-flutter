@@ -228,6 +228,13 @@ class SellApi {
     };
   }
 
+  /// Bought together (market basket analysis on the server, 27 Oct 2026): product ids ranked by how often they were on the same bill
+  /// as [inCart], best first; with an empty cart, the best sellers.
+  Future<List<String>> boughtWith(List<String> inCart) async {
+    final r = await _call('pos_basket_suggest', {'item_ids': inCart, 'limit': 12});
+    return [for (final i in (r['items'] as List?) ?? const []) '${(i as Map)['menu_item_id']}'];
+  }
+
   Future<SellCatalog> catalog({String q = '', String? category, bool availableOnly = false, String sort = 'name'}) async {
     final r = await _call('pos_sell_catalog', {
       if (q.trim().isNotEmpty) 'q': q.trim(),

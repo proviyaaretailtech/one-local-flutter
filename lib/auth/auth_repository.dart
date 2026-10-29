@@ -29,6 +29,10 @@ class AuthRepository {
   Future<AuthResponse> signInWithPassword(String email, String password) =>
       _auth.signInWithPassword(email: email, password: password);
 
+  // Mobile number + password (27 Oct 2026): the same password, with the account's mobile number instead of its email.
+  Future<AuthResponse> signInWithPhonePassword(String e164, String password) =>
+      _auth.signInWithPassword(phone: e164, password: password);
+
   Future<void> sendPasswordReset(String email) => _auth.resetPasswordForEmail(email);
 
   // Registration is OTP-based (Figma "Create account" -> verify contact). No password is set here.
@@ -42,6 +46,35 @@ class AuthRepository {
   Future<void> signOut() => _auth.signOut();
 
   /// The signed-in person's email, for the side nav profile. Null when Supabase has not started (tests).
+  /// The name given when the account was made (sign-up keeps it with the login), or null.
+  String? get currentName {
+    try {
+      final n = _auth.currentUser?.userMetadata?['full_name'];
+      return n is String && n.trim().isNotEmpty ? n.trim() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The login's mobile number (digits, with 91), or null.
+  String? get currentPhone {
+    try {
+      final p = _auth.currentUser?.phone;
+      return p == null || p.isEmpty ? null : p;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The signed-in login's id, or null.
+  String? get currentUserId {
+    try {
+      return _auth.currentUser?.id;
+    } catch (_) {
+      return null;
+    }
+  }
+
   String? get currentEmail {
     try {
       return _auth.currentUser?.email;

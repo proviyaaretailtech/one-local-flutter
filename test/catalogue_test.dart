@@ -15,6 +15,7 @@ import 'package:vinii_pos/catalogue/grn_screens.dart';
 import 'package:vinii_pos/catalogue/item_form_screen.dart';
 import 'package:vinii_pos/catalogue/item_photo.dart';
 import 'package:vinii_pos/catalogue/item_sheets.dart';
+import 'package:vinii_pos/catalogue/quick_add_screen.dart';
 import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
@@ -152,10 +153,10 @@ void main() {
       await phone(t, CatalogueScreen(api: s.api));
       expect(find.text('Catalogue'), findsWidgets);   // the page title, and the banner's until the outlet is known
       expect(find.text('142 items'), findsOneWidget);
-      for (final k in ['Active Items', 'Out of Stock', 'Inactive Items', 'Combos', 'Categories', 'Drafts']) {
-        expect(find.text(k), findsOneWidget);
+      // no count cards on Products (stock numbers live in Item → Stock)
+      for (final k in ['Active Items', 'Out of Stock', 'Inactive Items', 'Combos', 'Drafts', 'Food products']) {
+        expect(find.text(k), findsNothing, reason: k);
       }
-      expect(find.text('340'), findsOneWidget);
       for (final c in ['All', 'Beverages', 'Dairy', 'Snacks', 'Staples']) {
         expect(find.text(c), findsOneWidget);
       }
@@ -177,7 +178,7 @@ void main() {
     testWidgets('the grid view is a two column card layout; a category chip filters on the server; search is debounced', (t) async {
       final s = server();
       await phone(t, CatalogueScreen(api: s.api), height: 4200);
-      await t.tap(find.text('Grid'));
+      await t.tap(find.byKey(const ValueKey('cat-view-grid')));
       await t.pumpAndSettle();
       expect(find.text('QR ✓'), findsNWidgets(6));
       expect(find.text('Available'), findsNWidgets(6));
@@ -249,71 +250,44 @@ void main() {
       expect(find.text('Product image'), findsOneWidget);
     });
 
-    testWidgets('Add Items offers Quick Add and Item creation; Quick Add stays disabled until all three fields are valid, then posts', (t) async {
+    testWidgets('Quick add opens the one Quick Add screen straight away; the price is needed; the System Code comes from the name', (t) async {
       final s = server();
       await phone(t, CatalogueScreen(api: s.api), height: 3000);
-      await t.tap(find.text('+ Add Items'));
+      expect(find.text('Quick add'), findsOneWidget); // the button on the first screen
+      await t.tap(find.byKey(const ValueKey('cat-add')));
       await t.pumpAndSettle();
-      expect(find.text('Choose how much you want to fill in now'), findsOneWidget);
-      expect(find.text('Quick Add'), findsOneWidget);
-      expect(find.text('Item creation'), findsOneWidget);
-      await t.tap(find.text('Quick Add'));
-      await t.pumpAndSettle();
-      expect(find.text('Quick add product'), findsOneWidget);
-      expect(find.text('Required fields are blank · Not ready to add'), findsOneWidget);
-      await t.tap(find.text('Add product'));
+      expect(find.byType(QuickAddScreen), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('quick-name')), 'Oat Crunch');
       await t.pump();
+      expect(find.textContaining('System Code OATCRU-'), findsOneWidget);
+      await t.ensureVisible(find.byKey(const ValueKey('quick-save')));
+      await t.tap(find.byKey(const ValueKey('quick-save')));
+      await t.pump();
+      expect(find.text('Enter the selling price.'), findsOneWidget);
       expect(s.where('POST', '/cat_item_save'), isEmpty);
-      final fields = find.descendant(of: find.byType(Dialog), matching: find.byType(TextField));
-      await t.enterText(fields.at(0), 'Oat Crunch');
-      await t.enterText(fields.at(1), 'OAT1');
-      await t.enterText(fields.at(2), '45');
-      await t.pump();
-      expect(find.text('Required fields are blank · Not ready to add'), findsNothing);
-      await t.tap(find.text('Add product'));
+      await t.enterText(find.byKey(const ValueKey('quick-price')), '45');
+      await t.tap(find.byKey(const ValueKey('quick-save')));
       await t.pumpAndSettle();
       final post = s.where('POST', '/cat_item_save').single;
-      expect(s.body(post), {'mode': 'quick', 'name': 'Oat Crunch', 'sku': 'OAT1', 'price_minor': 4500});
+      final b = s.body(post);
+      expect(b, allOf(containsPair('mode', 'quick'), containsPair('name', 'Oat Crunch'), containsPair('price_minor', 4500), containsPair('selling_unit', 'pc')));
+      expect(b['sku'], startsWith('OATCRU-'));
       expect(post.headers['Idempotency-Key'], startsWith('cat-'));
       expect(toast('Oat added.'), findsOneWidget);
     });
 
-    testWidgets('the count cards are filters: Out of Stock lists those items, tapping it again or Show all lists everything', (t) async {
+    testWidgets('the header is compact: title, search and Add, and the chips all sit above the first product', (t) async {
       final s = server();
       await phone(t, CatalogueScreen(api: s.api), height: 3000);
-      Map<String, dynamic> last() => s.body(s.where('POST', '/cat_item_list').last);
-      expect(last().containsKey('status'), isFalse);
-      await t.tap(find.text('Out of Stock'));
-      await t.pumpAndSettle();
-      expect(last()['status'], 'out');
-      expect(find.text('Showing out of stock items'), findsOneWidget);
-      await t.tap(find.text('Drafts'));
-      await t.pumpAndSettle();
-      expect(last()['status'], 'draft');
-      await t.tap(find.text('Drafts'));
-      await t.pumpAndSettle();
-      expect(last().containsKey('status'), isFalse);
-      await t.tap(find.text('Inactive Items'));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('cat-show-all')));
-      await t.pumpAndSettle();
-      expect(last().containsKey('status'), isFalse);
-      expect(find.text('Showing inactive items'), findsNothing);
-    });
-
-    testWidgets('the Categories card opens the categories; picking one lists its items', (t) async {
-      final s = server();
-      await phone(t, CatalogueScreen(api: s.api), height: 3000);
-      final cats = s.body(s.where('POST', '/cat_item_list').last);
-      expect(cats['category'], isNull);
-      await t.tap(find.text('Categories').first);
-      await t.pumpAndSettle();
-      expect(find.text('All categories'), findsOneWidget);
-      final name = find.descendant(of: find.byType(BottomSheet), matching: find.byType(ListTile)).at(2); // 0 New category, 1 All categories
-      final label = (t.widget<ListTile>(name).title as Text).data!;
-      await t.tap(name);
-      await t.pumpAndSettle();
-      expect(s.body(s.where('POST', '/cat_item_list').last)['category'], label);
+      expect(s.body(s.where('POST', '/cat_item_list').last).containsKey('status'), isFalse);
+      final title = t.getRect(find.text('Catalogue').last), add = t.getRect(find.byKey(const ValueKey('cat-add')));
+      final chip = t.getRect(find.text('Beverages').first), first = t.getRect(find.text('Coca-Cola 500ml'));
+      expect(add.top, greaterThan(title.bottom));
+      expect(chip.top, greaterThan(add.bottom));
+      expect(first.top, greaterThan(chip.bottom));
+      expect(chip.bottom - title.top, lessThan(130)); // three short lines, not a page of cards
+      expect(find.byTooltip('Import'), findsOneWidget);
+      expect(find.byTooltip('Sample template'), findsOneWidget);
     });
 
     testWidgets('New category chip: name it, add its first product, and that category is shown', (t) async {
@@ -327,28 +301,14 @@ void main() {
       await t.tap(find.byKey(const ValueKey('new-category-next')));
       await t.pumpAndSettle();
       expect(find.text('Category: Personal care'), findsOneWidget);
-      final fields = find.descendant(of: find.byType(Dialog), matching: find.byType(TextField));
-      await t.enterText(fields.at(0), 'Shampoo');
-      await t.enterText(fields.at(1), 'SH1');
-      await t.enterText(fields.at(2), '99');
-      await t.pump();
-      await t.tap(find.text('Add product'));
+      await t.enterText(find.byKey(const ValueKey('quick-name')), 'Shampoo');
+      await t.enterText(find.byKey(const ValueKey('quick-price')), '99');
+      await t.ensureVisible(find.byKey(const ValueKey('quick-save')));
+      await t.tap(find.byKey(const ValueKey('quick-save')));
       await t.pumpAndSettle();
       expect(s.body(s.where('POST', '/cat_item_save').single)['category'], 'Personal care');
       expect(s.body(s.where('POST', '/cat_item_list').last)['category'], 'Personal care');
       expect(toast('Category Personal care is ready with Shampoo.'), findsOneWidget);
-    });
-
-    testWidgets('the Categories sheet starts with New category, which opens the name step', (t) async {
-      final s = server();
-      await phone(t, CatalogueScreen(api: s.api), height: 3000);
-      await t.tap(find.text('Categories').first);
-      await t.pumpAndSettle();
-      expect(t.getRect(find.byKey(const ValueKey('cat-sheet-new-category'))).top, lessThan(t.getRect(find.text('All categories')).top));
-      await t.tap(find.byKey(const ValueKey('cat-sheet-new-category')));
-      await t.pumpAndSettle();
-      expect(find.byKey(const ValueKey('new-category-name')), findsOneWidget);
-      expect(find.text('All categories'), findsNothing);
     });
 
     testWidgets('Quick Add opened for a category says so and saves the product into it', (t) async {
@@ -357,14 +317,13 @@ void main() {
       await t.tap(find.text('go'));
       await t.pumpAndSettle();
       expect(find.text('Category: Snacks'), findsOneWidget);
-      final fields = find.descendant(of: find.byType(Dialog), matching: find.byType(TextField));
-      await t.enterText(fields.at(0), 'Chips');
-      await t.enterText(fields.at(1), 'CH1');
-      await t.enterText(fields.at(2), '20');
-      await t.pump();
-      await t.tap(find.text('Add product'));
+      await t.enterText(find.byKey(const ValueKey('quick-name')), 'Chips');
+      await t.enterText(find.byKey(const ValueKey('quick-price')), '20');
+      await t.ensureVisible(find.byKey(const ValueKey('quick-save')));
+      await t.tap(find.byKey(const ValueKey('quick-save')));
       await t.pumpAndSettle();
-      expect(s.body(s.requests.single), {'mode': 'quick', 'name': 'Chips', 'sku': 'CH1', 'price_minor': 2000, 'category': 'Snacks'});
+      final save = s.body(s.requests.firstWhere((r) => r.url.path.endsWith('/cat_item_save')));
+      expect(save, allOf(containsPair('name', 'Chips'), containsPair('price_minor', 2000), containsPair('category', 'Snacks')));
     });
 
     testWidgets('Quick Add takes an optional photo, which goes on the product once it is added', (t) async {
@@ -377,39 +336,28 @@ void main() {
       await t.tap(find.byKey(const ValueKey('quick-photo-add')));
       await t.pumpAndSettle();
       expect(find.text('Tap to add photo'), findsNothing);
-      expect(find.byKey(const ValueKey('quick-photo-replace')), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('quick-photo-remove')));
-      await t.pumpAndSettle();
-      expect(find.text('Tap to add photo'), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('quick-photo-add')));
-      await t.pumpAndSettle();
-      final fields = find.descendant(of: find.byType(Dialog), matching: find.byType(TextField));
-      await t.enterText(fields.at(0), 'Oat');
-      await t.enterText(fields.at(1), 'OAT1');
-      await t.enterText(fields.at(2), '45');
-      await t.pump();
-      await t.tap(find.text('Add product'));
+      expect(find.byKey(const ValueKey('quick-photo-replace')), findsOneWidget); // tap the photo to change it
+      await t.enterText(find.byKey(const ValueKey('quick-name')), 'Oat');
+      await t.enterText(find.byKey(const ValueKey('quick-price')), '45');
+      await t.ensureVisible(find.byKey(const ValueKey('quick-save')));
+      await t.tap(find.byKey(const ValueKey('quick-save')));
       await t.pumpAndSettle();
       expect(photos.attached, ['n1']);
-      expect(find.text('Quick add product'), findsNothing);
+      expect(find.byType(QuickAddScreen), findsNothing);
     });
 
-    testWidgets('Quick Add shows the database refusal in the dialog and stays open', (t) async {
+    testWidgets('Quick Add shows the database refusal and stays open', (t) async {
       final s = Fake((r) => r.url.path.endsWith('/cat_item_save') ? err(409, 'Another item already uses System Code OAT1.', 'duplicate') : ok(catalogueList(sixItems)));
       await phone(t, CatalogueScreen(api: s.api), height: 3000);
-      await t.tap(find.text('+ Add Items'));
+      await t.tap(find.byKey(const ValueKey('cat-add')));
       await t.pumpAndSettle();
-      await t.tap(find.text('Quick Add'));
-      await t.pumpAndSettle();
-      final fields = find.descendant(of: find.byType(Dialog), matching: find.byType(TextField));
-      await t.enterText(fields.at(0), 'Oat');
-      await t.enterText(fields.at(1), 'OAT1');
-      await t.enterText(fields.at(2), '45');
-      await t.pump();
-      await t.tap(find.text('Add product'));
+      await t.enterText(find.byKey(const ValueKey('quick-name')), 'Oat');
+      await t.enterText(find.byKey(const ValueKey('quick-price')), '45');
+      await t.ensureVisible(find.byKey(const ValueKey('quick-save')));
+      await t.tap(find.byKey(const ValueKey('quick-save')));
       await t.pumpAndSettle();
       expect(find.text('Another item already uses System Code OAT1.'), findsOneWidget);
-      expect(find.text('Quick add product'), findsOneWidget);
+      expect(find.byType(QuickAddScreen), findsOneWidget);
     });
 
     testWidgets('Scan barcode: the search bar\'s barcode button reads with the camera and opens the product at once', (t) async {
@@ -435,14 +383,14 @@ void main() {
       expect(find.text('No item has that code.'), findsOneWidget);
     });
 
-    testWidgets('Unknown product: "Create product" opens Item creation with the scanned barcode filled in', (t) async {
+    testWidgets('Unknown product: "Create product" opens Quick Add with the scanned barcode filled in', (t) async {
       final s = server();
       await phone(t, CatalogueScreen(api: s.api, scan: (_) async => '8901234567890'), height: 3000);
       await t.tap(find.byTooltip('Scan a barcode'));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('unknown-create')));
       await t.pumpAndSettle();
-      expect(find.byType(ItemFormScreen), findsOneWidget);
+      expect(find.byType(QuickAddScreen), findsOneWidget);
       expect(find.widgetWithText(TextField, '8901234567890'), findsOneWidget);
     });
 
@@ -662,56 +610,15 @@ void main() {
     });
   });
 
-  group('GRN Matching', () {
-    testWidgets('invoice and receiving tables with the exception colours, counts and Review Exceptions', (t) async {
-      final s = Fake((r) => r.url.path.endsWith('/grn_matching_view') ? ok(matchingView()) : ok(grnView()));
-      await phone(t, GrnMatchingScreen(receiptId: 'r1', api: s.api), height: 3200);
-      expect(find.text('Purchase matching'), findsOneWidget);
-      expect(find.text('RCV-2026-BB4 • MATCH INVOICE'), findsOneWidget);
-      expect(find.text('INV-2024-0047 • Metro Cash & Carry'), findsOneWidget);
-      expect(find.text('Supplier Invoice'), findsOneWidget);
-      expect(find.text('Physical Receiving Logs'), findsOneWidget);
-      expect(find.text('Op: Niraj'), findsOneWidget);
-      expect(find.text('₹260.00'), findsWidgets);
-      expect(find.text('NOT ON INVOICE'), findsOneWidget);
-      expect(find.text('1 matched shown'), findsOneWidget);
-      expect(find.text('3 exceptions shown'), findsOneWidget);
-      expect(find.text('Review Exceptions'), findsOneWidget);
-      // the Vim Bar row is red, the Amul row (short) is amber, the Atta row (matched) is plain
-      Color? bgOf(String text) {
-        final box = find.ancestor(of: find.text(text).last, matching: find.byType(Container)).evaluate().map((e) => e.widget as Container).firstWhere((c) => c.decoration is BoxDecoration && (c.decoration as BoxDecoration).color != null && (c.decoration as BoxDecoration).borderRadius != null);
-        return (box.decoration as BoxDecoration).color;
-      }
-      expect(bgOf('Vim Bar 125g'), const Color(0xFFFEF2F2));
-      expect(bgOf('Amul Butter 500g'), const Color(0xFFFFF8E1)); // short: amber
-      expect(t.takeException(), isNull);
-    });
-
-    testWidgets('Review Exceptions opens the dashboard', (t) async {
-      final s = Fake((r) => r.url.path.endsWith('/grn_matching_view') ? ok(matchingView()) : ok(grnView()));
-      await phone(t, GrnMatchingScreen(receiptId: 'r1', api: s.api), height: 3200);
-      await t.tap(find.text('Review Exceptions'));
-      await t.pumpAndSettle();
-      expect(find.text('Purchase dashboard'), findsOneWidget);
-    });
-
-    testWidgets('no invoice yet: says so instead of inventing rows', (t) async {
-      final m = matchingView()..['has_invoice'] = false..['invoice_lines'] = [];
-      final s = Fake((_) => ok(m));
-      await phone(t, GrnMatchingScreen(receiptId: 'r1', api: s.api), height: 3200);
-      expect(find.text('The supplier invoice has not been entered for this receipt.'), findsOneWidget);
-    });
-  });
-
   group('GRN Dashboard', () {
     testWidgets('shows the GRN, the invoice against physical receiving, the resolution form, posting preview and checklist', (t) async {
       final s = Fake((_) => ok(grnView()));
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
       expect(s.requests.first.url.path, '/rpc/grn_open');
-      expect(find.text('Purchase dashboard'), findsOneWidget);
-      expect(find.text('Open receipt → Scan/Enter Products → Match Invoice'), findsOneWidget);
-      for (final c in ['Receiving', 'Purchase', 'Putaway', 'Shelf Labels']) {
-        expect(find.text(c), c == 'Purchase' ? findsWidgets : findsOneWidget);   // 'Purchase' is also the banner's title
+      expect(find.text('Match bill'), findsOneWidget); // the title; the step strip says Bill
+      // one page: no tab strip, no separate matching screen
+      for (final gone in ['Purchase dashboard', 'Putaway', 'Shelf Labels', 'Match against the invoice']) {
+        expect(find.text(gone), findsNothing, reason: gone);
       }
       expect(find.text('GRN-105'), findsOneWidget);
       expect(find.text('RCV-105 / PO-105 / INV-5512'), findsOneWidget);
@@ -719,13 +626,35 @@ void main() {
       expect(find.text('Rohan Shah · Owner'), findsOneWidget);
       expect(find.text('Not posted'), findsOneWidget);
       expect(find.text('Review'), findsNWidgets(2)); // the status chip and the resolve card chip
-      expect(find.text('Open Receipt'), findsOneWidget);
-      expect(find.text('Invoice vs physical receiving'), findsOneWidget);
+      expect(find.text('Open the count'), findsOneWidget);
+      expect(find.text('Invoice vs counted · 0 match · 1 differs'), findsOneWidget);
+      // the items as one table: billed, received, rate, amount, GST; the bill's totals under it
+      expect(find.byKey(const ValueKey('check-header')), findsOneWidget); // the green purchase card
+      for (final x in ['Bill', 'Rcvd', 'Rate', 'Amount', '₹30', '₹720']) {
+        expect(find.text(x), findsWidgets, reason: x);
+      }
+      expect(find.textContaining('GST 18%'), findsOneWidget);
+      expect(find.text('₹129.60'), findsOneWidget); // GST: 18% of ₹720
+      expect(find.text('₹849.60'), findsOneWidget); // bill total
+      expect(find.text('₹778.80'), findsOneWidget); // received: ₹660 + 18%
+      // each item can be ticked as it is checked
+      expect(find.text('0 / 1 checked'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('check-tick-i1')));
+      await t.pump();
+      expect(find.text('1 / 1 checked'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('check-tick-i1')));
+      await t.pump();
+      expect(find.text('0 / 1 checked'), findsOneWidget);
+      // a row opens its full comparison
+      await t.tap(find.byKey(const ValueKey('check-row-i1')));
+      await t.pumpAndSettle();
       expect(find.text('24 / 24 units'), findsOneWidget);
       expect(find.text('22 / 2 units'), findsOneWidget);
       expect(find.text('24 × ₹30.00 = ₹720.00'), findsOneWidget);
       expect(find.text('22 × ₹30.00 = ₹660.00'), findsOneWidget);
       expect(find.text('2 × ₹30.00 = ₹60.00'), findsOneWidget);
+      await t.tapAt(const Offset(10, 10));
+      await t.pumpAndSettle();
       expect(find.text('Resolve exceptions'), findsOneWidget);
       expect(find.text('Accept 22 · Claim credit for 2'), findsOneWidget);
       expect(find.text('Posting preview'), findsOneWidget);
@@ -734,15 +663,17 @@ void main() {
       expect(find.text('Physical count verified by Niraj'), findsOneWidget);
       expect(find.text('Lot and expiry captured · CC-C / 2027-11-15'), findsOneWidget);
       expect(find.text('Owner approval pending • nothing posted'), findsOneWidget);
-      expect(find.text('Resolve the exceptions first.'), findsOneWidget);
-      // the request button is there but not usable until the database says so
-      await t.tap(find.text('Request owner approval'));
-      await t.pump();
-      expect(s.requests.where((r) => r.url.path.endsWith('/grn_request_approval')), isEmpty);
+      expect(find.byKey(const ValueKey('purchase-steps-3')), findsOneWidget);
+      // one button finishes: a claim needs its reference and evidence first, so nothing is sent yet
+      expect(find.text('Send to owner for approval'), findsOneWidget); // this person may not approve
+      await t.ensureVisible(find.byKey(const ValueKey('check-finish')));
+      await t.tap(find.byKey(const ValueKey('check-finish')));
+      await t.pumpAndSettle();
+      expect(s.requests.where((r) => r.url.path.endsWith('/grn_resolve') || r.url.path.endsWith('/grn_request_approval')), isEmpty);
       expect(t.takeException(), isNull);
     });
 
-    testWidgets('saving a claim sends the reference and evidence; once valid, Request owner approval works', (t) async {
+    testWidgets('one tap settles the claim and sends the match to the owner', (t) async {
       var view = grnView();
       final s = Fake((r) {
         if (r.url.path.endsWith('/grn_resolve')) view = grnView(valid: true, blockers: const [], version: 5);
@@ -752,19 +683,41 @@ void main() {
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
       await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == 'CLM-105'), 'CLM-105');
       await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == 'Seal inspection · 2 photos'), 'Seal inspection, 2 photos');
-      await t.ensureVisible(find.text('Save resolution'));
-      await t.tap(find.text('Save resolution'));
+      await t.ensureVisible(find.text('Send to owner for approval'));
+      await t.tap(find.text('Send to owner for approval'));
       await t.pumpAndSettle();
       final res = s.requests.firstWhere((r) => r.url.path.endsWith('/grn_resolve'));
       expect(jsonDecode(res.body), {'receipt_document_id': 'r1', 'version': 4, 'resolution': 'accept_claim_credit', 'claim_ref': 'CLM-105', 'evidence': 'Seal inspection, 2 photos'});
-      expect(find.text('Resolved'), findsOneWidget);
-      await t.ensureVisible(find.text('Request owner approval'));
-      await t.tap(find.text('Request owner approval'));
-      await t.pumpAndSettle();
       final req = s.requests.firstWhere((r) => r.url.path.endsWith('/grn_request_approval'));
       expect(jsonDecode(req.body), {'receipt_document_id': 'r1', 'version': 5});
       expect(find.text('Approval due'), findsOneWidget);
       expect(find.text('Waiting for owner approval'), findsOneWidget);
+    });
+
+    testWidgets('the owner matches the bill and adds the stock in one tap (accepting differences as delivered)', (t) async {
+      final owner = {'can_resolve': true, 'can_request': false, 'can_approve': false, 'can_reject': false, 'self_approve': true};
+      var view = grnView(actions: owner);
+      final s = Fake((r) {
+        final p = r.url.path;
+        if (p.endsWith('/grn_resolve')) view = grnView(valid: true, blockers: const [], version: 5, actions: owner);
+        if (p.endsWith('/grn_request_approval')) view = grnView(status: 'approval_due', valid: true, blockers: const [], version: 6, actions: owner);
+        if (p.endsWith('/grn_decide')) view = grnView(status: 'approved', valid: true, blockers: const [], version: 7, actions: owner);
+        return ok(view);
+      });
+      HomeNav.stockPage = (c, page, {itemId}) {};
+      await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
+      // choose "accept as received" for the 2 short units
+      await t.tap(find.text('Accept 22 · Claim credit for 2'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Accept 22 as received').last);
+      await t.pumpAndSettle();
+      await t.ensureVisible(find.text('Match bill & add stock'));
+      await t.tap(find.text('Match bill & add stock'));
+      await t.pumpAndSettle();
+      final paths = s.requests.map((r) => r.url.path.split('/').last).where((p) => p != 'grn_open' && p != 'grn_view').toList();
+      expect(paths, ['grn_resolve', 'grn_request_approval', 'grn_decide']);
+      expect(jsonDecode(s.requests.firstWhere((r) => r.url.path.endsWith('/grn_resolve')).body)['note'], 'Accepted as delivered');
+      expect(find.text('Print labels for this lot?'), findsOneWidget); // step 3 done: labels offered
     });
 
     testWidgets('an approver sees Approve and post stock and Send back; send back needs a reason', (t) async {
@@ -798,13 +751,37 @@ void main() {
         return ok(view);
       });
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
+      // approving leads straight on to the whole lot's labels (founder, 26 Oct 2026)
+      final opened = <String>[];
+      HomeNav.stockPage = (c, page, {itemId}) => opened.add(itemId == null ? page : '$page:$itemId');
       await t.ensureVisible(find.text('Approve and post stock'));
       await t.tap(find.text('Approve and post stock'));
       await t.pumpAndSettle();
       expect(jsonDecode(s.requests.last.body), {'receipt_document_id': 'r1', 'version': 6, 'decision': 'approve'});
+      // the voucher is matched: a question, not the labels straight away
+      expect(opened, isEmpty);
+      expect(find.text('Print labels for this lot?'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('labels-offer-yes')));
+      await t.pumpAndSettle();
+      expect(opened, ['lot_labels:r1']);
       expect(find.text('Approved · stock posted'), findsOneWidget);
       expect(find.text('Posted'), findsOneWidget);
       expect(find.text('Owner approved · stock posted'), findsOneWidget);
+      // the optional next steps appear as two buttons, and open the stock pages for this delivery
+      await t.ensureVisible(find.byKey(const ValueKey('check-putaway')));
+      await t.tap(find.byKey(const ValueKey('check-putaway')));
+      await t.tap(find.byKey(const ValueKey('check-labels')));
+      expect(opened, ['lot_labels:r1', 'putaway:r1', 'lot_labels:r1']);
+    });
+
+    testWidgets('every line is listed, the differences first, and matching lines too', (t) async {
+      final s = Fake((_) => ok(grnView(rows: [
+            row('matched', invoice: {'name': 'Matched item', 'qty': 5, 'unit': 'units', 'unit_price_minor': 1000, 'amount_minor': 5000}, received: {'line_id': 'l2', 'name': 'Matched item', 'qty': 5, 'rejected_qty': 0, 'unit': 'unit', 'unit_cost_minor': 1000}, accepted: 5),
+            colaRow(),
+          ])));
+      await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
+      expect(find.text('Invoice vs counted · 1 match · 1 differs'), findsOneWidget);
+      expect(t.getTopLeft(find.text('Coca-Cola 500ml').first).dy, lessThan(t.getTopLeft(find.text('Matched item')).dy));
     });
 
     testWidgets('a database refusal is shown as a message; a stale version reloads', (t) async {
@@ -815,8 +792,8 @@ void main() {
         return ok(grnView(valid: true, blockers: const []));
       });
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
-      await t.ensureVisible(find.text('Request owner approval'));
-      await t.tap(find.text('Request owner approval'));
+      await t.ensureVisible(find.text('Send to owner for approval'));
+      await t.tap(find.text('Send to owner for approval'));
       await t.pumpAndSettle();
       expect(toast('This GRN was changed on another device.'), findsOneWidget);
       expect(n, greaterThan(1)); // reloaded
@@ -835,11 +812,40 @@ void main() {
       expect(find.text('+0 '), findsNothing);
     });
 
-    testWidgets('no invoice yet: no invented numbers, and no resolution form', (t) async {
-      final s = Fake((_) => ok(grnView(hasInvoice: false, rows: [], blockers: const ['Enter the supplier invoice first.'])..['totals'] = {'invoice_amount_minor': 0, 'accepted_value_minor': 0, 'claim_minor': 0, 'exceptions': 0}));
+    testWidgets('no bill yet: the counted items are listed with estimates; the bill is entered here, prefilled from the count', (t) async {
+      final counted = row('not_on_invoice', received: {'line_id': 'l1', 'name': 'Surf Excel 1kg', 'qty': 12, 'rejected_qty': 2, 'unit': 'pack'}, accepted: 10)
+        ..addAll({'item_id': 'i9', 'gst_pct': 18, 'ref_unit_minor': 11200});
+      Map<String, dynamic>? sent;
+      final s = Fake((r) {
+        if (r.url.path.endsWith('/grn_invoice_save')) sent = jsonDecode(r.body) as Map<String, dynamic>;
+        return ok(grnView(hasInvoice: false, rows: [counted], blockers: const ['Enter the supplier invoice first.'])
+          ..['totals'] = {'invoice_amount_minor': 0, 'accepted_value_minor': 0, 'claim_minor': 0, 'exceptions': 0});
+      });
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4000);
-      expect(find.text('The supplier invoice has not been entered for this receipt yet, so there is nothing to match.'), findsOneWidget);
+      expect(find.text('Surf Excel 1kg'), findsOneWidget);
+      expect(find.textContaining('2 damaged'), findsOneWidget);
+      expect(find.text('No supplier bill yet: rates are from the order or the product cost.'), findsOneWidget);
+      expect(find.text('₹112'), findsOneWidget); // the order's rate
+      expect(find.text('₹1,120'), findsOneWidget); // 10 good × ₹112
+      expect(find.text('₹1,321.60'), findsOneWidget); // estimated total with 18% GST
       expect(find.text('Resolve exceptions'), findsNothing);
+      await t.ensureVisible(find.byKey(const ValueKey('check-enter-bill')));
+      await t.tap(find.byKey(const ValueKey('check-enter-bill')));
+      await t.pumpAndSettle();
+      expect(t.widget<TextField>(find.byKey(const ValueKey('bill-qty-i9'))).controller!.text, '12');
+      expect(t.widget<TextField>(find.byKey(const ValueKey('bill-rate-i9'))).controller!.text, '112');
+      expect(find.text('₹1,344.00'), findsOneWidget); // 12 × ₹112
+      await t.enterText(find.byKey(const ValueKey('bill-number')), '');
+      await t.tap(find.byKey(const ValueKey('bill-save')));
+      await t.pump();
+      expect(find.text('Enter the bill number.'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('bill-number')), 'LFA-9001');
+      await t.tap(find.byKey(const ValueKey('bill-save')));
+      await t.pumpAndSettle();
+      expect(sent, isNotNull);
+      expect(sent!['invoice_no'], 'LFA-9001');
+      expect(sent!['supplier_name'], 'Coca-Cola Bottling');
+      expect(sent!['lines'], [{'inventory_item_id': 'i9', 'product_name': 'Surf Excel 1kg', 'qty': 12, 'unit_price_minor': 11200}]);
     });
 
     testWidgets('a role that may only read opens the existing GRN (open refused with 403)', (t) async {
@@ -860,7 +866,8 @@ void main() {
             })
           : ok(grnView()));
       await phone(t, GrnQueueScreen(api: s.api));
-      expect(find.text('Purchases'), findsOneWidget);
+      expect(find.text('Deliveries to check'), findsOneWidget);
+      expect(find.text('Putaway'), findsNothing); // no tab strip
       expect(find.text('GRN-105'), findsOneWidget);
       expect(find.text('RCV-105 / INV-5512'), findsOneWidget);
       expect(find.text('Coca-Cola Bottling'), findsOneWidget);
@@ -868,24 +875,21 @@ void main() {
       expect(find.text('RCV-106'), findsOneWidget);
       expect(find.text('Not opened'), findsOneWidget);
       expect(find.text('Needs review'), findsOneWidget);
-      expect(find.text('No purchases waiting for review'), findsNothing);
+      expect(find.text('No deliveries to check'), findsNothing);
       await t.tap(find.text('GRN-105'));
       await t.pumpAndSettle();
-      expect(find.text('Purchase dashboard'), findsOneWidget);
+      expect(find.text('Match bill'), findsOneWidget); // the title; the step strip says Bill
     });
 
     testWidgets('no receipts: explains the flow and Receive stock opens Receiving', (t) async {
       final s = Fake((r) => ok({'items': []}));
       var received = 0;
       await phone(t, GrnQueueScreen(api: s.api, onReceive: (_) => received++));
-      expect(find.text('No purchases waiting for review'), findsOneWidget);
+      expect(find.text('No deliveries to check'), findsOneWidget);
       expect(find.text('Count the delivery in Receiving'), findsOneWidget);
       await t.tap(find.text('Receive stock'));
       await t.pump();
       expect(received, 1);
-      await t.tap(find.text('Receiving'));
-      await t.pump();
-      expect(received, 2);
     });
   });
 }
@@ -895,6 +899,9 @@ class _FakePhotos extends ItemPhotoService {
   final attached = <String>[];
   @override
   Future<ItemPhoto?> pick() async => ItemPhoto(bytes: Uint8List.fromList(const [0x89, 0x50, 0x4E, 0x47]), contentType: 'image/png');
+  // no camera in tests: the camera screen has its own tests (photo_capture_test.dart)
+  @override
+  Future<ItemPhoto?> capture(BuildContext context) => pick();
   @override
   Future<ItemPhoto> removeBackground(ItemPhoto p, {String? bgColor}) async => ItemPhoto(bytes: p.bytes, contentType: 'image/png', backgroundRemoved: true);
   @override

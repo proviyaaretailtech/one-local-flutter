@@ -10,6 +10,7 @@ import 'activity_tasks_screens.dart';
 import 'roles_screen.dart';
 import 'team_api.dart';
 import 'team_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Loads one answer and keeps it for the screen; every Team screen uses the same three-state pattern (loading, error with retry, content).
 mixin TeamLoader<W extends StatefulWidget, T> on State<W> {
@@ -67,7 +68,7 @@ class _TeamDashboardState extends State<TeamDashboardScreen>
   @override
   Widget build(BuildContext context) => TeamPage(
     env: env,
-    title: 'Team dashboard',
+    title: tr('Team dashboard'),
     subtitle: data == null
         ? null
         : '${data!.n('members')} staff · ${data!.n('locations')} ${data!.n('locations') == 1 ? 'location' : 'locations'}${data!.s('place').isEmpty ? '' : ' · ${data!.s('place')}'}',
@@ -105,36 +106,36 @@ class _TeamDashboardState extends State<TeamDashboardScreen>
         children: [
           StatTile(
             value: '$members',
-            label: 'Team members',
+            label: tr('Team members'),
             note:
                 'Across ${d.n('locations')} ${d.n('locations') == 1 ? 'location' : 'locations'}',
             onTap: () => _go(UsersScreen(env: env)),
           ),
           StatTile(
             value: '$active',
-            label: 'Active now',
-            note: 'On shift today',
+            label: tr('Active now'),
+            note: tr('On shift today'),
             color: kGreenDeep,
             onTap: () => _go(UsersScreen(env: env, filter: 'active')),
           ),
           StatTile(
             value: '${d.n('invitations')}',
-            label: 'Invitations',
-            note: 'Awaiting response',
+            label: tr('Invitations'),
+            note: tr('Awaiting response'),
             color: kAmber,
             onTap: () => _go(UsersScreen(env: env, filter: 'invited')),
           ),
           StatTile(
             value: '${d.n('tasks_due')}',
-            label: 'Tasks due',
-            note: 'Needs attention',
+            label: tr('Tasks due'),
+            note: tr('Needs attention'),
             color: kBadText,
             onTap: () => _go(TasksScreen(env: env, filter: 'overdue')),
           ),
         ],
       ),
       const SizedBox(height: 18),
-      Text('Quick actions', style: inter(17, 600)),
+      Text(tr('Quick actions'), style: inter(17, 600)),
       const SizedBox(height: 10),
       if (d.b('can_invite'))
         Padding(
@@ -145,24 +146,24 @@ class _TeamDashboardState extends State<TeamDashboardScreen>
           ),
         ),
       LightCta(
-        label: 'Staff tasks',
+        label: tr('Staff tasks'),
         icon: LucideIcons.listChecks,
         onPressed: () => _go(TasksScreen(env: env)),
       ),
       const SizedBox(height: 8),
       LightCta(
-        label: 'Staff activity',
+        label: tr('Staff activity'),
         icon: LucideIcons.activity,
         onPressed: () => _go(ActivityScreen(env: env)),
       ),
       const SizedBox(height: 8),
       LightCta(
-        label: 'Roles & permissions',
+        label: tr('Roles & permissions'),
         icon: LucideIcons.shieldCheck,
         onPressed: () => _go(RolesScreen(env: env)),
       ),
       const SizedBox(height: 18),
-      Text('Team on shift', style: inter(17, 600)),
+      Text(tr('Team on shift'), style: inter(17, 600)),
       const SizedBox(height: 10),
       if (d.l('on_shift').isEmpty)
         OrderCardBox(
@@ -238,8 +239,8 @@ class _UsersState extends State<UsersScreen>
     final c = data?.m('counts');
     return TeamPage(
       env: env,
-      title: 'Users',
-      subtitle: 'Manage access across your locations',
+      title: tr('Users'),
+      subtitle: tr('Manage access across your locations'),
       onRefresh: load,
       bottom: data != null && data!.b('can_invite')
           ? LimeButton(
@@ -254,7 +255,7 @@ class _UsersState extends State<UsersScreen>
           onSubmitted: (_) => load(),
           style: inter(15, 400),
           decoration: InputDecoration(
-            hintText: 'Search name, email or number',
+            hintText: tr('Search name, email or number'),
             hintStyle: inter(15, 400, color: kKicker),
             prefixIcon: const Icon(LucideIcons.search, size: 20, color: kMuted),
             filled: true,
@@ -372,7 +373,7 @@ class _InviteState extends State<InviteScreen> {
 
   Future<void> _pickRole() async {
     final roles = _options!.l('roles');
-    final v = await pickTeamRole(context, title: 'Role', roles: roles, current: _role, kind: env.kind);
+    final v = await pickTeamRole(context, title: tr('Role'), roles: roles, current: _role, kind: env.kind);
     if (v != null) {
       setState(() {
         _role = v;
@@ -446,7 +447,7 @@ class _InviteState extends State<InviteScreen> {
     final locs = _options?.l('locations') ?? const <Facts>[];
     return TeamPage(
       env: env,
-      title: 'Invite user',
+      title: tr('Invite user'),
       subtitle: hasError
           ? 'Fix the details and try again'
           : 'They get an invitation to join your team',
@@ -466,15 +467,15 @@ class _InviteState extends State<InviteScreen> {
       children: [
         if (hasError)
           TeamBanner(
-            title: 'Invitation couldn\'t be sent',
+            title: tr('Invitation couldn\'t be sent'),
             body: _bannerBody!,
             onClose: () => setState(() => _bannerBody = null),
           ),
         if (_loadError != null)
-          TeamBanner(title: 'Could not load roles', body: _loadError!),
-        TeamField(label: 'Full name', controller: _name, hint: 'e.g. Pooja Nair'),
+          TeamBanner(title: tr('Could not load roles'), body: _loadError!),
+        TeamField(label: tr('Full name'), controller: _name, hint: 'e.g. Pooja Nair'),
         TeamField(
-          label: 'Mobile number',
+          label: tr('Mobile number'),
           controller: _mobile,
           prefix: '+91',
           keyboard: TextInputType.phone,
@@ -486,7 +487,7 @@ class _InviteState extends State<InviteScreen> {
           error: _mobileError,
         ),
         TeamField(
-          label: 'Email address',
+          label: tr('Email address'),
           controller: _email,
           keyboard: TextInputType.emailAddress,
           hint: 'name@example.com',
@@ -494,13 +495,13 @@ class _InviteState extends State<InviteScreen> {
           action: TextInputAction.done,
         ),
         TeamSelect(
-          label: 'Role',
+          label: tr('Role'),
           value: _roleName,
           onTap: _options == null ? null : _pickRole,
         ),
         if (locs.length > 1)
           TeamSelect(
-            label: 'Location',
+            label: tr('Location'),
             value: _locationName,
             onTap: _pickLocation,
           ),
@@ -551,7 +552,7 @@ class _UserDetailState extends State<UserDetailScreen>
     final o = await env.api.options();
     if (!mounted) return;
     final roles = o.l('roles').where((r) => r.b('assignable')).toList();
-    final v = await pickTeamRole(context, title: 'Edit role', roles: roles, current: d.m('role').s('slug'), kind: env.kind);
+    final v = await pickTeamRole(context, title: tr('Edit role'), roles: roles, current: d.m('role').s('slug'), kind: env.kind);
     if (v == null || v == d.m('role').s('slug') || !mounted) return;
     final role = roles.firstWhere((r) => r.s('slug') == v);
     List<String>? places;
@@ -596,7 +597,7 @@ class _UserDetailState extends State<UserDetailScreen>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Location access', style: inter(18, 700)),
+                Text(tr('Location access'), style: inter(18, 700)),
                 const SizedBox(height: 6),
                 for (final l in locs)
                   CheckboxListTile(
@@ -659,7 +660,7 @@ class _UserDetailState extends State<UserDetailScreen>
               DarkCta(label: yes, onPressed: () => Navigator.of(ctx).pop(true)),
               const SizedBox(height: 8),
               LightCta(
-                label: 'Cancel',
+                label: tr('Cancel'),
                 onPressed: () => Navigator.of(ctx).pop(false),
               ),
             ],
@@ -724,7 +725,7 @@ class _UserDetailState extends State<UserDetailScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('CONTACT', style: inter(11, 600, color: kMuted)),
+            Text(tr('CONTACT'), style: inter(11, 600, color: kMuted)),
             const SizedBox(height: 6),
             Text(
               d.so('mobile') == null || d.s('mobile').isEmpty
@@ -740,7 +741,7 @@ class _UserDetailState extends State<UserDetailScreen>
       const SizedBox(height: 10),
       Semantics(
         button: actions.contains('set_locations'),
-        label: 'Location access',
+        label: tr('Location access'),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: actions.contains('set_locations')
@@ -753,7 +754,7 @@ class _UserDetailState extends State<UserDetailScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Location access', style: inter(16, 600)),
+                  Text(tr('Location access'), style: inter(16, 600)),
                   const SizedBox(height: 6),
                   Text(
                     places.isEmpty
@@ -775,7 +776,7 @@ class _UserDetailState extends State<UserDetailScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Role & permissions', style: inter(16, 600)),
+              Text(tr('Role & permissions'), style: inter(16, 600)),
               const SizedBox(height: 6),
               Text(
                 '${d.m('role').s('name')} · ${d.n('permission_count')} permissions enabled',
@@ -802,7 +803,7 @@ class _UserDetailState extends State<UserDetailScreen>
       ),
       const SizedBox(height: 18),
       if (actions.contains('set_role'))
-        LimeButton('Edit role', busy: _busy, onPressed: () => _editRole(d)),
+        LimeButton(tr('Edit role'), busy: _busy, onPressed: () => _editRole(d)),
       if (actions.contains('suspend')) ...[
         const SizedBox(height: 10),
         OutlineButton2(

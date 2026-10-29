@@ -15,6 +15,7 @@ import 'order_widgets.dart';
 import 'orders_api.dart';
 import '../home/home_nav.dart';
 import '../outlets/outlet_header.dart';
+import '../ui/i18n.dart';
 
 // Badge and channel colours sampled from the Figma frames (FINAL PARTNER APP, sections E/H; assets/figma_ref_h/Section H Export).
 const _blue = Color(0xFF2563EB), _blueBg = Color(0xFFEFF6FF);
@@ -471,7 +472,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         const Icon(LucideIcons.plus, size: 20, color: kInk),
                         const SizedBox(width: 6),
-                        Text('New Order', style: inter(15, 700)),
+                        Text(tr('New Order'), style: inter(15, 700)),
                       ]),
                     ),
                   ),
@@ -609,8 +610,8 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
       if (_aggregator && st != null && !st.online) {
         return [...out, _Empty(icon: LucideIcons.plugZap, title: '$name is not connected', body: 'No $name orders reach One Local yet. They appear here once $name is connected.')];
       }
-      if (_liveQ.text.trim().isNotEmpty) return [...out, const _Empty(icon: LucideIcons.searchX, title: 'No orders match', body: 'Try another order number or name.')];
-      return [...out, _Empty(icon: LucideIcons.chefHat, title: 'All Caught Up!', body: _emptyBody[_status]!)];
+      if (_liveQ.text.trim().isNotEmpty) return [...out, _Empty(icon: LucideIcons.searchX, title: tr('No orders match'), body: tr('Try another order number or name.'))];
+      return [...out, _Empty(icon: LucideIcons.chefHat, title: tr('All Caught Up!'), body: _emptyBody[_status]!)];
     }
     return [
       ...out,
@@ -692,8 +693,8 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
       return [
         ...out,
         _holdQ.text.trim().isNotEmpty || _holdChannel != 'all'
-            ? const _Empty(icon: LucideIcons.searchX, title: 'No held bills match', body: 'Try another search or channel.')
-            : const _Empty(icon: LucideIcons.pause, title: 'No bills on hold', body: 'Bills saved with Save & Hold appear here until they are paid or cancelled.'),
+            ? _Empty(icon: LucideIcons.searchX, title: tr('No held bills match'), body: tr('Try another search or channel.'))
+            : _Empty(icon: LucideIcons.pause, title: tr('No bills on hold'), body: tr('Bills saved with Save & Hold appear here until they are paid or cancelled.')),
       ];
     }
     return [
@@ -909,7 +910,7 @@ class _HoldCard extends StatelessWidget {
                 key: ValueKey('cancel-${b.id}'),
                 onPressed: busy ? null : onCancel,
                 style: OutlinedButton.styleFrom(side: const BorderSide(color: _chipLine), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                child: Text('Cancel Order', style: inter(15, 600, color: kBadText)),
+                child: Text(tr('Cancel Order'), style: inter(15, 600, color: kBadText)),
               ),
             ),
           ),
@@ -921,7 +922,7 @@ class _HoldCard extends StatelessWidget {
                 key: ValueKey('resume-${b.id}'),
                 onPressed: busy ? null : onResume,
                 style: FilledButton.styleFrom(backgroundColor: kLime, foregroundColor: kInk, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                child: Text('Resume order', style: inter(15, 700)),
+                child: Text(tr('Resume order'), style: inter(15, 700)),
               ),
             ),
           ),
@@ -951,17 +952,17 @@ class _CancelSheetState extends State<_CancelSheet> {
   Widget build(BuildContext context) {
     final ok = _reason.text.trim().length >= 3;
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text('No payment was taken. The bill stays in the order history as cancelled.', style: inter(13.5, 400, color: kMuted)),
+      Text(tr('No payment was taken. The bill stays in the order history as cancelled.'), style: inter(13.5, 400, color: kMuted)),
       const SizedBox(height: 12),
       TextField(
         key: const ValueKey('cancel-reason'),
         controller: _reason,
         maxLength: 200,
-        decoration: const InputDecoration(hintText: 'Reason (for example: customer left)'),
+        decoration: InputDecoration(hintText: tr('Reason (for example: customer left)')),
         onChanged: (_) => setState(() {}),
       ),
       const SizedBox(height: 8),
-      DarkCta(label: 'Cancel bill', onPressed: ok ? () => Navigator.pop(context, _reason.text.trim()) : null),
+      DarkCta(label: tr('Cancel bill'), onPressed: ok ? () => Navigator.pop(context, _reason.text.trim()) : null),
       const SizedBox(height: 6),
       UnderLink('Keep on hold', onTap: () => Navigator.pop(context)),
     ]);

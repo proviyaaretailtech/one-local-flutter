@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../states/state_kit.dart';
+import '../ui/app_header.dart';
 import '../ui/theme.dart';
 import 'storefront_api.dart';
 
@@ -30,32 +31,18 @@ class SfPage extends StatelessWidget {
         backgroundColor: kBg,
         body: SafeArea(
           child: Column(children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Row(children: [
-                Semantics(
-                  button: true,
-                  label: 'Back',
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: onBack ?? () => Navigator.of(context).maybePop(),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: kLine)),
-                      child: const Icon(LucideIcons.arrowLeft, size: 20, color: kInk),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(title, style: inter(20, 700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    if (subtitle != null) Text(subtitle!, style: inter(13, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ]),
-                ),
-                ?trailing,
-              ]),
+            // the banner (☰ always), with the one back arrow, the page's line and its action under it
+            AppHeader(
+              title: title,
+              safeTop: false,
+              back: true,
+              onBack: onBack,
+              under: subtitle == null && trailing == null
+                  ? null
+                  : Row(children: [
+                      Expanded(child: Text(subtitle ?? '', style: inter(13, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      ?trailing,
+                    ]),
             ),
             Expanded(child: ListView(padding: padding, children: children)),
             if (bottom != null) Padding(padding: const EdgeInsets.fromLTRB(16, 6, 16, 14), child: bottom),

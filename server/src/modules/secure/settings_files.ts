@@ -2,6 +2,7 @@
 // a signed upload slot, sends the bytes to it, then confirms. The slot and the signed links are made here with the service role, but only for a
 // path under the CALLER's own business folder, and the database (run as the caller) decides who may attach or open a file.
 import { db, mapDbError, userClient } from '../../db.ts';
+import { viaProxy } from '../../config.ts';
 import { HttpError } from '../../http.ts';
 import { parse } from '../../validate.ts';
 import { FILE_EXT, FILE_MAX_BYTES, FileAsk, FileAttach, FileLink } from '../../schemas/settings.ts';
@@ -24,7 +25,7 @@ export async function fileSlot({ request, args }: SecureCtx) {
   const path = `${org}/${b.kind}/${crypto.randomUUID()}.${FILE_EXT[b.content_type]}`;
   const signed = await db().storage.from(BUCKET).createSignedUploadUrl(path);
   if (signed.error || !signed.data) { console.error('[secure] signed upload failed', signed.error?.message); throw new HttpError(502, 'Uploads are not available right now.'); }
-  return { path, upload_url: signed.data.signedUrl, max_bytes: FILE_MAX_BYTES };
+  return { path, upload_url: viaProxy(signed.data.signedUrl), max_bytes: FILE_MAX_BYTES };
 }
 
 export async function fileAttach({ request, args }: SecureCtx) {
@@ -55,7 +56,7 @@ export async function fileLink({ request, args }: SecureCtx) {
   if (!path) throw new HttpError(404, 'That file was not found.', undefined, 'not_found');
   const signed = await db().storage.from(BUCKET).createSignedUrl(path, 300);
   if (signed.error || !signed.data) throw new HttpError(502, 'The file is not available right now.');
-  return { url: signed.data.signedUrl, content_type: path.endsWith('.pdf') ? 'application/pdf' : path.endsWith('.png') ? 'image/png' : 'image/jpeg', expires_in: 300 };
+  return { url: viaProxy(signed.data.signedUrl), content_type: path.endsWith('.pdf') ? 'application/pdf' : path.endsWith('.png') ? 'image/png' : 'image/jpeg', expires_in: 300 };
 }
 
 /** Result transform for the remove functions: delete the stored file the database just detached, and do not hand its path to the app. */

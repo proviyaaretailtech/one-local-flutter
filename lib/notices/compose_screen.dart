@@ -6,6 +6,7 @@ import '../states/state_kit.dart';
 import '../ui/theme.dart';
 import 'notices_api.dart';
 import 'notices_widgets.dart';
+import '../ui/i18n.dart';
 
 /// Message customers: channel, group, a live count of who has agreed to hear from the store, the text, "Queue message".
 /// The database records and queues it (one audited step). Nothing is sent from the app or the server today; the screen says so.
@@ -100,7 +101,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           OrdersTopBar(
-            title: 'Message customers',
+            title: tr('Message customers'),
             onBack: () => Navigator.of(context).maybePop(),
           ),
           Expanded(
@@ -202,10 +203,10 @@ class _ComposeScreenState extends State<ComposeScreen> {
                             minLines: 4,
                             maxLines: 8,
                             onChanged: (_) => setState(() {}),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.white,
-                              hintText: 'Write your message',
+                              hintText: tr('Write your message'),
                               border: OutlineInputBorder(),
                             ),
                           ),
@@ -219,7 +220,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                               ),
                             ),
                           DarkCta(
-                            label: 'Queue message',
+                            label: tr('Queue message'),
                             busy: _busy,
                             onPressed:
                                 can &&
@@ -249,7 +250,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
             : 'Message queued',
         body:
             '${q.n('audience_count').toInt()} customers on ${q.s('channel')}. ${q.s('status_note')}',
-        primaryLabel: 'Done',
+        primaryLabel: tr('Done'),
         onPrimary: () => Navigator.of(context).maybePop(),
       ),
     ],

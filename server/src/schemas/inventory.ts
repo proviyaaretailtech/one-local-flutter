@@ -33,3 +33,8 @@ export const DocumentSave = obj({
 });
 export const DocumentAct = obj({ id, action: z.string({ message: 'Choose an action.' }).min(1).max(30), version: z.number().int({ message: 'version is required' }), note: z.string().max(500).nullish(), ...key });
 export const AuditToAdjustment = obj({ id, ...key });
+/** Quick Add's "how many in stock now": the first stock of a new item, by its stock item id or its System Code. */
+export const OpeningStock = obj({
+  inventory_item_id: id.optional(), sku: z.string().trim().max(40).optional(),
+  qty: z.number({ message: 'Enter how many you have.' }).positive('Enter how many you have, above zero.').max(1_000_000), ...key,
+});

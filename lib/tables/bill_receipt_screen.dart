@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../inventory/inventory_api.dart';
 import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
+import '../ui/whatsapp.dart';
 import 'bill_api.dart';
 import 'bill_widgets.dart';
 import 'table_widgets.dart';
@@ -88,7 +89,7 @@ class _BillReceiptScreenState extends State<BillReceiptScreen> {
         if (to == null || to.isEmpty) return;
         var digits = to.replaceAll(RegExp(r'\D'), '');
         if (digits.length == 10) digits = '91$digits';
-        uri = channel == 'whatsapp' ? Uri.parse('https://wa.me/$digits?text=${Uri.encodeComponent(text)}') : Uri(scheme: 'sms', path: '+$digits', queryParameters: {'body': text});
+        uri = channel == 'whatsapp' ? whatsAppLink(digits, text) : Uri(scheme: 'sms', path: '+$digits', queryParameters: {'body': text});
       case 'email':
         to = await _ask('Send by email', 'name@example.com', TextInputType.emailAddress, '');
         if (to == null || to.isEmpty) return;
