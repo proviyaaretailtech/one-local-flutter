@@ -52,7 +52,7 @@ class _ProfileFormState extends State<_ProfileForm> {
         'phone': phone.text.trim(),
         'store_slug': slug.text.trim(),
       });
-      // it stays open: from the side menu it is Business profile's first screen (founder, 27 Oct 2026)
+      // it stays open: it is a part of Page Manager (founder, 28 Oct 2026)
       if (mounted) {
         setState(() => busy = false);
         showToast(context, 'Profile saved.');
@@ -76,7 +76,7 @@ class _ProfileFormState extends State<_ProfileForm> {
 
   @override
   Widget build(BuildContext context) => SfPage(
-        title: 'Business Profile',
+        title: 'Shop profile',
         subtitle: 'Your storefront on OneLocal',
         bottom: Column(mainAxisSize: MainAxisSize.min, children: [
           // the rest of Business profile, as in the design: "Offers & Promotions · Hours · Delivery"

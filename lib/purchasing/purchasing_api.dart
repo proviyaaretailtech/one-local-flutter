@@ -66,8 +66,8 @@ class PurchasingApi {
 
   /// Received, in one step: [lines] {inventory_item_id, qty, mrp, cost, ordered_qty}, money in rupees. Stock goes up, the MRP and price are saved on the
   /// items, the order ([poId]) is closed, and the bill is started. Without an order, [supplierName] says who it came from.
-  Future<Facts> receivePost({String? poId, String? supplierName, required List<Map<String, Object?>> lines, required String key}) async =>
-      Facts(await _call('pur_receive_post', {'po_id': poId, 'supplier_name': supplierName, 'lines': lines}, key: key));
+  Future<Facts> receivePost({String? poId, String? supplierName, String? invoiceNo, String? replaces, required List<Map<String, Object?>> lines, required String key}) async =>
+      Facts(await _call('pur_receive_post', {'po_id': poId, 'supplier_name': supplierName, if (invoiceNo != null && invoiceNo.isNotEmpty) 'invoice_no': invoiceNo, if (replaces != null) 'replaces_receipt_id': replaces, 'lines': lines}, key: key));
 
   /// A received delivery (receipt) and its bill (bill).
   Future<Facts> bill(String receiptId) async => Facts(await _call('pur_bill_get', {'receipt_document_id': receiptId}));

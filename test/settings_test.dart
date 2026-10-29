@@ -186,10 +186,10 @@ void main() {
   });
 
   group('Settings page', () {
-    testWidgets('Settings opens on five section cards, each with a one-line summary; a card opens its rows and back returns', (t) async {
+    testWidgets('Settings opens on six section cards, each with a one-line summary; a card opens its rows and back returns', (t) async {
       final f = Fake()..page = fx['full'] as Map<String, dynamic>;
       await openSettings(t, f);
-      for (final p in ['Store', 'Orders & delivery', 'Team & access', 'Money & documents', 'Me & app']) {
+      for (final p in ['Store', 'Orders & delivery', 'Team & access', 'Money & documents', 'Returns & refunds', 'Me & app']) {
         expect(find.text(p), findsOneWidget, reason: p);
       }
       expect(find.text('9:00 AM – 10:30 PM · location set'), findsOneWidget);

@@ -443,7 +443,7 @@ void main() {
     testWidgets('Business Profile: prefilled from the server, a taken store link shows the sentence', (t) async {
       final s = Fake((r) => fnOf(r) == 'sf_profile_save' ? err(409, 'That store link is already taken.', 'conflict') : null);
       await show(t, ProfileScreen(api: s.api, picker: const FakePicker()));
-      expect(find.text('Business Profile'), findsOneWidget);
+      expect(find.text('Shop profile'), findsOneWidget);
       expect(find.text('The NOICE Store'), findsOneWidget);
       expect(find.text('${(fx['settings']['profile']['description'] as String).length}/200'), findsOneWidget);
       expect(find.byKey(const ValueKey('profile-banner')), findsOneWidget);
@@ -489,7 +489,7 @@ void main() {
       await show(t, ProfileScreen(api: s.api, picker: const FakePicker()));
       await tapText(t, 'Save Profile');
       expect(s.calls('sf_profile_save'), hasLength(1));
-      expect(find.text('Business Profile'), findsOneWidget);
+      expect(find.text('Shop profile'), findsOneWidget);
     });
 
     testWidgets('Business Profile: changing the logo uses the setup picture handlers, then reloads', (t) async {

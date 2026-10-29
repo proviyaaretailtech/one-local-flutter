@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { Readable } from 'node:stream';
 import './routes.ts';
 import { dispatch } from './router.ts';
+import { isSupabaseProxyPath, supabaseProxy } from './supabase-proxy.ts';
 import { fail, redact } from './http.ts';
 
 function cors(origin: string | undefined): Record<string, string> {
@@ -12,8 +13,8 @@ function cors(origin: string | undefined): Record<string, string> {
   if (!origin || !(isLocalDev || allowed.includes(origin))) return {};
   return {
     'Access-Control-Allow-Origin': origin, 'Vary': 'Origin',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS', 'Access-Control-Max-Age': '600',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key, apikey, x-client-info, x-upsert, x-supabase-api-version',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS', 'Access-Control-Max-Age': '600',
   };
 }
 
@@ -36,7 +37,9 @@ export async function handle(request: Request): Promise<Response> {
   const extra = cors(request.headers.get('origin') ?? undefined);
   let response: Response;
   try {
-    response = request.method === 'OPTIONS' ? new Response(null, { status: 204 }) : await dispatch(request);
+    response = request.method === 'OPTIONS' ? new Response(null, { status: 204 })
+      : isSupabaseProxyPath(new URL(request.url).pathname) ? await supabaseProxy(request)
+      : await dispatch(request);
   } catch (error) {
     console.error('[server]', redact(error));
     response = fail(500, 'Something went wrong. Please try again.');

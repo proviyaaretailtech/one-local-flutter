@@ -21,7 +21,9 @@ class StockEnv {
   final StockOpener? _open;
 
   /// Purchase (new purchase order) and Receiving (count a delivery): they live in the Purchase section; null shows a note.
-  final void Function(BuildContext context)? onOpenPurchase, onOpenReceiving;
+  /// A new purchase order, with [want] already on it when given.
+  final void Function(BuildContext context, [List<OrderWant> want])? onOpenPurchase;
+  final void Function(BuildContext context)? onOpenReceiving;
 
   InventoryApi get api => inv.api;
 
@@ -34,6 +36,9 @@ class StockEnv {
 }
 
 typedef StockOpener = Future<void> Function(BuildContext context, String page, {String? itemId});
+
+/// An item to buy and how much: Reorder and Purchase's "Need to order" hand these to a new purchase order (founder, 29 Oct 2026).
+typedef OrderWant = ({String itemId, String name, String unit, num qty});
 
 /// The stock pages. Stock (bottom bar, side menu) opens Stock Management; the others open from buttons on other screens (founder,
 /// 25 Oct 2026): Receive from Purchase, Low stock from Home's "Restock critical items", Alerts from Home's Stock health "Full report",

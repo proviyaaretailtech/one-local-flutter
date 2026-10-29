@@ -7,6 +7,9 @@ import * as storage from './storage.ts';
 import * as storefront from './storefront.ts';
 import * as settingsFiles from './settings_files.ts';
 import * as itemPhotos from './itemPhotos.ts';
+import * as moneyProofs from './moneyProofs.ts';
+import * as adMedia from './adMedia.ts';
+import * as packedPhotos from './packedPhotos.ts';
 import { me } from './me.ts';
 import { webhook } from './payments.ts';
 import { describeDish } from './menuAi.ts';
@@ -37,6 +40,12 @@ export const secureHandlers = {
   cat_item_photo_slot: itemPhotos.photoSlot,
   cat_item_photo_attach: itemPhotos.photoAttach,
   cat_item_photo_remove: itemPhotos.photoRemove,
+  smoney_proof_slot: moneyProofs.proofSlot,
+  smoney_proof_link: moneyProofs.proofLink,
+  ads_media_slot: adMedia.mediaSlot,
+  ads_media_link: adMedia.mediaLink,
+  pos_packed_photo_slot: packedPhotos.photoSlot,
+  pos_packed_photo_link: packedPhotos.photoLink,
 } satisfies Record<string, SecureHandler>;
 
 /** Real HTTP endpoints (no user token): provider webhooks. */

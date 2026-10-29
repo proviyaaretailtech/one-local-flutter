@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../home/app_actions.dart';
 import 'i18n.dart';
+import 'ol_guide.dart';
 import 'theme.dart';
 
 /// Ol moves (looks around, blinks, bobs) and says hello once. Off under `flutter test`, where a forever-running animation would
@@ -252,7 +253,6 @@ class _OlSheetState extends State<_OlSheet> {
   List<AppAction> _hits = const [];
   bool _asked = false;
 
-  static const _jobs = ['Make a bill', 'Add a product', 'Receive goods', 'Check stock', 'Online orders'];
 
   @override
   void dispose() {
@@ -271,6 +271,19 @@ class _OlSheetState extends State<_OlSheet> {
   void _go(AppAction a) {
     Navigator.of(context).pop();
     a.open();
+  }
+
+  /// Show me how (founder, 28 Oct 2026): Ol walks the person through the job on the real screens.
+  void _guide(OlTour tour) {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    Navigator.of(context).pop();
+    OlGuide.start(overlay, tour);
+  }
+
+  /// The walkthroughs whose name shares a word with what was typed.
+  List<OlTour> get _tourHits {
+    final words = _ask.text.toLowerCase().split(RegExp(r'\s+')).where((w) => w.length > 2).toSet();
+    return olTours.where((t) => t.name.toLowerCase().split(' ').any(words.contains)).toList();
   }
 
   @override
@@ -311,21 +324,31 @@ class _OlSheetState extends State<_OlSheet> {
             const SizedBox(height: 12),
             if (!_asked)
               Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final j in _jobs)
+                for (final t in olTours)
                   ActionChip(
-                    key: ValueKey('ol-job-$j'),
-                    label: Text(tr(j), style: inter(13, 600)),
+                    key: ValueKey('ol-job-${t.name}'),
+                    avatar: const Icon(LucideIcons.mousePointerClick, size: 15, color: kInk),
+                    label: Text(tr(t.name), style: inter(13, 600)),
                     backgroundColor: const Color(0xFFF2FDE6),
                     side: const BorderSide(color: Color(0xFFCDEFAA)),
-                    onPressed: () {
-                      _ask.text = j;
-                      _search(j);
-                    },
+                    onPressed: () => _guide(t),
                   ),
               ])
-            else if (_hits.isEmpty)
-              Text(tr("I can't do that yet. I'm still learning — try other words."), style: inter(13.5, 500, color: kMuted))
-            else
+            else ...[
+              for (final t in _tourHits)
+                ListTile(
+                  key: ValueKey('ol-tour-${t.name}'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const CircleAvatar(backgroundColor: Color(0xFFD2F64B), child: Icon(LucideIcons.mousePointerClick, size: 18, color: kInk)),
+                  title: Text('${tr('Show me how')}: ${tr(t.name)}', style: inter(14.5, 700)),
+                  subtitle: Text('${t.steps.length} ${tr('steps, on your screen')}', style: inter(12.5, 400, color: kMuted)),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 18),
+                  onTap: () => _guide(t),
+                ),
+            ],
+            if (_asked && _hits.isEmpty && _tourHits.isEmpty)
+              Text(tr("I can't do that yet. I'm still learning — try other words."), style: inter(13.5, 500, color: kMuted)),
+            if (_asked)
               for (final a in _hits)
                 ListTile(
                   key: ValueKey('ol-hit-${a.title}'),
@@ -337,7 +360,7 @@ class _OlSheetState extends State<_OlSheet> {
                   onTap: () => _go(a),
                 ),
             const SizedBox(height: 6),
-            Text(tr('Ol is learning. Soon Ol will do these jobs for you.'), style: inter(11.5, 400, color: kMuted)),
+            Text(tr("Pick a job and I'll show you where to tap, step by step."), style: inter(11.5, 400, color: kMuted)),
           ]),
         ),
       );

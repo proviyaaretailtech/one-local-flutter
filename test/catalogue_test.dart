@@ -615,7 +615,7 @@ void main() {
       final s = Fake((_) => ok(grnView()));
       await phone(t, GrnDashboardScreen(receiptId: 'r1', api: s.api), height: 4600);
       expect(s.requests.first.url.path, '/rpc/grn_open');
-      expect(find.text('Match bill'), findsNWidgets(2)); // the title and the step strip
+      expect(find.text('Match bill'), findsOneWidget); // the title; the step strip says Bill
       // one page: no tab strip, no separate matching screen
       for (final gone in ['Purchase dashboard', 'Putaway', 'Shelf Labels', 'Match against the invoice']) {
         expect(find.text(gone), findsNothing, reason: gone);
@@ -878,7 +878,7 @@ void main() {
       expect(find.text('No deliveries to check'), findsNothing);
       await t.tap(find.text('GRN-105'));
       await t.pumpAndSettle();
-      expect(find.text('Match bill'), findsNWidgets(2)); // the title and the step strip
+      expect(find.text('Match bill'), findsOneWidget); // the title; the step strip says Bill
     });
 
     testWidgets('no receipts: explains the flow and Receive stock opens Receiving', (t) async {

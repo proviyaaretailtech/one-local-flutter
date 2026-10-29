@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -9,7 +10,9 @@ import '../inventory/receiving_screen.dart' show newItemForReceiving;
 import '../ui/app_header.dart';
 import '../ui/barcode_scanner.dart';
 import '../ui/i18n.dart';
+import '../ui/purchase_steps.dart';
 import '../ui/theme.dart';
+import 'add_supplier_sheet.dart' show pickPhoneContact, showAddSupplier, PickedContact;
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
 
@@ -98,11 +101,17 @@ class OpenOrderCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          OutlinedButton(
+          // a dustbin, not a word (founder, 29 Oct 2026); it still asks before cancelling
+          IconButton(
             key: ValueKey('po-cancel-${po.id}'),
             onPressed: onCancel,
-            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16), side: const BorderSide(color: kCardLine), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: Text(tr('Cancel PO'), style: inter(14, 700, color: const Color(0xFFC62828))),
+            tooltip: tr('Cancel PO'),
+            icon: const Icon(LucideIcons.trash2, size: 19, color: Color(0xFFC62828)),
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xFFFDECEC),
+              fixedSize: const Size(46, 46),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
         ]),
       ]),
@@ -134,20 +143,313 @@ Future<bool> cancelOrder(BuildContext context, PurchasingApi api, PurchaseOrder 
   }
 }
 
-/// One line of a delivery: what came, at what MRP and price.
+/// Who the goods came from: the shop's saved suppliers (search by name, phone, GSTIN or city), the phone's contact list in the app,
+/// or a new name typed in. The supplier picked (name, phone, gstin), or null.
+Future<Facts?> chooseSupplier(BuildContext context, PurchasingApi api) => showModalBottomSheet<Facts>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: kBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _SupplierSheet(api: api),
+    );
+
+class _SupplierSheet extends StatefulWidget {
+  const _SupplierSheet({required this.api});
+  final PurchasingApi api;
+  @override
+  State<_SupplierSheet> createState() => _SupplierSheetState();
+}
+
+class _SupplierSheetState extends State<_SupplierSheet> {
+  final _q = TextEditingController();
+  List<Facts>? _all;
+  String? _error;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.api.suppliers().then((r) {
+      if (mounted) setState(() => _all = r);
+    }, onError: (Object e) {
+      if (mounted) setState(() => _error = e is PartnerApiException ? e.message : tr('Could not load your suppliers.'));
+    });
+  }
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  static String _ten(String raw) {
+    final d = raw.replaceAll(RegExp(r'\D'), '');
+    return d.length > 10 ? d.substring(d.length - 10) : d;
+  }
+
+  /// The phone's contact list (in the app): a contact already saved is used as it is, a new one is saved as a supplier.
+  /// In the browser, where contacts cannot open, the short typed form shows instead.
+  Future<void> _fromPhone() async {
+    if (_busy) return;
+    if (kIsWeb) {
+      final s = await showAddSupplier(context, widget.api);
+      if (s != null && mounted) Navigator.of(context).pop(s);
+      return;
+    }
+    PickedContact? c;
+    try {
+      c = await pickPhoneContact();
+    } catch (_) {
+      if (mounted) showToast(context, tr('Contacts could not open on this phone. Type the name instead.'));
+      return;
+    }
+    if (c == null || !mounted) return;
+    final phone = _ten(c.phone);
+    final known = (_all ?? const <Facts>[]).where((s) => phone.isNotEmpty && _ten(s.s('phone')) == phone).firstOrNull;
+    if (known != null) return Navigator.of(context).pop(known);
+    final name = c.name.trim().length >= 2 ? c.name.trim() : phone;
+    if (name.length < 2) return showToast(context, tr('That contact has no name or number.'));
+    setState(() => _busy = true);
+    try {
+      final s = await widget.api.saveSupplier(name: name, phone: phone, key: PurchasingApi.newKey());
+      if (mounted) Navigator.of(context).pop(s);
+    } catch (e) {
+      if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not add that supplier. Try again.'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _q.text.trim().toLowerCase();
+    final list = (_all ?? const <Facts>[])
+        .where((s) => q.isEmpty || [s.s('name'), s.s('phone'), s.s('gstin'), s.s('city')].any((v) => v.toLowerCase().contains(q)))
+        .toList();
+    final exact = (_all ?? const <Facts>[]).any((s) => s.s('name').toLowerCase() == q);
+    final h = MediaQuery.sizeOf(context).height;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: h * 0.85),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 10),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(color: kCardLine, borderRadius: BorderRadius.circular(99)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+            child: Text(tr('Choose supplier'), style: inter(19, 800)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Text(tr('Who did the goods come from?'), style: inter(13, 500, color: kMuted)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Material(
+              color: const Color(0xFFD2F64B),
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                key: const ValueKey('supplier-from-phone'),
+                borderRadius: BorderRadius.circular(18),
+                onTap: _fromPhone,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(color: const Color(0xFF16181D), borderRadius: BorderRadius.circular(12)),
+                      child: Icon(kIsWeb ? LucideIcons.userPlus : LucideIcons.contactRound, size: 20, color: const Color(0xFFD2F64B)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(tr(kIsWeb ? 'Add a new supplier' : 'Pick from phone contacts'), style: inter(15, 800, color: const Color(0xFF16181D))),
+                        Text(tr(kIsWeb ? 'Name, phone and GSTIN' : 'Saved as a supplier for next time'), style: inter(12, 500, color: const Color(0xFF3A4214))),
+                      ]),
+                    ),
+                    _busy
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(LucideIcons.chevronRight, size: 18, color: Color(0xFF16181D)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              key: const ValueKey('supplier-search'),
+              controller: _q,
+              onChanged: (_) => setState(() {}),
+              style: inter(14.5, 500),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: tr('Search your suppliers, or type a new name'),
+                prefixIcon: const Icon(LucideIcons.search, size: 18),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kCardLine)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kCardLine)),
+              ),
+            ),
+          ),
+          Flexible(
+            child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 0, 16, 24), children: [
+              if (q.length >= 2 && !exact)
+                _row(
+                  key: 'supplier-use-typed',
+                  icon: LucideIcons.plus,
+                  title: '${tr('Use')} "${_q.text.trim()}"',
+                  sub: tr('Not saved as a supplier'),
+                  onTap: () => Navigator.of(context).pop(Facts({'name': _q.text.trim()})),
+                ),
+              if (_error != null)
+                Padding(padding: const EdgeInsets.all(16), child: Text(_error!, style: inter(13.5, 500, color: kMuted)))
+              else if (_all == null)
+                const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+              else if (list.isEmpty && q.isEmpty)
+                Padding(padding: const EdgeInsets.all(16), child: Text(tr('No suppliers saved yet. Pick one from your contacts.'), style: inter(13.5, 500, color: kMuted)))
+              else ...[
+                if (list.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
+                    child: Text('${tr('Your suppliers')} · ${list.length}', style: inter(12.5, 700, color: kMuted)),
+                  ),
+                for (final s in list)
+                  _row(
+                    key: 'supplier-${s.s('id')}',
+                    initials: s.s('name'),
+                    title: s.s('name'),
+                    sub: [s.s('phone'), if (s.s('gstin').isNotEmpty) 'GSTIN ${s.s('gstin')}', s.s('city')].where((v) => v.isNotEmpty).join(' · '),
+                    onTap: () => Navigator.of(context).pop(s),
+                  ),
+              ],
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _row({required String key, IconData? icon, String? initials, required String title, required String sub, required VoidCallback onTap}) {
+    final letters = (initials ?? '').trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).take(2).map((w) => w[0].toUpperCase()).join();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          key: ValueKey(key),
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            child: Row(children: [
+              Container(
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: const Color(0xFFEFF3E6), borderRadius: BorderRadius.circular(12)),
+                child: icon != null ? Icon(icon, size: 18, color: kInk) : Text(letters, style: inter(13, 800, color: const Color(0xFF3A4214))),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(14.5, 700)),
+                  if (sub.isNotEmpty) Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12, 500, color: kMuted)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One line of a delivery as on the supplier's GST invoice: HSN, what came, MRP, rate, discount and GST.
 class _Line {
-  _Line({required this.itemId, required this.name, this.sku = '', this.ordered, required num qty, num? mrp, num? cost})
+  _Line({required this.itemId, required this.name, this.sku = '', this.ordered, required num qty, num? mrp, num? cost, String? hsn, num? gst})
       : qty = TextEditingController(text: _rupees(qty)),
         mrp = TextEditingController(text: mrp == null ? '' : _rupees(mrp)),
-        cost = TextEditingController(text: cost == null ? '' : _rupees(cost));
+        cost = TextEditingController(text: cost == null ? '' : _rupees(cost)),
+        hsn = TextEditingController(text: hsn ?? ''),
+        disc = TextEditingController(),
+        gst = gstRates.contains(gst) ? gst! : 0;
   final String itemId, name, sku;
   final num? ordered;
-  final TextEditingController qty, mrp, cost;
+  final TextEditingController qty, mrp, cost, hsn, disc;
+  num gst;
   bool get extra => ordered == null;
+  GstLine get money => GstLine(qty: _num(qty.text) ?? 0, rate: _num(cost.text) ?? 0, discountPct: _num(disc.text) ?? 0, gstPct: gst);
   void dispose() {
     qty.dispose();
     mrp.dispose();
     cost.dispose();
+    hsn.dispose();
+    disc.dispose();
+  }
+}
+
+/// The money of one invoice line: gross (qty × rate), discount, taxable value, GST and the line total, in rupees.
+class GstLine {
+  const GstLine({required this.qty, required this.rate, this.discountPct = 0, this.gstPct = 0});
+  final num qty, rate, discountPct, gstPct;
+  num get gross => qty * rate;
+  num get discount => gross * discountPct / 100;
+  num get taxable => gross - discount;
+  num get gst => taxable * gstPct / 100;
+  num get total => taxable + gst;
+}
+
+/// GST rates a purchase line can carry (the server takes the same).
+const gstRates = <num>[0, 3, 5, 12, 18, 28, 40];
+
+String _paise(num rupees) => money((rupees * 100).round());
+
+/// The foot of a GST invoice: gross amount, discount, taxable value, GST (CGST + SGST), round off and the net payable.
+class GstTotals extends StatelessWidget {
+  const GstTotals({super.key, required this.lines, this.keyPrefix = 'gst'});
+  final List<GstLine> lines;
+  final String keyPrefix;
+
+  @override
+  Widget build(BuildContext context) {
+    num sum(num Function(GstLine) f) => lines.fold<num>(0, (s, l) => s + f(l));
+    final gross = sum((l) => l.gross), discount = sum((l) => l.discount), taxable = sum((l) => l.taxable), gst = sum((l) => l.gst);
+    final net = (taxable + gst).roundToDouble();
+    Widget row(String k, String v, {String? key, String? sub, Color? color}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(tr(k), style: inter(13.5, 500, color: kMuted)),
+                if (sub != null) Text(sub, style: inter(11.5, 500, color: kMuted)),
+              ]),
+            ),
+            Text(v, key: key == null ? null : ValueKey('$keyPrefix-$key'), style: inter(14, 700, color: color ?? kInk)),
+          ]),
+        );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      row('Gross amount', _paise(gross), key: 'gross', sub: '${lines.length} ${tr(lines.length == 1 ? 'item' : 'items')} · ${tr('qty × rate')}'),
+      if (discount > 0) row('Discount', '− ${_paise(discount)}', key: 'discount', color: const Color(0xFF15803D)),
+      row('Taxable value', _paise(taxable), key: 'taxable'),
+      row('Total GST', _paise(gst), key: 'gst', sub: '${tr('CGST')} ${_paise(gst / 2)} + ${tr('SGST')} ${_paise(gst / 2)}'),
+      if ((net - taxable - gst).abs() >= 0.005) row('Round off', _paise(net - taxable - gst), key: 'round'),
+      const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Divider(height: 1)),
+      Row(children: [
+        Expanded(child: Text(tr('Net payable'), style: inter(15.5, 800))),
+        Text(_paise(net), key: ValueKey('$keyPrefix-net'), style: inter(19, 800)),
+      ]),
+    ]);
   }
 }
 
@@ -155,9 +457,13 @@ class _Line {
 /// extra (search by name, scan, or a new product); the MRP of every line. Mark received adds the stock and opens the purchase bill.
 /// Without [po] it is Add Purchase: goods bought without an order.
 class ReceiveGoodsScreen extends StatefulWidget {
-  const ReceiveGoodsScreen({super.key, required this.api, this.po, this.openBill});
+  const ReceiveGoodsScreen({super.key, required this.api, this.po, this.replaces, this.openBill});
   final PurchasingApi api;
   final PurchaseOrder? po;
+
+  /// A receipt note started the old way (counted, or waiting for a check): its items and supplier fill this screen, and Mark received
+  /// sets it aside, so one simple step finishes it (founder, 29 Oct 2026: no separate Match bill).
+  final Facts? replaces;
 
   /// Tests replace what opens after receiving.
   final void Function(BuildContext context, String receiptId)? openBill;
@@ -177,12 +483,56 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
           qty: (l.n('ordered_qty') - l.n('received_qty') - l.n('rejected_qty')).clamp(0, double.infinity),
           mrp: l.no('mrp_minor') == null ? null : l.n('mrp_minor') / 100,
           cost: l.no('unit_cost_minor') == null ? null : l.n('unit_cost_minor') / 100,
+          hsn: l.s('hsn'),
+          gst: l.no('gst_pct'),
         ),
   ];
   final _find = TextEditingController();
-  final _supplier = TextEditingController();
+  final _supplier = TextEditingController(), _gstin = TextEditingController(), _invoice = TextEditingController();
+  DateTime _date = DateTime.now();
+  String _supplierPhone = '';
   final _key = PurchasingApi.newKey();
   List<Facts> _hits = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.replaces != null) _fromOldNote(widget.replaces!);
+  }
+
+  /// The old note's supplier and items, with each item's MRP, price, HSN and GST as the catalogue has them.
+  Future<void> _fromOldNote(Facts note) async {
+    try {
+      final rec = (await widget.api.bill(note.s('id'))).m('receipt');
+      if (!mounted) return;
+      if (widget.po == null && _supplier.text.isEmpty) _supplier.text = rec.s('supplier_name').isEmpty ? note.s('supplier_name') : rec.s('supplier_name');
+      for (final l in rec.l('lines')) {
+        if (_lines.any((x) => x.itemId == l.s('inventory_item_id'))) {
+          _lines.firstWhere((x) => x.itemId == l.s('inventory_item_id')).qty.text = _rupees(l.n('qty'));
+          continue;
+        }
+        Facts? item;
+        try {
+          item = (await widget.api.findItems(l.s('name'))).where((i) => i.s('id') == l.s('inventory_item_id')).firstOrNull;
+        } catch (_) {}
+        if (!mounted) return;
+        _lines.add(_Line(
+          itemId: l.s('inventory_item_id'),
+          name: l.s('name'),
+          sku: item?.s('sku') ?? '',
+          ordered: l.no('expected_qty'),
+          qty: l.n('qty'),
+          mrp: item?.no('mrp_minor') == null ? null : item!.n('mrp_minor') / 100,
+          cost: item?.no('cost_minor') == null ? null : item!.n('cost_minor') / 100,
+          hsn: item?.s('hsn'),
+          gst: item?.no('gst_pct'),
+        ));
+      }
+      setState(() {});
+    } catch (e) {
+      if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not load that receipt note.'));
+    }
+  }
   bool _busy = false, _searching = false;
   int _seq = 0;
 
@@ -191,8 +541,9 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
     for (final l in _lines) {
       l.dispose();
     }
-    _find.dispose();
-    _supplier.dispose();
+    for (final c in [_find, _supplier, _gstin, _invoice]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -223,6 +574,8 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
           qty: 1,
           mrp: item.no('mrp_minor') == null ? null : item.n('mrp_minor') / 100,
           cost: item.no('cost_minor') == null ? null : item.n('cost_minor') / 100,
+          hsn: item.s('hsn'),
+          gst: item.no('gst_pct'),
         ));
       }
       _find.clear();
@@ -253,13 +606,31 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
     _add(item);
   }
 
-  num get _total => _lines.fold<num>(0, (s, l) => s + (_num(l.qty.text) ?? 0) * (_num(l.cost.text) ?? 0));
+  /// The supplier comes from the saved list or the phone's contacts; its GSTIN fills in when it has one.
+  Future<void> _chooseSupplier() async {
+    final s = await chooseSupplier(context, widget.api);
+    if (s == null || !mounted) return;
+    setState(() {
+      _supplier.text = s.s('name');
+      _supplierPhone = s.s('phone');
+      if (s.s('gstin').isNotEmpty) _gstin.text = s.s('gstin');
+    });
+  }
+
+  num get _net => _lines.fold<num>(0, (s, l) => s + l.money.total).roundToDouble();
+
+  static final _gstinShape = RegExp(r'^[0-9]{2}[A-Z0-9]{10}[0-9A-Z]Z[0-9A-Z]$');
+  static String _iso(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _receive() async {
     if (_busy) return;
     if (widget.po == null && _supplier.text.trim().isEmpty) return showToast(context, tr('Enter who the goods came from.'));
     final got = _lines.where((l) => (_num(l.qty.text) ?? 0) > 0).toList();
     if (got.isEmpty) return showToast(context, tr('Enter the quantity that came.'));
+    final gstin = _gstin.text.trim().toUpperCase();
+    if (gstin.isNotEmpty && !_gstinShape.hasMatch(gstin)) return showToast(context, tr('The supplier GSTIN does not look right. It has 15 letters and numbers.'));
+    final badHsn = got.where((l) => l.hsn.text.trim().isNotEmpty && l.hsn.text.trim().length < 2).toList();
+    if (badHsn.isNotEmpty) return showToast(context, '${tr('An HSN code is 2 to 8 digits')}: ${badHsn.map((l) => l.name).join(', ')}');
     final noMrp = got.where((l) => (_num(l.mrp.text) ?? 0) <= 0).toList();
     if (noMrp.isNotEmpty) {
       setState(() {}); // the lines without MRP turn red
@@ -270,14 +641,41 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
       final r = await widget.api.receivePost(
         poId: widget.po?.id,
         supplierName: widget.po == null ? _supplier.text.trim() : null,
+        invoiceNo: _invoice.text.trim(),
+        replaces: widget.replaces?.s('id'),
         key: _key,
         lines: [
           for (final l in got)
-            {'inventory_item_id': l.itemId, 'qty': _num(l.qty.text), 'mrp': _num(l.mrp.text), 'cost': _num(l.cost.text), 'ordered_qty': l.ordered},
+            {
+              'inventory_item_id': l.itemId, 'qty': _num(l.qty.text), 'mrp': _num(l.mrp.text), 'cost': _num(l.cost.text), 'ordered_qty': l.ordered,
+              'hsn': l.hsn.text.trim(), 'gst_pct': l.gst, 'discount_pct': _num(l.disc.text) ?? 0,
+            },
         ],
       );
       if (!mounted) return;
-      showToast(context, '${r.s('doc_no')} · ${tr('stock added')}.');
+      // with an invoice number the supplier's bill is saved too: one entry, not two
+      var billed = false;
+      if (_invoice.text.trim().isNotEmpty) {
+        try {
+          await widget.api.saveBill({
+            'receipt_document_id': r.s('document_id'),
+            'supplier_name': widget.po?.supplierName ?? _supplier.text.trim(),
+            'supplier_gstin': gstin,
+            'invoice_no': _invoice.text.trim(),
+            'invoice_date': _iso(_date),
+            'lines': [
+              for (final l in got)
+                {
+                  'inventory_item_id': l.itemId, 'name': l.name, 'hsn': l.hsn.text.trim(), 'qty': _num(l.qty.text) ?? 0, 'mrp': _num(l.mrp.text),
+                  'rate': _num(l.cost.text) ?? 0, 'discount_pct': _num(l.disc.text) ?? 0, 'gst_pct': l.gst,
+                },
+            ],
+          });
+          billed = true;
+        } catch (_) {} // the stock is in; the bill screen that opens next lets them save it again
+      }
+      if (!mounted) return;
+      showToast(context, '${r.s('doc_no')} · ${tr(billed ? 'stock added, bill saved' : 'stock added')}.');
       final open = widget.openBill ?? (c, id) => Navigator.of(c).pushReplacement(MaterialPageRoute(builder: (_) => PurchaseBillScreen(api: widget.api, receiptId: id, justReceived: true)));
       open(context, r.s('document_id'));
     } catch (e) {
@@ -332,15 +730,133 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
         Text([if (l.sku.isNotEmpty) l.sku, if (l.ordered != null) '${tr('Ordered')} ${_rupees(l.ordered!)}'].join(' · '), style: inter(12, 400, color: kMuted)),
         const SizedBox(height: 10),
         Row(children: [
-          _field(l.qty, 'Received', key: ValueKey('recv-qty-$i')),
+          Expanded(
+            child: TextField(
+              key: ValueKey('recv-hsn-$i'),
+              controller: l.hsn,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(8)],
+              style: inter(14.5, 600),
+              decoration: _dec('HSN'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _field(l.qty, 'Qty', key: ValueKey('recv-qty-$i')),
           const SizedBox(width: 8),
           _field(l.mrp, 'MRP', key: ValueKey('recv-mrp-$i'), wrong: noMrp, prefix: '₹ '),
-          const SizedBox(width: 8),
-          _field(l.cost, 'Price', key: ValueKey('recv-cost-$i'), prefix: '₹ '),
         ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          _field(l.cost, 'Rate', key: ValueKey('recv-cost-$i'), prefix: '₹ '),
+          const SizedBox(width: 8),
+          _field(l.disc, 'Disc %', key: ValueKey('recv-disc-$i')),
+          const SizedBox(width: 8),
+          Expanded(
+            child: DropdownButtonFormField<num>(
+              key: ValueKey('recv-gst-$i'),
+              initialValue: l.gst,
+              isDense: true,
+              isExpanded: true,
+              decoration: _dec('GST'),
+              items: [for (final g in gstRates) DropdownMenuItem(value: g, child: Text('${_rupees(g)}%', style: inter(14, 600)))],
+              onChanged: (v) => setState(() => l.gst = v ?? 0),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        _lineMoney(i, l.money),
         if (noMrp) Padding(padding: const EdgeInsets.only(top: 6), child: Text(tr('Add the MRP to add this to stock.'), style: inter(12, 600, color: const Color(0xFFC62828)))),
         if (l.ordered != null && q < l.ordered! && q >= 0)
           Padding(padding: const EdgeInsets.only(top: 6), child: Text('${_rupees(l.ordered! - q)} ${tr('fewer than ordered')}', style: inter(12, 600, color: const Color(0xFFB45309)))),
+      ]),
+    );
+  }
+
+  InputDecoration _dec(String label) => InputDecoration(
+        isDense: true,
+        labelText: tr(label),
+        labelStyle: inter(12.5, 500, color: kMuted),
+        filled: true,
+        fillColor: kBg,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kCardLine)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kCardLine)),
+      );
+
+  /// Under each line: its taxable value, GST and total, like the columns of the supplier's invoice.
+  Widget _lineMoney(int i, GstLine m) {
+    Widget cell(String k, String v, {bool bold = false}) => Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tr(k), style: inter(11, 600, color: kMuted)),
+            Text(v, style: inter(13.5, bold ? 800 : 600)),
+          ]),
+        );
+    return Container(
+      key: ValueKey('recv-line-money-$i'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: kBg, borderRadius: BorderRadius.circular(10)),
+      child: Row(children: [
+        cell('Taxable', _paise(m.taxable)),
+        cell('GST ${_rupees(m.gstPct)}%', _paise(m.gst)),
+        cell('Total', _paise(m.total), bold: true),
+      ]),
+    );
+  }
+
+  /// Invoice number and date, and the supplier with its GSTIN: the top of the supplier's bill.
+  Widget _invoiceCard() {
+    final po = widget.po;
+    return InvCard(
+      key: const ValueKey('recv-invoice-card'),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const Icon(LucideIcons.receiptText, size: 18, color: kMuted),
+          const SizedBox(width: 8),
+          Expanded(child: Text(tr('Supplier invoice'), style: inter(15.5, 800))),
+        ]),
+        const SizedBox(height: 10),
+        if (po != null)
+          Text('${po.number} · ${po.supplierName}', style: inter(14.5, 700))
+        else
+          TextField(
+            key: const ValueKey('recv-supplier'),
+            controller: _supplier,
+            readOnly: true,
+            onTap: _chooseSupplier,
+            style: inter(14.5, 600),
+            decoration: _dec('Supplier').copyWith(
+              hintText: tr('Tap to choose a supplier'),
+              helperText: _supplierPhone.isEmpty ? null : _supplierPhone,
+              suffixIcon: const Icon(LucideIcons.bookUser, size: 18),
+            ),
+          ),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: TextField(key: const ValueKey('recv-invoice'), controller: _invoice, style: inter(14.5, 600), decoration: _dec('Invoice number'))),
+          const SizedBox(width: 8),
+          Expanded(
+            child: InkWell(
+              key: const ValueKey('recv-date'),
+              borderRadius: BorderRadius.circular(10),
+              onTap: () async {
+                final d = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime(2020), lastDate: DateTime.now());
+                if (d != null) setState(() => _date = d);
+              },
+              child: InputDecorator(
+                decoration: _dec('Invoice date').copyWith(suffixIcon: const Icon(LucideIcons.calendar, size: 16)),
+                child: Text(dayMonth(_date, year: true), style: inter(14.5, 600)),
+              ),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        TextField(
+          key: const ValueKey('recv-gstin'),
+          controller: _gstin,
+          textCapitalization: TextCapitalization.characters,
+          inputFormatters: [LengthLimitingTextInputFormatter(15)],
+          style: inter(14.5, 600),
+          decoration: _dec('Supplier GSTIN (if any)'),
+        ),
       ]),
     );
   }
@@ -413,24 +929,52 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        AppHeader(title: tr(po == null ? 'Add purchase' : 'Received'), onBack: () => Navigator.of(context).maybePop()),
+        AppHeader(
+          title: po != null
+              ? tr('Received')
+              : widget.replaces != null
+                  ? '${tr('Finish')} ${widget.replaces!.s('doc_no')}'.trim()
+                  : tr('Add purchase'),
+          onBack: () => Navigator.of(context).maybePop(),
+        ),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(14, 14, 14, 24), children: [
-            if (po != null)
-              Text('${po.number} · ${po.supplierName}', style: inter(16, 800))
-            else
-              TextField(
-                key: const ValueKey('recv-supplier'),
-                controller: _supplier,
-                style: inter(15, 600),
-                decoration: InputDecoration(labelText: tr('Supplier'), hintText: tr('Who did the goods come from?'), filled: true, fillColor: Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+            if (po != null) const PurchaseSteps(2),
+            // an old receipt note, finished here: say which one, so it does not look like a new purchase
+            if (widget.replaces != null)
+              Container(
+                key: const ValueKey('recv-old-note'),
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xFFFFF4E0), borderRadius: BorderRadius.circular(14)),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(LucideIcons.fileClock, size: 18, color: Color(0xFFB45309)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${tr('Receipt note')} ${[widget.replaces!.s('doc_no'), if (widget.replaces!.s('po_ref').isNotEmpty) widget.replaces!.s('po_ref')].join(' · ')} '
+                      '${tr('was started earlier and never finished. Check the quantities and MRP, then Mark received to add the stock.')}',
+                      style: inter(13, 500, height: 1.35),
+                    ),
+                  ),
+                ]),
               ),
-            const SizedBox(height: 6),
-            Text(tr('Enter what actually came. Stock goes up for every line with an MRP.'), style: inter(13, 400, color: kMuted)),
-            const SizedBox(height: 12),
+            _invoiceCard(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+              child: Text(tr('Enter what actually came, as on the bill. Stock goes up for every line with an MRP.'), style: inter(13, 400, color: kMuted)),
+            ),
             for (final (i, l) in _lines.indexed) _lineCard(i, l),
             _addLine(),
+            if (_lines.isNotEmpty)
+              InvCard(
+                key: const ValueKey('recv-totals'),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Text(tr('Bill summary'), style: inter(15.5, 800)),
+                  const SizedBox(height: 8),
+                  GstTotals(lines: [for (final l in _lines) if ((_num(l.qty.text) ?? 0) > 0) l.money], keyPrefix: 'recv'),
+                ]),
+              ),
           ]),
         ),
         SafeArea(
@@ -441,8 +985,8 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
             child: Row(children: [
               Expanded(
                 child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tr('Total'), style: inter(12, 500, color: kMuted)),
-                  Text(money((_total * 100).round()), key: const ValueKey('recv-total'), style: inter(18, 800)),
+                  Text(tr('Net payable'), style: inter(12, 500, color: kMuted)),
+                  Text(money((_net * 100).round()), key: const ValueKey('recv-total'), style: inter(18, 800)),
                 ]),
               ),
               FilledButton(
@@ -466,12 +1010,17 @@ class _BillLine {
         qty = TextEditingController(text: _rupees(f.n('qty'))),
         rate = TextEditingController(text: _rupees(f.n('rate_minor') / 100)),
         disc = TextEditingController(text: f.n('discount_pct') == 0 ? '' : _rupees(f.n('discount_pct'))),
+        hsn = TextEditingController(text: f.s('hsn')),
+        mrp = f.no('mrp_minor') == null ? null : f.n('mrp_minor') / 100,
         gst = f.n('gst_pct');
   final String itemId;
-  final TextEditingController name, qty, rate, disc;
+  final TextEditingController name, qty, rate, disc, hsn;
+  final num? mrp;
   num gst;
-  num get taxable => (_num(qty.text) ?? 0) * (_num(rate.text) ?? 0) * (1 - (_num(disc.text) ?? 0) / 100);
+  GstLine get money => GstLine(qty: _num(qty.text) ?? 0, rate: _num(rate.text) ?? 0, discountPct: _num(disc.text) ?? 0, gstPct: gst);
+  num get taxable => money.taxable;
   void dispose() {
+    hsn.dispose();
     name.dispose();
     qty.dispose();
     rate.dispose();
@@ -494,7 +1043,6 @@ class _CreditLine {
   }
 }
 
-const _gstRates = [0, 5, 12, 18, 28];
 const _reasons = {'short': 'Short supplied', 'damaged': 'Damaged', 'returned': 'Returned', 'rate_difference': 'Rate difference', 'other': 'Other'};
 
 /// The purchase bill of a received delivery: invoice number and date, supplier GSTIN, every line with rate, discount and GST, the
@@ -586,7 +1134,7 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
         'note': _note.text.trim(),
         'lines': [
           for (final l in _lines)
-            {'inventory_item_id': l.itemId.isEmpty ? null : l.itemId, 'name': l.name.text.trim(), 'qty': _num(l.qty.text) ?? 0, 'rate': _num(l.rate.text) ?? 0, 'discount_pct': _num(l.disc.text) ?? 0, 'gst_pct': l.gst},
+            {'inventory_item_id': l.itemId.isEmpty ? null : l.itemId, 'name': l.name.text.trim(), 'hsn': l.hsn.text.trim(), 'mrp': l.mrp, 'qty': _num(l.qty.text) ?? 0, 'rate': _num(l.rate.text) ?? 0, 'discount_pct': _num(l.disc.text) ?? 0, 'gst_pct': l.gst},
         ],
         'credit_lines': [
           for (final c in _credit)
@@ -644,7 +1192,7 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
   @override
   Widget build(BuildContext context) {
     final rec = _receipt;
-    final taxable = _taxable, gst = _gstAmt, total = _total;
+    final total = _total;
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
@@ -655,6 +1203,7 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
               : rec == null
                   ? const Center(child: CircularProgressIndicator())
                   : ListView(key: const ValueKey('purchase-bill'), padding: const EdgeInsets.fromLTRB(14, 14, 14, 24), children: [
+                      if (widget.justReceived) const PurchaseSteps(3),
                       if (widget.justReceived)
                         Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -701,9 +1250,20 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                              Text(l.name.text, style: inter(14, 700)),
+                              Text([l.name.text, if (l.mrp != null) '${tr('MRP')} ${_paise(l.mrp!)}'].join(' · '), style: inter(14, 700)),
                               const SizedBox(height: 6),
                               Row(children: [
+                                Expanded(
+                                  child: TextField(
+                                    key: ValueKey('bill-hsn-$i'),
+                                    controller: l.hsn,
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(8)],
+                                    style: inter(14, 600),
+                                    decoration: _dec('HSN'),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
                                 _num2(l.qty, 'Qty', key: ValueKey('bill-qty-$i')),
                                 const SizedBox(width: 6),
                                 _num2(l.rate, 'Rate', prefix: '₹ ', key: ValueKey('bill-rate-$i')),
@@ -715,11 +1275,11 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
                                 Expanded(
                                   child: DropdownButtonFormField<num>(
                                     key: ValueKey('bill-gst-$i'),
-                                    initialValue: _gstRates.contains(l.gst) ? l.gst : 0,
+                                    initialValue: gstRates.contains(l.gst) ? l.gst : 0,
                                     isDense: true,
                                     isExpanded: true,
                                     decoration: _dec('GST'),
-                                    items: [for (final g in _gstRates) DropdownMenuItem(value: g, child: Text('$g%', style: inter(14, 600)))],
+                                    items: [for (final g in gstRates) DropdownMenuItem(value: g, child: Text('${_rupees(g)}%', style: inter(14, 600)))],
                                     onChanged: (v) => setState(() => l.gst = v ?? 0),
                                   ),
                                 ),
@@ -729,10 +1289,7 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
                             ]),
                           ),
                         const Divider(height: 18),
-                        _kv('Taxable value', money((taxable * 100).round())),
-                        _kv('GST', money((gst * 100).round())),
-                        _kv('Round off', money(((total - taxable - gst) * 100).round())),
-                        _kv('Invoice total', money((total * 100).round()), bold: true),
+                        GstTotals(lines: [for (final l in _lines) l.money], keyPrefix: 'bill'),
                       ]),
                       _section('Payment', [
                         Wrap(spacing: 8, children: [

@@ -29,10 +29,13 @@ import * as sell from './schemas/sell.ts';
 import * as pur from './schemas/purchasing.ts';
 import * as staff from './schemas/staff.ts';
 import * as mo from './schemas/money.ts';
+import * as ads from './schemas/ads.ts';
 import * as team from './schemas/team.ts';
 import * as sf from './schemas/storefront.ts';
 import * as nt from './schemas/notices.ts';
 import * as st from './schemas/settings.ts';
+import * as rr from './schemas/returns.ts';
+import * as pk from './schemas/packed.ts';
 import { helpContent } from './modules/help.ts';
 import * as out from './schemas/outlets.ts';
 import * as cu from './schemas/customers.ts';
@@ -283,6 +286,10 @@ export const MANIFEST: Entry[] = [
   db('smoney_register', { args: mo.StoreRegister, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('smoney_close_day', { args: mo.StoreClose, map: P, rate: 'money', roles: 'staff with money:record' }),
   db('smoney_dues', { args: mo.Options, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('smoney_contacts', { args: mo.StoreContacts, map: P, rate: 'read', roles: 'staff with money:read' }),
+  db('smoney_contact_save', { args: mo.StoreContactSave, map: P, rate: 'money', roles: 'staff with money:record' }),
+  sec('smoney_proof_slot', { args: mo.ProofAsk, rate: 'secure', roles: 'staff with money:record' }),
+  sec('smoney_proof_link', { args: mo.ProofLink, rate: 'secure', roles: 'staff with money:read' }),
   db('money_overview', { args: mo.Window, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('money_payments_list', { args: mo.Payments, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('money_transactions_list', { args: mo.Transactions, map: P, rate: 'read', roles: 'staff with money:read' }),
@@ -330,6 +337,26 @@ export const MANIFEST: Entry[] = [
   db('sf_image_library', { args: sf.ImageLibrary, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
   db('sf_offer_list', { args: sf.None, map: P, rate: 'read', roles: STOREFRONT }),
   db('sf_ad_list', { args: sf.None, map: P, rate: 'read', post: links2, roles: STOREFRONT }),
+  // Ads with OneLocal coins (founder, 29 Oct 2026): dashboard, a new ad, stopping one, topping up coins; the 9:16 photo or video upload
+  db('ads_home', { args: ads.None, map: P, rate: 'read', roles: STOREFRONT }),
+  db('ads_save', { args: ads.Save, map: P, rate: 'write', idem: true, roles: STOREFRONT }),
+  db('ads_stop', { args: ads.Stop, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_quote', { args: ads.Quote, map: P, rate: 'read', roles: STOREFRONT }),
+  db('ads_accept', { args: ads.Accept, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_fund', { args: ads.Fund, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_pause', { args: ads.Pause, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_change_request', { args: ads.ChangeRequest, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_dispute', { args: ads.Dispute, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_report', { args: ads.Report, map: P, rate: 'read', roles: STOREFRONT }),
+  db('ads_track', { args: ads.Track, map: P, rate: 'write', roles: ANY }),
+  db('adv_app_get', { args: ads.None, map: P, rate: 'read', roles: ANY }),
+  db('adv_app_save', { args: ads.AdvSave, map: P, rate: 'write', roles: ANY }),
+  db('adv_app_submit', { args: ads.AdvSubmit, map: P, rate: 'write', roles: ANY }),
+  db('ads_profile', { args: ads.None, map: P, rate: 'read', roles: STAFF }),
+  db('ads_profile_save', { args: ads.ProfileSave, map: P, rate: 'write', roles: STOREFRONT }),
+  db('ads_topup', { args: ads.TopUp, map: P, rate: 'write', idem: true, roles: STOREFRONT }),
+  sec('ads_media_slot', { args: ads.MediaAsk, rate: 'secure', roles: STOREFRONT }),
+  sec('ads_media_link', { args: ads.MediaLink, rate: 'secure', roles: STOREFRONT }),
   db('sf_draft_save', { args: sf.DraftSave, map: P, rate: 'write', roles: STOREFRONT }),
   db('sf_draft_discard', { args: sf.DraftDiscard, map: P, rate: 'write', roles: STOREFRONT }),
   db('sf_publish', { args: sf.Publish, map: P, rate: 'write', roles: 'staff with storefront:publish' }),
@@ -360,6 +387,13 @@ export const MANIFEST: Entry[] = [
   //      (read: any active person; save: owner, admin, business manager, manager; bank only owner and admin). Bank numbers are saved by the
   //      existing secure handler partner_setup_save_payment and are never returned.
   db('pos_settings_get', { args: st.Empty, map: P, rate: 'read', roles: STAFF }),
+  db('rr_home', { args: rr.None, map: P, rate: 'read', roles: STAFF }),
+  db('rr_policy_save', { args: rr.PolicySave, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('rr_history', { args: rr.History, map: P, rate: 'read', roles: STAFF }),
+  sec('pos_packed_photo_slot', { args: pk.PhotoAsk, rate: 'secure', roles: STAFF }),
+  sec('pos_packed_photo_link', { args: pk.PhotoLink, rate: 'secure', roles: STAFF }),
+  db('pos_packed_photo_save', { args: pk.PhotoSave, map: P, rate: 'write', roles: STAFF }),
+  db('rr_settings_save', { args: rr.SettingsSave, map: P, rate: 'write', roles: 'owner or manager' }),
   db('pos_settings_save_hours', { args: st.Hours, map: P, rate: 'write', roles: 'owner or manager' }),
   db('pos_settings_save_readiness', { args: st.Readiness, map: P, rate: 'write', roles: 'owner or manager' }),
   db('pos_settings_save_help', { args: st.Help, map: P, rate: 'write', roles: 'owner or manager' }),

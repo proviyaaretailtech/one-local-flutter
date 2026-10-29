@@ -108,7 +108,7 @@ void main() {
       final env = till.env();
       await tall(t, SellScreen(env: env));
       expect(find.text('Coca-Cola 500ml'), findsOneWidget);
-      expect(find.text('Out of Stock'), findsOneWidget);
+      expect(find.text('Not on sale'), findsOneWidget);
       expect(find.text('PAY'), findsOneWidget);
       expect(find.text('ADD'), findsNothing); // the card is the button
       await t.tap(find.byKey(const ValueKey('product-m1')));
@@ -118,7 +118,8 @@ void main() {
       await t.pumpAndSettle();
       expect(env.carts.active.units, 2);
       expect(t.widget<Text>(find.descendant(of: find.byKey(const ValueKey('product-count-m1')), matching: find.byType(Text))).data, '2');
-      expect(find.text('PAY ₹84'), findsOneWidget); // 2 x ₹40 + 5% GST, as the server quoted it
+      expect(find.text('PAY'), findsOneWidget);
+      expect(find.text('₹84'), findsWidgets); // 2 x ₹40 + 5% GST, as the server quoted it
       final q = jsonDecode(till.where('POST', '/quote').last.body);
       expect(q['lines'], [{'menu_item_id': 'm1', 'qty': 2}]);
     });
@@ -170,17 +171,21 @@ void main() {
           {'id': 'i3', 'status': 'low', 'available': 3, 'stock_days': 1.5},
         ];
 
-      testWidgets('MRP is struck through when the price is lower; stock says Available or Out of Stock and an empty item cannot be added', (t) async {
+      testWidgets('MRP is struck through when the price is lower; an item with no stock is greyed but still sells (negative stock); one not on sale cannot be added', (t) async {
         final env = stocked().env();
         await tall(t, SellScreen(env: env));
         final mrp = t.widget<Text>(find.text('₹50'));
         expect(mrp.style?.decoration, TextDecoration.lineThrough);
         expect(find.text('₹280'), findsOneWidget); // no MRP above the price: nothing struck through
         expect(find.text('Tap to add'), findsWidgets); // Coca-Cola
-        expect(find.text('Out of Stock'), findsNWidgets(2)); // butter (stock 0) and the item not on sale
-        await t.tap(find.byKey(const ValueKey('product-m2'))); // butter
+        expect(find.text('No stock · still sells'), findsOneWidget); // butter, stock 0
+        expect(find.text('Not on sale'), findsOneWidget);
+        await t.tap(find.byKey(const ValueKey('product-m2'))); // butter: billed anyway, stock goes below zero
         await t.pumpAndSettle();
-        expect(env.carts.active.isEmpty, isTrue);
+        expect(env.carts.active.isEmpty, isFalse);
+        expect(find.textContaining('has no stock. It is billed anyway'), findsOneWidget);
+        // the card counts the cart: 0 in stock, 1 billed → −1 after this bill
+        expect(t.widget<Text>(find.byKey(const ValueKey('product-stock-m2'))).data, 'Stock -1 after this bill');
       });
 
       testWidgets('no All Items / In Stock / Fast Moving / Low Inventory tabs and no New category: every product of the category shows', (t) async {
@@ -485,7 +490,7 @@ void main() {
       expect(jsonDecode(till.where('POST', '/cancel').single.body)['reason'], 'Payment not collected');
     });
 
-    testWidgets('WhatsApp needs a mobile number; with one it opens wa.me', (t) async {
+    testWidgets('WhatsApp needs a mobile number; with one it opens WhatsApp', (t) async {
       final till = Till();
       final opened = <Uri>[];
       final env = till.env(opened: opened);
@@ -498,8 +503,8 @@ void main() {
       cart.customerPhone = '9876543210';
       await t.tap(find.text('Send by WhatsApp'));
       await t.pumpAndSettle();
-      expect(opened.single.host, 'wa.me');
-      expect(opened.single.path, '/919876543210');
+      expect(opened.single.host, 'api.whatsapp.com');
+      expect(opened.single.queryParameters['phone'], '919876543210');
     });
 
     testWidgets('Razorpay checkout: the server says no provider is set up, the attempt is logged and the failure screen opens', (t) async {

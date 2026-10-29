@@ -7,6 +7,7 @@ import '../orders/order_widgets.dart' show OrdersTopBar, kChipGreen, kGreenText,
 import '../states/state_kit.dart' show StateTone, StatusCard;
 import '../ui/i18n.dart';
 import '../ui/theme.dart';
+import 'returns_screens.dart';
 import 'settings_api.dart';
 import 'settings_sheets.dart';
 import 'settings_widgets.dart';
@@ -166,7 +167,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: InkWell(
             key: ValueKey('settings-part-${p.id}'),
             borderRadius: BorderRadius.circular(18),
-            onTap: () => setState(() => _part = p.id),
+            onTap: p.open ?? () => setState(() => _part = p.id),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
               child: Row(
@@ -382,6 +383,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
+      // Returns, refunds & replacements (founder's spec, 29 Oct 2026): one tap opens its own page
+      _Part('returns', 'Returns & refunds', LucideIcons.packageCheck, 'Policy for each category · always-covered claims', const [],
+          open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReturnsHomeScreen(api: widget.env.returns)))),
       _Part('me', 'Me & app', LucideIcons.settings2, '${kLanguages[s.language] ?? s.language} · help · feedback', [
         // one step (founder, 26 Oct 2026): the three languages right on the row; a tap saves it, no sheet
         _LanguageRow(current: s.language, onPick: edit && !_busy ? _setLanguage : null),
@@ -406,10 +410,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
 /// One Settings section: its card (icon, title, summary) and the rows it opens.
 class _Part {
-  const _Part(this.id, this.title, this.icon, this.summary, this.rows);
+  const _Part(this.id, this.title, this.icon, this.summary, this.rows, {this.open});
   final String id, title, summary;
   final IconData icon;
   final List<Widget> rows;
+  /// Set when the card opens a page of its own instead of rows.
+  final VoidCallback? open;
 }
 
 /// Language as a three-way toggle on the row itself: English · हिन्दी · Hinglish. [onPick] null: read-only.

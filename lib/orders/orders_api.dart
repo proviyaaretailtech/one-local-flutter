@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/partner_api.dart';
 import '../api/app_env.dart';
+import '../api/rpc_client.dart';
+import '../onboarding/document_picker.dart';
 
 /// One order as the server describes it (`GET /api/partner/pos-orders/:id`). Read-only: the stage, every label, the bill,
 /// the payment record and the actions allowed right now all come from the server; the app only draws them.
@@ -48,6 +50,19 @@ class OrderView {
   List<Map<String, dynamic>> get items => _list('items');
   List<Map<String, dynamic>> get actions => _list('actions');
   List<Map<String, dynamic>> get events => _list('events');
+
+  /// The four steps (Accept · Pack · Hand over · Done) and the one to do now (4: all done); null for a counter bill or a cancelled order.
+  ({List<String> labels, int current})? get steps {
+    final s = raw['steps'];
+    if (s is! Map) return null;
+    return (labels: [for (final l in s['labels'] as List? ?? const []) '$l'], current: (s['current'] as num?)?.toInt() ?? 0);
+  }
+
+  /// The photo of the packed bag: {id, has_photo, skip_reason, at}, or null when none was taken.
+  Map<String, dynamic>? get packedPhoto => (raw['packed_photo'] as Map?)?.cast<String, dynamic>();
+
+  /// The store asks for a photo of the packed bag before it is marked packed (Settings → Returns & refunds).
+  bool get photoRequired => raw['photo_required'] != false;
 
   Map<String, dynamic>? action(String style) {
     for (final a in actions) {
@@ -326,6 +341,40 @@ class OrdersApi {
 
   Future<OrderView> cancel(String id, {required String reason, Object? version}) async =>
       OrderView(await _send('POST', '/$id/cancel', body: {'reason': reason, 'version': version}));
+
+  late final RpcClient _rpcClient = RpcClient(client: _http, baseUrl: _base, accessToken: _token);
+
+  /// Sends the photo of the packed bag to a signed slot under the order's folder, then records it. {id, has_photo, at}
+  Future<Map<String, dynamic>> savePackedPhoto(String orderId, PickedDocument photo) async {
+    try {
+      final slot = await _rpcClient.callMap('pos_packed_photo_slot', {'order_id': orderId, 'content_type': photo.contentType, 'size': photo.bytes.length});
+      final put = await _http
+          .put(Uri.parse(slot['upload_url'] as String), headers: {'Content-Type': photo.contentType, 'x-upsert': 'true'}, body: photo.bytes)
+          .timeout(const Duration(minutes: 2));
+      if (put.statusCode >= 300) throw const OrdersApiException(502, 'Could not upload the photo. Try again.', null);
+      return await _rpcClient.callMap('pos_packed_photo_save', {'order_id': orderId, 'path': slot['path']});
+    } on RpcException catch (e) {
+      throw OrdersApiException(e.status, e.message, e.code);
+    }
+  }
+
+  /// Records why there is no photo of the packed bag (no camera, camera broken...).
+  Future<Map<String, dynamic>> skipPackedPhoto(String orderId, String reason) async {
+    try {
+      return await _rpcClient.callMap('pos_packed_photo_save', {'order_id': orderId, 'skip_reason': reason});
+    } on RpcException catch (e) {
+      throw OrdersApiException(e.status, e.message, e.code);
+    }
+  }
+
+  /// A 10-minute link to the packed photo.
+  Future<String> packedPhotoLink(String orderId) async {
+    try {
+      return (await _rpcClient.callMap('pos_packed_photo_link', {'order_id': orderId}))['url'] as String;
+    } on RpcException catch (e) {
+      throw OrdersApiException(e.status, e.message, e.code);
+    }
+  }
 
   Future<OrderView> act(String id, String action, {Object? version, List<Map<String, dynamic>>? lines, Map<String, String>? delivery, String? note, String? reason, String? key}) async =>
       OrderView(await _send('POST', '/$id/act', key: key ?? newKey(), body: {

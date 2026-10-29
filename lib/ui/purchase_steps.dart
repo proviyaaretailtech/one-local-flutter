@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'i18n.dart';
 import 'theme.dart';
 
-/// The three purchase steps (founder, 26 Oct 2026): 1 place the order, 2 receive the goods, 3 match the supplier's bill. Shown on top
+/// The three purchase steps (founder, 26 Oct 2026; simplified 29 Oct 2026): 1 place the order, 2 mark what was received, 3 the supplier's bill. Shown on top
 /// of each step's screen so the person always sees where the purchase is; [current] is 1, 2 or 3.
 class PurchaseSteps extends StatelessWidget {
   const PurchaseSteps(this.current, {super.key});
   final int current;
 
-  static const _steps = ['Order', 'Receive', 'Match bill'];
+  static const _steps = ['Order', 'Received', 'Bill'];
 
   @override
   Widget build(BuildContext context) => Padding(

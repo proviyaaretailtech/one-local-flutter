@@ -14,7 +14,10 @@ class PartnerApi {
 }
 
 class PartnerMe {
-  PartnerMe({required this.name, required this.email, required this.outlet, this.kind = 'store', this.sellPlan});
+  PartnerMe({required this.name, required this.email, required this.outlet, this.kind = 'store', this.sellPlan, this.advertising = false});
+
+  /// An advertising-only partner (no store): its app is Ads.
+  final bool advertising;
   final String name;
 
   /// store | restaurant | service, from the server.
@@ -34,6 +37,7 @@ class PartnerMe {
       outlet: (outlet['name'] ?? '') as String,
       kind: (j['business_kind'] ?? 'store') as String,
       sellPlan: j['sell_plan'] as String?,
+      advertising: j['advertising_only'] == true,
     );
   }
 }

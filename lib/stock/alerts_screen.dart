@@ -60,7 +60,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
         out.add((
           kind: 'low',
           title: it.s('name'),
-          line: status == 'out' ? 'Out of stock' : 'Only ${u(it, it.n('available'))} left${it.no('stock_days') == null ? '' : ' · lasts about ${qty(it.n('stock_days'))} days'}',
+          line: status == 'out' ? (it.n('available') < 0 ? 'Sold ${u(it, -it.n('available'))} more than you had · restock' : 'Out of stock') : 'Only ${u(it, it.n('available'))} left${it.no('stock_days') == null ? '' : ' · lasts about ${qty(it.n('stock_days'))} days'}',
           action: tr('Reorder'),
           page: StockPage.reorder,
           itemId: id,

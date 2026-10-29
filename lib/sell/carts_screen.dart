@@ -305,7 +305,7 @@ class _CartsScreenState extends State<CartsScreen> {
             ]),
             const SizedBox(height: 10),
             Row(children: [
-              Expanded(flex: 3, child: DarkCta(label: total == null ? 'PAY' : 'PAY ${rupees(total)}', onPressed: cart.isEmpty ? null : () async {
+              Expanded(flex: 3, child: DarkCta(label: 'PAY', labelStart: true, amount: total == null ? null : rupees(total), onPressed: cart.isEmpty ? null : () async {
                 await Navigator.of(context).push(MaterialPageRoute(builder: (_) => PayScreen(env: env, cart: cart)));
                 if (mounted) {
                   _requote();

@@ -70,7 +70,7 @@ void main() {
 
   testWidgets('no store link chosen yet: says so, no address or QR to share', (t) async {
     await show(t, {'slug': null, 'path': null, 'live': false, 'blockers': ['no_store_link', 'not_published']});
-    expect(find.text('Choose your store link in the page builder (Business Profile).'), findsOneWidget);
+    expect(find.text('Choose your store link in Page Manager (Shop profile).'), findsOneWidget);
     expect(find.byKey(const ValueKey('menu-link-qr')), findsNothing);
     expect(find.byKey(const ValueKey('menu-link-url')), findsNothing);
   });

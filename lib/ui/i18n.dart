@@ -937,6 +937,7 @@ const _words = <String, (String, String)>{
   'New': ('नए', 'Naye'),
   'Packed': ('पैक', 'Packed'),
   'Business profile': ('बिज़नेस प्रोफ़ाइल', 'Business profile'),
+  'Page Manager': ('पेज मैनेजर', 'Page Manager'),
   'How customers see you': ('ग्राहक आपको कैसे देखते हैं', 'Customers aapko kaise dekhte hain'),
   'Store page': ('दुकान का पेज', 'Store page'),
   'Banner, categories, product lists and deals, in the order you choose': ('बैनर, श्रेणियाँ, सामान और ऑफ़र, आपके क्रम में', 'Banner, categories, products aur deals, aapke order mein'),

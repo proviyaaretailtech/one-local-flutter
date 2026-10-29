@@ -437,7 +437,9 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
         isScrollControlled: true,
         backgroundColor: kBg,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        builder: (ctx) => SafeArea(child: Padding(padding: const EdgeInsets.all(12), child: _lineCard(r))),
+        useRootNavigator: true,
+        // as tall as the line's details, not the whole screen
+        builder: (ctx) => SafeArea(child: Padding(padding: const EdgeInsets.all(12), child: Column(mainAxisSize: MainAxisSize.min, children: [_lineCard(r)]))),
       );
 
   Widget _lineCard(GrnRow r) {
@@ -448,7 +450,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
     return OrderCardBox(
       radius: 24,
       padding: const EdgeInsets.all(18),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(r.name, style: inter(19, 700)),
         Text(_stateText(r), style: inter(14, 400, color: r.severity == 'ok' ? kMuted : (r.severity == 'red' ? kBadText : kWarnText))),
         const SizedBox(height: 8),
@@ -632,28 +634,29 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
                 const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
               else ...[
                 const PurchaseSteps(3),
-                // the purchase card, in a green gradient (founder, 26 Oct 2026)
+                // the purchase card: a soft mint wash, not a solid green block (founder, 29 Oct 2026)
                 Container(
                   key: const ValueKey('check-header'),
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(24),
-                    gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF14532D), Color(0xFF2F8F4E)]),
+                    border: Border.all(color: const Color(0xFFDDEBD6)),
+                    gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFEAF6E4), Color(0xFFFFFFFF)]),
                   ),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(v.grnNo, style: inter(21, 800, color: Colors.white)),
-                          Text([v.docNo, if (v.poRef.isNotEmpty) v.poRef, if (v.invoiceNo.isNotEmpty) v.invoiceNo].join(' / '), style: inter(14, 400, color: Colors.white70)),
+                          Text(v.grnNo, style: inter(21, 800)),
+                          Text([v.docNo, if (v.poRef.isNotEmpty) v.poRef, if (v.invoiceNo.isNotEmpty) v.invoiceNo].join(' / '), style: inter(14, 400, color: kMuted)),
                         ]),
                       ),
                       _statusChip(v),
                     ]),
                     const SizedBox(height: 8),
-                    _kv('Supplier', v.supplier.isEmpty ? '—' : v.supplier, kc: Colors.white70, vc: Colors.white),
-                    _kv('Approver', [v.approver['name'], if (v.approver['role'] == 'org_owner') 'Owner'].whereType<String>().join(' · ').ifEmpty('—'), kc: Colors.white70, vc: Colors.white),
-                    _kv('Posting status', v.posted ? 'Posted' : 'Not posted', kc: Colors.white70, vc: Colors.white),
+                    _kv('Supplier', v.supplier.isEmpty ? '—' : v.supplier),
+                    _kv('Approver', [v.approver['name'], if (v.approver['role'] == 'org_owner') 'Owner'].whereType<String>().join(' · ').ifEmpty('—')),
+                    _kv('Posting status', v.posted ? 'Posted' : 'Not posted', vc: v.posted ? kGreenText : kWarnText),
                   ]),
                 ),
                 const SizedBox(height: 12),

@@ -29,5 +29,7 @@ export async function me({ userId }: SecureCtx) {
     business_kind: kindOf(org.business_domain, null),
     // POS only: no online orders until the store upgrades (founder, 28 Oct 2026).
     sell_plan: (app?.sell_plan as string | null | undefined) ?? null,
+    // An advertising-only partner (hosted_advertisers_2026-10-29.sql): no store; the app opens Ads.
+    advertising_only: (org.business_domain ?? '') === 'Advertising',
   };
 }

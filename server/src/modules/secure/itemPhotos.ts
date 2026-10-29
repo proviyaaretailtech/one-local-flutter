@@ -3,6 +3,7 @@
 // (menu:create or menu:update). The file is recorded by the service-only cat_item_photo_attach after the storage service confirms it
 // exists and is small enough; the photo it replaced is deleted. Bucket: item-images (public, so the link on the item never expires).
 import { db, rpc } from '../../db.ts';
+import { viaProxy } from '../../config.ts';
 import { HttpError } from '../../http.ts';
 import { parse } from '../../validate.ts';
 import { IMAGE_MAX_BYTES, PHOTO_EXT, PhotoAsk, PhotoAttach, PhotoRemove } from '../../schemas/catalogue.ts';
@@ -37,7 +38,7 @@ export async function photoSlot({ userId, args }: SecureCtx) {
   const path = `${org}/items/${b.item_id}/${crypto.randomUUID()}.${PHOTO_EXT[b.content_type]}`;
   const signed = await db().storage.from(BUCKET).createSignedUploadUrl(path);
   if (signed.error || !signed.data) { console.error('[secure] signed upload failed', signed.error?.message); throw new HttpError(502, 'Uploads are not available right now.'); }
-  return { path, upload_url: signed.data.signedUrl, max_bytes: IMAGE_MAX_BYTES };
+  return { path, upload_url: viaProxy(signed.data.signedUrl), max_bytes: IMAGE_MAX_BYTES };
 }
 
 export async function photoAttach({ userId, args }: SecureCtx) {

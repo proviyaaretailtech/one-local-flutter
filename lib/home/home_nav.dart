@@ -72,7 +72,7 @@ class HomeNav {
   // Section M: the storefront page builder and its settings.
   static HomeRoute? storefront;
 
-  /// Business profile (founder, 27 Oct 2026): how the shop looks to customers, every storefront screen in one place.
+  /// Page Manager (founder, 28 Oct 2026; was Business profile, 27 Oct): how the shop looks to customers, every storefront screen in one place.
   static HomeRoute? businessProfile;
   static HomeRoute? money;
   // Section K: one Money screen by its key ('payouts', 'invoices', 'settlements', ...), for links that name a screen.

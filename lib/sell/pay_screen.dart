@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
+import '../ui/whatsapp.dart';
 import '../shift/shift_screens.dart';
 import 'payment_pending_screen.dart';
 import 'razorpay_screen.dart';
@@ -254,7 +255,7 @@ class _PayScreenState extends State<PayScreen> {
     }
     final q = _quote;
     final text = q == null ? 'Your bill' : 'Your bill: ${rupees(q.total)} (subtotal ${rupees(q.subtotal)}, GST ${rupees(q.gst)}${q.discount > 0 ? ', discount -${rupees(q.discount)}' : ''}).';
-    await env.openUrl(Uri.https('wa.me', '/91${phone.substring(phone.length - 10)}', {'text': text}));
+    await env.openUrl(whatsAppLink(phone, text));
   }
 
   @override

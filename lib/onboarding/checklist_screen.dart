@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../ads/advertiser_screens.dart';
 import '../auth/auth_repository.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -146,8 +147,11 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 /// Decides which onboarding screen a person lands on, from the application the server holds.
 /// Signed in, no store yet, comes here. Nothing is stored on the phone; the server is the record.
 class OnboardingEntry extends StatefulWidget {
-  const OnboardingEntry({super.key, this.api, this.auth, this.phone, this.name});
+  const OnboardingEntry({super.key, this.api, this.auth, this.phone, this.name, this.advertiserApi});
   final OnboardingApi? api;
+
+  /// An advertiser application (advertising only, no store) is picked up here too.
+  final AdvertiserApi? advertiserApi;
   final AuthRepository? auth;
   final String? phone;
 
@@ -188,7 +192,15 @@ class _OnboardingEntryState extends State<OnboardingEntry> {
           );
         }
         final app = snap.data!;
-        if (!app.exists) return StartScreen(api: _api, phone: widget.phone ?? widget.auth?.currentPhone, name: widget.name ?? widget.auth?.currentName);
+        if (!app.exists) {
+          return _AdvertiserOrStart(
+            api: _api,
+            advertiserApi: widget.advertiserApi ?? AdvertiserApi(),
+            auth: widget.auth,
+            phone: widget.phone ?? widget.auth?.currentPhone,
+            name: widget.name ?? widget.auth?.currentName,
+          );
+        }
         return switch (app.status) {
           'draft' => app.sellPlan == null
               ? MerchantProfileScreen(api: _api, type: app.partnerType ?? 'store', app: app, phone: widget.phone, name: widget.name)
@@ -199,4 +211,34 @@ class _OnboardingEntryState extends State<OnboardingEntry> {
       },
     );
   }
+}
+
+/// No store application: an advertiser application (advertising only), if there is one, carries on where it was; otherwise the
+/// account choice.
+class _AdvertiserOrStart extends StatefulWidget {
+  const _AdvertiserOrStart({required this.api, required this.advertiserApi, this.auth, this.phone, this.name});
+  final OnboardingApi api;
+  final AdvertiserApi advertiserApi;
+  final AuthRepository? auth;
+  final String? phone, name;
+  @override
+  State<_AdvertiserOrStart> createState() => _AdvertiserOrStartState();
+}
+
+class _AdvertiserOrStartState extends State<_AdvertiserOrStart> {
+  late final Future<Map<String, dynamic>?> _adv = widget.advertiserApi.get().then<Map<String, dynamic>?>((g) => g).catchError((Object _) => null);
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>?>(
+        future: _adv,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) return const Scaffold(body: Center(child: CircularProgressIndicator(color: kLink)));
+          final a = ((snap.data?['application'] as Map?) ?? const {}).cast<String, dynamic>();
+          return switch (a['status']) {
+            'draft' => AdvertiserSignupScreen(api: widget.advertiserApi, auth: widget.auth, phone: widget.phone, name: widget.name),
+            'submitted' || 'approved' || 'rejected' => AdvertiserStatusScreen(api: widget.advertiserApi, auth: widget.auth, application: a),
+            _ => StartScreen(api: widget.api, phone: widget.phone, name: widget.name),
+          };
+        },
+      );
 }

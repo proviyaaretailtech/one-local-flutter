@@ -38,3 +38,21 @@ export function piiKey(): string {
   if (isProduction()) return '';
   return 'dev-only-partner-pii-key-0123456789'; // local development only; never used in production
 }
+
+/** Where phones reach Supabase through this server (`/sb`), for networks that block supabase.co (29 Oct 2026: some Indian ISPs'
+ *  DNS does not resolve *.supabase.co). SUPABASE_PROXY_URL wins; on Vercel it is this deployment's production address + /sb;
+ *  null locally (a local Supabase is never blocked). */
+export function supabaseProxyUrl(): string | null {
+  const set = process.env.SUPABASE_PROXY_URL?.trim();
+  if (set) return set.replace(/\/+$/, '');
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  return host ? `https://${host}/sb` : null;
+}
+
+/** A Supabase storage link (signed upload, signed or public read) rewritten to go through this server when it should. */
+export function viaProxy<T extends string | null | undefined>(url: T): T {
+  const proxy = supabaseProxyUrl(), base = supabaseUrl();
+  if (!url || !proxy || !base) return url;
+  const origin = base.replace(/\/+$/, '');
+  return (url.startsWith(origin + '/storage/v1/') ? proxy + url.slice(origin.length) : url) as T;
+}

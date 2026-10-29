@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
 import '../onboarding/document_picker.dart';
+import 'returns_api.dart';
 
 /// The Settings page as the server describes it (`pos_settings_get`). Read-only: every value comes from the database and the app only draws it.
 /// Bank and tax numbers are never part of it: only holder, bank name, last four digits, IFSC and the status.
@@ -103,8 +104,10 @@ class SettingsApi {
 
 /// What the screens may do beyond the server: pick a time, pick a file, open a link. Tests replace these.
 class SettingsEnv {
-  SettingsEnv({SettingsApi? api, this.pickTime, this.picker = const DevicePicker(), this.onOpenLink, this.newKey}) : api = api ?? SettingsApi();
+  SettingsEnv({SettingsApi? api, this.returns, this.pickTime, this.picker = const DevicePicker(), this.onOpenLink, this.newKey}) : api = api ?? SettingsApi();
   final SettingsApi api;
+  /// Returns & refunds (the section opens its own screen); null: the real server.
+  final ReturnsApi? returns;
   /// Asks for a time and answers "HH:MM"; null means the person backed out. Default: the system time picker.
   final Future<String?> Function(BuildContext context, String? current)? pickTime;
   final DocumentPicker picker;

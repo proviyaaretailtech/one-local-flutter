@@ -97,7 +97,7 @@ void main() {
     }
 
     testWidgets('Money, Team, Business profile, Settings and Help open their screens', (t) async {
-      for (final (label, hook) in [('Money', 'money'), ('Team', 'team'), ('Business profile', 'business-profile'), ('Settings', 'settings'), ('Help & support', 'support')]) {
+      for (final (label, hook) in [('Money', 'money'), ('Team', 'team'), ('Page Manager', 'business-profile'), ('Settings', 'settings'), ('Help & support', 'support')]) {
         final opened = fakeHooks();
         await openSideNav(t);
         expect(soonOn(label), findsNothing, reason: label);

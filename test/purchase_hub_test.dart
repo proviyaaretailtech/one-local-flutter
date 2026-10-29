@@ -10,6 +10,7 @@ import 'package:vinii_pos/catalogue/catalogue_api.dart';
 import 'package:vinii_pos/catalogue/item_parts.dart';
 import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart';
+import 'package:vinii_pos/purchasing/po_create_screen.dart';
 import 'package:vinii_pos/purchasing/purchase_hub_screen.dart';
 import 'package:vinii_pos/purchasing/simple_purchase.dart';
 import 'package:vinii_pos/purchasing/purchasing_api.dart';
@@ -17,7 +18,6 @@ import 'package:vinii_pos/purchasing/add_supplier_sheet.dart' show pickPhoneCont
 import 'package:vinii_pos/stock/stock_env.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
-import 'helpers.dart' show toast;
 
 http.Response ok(Object body) => http.Response(jsonEncode(body), 200, headers: {'content-type': 'application/json; charset=utf-8'});
 http.Response err(int status, String detail, [String? code]) =>
@@ -50,7 +50,13 @@ class Fake {
     final b = r.body.isEmpty ? <String, dynamic>{} : jsonDecode(r.body) as Map<String, dynamic>;
     switch (fnOf(r)) {
       case 'inv_dashboard':
-        return ok({'replenishment': [{'id': 'i1', 'name': 'Tata Salt'}, {'id': 'i2', 'name': 'Parle-G'}], 'counts': {}});
+        return ok({
+          'replenishment': [
+            {'id': 'i1', 'name': 'Tata Salt', 'unit': 'unit', 'suggest': 24, 'urgent': true},
+            {'id': 'i2', 'name': 'Parle-G', 'unit': 'unit', 'suggest': 10, 'urgent': false},
+          ],
+          'counts': {},
+        });
       case 'pur_po_open':
         return ok({
           'orders': [
@@ -200,7 +206,7 @@ void main() {
     expect(find.text('To check'), findsNWidgets(2));
   });
 
-  testWidgets('Purchase orders: one list of open orders (no tabs), each with its day counter, Received and Cancel PO; suppliers; Buy again', (t) async {
+  testWidgets('Purchase orders: one list of open orders (no tabs), each with its day counter, Received and a dustbin to cancel; no supplier list; Buy again', (t) async {
     final f = Fake();
     await phone(t, hub(f));
     await tap(t, find.byKey(const ValueKey('part-orders')));
@@ -212,7 +218,9 @@ void main() {
     expect(find.text('Ordered yesterday · not received yet'), findsOneWidget);
     expect(find.text('On time'), findsOneWidget);
     expect(find.text('₹1,250'), findsNWidgets(2));
-    expect(find.text('Latur · 9876543210'), findsOneWidget);
+    expect(find.text('Latur · 9876543210'), findsNothing); // suppliers are not listed here
+    expect(find.byKey(const ValueKey('supplier-add')), findsNothing);
+    expect(t.widget<IconButton>(find.byKey(const ValueKey('po-cancel-p1'))).tooltip, 'Cancel PO');
     expect(find.text('Buy again · 2'), findsOneWidget);
     await tap(t, find.byKey(const ValueKey('po-buy-again')));
     expect(f.opened, ['reorder']);
@@ -226,6 +234,30 @@ void main() {
     expect(find.byType(ReceiveGoodsScreen), findsOneWidget);
   });
 
+  testWidgets('Items and Purchase in step: what Stock says is low shows as Need to order, and Order these puts it all on a new order', (t) async {
+    final f = Fake();
+    await phone(t, hub(f));
+    expect(find.byKey(const ValueKey('need-to-order')), findsOneWidget);
+    expect(find.text('Need to order · 2'), findsOneWidget);
+    expect(find.text('Tata Salt'), findsOneWidget);
+    expect(find.text('Out / very low'), findsOneWidget);
+    expect(find.text('buy 24'), findsOneWidget);
+    expect(find.text('Low'), findsOneWidget);
+    await tap(t, find.byKey(const ValueKey('need-order')));
+    final screen = t.widget<PoCreateScreen>(find.byType(PoCreateScreen));
+    expect([for (final w in screen.want) '${w.name} ${w.qty}'], ['Tata Salt 24', 'Parle-G 10']);
+    Navigator.of(t.element(find.byType(PoCreateScreen))).pop();
+    await t.pumpAndSettle();
+    await tap(t, find.byKey(const ValueKey('need-review')));
+    expect(f.opened, ['reorder']);
+  });
+
+  testWidgets('nothing low: no Need to order card', (t) async {
+    final f = Fake((r) => fnOf(r) == 'inv_dashboard' ? ok({'replenishment': [], 'counts': {}}) : null);
+    await phone(t, hub(f));
+    expect(find.byKey(const ValueKey('need-to-order')), findsNothing);
+  });
+
   testWidgets('the wait tone: under 3 days on time, 3 to 6 needs attention, 7 or more late', (t) async {
     expect([for (final d in [0, 2, 3, 6, 7, 30]) waitTone(d).word], ['On time', 'On time', 'Needs attention', 'Needs attention', 'Late', 'Late']);
   });
@@ -236,46 +268,6 @@ void main() {
     await tap(t, find.byKey(const ValueKey('past-purchases')));
     expect(find.byType(PastPurchasesScreen), findsOneWidget);
     expect(f.calls('pur_history'), isNotEmpty);
-  });
-
-  testWidgets('a supplier opens its details and prices; New order is there', (t) async {
-    final f = Fake();
-    await phone(t, hub(f));
-    await tap(t, find.byKey(const ValueKey('part-orders')));
-    await tap(t, find.byKey(const ValueKey('supplier-sup_1')));
-    expect(find.text('27ABCDE1234F1Z5'), findsOneWidget);
-    expect(find.text('Ravi'), findsOneWidget);
-    expect(find.text('Tata Salt 1kg'), findsOneWidget);
-    expect(find.byKey(const ValueKey('supplier-new-order')), findsOneWidget);
-  });
-
-  testWidgets('Add supplier: the name is needed; the rest is optional; the new supplier is listed', (t) async {
-    final f = Fake();
-    await phone(t, hub(f));
-    await tap(t, find.byKey(const ValueKey('part-orders')));
-    await tap(t, find.byKey(const ValueKey('supplier-add')));
-    await tap(t, find.byKey(const ValueKey('supplier-save')));
-    expect(find.text('Enter the supplier name.'), findsOneWidget);
-    expect(f.calls('pur_supplier_save'), isEmpty);
-    await t.enterText(find.byKey(const ValueKey('supplier-name')), 'Fresh Farms');
-    await t.enterText(find.byKey(const ValueKey('supplier-city')), 'Pune');
-    await tap(t, find.byKey(const ValueKey('supplier-save')));
-    final save = f.calls('pur_supplier_save').single;
-    expect(f.body(save), {'name': 'Fresh Farms', 'city': 'Pune'});
-    expect(save.headers['Idempotency-Key'], startsWith('pur-'));
-    expect(toast('Fresh Farms added.'), findsOneWidget);
-    expect(find.text('Fresh Farms'), findsOneWidget);
-  });
-
-  testWidgets('a refused supplier keeps the sheet open with the reason', (t) async {
-    final f = Fake((r) => fnOf(r) == 'pur_supplier_save' ? err(409, 'You already have a supplier named ABC Foods.', 'duplicate') : null);
-    await phone(t, hub(f));
-    await tap(t, find.byKey(const ValueKey('part-orders')));
-    await tap(t, find.byKey(const ValueKey('supplier-add')));
-    await t.enterText(find.byKey(const ValueKey('supplier-name')), 'ABC Foods');
-    await tap(t, find.byKey(const ValueKey('supplier-save')));
-    expect(find.text('You already have a supplier named ABC Foods.'), findsOneWidget);
-    expect(find.byKey(const ValueKey('supplier-save')), findsOneWidget);
   });
 
   testWidgets('a wide screen shows Receipt notes and Purchase orders side by side', (t) async {

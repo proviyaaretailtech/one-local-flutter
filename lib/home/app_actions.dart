@@ -87,8 +87,9 @@ List<AppAction> appActions(BuildContext context, {VoidCallback? onReports}) {
   add(LucideIcons.users, 'Team', 'Side menu', 'team staff users roles invite cashier manager employee', route(HomeNav.team));
   add(LucideIcons.settings, 'Settings', 'Side menu', 'settings preferences store timings language', route(HomeNav.settings ?? HomeNav.setup));
   add(LucideIcons.mapPinned, 'Delivery area & charges', 'Settings → Orders & delivery', 'delivery distance radius km fee minimum order free delivery', route(HomeNav.deliverySettings));
-  add(LucideIcons.store, 'Business profile', 'Side menu', 'business profile shop page online store storefront onelocal page how customers see banner theme colours publish details logo hours delivery offers ads', route(HomeNav.businessProfile ?? HomeNav.storefront));
-  add(LucideIcons.layoutTemplate, 'Store page', 'Business profile', 'store page builder sections banner categories products deals preview publish theme', route(HomeNav.storefront));
+  add(LucideIcons.layoutDashboard, 'Page Manager', 'Side menu', 'page manager business profile shop page online store storefront onelocal page how customers see banner theme colours publish details logo hours delivery offers ads promote', route(HomeNav.businessProfile ?? HomeNav.storefront));
+  add(LucideIcons.megaphone, 'Ads', 'Page Manager', 'ads advertise promote boost visibility customers nearby', route(HomeNav.businessProfile ?? HomeNav.storefront));
+  add(LucideIcons.layoutTemplate, 'Store page', 'Page Manager', 'store page builder sections banner categories products deals preview publish theme', route(HomeNav.storefront));
   add(LucideIcons.wallet, 'OneLocal Wallet', 'Side menu', 'wallet balance', route(HomeNav.wallet));
   add(LucideIcons.bell, 'Notifications', 'Banner', 'notifications alerts messages announcements', route(HomeNav.notifications));
   add(LucideIcons.circleQuestionMark, 'Help & support', 'Side menu', 'help support complaint ticket contact problem', route(HomeNav.support));

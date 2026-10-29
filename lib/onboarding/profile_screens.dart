@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../ads/advertiser_screens.dart' show AdvertiserSignupScreen;
 import '../screens/register_account_type_screen.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
@@ -343,5 +344,6 @@ class StartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => RegisterAccountTypeScreen(
         onChosen: (t) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MerchantProfileScreen(api: api, type: t.name, phone: phone, name: name))),
+        onAdvertise: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdvertiserSignupScreen(phone: phone, name: name))),
       );
 }

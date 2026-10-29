@@ -39,7 +39,8 @@ Future<void> showStoreSideNav(
     SideNavEntry(LucideIcons.indianRupee, 'Money', hook(HomeNav.money)),
     SideNavEntry(LucideIcons.circleUser, 'Customer', hook(HomeNav.customers)),
     // how the shop looks to customers (founder, 27 Oct 2026): next to the customers it is for
-    SideNavEntry(LucideIcons.store, 'Business profile', hook(HomeNav.businessProfile ?? HomeNav.storefront)),
+    // Page Manager (founder, 28 Oct 2026; was Business profile): the shop's OneLocal page, ads and offers from one dashboard
+    SideNavEntry(LucideIcons.layoutDashboard, 'Page Manager', hook(HomeNav.businessProfile ?? HomeNav.storefront)),
     SideNavEntry(LucideIcons.fileText, 'Reports', onReports),
     SideNavEntry(LucideIcons.users, 'Team', hook(HomeNav.team)),
     SideNavEntry(LucideIcons.settings, 'Settings', hook(HomeNav.settings ?? HomeNav.setup)),

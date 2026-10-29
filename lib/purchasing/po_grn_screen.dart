@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
+import '../ui/whatsapp.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
 import 'simple_purchase.dart';
@@ -93,7 +94,7 @@ class _PoGrnScreenState extends State<PoGrnScreen> {
       for (final l in po.lines) '• ${l.s('name')} × ${qty1(l.n('ordered_qty'))} ${unitWord(l.s('unit'))}',
       if (expected != null) 'Please deliver by ${dayMonth(expected)}.',
     ].join('\n');
-    final uri = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(text)}');
+    final uri = whatsAppLink(phone, text);
     if (!await (widget.openUrl ?? (u) => launchUrl(u, mode: LaunchMode.externalApplication))(uri) && mounted) showToast(context, 'WhatsApp could not be opened.');
   }
 
@@ -118,8 +119,7 @@ class _PoGrnScreenState extends State<PoGrnScreen> {
     return [
       if (discrepancy) const Padding(padding: EdgeInsets.only(bottom: 10), child: Align(alignment: Alignment.centerLeft, child: PoChip('Discrepancy', bg: kRedBgH, fg: kRedText))),
       PoHeaderCard(po),
-      for (final l in po.lines) PoLineCard(l, supplier: po.supplierName),
-      PoTotalsCard(po),
+      PoItemsCard(po),
       // two outcomes only (founder, 28 Oct 2026): Received, or Cancel; no approval
       if (const ['Draft', 'Pending', 'Approved', 'Partially Received'].contains(po.status)) ...[
         InvPrimary(tr('Received'), key: const ValueKey('po-receive'), busy: _busy, onPressed: _confirm),

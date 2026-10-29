@@ -2,6 +2,7 @@ import 'storefront/menu_link_screen.dart';
 import 'package:flutter/material.dart';
 
 import 'account/routes.dart';
+import 'ads/advertiser_screens.dart' show AdvertiserApi, AdvertiserHomeScreen;
 import 'auth/auth_repository.dart';
 import 'auth/partner_api.dart';
 import 'catalogue/catalogue_api.dart' show CatalogueApi;
@@ -27,6 +28,7 @@ import 'orders/cart_screen.dart';
 import 'purchasing/po_create_screen.dart';
 import 'purchasing/purchase_hub_screen.dart';
 import 'purchasing/purchasing_api.dart';
+import 'purchasing/simple_purchase.dart' show ReceiveGoodsScreen;
 import 'orders/order_screen.dart';
 import 'orders/orders_board_screen.dart';
 import 'money/store_money.dart';
@@ -49,6 +51,7 @@ import 'settings/support_screens.dart';
 import 'setup/setup_api.dart';
 import 'setup/setup_flow.dart';
 import 'storefront/builder_screen.dart';
+import 'storefront/page_manager_screen.dart';
 import 'storefront/settings_screens.dart';
 import 'storefront/storefront_api.dart';
 import 'tables/floor_screen.dart';
@@ -137,7 +140,7 @@ void installRoutes() {
       : Navigator.of(c).push(TeamDashboardScreen.route(TeamEnv(onNavigate: (id) => _tab(c, id), kind: HomeNav.shell?.kind)));
   // Section M: the storefront page builder (profile, hours, delivery, offers, ads and publishing hang off it).
   HomeNav.storefront = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'storefront'), builder: (_) => StorePageBuilder(api: StorefrontApi())));
-  HomeNav.businessProfile = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'business-profile'), builder: (_) => ProfileScreen(api: StorefrontApi())));
+  HomeNav.businessProfile = (c) => Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: 'business-profile'), builder: (_) => PageManagerScreen(api: StorefrontApi())));
   HomeNav.deliverySettings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => DeliveryScreen(api: StorefrontApi())));
   // Section N: notification and announcement centres, customer messages and feedback.
   HomeNav.notifications = (c) => Navigator.of(c).push(NoticesHome.route());
@@ -180,8 +183,10 @@ void _itemPart(BuildContext c, String part) {
 /// Every stock page's environment: the stock API and bottom bar, and the ways to Purchase (new purchase order) and Receiving.
 StockEnv _stockEnv(BuildContext c) => StockEnv(
     inv: _inventoryEnv(c),
-    onOpenPurchase: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => PoCreateScreen(env: PurEnv(inv: _inventoryEnv(ctx))))),
-    onOpenReceiving: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => ReceivingScreen(env: _inventoryEnv(ctx)))));
+    onOpenPurchase: (ctx, [want = const []]) => Navigator.of(ctx).push(MaterialPageRoute(builder: (_) => PoCreateScreen(env: PurEnv(inv: _inventoryEnv(ctx)), want: want))),
+    // a store receives in one step, Add purchase (founder, 29 Oct 2026); a restaurant keeps its count
+    onOpenReceiving: (ctx) => Navigator.of(ctx).push(MaterialPageRoute(
+        builder: (_) => _restaurant ? ReceivingScreen(env: _inventoryEnv(ctx)) : ReceiveGoodsScreen(api: PurchasingApi()))));
 
 /// Switches the app shell to the tab with this bar label, when the shell is up and has that tab.
 bool _inShell(String label) => HomeNav.shell?.show(label) ?? false;
@@ -238,7 +243,18 @@ void _kitchenTab(BuildContext context, String id) => switch (id) {
 /// "Continue to store": an owner or admin whose workspace setup is not finished goes to setup first
 /// (Figma: finish setup before using the merchant tools); everyone else goes to the control centre.
 /// The server decides who may run setup; a refusal (staff, not yet approved) means "go to the control centre".
-Future<void> openWorkspace(BuildContext context, {AuthRepository? auth, SetupApi? setupApi}) async {
+Future<void> openWorkspace(BuildContext context, {AuthRepository? auth, SetupApi? setupApi, AdvertiserApi? advertiserApi}) async {
+  // an advertising-only partner has no store to set up: its app is Ads (the Advertising & Partner Growth spec, 29 Oct 2026)
+  try {
+    final p = await (advertiserApi ?? AdvertiserApi()).profile();
+    if (p['partner_kind'] == 'advertising') {
+      if (context.mounted) Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdvertiserHomeScreen(auth: auth)));
+      return;
+    }
+  } catch (_) {
+    // not known (offline, or a server without advertisers yet): carry on as a store
+  }
+  if (!context.mounted) return;
   bool needsSetup = false;
   try {
     final setup = await (setupApi ?? SetupApi()).get();

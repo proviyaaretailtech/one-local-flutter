@@ -28,6 +28,7 @@ class AppHeader extends StatelessWidget {
     this.onBell,
     this.bellKey = const ValueKey('app-header-bell'),
     this.bell = true,
+    this.wallet = true,
     this.profile = true,
     this.trailing,
     this.safeTop = true,
@@ -58,6 +59,9 @@ class AppHeader extends StatelessWidget {
   final Key bellKey;
   final bool bell;
 
+  /// The OneLocal wallet button, beside the bell ([HomeNav.wallet]).
+  final bool wallet;
+
   /// The profile icon (the person's initials) on the right; it opens Manage account when that screen is plugged in.
   final bool profile;
   final Widget? trailing;
@@ -69,11 +73,30 @@ class AppHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final showBack = back ?? (onBack != null || (ModalRoute.of(context)?.canPop ?? false));
     final menu = onMenu ?? (HomeNav.openMenu == null ? null : () => HomeNav.openMenu!(context));
-    final top = Text((kicker ?? HomeNav.storeName ?? 'OneLocal Partner').toUpperCase(),
-        maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10, 700, color: kMuted).copyWith(letterSpacing: 0.8));
+    final kickerStyle = inter(10, 700, color: kMuted).copyWith(letterSpacing: 0.8);
+    final kickerText = (kicker ?? HomeNav.storeName ?? 'OneLocal Partner').toUpperCase();
+    // a store name too long for the line becomes its initials (founder, 28 Oct 2026): SHARMA GENERAL STORE - MAIN → SGS - MAIN
+    final top = LayoutBuilder(builder: (context, c) {
+      final full = TextPainter(text: TextSpan(text: kickerText, style: kickerStyle), maxLines: 1, textDirection: TextDirection.ltr, textScaler: MediaQuery.textScalerOf(context))
+        ..layout(maxWidth: double.infinity);
+      final text = full.width <= c.maxWidth ? kickerText : shortStoreName(kickerText);
+      return Text(text, key: const ValueKey('app-header-kicker'), maxLines: 1, overflow: TextOverflow.ellipsis, style: kickerStyle);
+    });
+    final titleStyle = inter(17, 800, height: 1.15);
+    final isStoreName = HomeNav.storeName != null && title.trim().toLowerCase() == HomeNav.storeName!.trim().toLowerCase();
     final name = Row(children: [
-      // a long store name wraps onto a second line rather than being cut off
-      Flexible(child: Text(title, key: titleKey, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(17, 800, height: 1.15))),
+      // the store's name, when it is the title and too long for one line, becomes its initials too; other titles wrap onto a second line
+      Flexible(
+        child: LayoutBuilder(builder: (context, c) {
+          var text = title;
+          if (isStoreName) {
+            final p = TextPainter(text: TextSpan(text: title, style: titleStyle), maxLines: 1, textDirection: TextDirection.ltr, textScaler: MediaQuery.textScalerOf(context))
+              ..layout(maxWidth: double.infinity);
+            if (p.width > c.maxWidth) text = shortStoreName(title);
+          }
+          return Text(text, key: titleKey, maxLines: 2, overflow: TextOverflow.ellipsis, style: titleStyle);
+        }),
+      ),
       if (onTitle != null) ...[const SizedBox(width: 2), const Icon(LucideIcons.chevronDown, size: 16, color: kInk)],
     ]);
     final account = profile ? HomeNav.account : null;
@@ -138,6 +161,11 @@ class AppHeader extends StatelessWidget {
                 ]),
               ),
               if (trailing != null) ...[const SizedBox(width: 6), trailing!],
+              // the OneLocal wallet, on every screen's banner (founder, 28 Oct 2026)
+              if (wallet && HomeNav.wallet != null) ...[
+                const SizedBox(width: 6),
+                _Round(key: const ValueKey('app-header-wallet'), icon: LucideIcons.wallet, label: 'OneLocal wallet', onTap: () => HomeNav.wallet!(context)),
+              ],
               if (bell) ...[
                 const SizedBox(width: 6),
                 _Round(key: bellKey, icon: LucideIcons.bell, label: 'Notifications', onTap: onBell ?? () => HomeNav.go(context, HomeNav.notifications, 'Notifications')),
@@ -152,7 +180,22 @@ class AppHeader extends StatelessWidget {
       );
 }
 
-/// A round white button on the banner (☰, bell).
+/// A store's name as initials when it is too long for the banner: "SHARMA GENERAL STORE - MAIN" → "SGS - MAIN". The part after " - " or
+/// " · " (the outlet) is kept; small words (and, of, the) and words without a letter are left out.
+String shortStoreName(String name) {
+  final m = RegExp(r'^(.*?)(\s+[-·–]\s+.*)?$').firstMatch(name.trim());
+  final store = (m?.group(1) ?? name).trim(), outlet = m?.group(2) ?? '';
+  const small = {'and', 'of', 'the', 'n'}; // "Wholesale and Retail" → WR
+  final initials = store
+      .split(RegExp(r'\s+'))
+      .where((w) => RegExp(r'[A-Za-z]').hasMatch(w) && !small.contains(w.toLowerCase()))
+      .map((w) => w[w.indexOf(RegExp(r'[A-Za-z]'))].toUpperCase())
+      .join();
+  if (initials.length < 2) return name;
+  return '$initials$outlet';
+}
+
+/// A round white button on the banner (☰, wallet, bell).
 class _Round extends StatelessWidget {
   const _Round({super.key, required this.icon, required this.label, required this.onTap});
   final IconData icon;

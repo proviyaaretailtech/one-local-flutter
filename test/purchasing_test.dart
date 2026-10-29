@@ -129,6 +129,27 @@ void main() {
     });
   });
 
+  group('A purchase order from what is low', () {
+    testWidgets('the items come on with their quantities; the supplier with their prices is chosen; a line without a price is tapped to add it', (t) async {
+      final s = Fake();
+      await showTall(t, PoCreateScreen(env: s.env, want: const [
+        (itemId: '43b00000-0000-0000-0000-000000000001', name: 'Paneer', unit: 'kg', qty: 5),
+        (itemId: '43b00000-0000-0000-0000-000000000004', name: 'Red Tomatoes', unit: 'kg', qty: 3),
+      ]));
+      expect(find.textContaining('ABC Foods', findRichText: true), findsOneWidget); // the supplier with a price for Paneer
+      expect(find.text('5 kg · ₹410/kg'), findsOneWidget);
+      expect(find.text('3 kg · tap to add the price'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('po-line-43b00000-0000-0000-0000-000000000004')));
+      await t.pumpAndSettle();
+      expect(find.widgetWithText(TextField, '3'), findsOneWidget);
+      await t.enterText(find.byType(TextField).last, '40');
+      await t.tap(find.byKey(const ValueKey('po-line-save')));
+      await t.pumpAndSettle();
+      expect(find.text('3 kg · ₹40/kg'), findsOneWidget);
+      expect(find.text('₹2,170'), findsOneWidget); // 5 × 410 + 3 × 40
+    });
+  });
+
   group('Purchase order page', () {
     testWidgets('a received order: the Figma discrepancy lines, tax and total as the server computed them; no receive button', (t) async {
       final s = Fake();
@@ -267,7 +288,8 @@ void main() {
       await t.tap(find.byKey(const ValueKey('po-send')));
       await t.pumpAndSettle();
       final u = opened.single;
-      expect('${u.host}${u.path}', 'wa.me/919876543210');
+      expect(u.host, 'api.whatsapp.com');
+      expect(u.queryParameters['phone'], '919876543210');
       final text = u.queryParameters['text']!;
       expect(text, startsWith('Purchase order ${po['number']}'));
       for (final l in po['lines'] as List) {

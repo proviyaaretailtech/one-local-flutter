@@ -4,9 +4,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../ui/theme.dart';
+import '../ui/whatsapp.dart';
 import 'cart_screen.dart';
 import 'order_widgets.dart';
 import 'orders_api.dart';
+import 'pack_order_screen.dart';
 import '../ui/i18n.dart';
 
 /// Every placed order state from Figma section E: Checkout (held bill), Order Confirmation, Preparing, Picked, Ready, In Transit,
@@ -73,8 +75,17 @@ class _OrderScreenState extends State<OrderScreen> {
   Future<void> _onAction(String id) async {
     final v = _v!;
     switch (id) {
-      case 'pack' || 'handover' || 'dispatch' || 'choose_collection' || 'return_to_store' || 'online_accept' || 'online_ready':
+      case 'accept' || 'handover' || 'dispatch' || 'choose_collection' || 'return_to_store' || 'online_accept':
         await _act(id);
+      // packing is one screen: tick the items, photo of the packed bag, then packed (founder, 29 Oct 2026)
+      case 'pack_order' || 'pack' || 'online_ready':
+        final packed = await Navigator.of(context).push<OrderView>(MaterialPageRoute(builder: (_) => PackOrderScreen(api: _api, order: v)));
+        if (packed != null && mounted) {
+          setState(() => _v = packed);
+          showToast(context, packed.online ? 'Packed. Hand it to the rider when they arrive.' : 'Packed. Ready to hand over.');
+        } else {
+          await _load(); // a photo may have been saved before something failed
+        }
       case 'refresh':
         await _load();
       case 'pay':
@@ -88,7 +99,7 @@ class _OrderScreenState extends State<OrderScreen> {
       case 'print':
         showToast(context, 'No receipt printer is connected to this device yet.');
       case 'whatsapp':
-        final uri = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(v.receiptText)}');
+        final uri = whatsAppLink('', v.receiptText);
         if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) showToast(context, 'WhatsApp could not be opened.');
       case 'acceptance':
         await _acceptanceSheet();
@@ -160,16 +171,26 @@ class _OrderScreenState extends State<OrderScreen> {
     final primary = v.action('primary'), secondary = v.action('secondary'), links = v.actionsOf('link');
     final checkout = v.stage == 'checkout';
     final cancelled = v.stage == 'cancelled';
+    // An order still moving (accept, pack, hand over) shows its next step right under the note, not below the bill (founder, 29 Oct 2026).
+    final upTop = v.steps != null && (v.steps!.current) < 4;
+    final buttons = [
+      if (primary != null) _button(primary, dark: true),
+      if (secondary != null) ...[const SizedBox(height: 10), _button(secondary, dark: false)],
+      for (final l in links) ...[const SizedBox(height: 8), UnderLink('${l['label']}', onTap: _busy ? null : () => _onAction('${l['id']}'))],
+    ];
     return ListView(padding: const EdgeInsets.fromLTRB(12, 14, 12, 16), children: [
       OrderHeaderCard(
         number: 'Order #${v.displayNo}${v.placeLabel != null ? ' - ${v.placeLabel}' : ''}',
         channel: v.channelLabel,
         subtitle: 'Customer: ${v.customer} · ${v.placedAt}',
       ),
+      if (v.steps case final s?) ...[const SizedBox(height: 12), OrderSteps(labels: s.labels, current: s.current)],
       const SizedBox(height: 14),
       StateHeader(title: v.title, chip: v.paymentChip, orderStatus: v.orderStatus, fulfilment: v.fulfilment, danger: v.danger),
       const SizedBox(height: 10),
       StateNote(tone: '${v.note['tone'] ?? 'info'}', title: '${v.note['title'] ?? ''}', body: '${v.note['body'] ?? ''}'),
+      if (v.packedPhoto != null) ...[const SizedBox(height: 12), PackedPhotoCard(key: ValueKey('packed-${v.packedPhoto!['id']}'), api: _api, order: v)],
+      if (upTop) ...[const SizedBox(height: 14), ...buttons],
       const SizedBox(height: 12),
       OrderCardBox(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -222,10 +243,7 @@ class _OrderScreenState extends State<OrderScreen> {
           changeValue: rupees(n(pay['change'])),
         ),
       ),
-      const SizedBox(height: 16),
-      if (primary != null) _button(primary, dark: true),
-      if (secondary != null) ...[const SizedBox(height: 10), _button(secondary, dark: false)],
-      for (final l in links) ...[const SizedBox(height: 8), UnderLink('${l['label']}', onTap: _busy ? null : () => _onAction('${l['id']}'))],
+      if (!upTop) ...[const SizedBox(height: 16), ...buttons],
     ]);
   }
 

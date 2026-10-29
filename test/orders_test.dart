@@ -9,6 +9,7 @@ import 'package:vinii_pos/orders/order_screen.dart';
 import 'package:vinii_pos/orders/orders_api.dart';
 import 'package:vinii_pos/orders/orders_home.dart';
 import 'package:vinii_pos/ui/theme.dart';
+import 'package:vinii_pos/ui/wallet.dart';
 
 import 'helpers.dart';
 import 'order_fixtures.dart';
@@ -117,7 +118,7 @@ void main() {
       expect(find.text('New orders · 2'), findsOneWidget);
       // the customer leads, in the pile's colour; the order number is small
       final name = t.widget<Text>(find.descendant(of: find.byKey(const ValueKey('order-card-1')), matching: find.text('Rahul Mehta')));
-      expect(name.style?.color, const Color(0xFFC2410C));
+      expect(name.style?.color, WalletColors.orange.first);
       expect(find.descendant(of: find.byKey(const ValueKey('order-card-1')), matching: find.textContaining('#P-1 ·')), findsOneWidget);
       expect(find.text('Waiting for you to accept'), findsOneWidget);
       // the phone's back button closes the pile first
@@ -261,11 +262,11 @@ void main() {
   group('OrderScreen', () {
     for (final (stage, title, primary, secondary) in const [
       ('checkout', 'Checkout', 'Complete Payment', 'Cancel bill'),
-      ('pending', 'Order Confirmation', 'Print receipt', 'Send by WhatsApp'),
-      ('preparing', 'Order Preparing', 'Open picking checklist', 'Report missing item'),
-      ('picked', 'Order Picked', 'Start packing', 'Review picked quantities'),
-      ('ready', 'Order Ready', 'Record handover', 'Arrange dispatch'),
-      ('in_transit', 'Order In Transit', 'Check delivery status', 'Report delivery issue'),
+      ('pending', 'Order Confirmation', 'Accept order', 'Send receipt on WhatsApp'),
+      ('preparing', 'Order Preparing', 'Pack order', 'Something missing?'),
+      ('picked', 'Order Picked', 'Pack order', 'Something missing?'),
+      ('ready', 'Order Ready', 'Customer collected it', 'Send for delivery'),
+      ('in_transit', 'Order In Transit', 'Mark delivered', 'Report a delivery problem'),
       ('exception', 'Order Exception', 'Resolve missing information', 'Arrange store collection'),
       ('cancelled', 'Order Cancelled', 'Review cancellation', 'Create new cart from items'),
     ]) {
@@ -286,30 +287,17 @@ void main() {
       });
     }
 
-    testWidgets('Start packing sends the version and a key, then shows the new state', (t) async {
-      final s = FakeServer((r) => r.method == 'GET' ? ok(view('picked', version: 4)) : ok(view('ready', version: 5)));
+    testWidgets('a new order: Accept order accepts it straight away, with the steps on top', (t) async {
+      final s = FakeServer((r) => r.method == 'GET' ? ok(view('pending', version: 1)) : ok(view('preparing', version: 2)));
       await showTall(t, OrderScreen(api: s.api, orderId: orderId));
-      await t.tap(find.text('Start packing'));
+      expect(find.byKey(const ValueKey('order-step-0')), findsOneWidget);
+      expect(find.text('Hand over'), findsOneWidget);
+      await t.tap(find.text('Accept order'));
       await t.pumpAndSettle();
       final post = s.where('POST', '/act').single;
-      expect(jsonDecode(post.body), {'action': 'pack', 'version': 4});
+      expect(jsonDecode(post.body), {'action': 'accept', 'version': 1});
       expect(post.headers['Idempotency-Key'], startsWith('pos-'));
-      expect(find.text('Order Ready'), findsOneWidget);
-    });
-
-    testWidgets('picking checklist sends every line with its picked quantity', (t) async {
-      final s = FakeServer((r) => r.method == 'GET' ? ok(view('preparing')) : ok(view('picked', version: 3)));
-      await showTall(t, OrderScreen(api: s.api, orderId: orderId));
-      await t.tap(find.text('Open picking checklist'));
-      await t.pumpAndSettle();
-      await t.tap(find.byType(Checkbox).first);
-      await t.pump();
-      await t.tap(find.text('Save picked quantities'));
-      await t.pumpAndSettle();
-      final body = jsonDecode(s.where('POST', '/act').single.body) as Map;
-      expect(body['action'], 'pick');
-      expect((body['lines'] as List).first, {'order_item_id': '00000001-0000-0000-0000-000000000000', 'qty': 2});
-      expect((body['lines'] as List), hasLength(5));
+      expect(find.text('Pack order'), findsOneWidget);
     });
 
     testWidgets('a version conflict reloads the order and says why', (t) async {
@@ -319,7 +307,7 @@ void main() {
         return err(409, 'This order was changed on another device.', 'version_conflict');
       });
       await showTall(t, OrderScreen(api: s.api, orderId: orderId));
-      await t.tap(find.text('Record handover'));
+      await t.tap(find.text('Customer collected it'));
       await t.pumpAndSettle();
       expect(toast('This order was changed on another device.'), findsOneWidget);
       expect(find.text('Order In Transit'), findsOneWidget);
@@ -357,7 +345,7 @@ void main() {
     });
 
     testWidgets('print says honestly that no printer is connected', (t) async {
-      final s = FakeServer((_) => ok(view('pending')));
+      final s = FakeServer((_) => ok(view('completed')));
       await showTall(t, OrderScreen(api: s.api, orderId: orderId));
       await t.tap(find.text('Print receipt'));
       await t.pump();

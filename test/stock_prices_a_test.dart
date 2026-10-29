@@ -101,7 +101,7 @@ class Fake {
     catalogue: CatalogueApi(baseUrl: 'http://pos.test', accessToken: () => 't', client: client),
     rpc: RpcClient(baseUrl: 'http://pos.test', accessToken: () => 't', client: client),
     open: (context, page, {itemId}) async => opened.add(itemId == null ? page : '$page:$itemId'),
-    onOpenPurchase: (_) => purchases++,
+    onOpenPurchase: (_, [_ = const []]) => purchases++,
   );
 
   List<http.Request> calls(String fn) => requests.where((r) => fnOf(r) == fn).toList();

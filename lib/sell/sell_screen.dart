@@ -53,6 +53,7 @@ class _SellScreenState extends State<SellScreen> {
   Map<String, SellFacts> _facts = const {};
 
   Quote? _quote;
+  num? _lastTotal; // the total last quoted: PAY keeps showing it while the next quote loads, so nothing flickers
   int _seq = 0, _quoteSeq = 0;
   bool _busy = false;
   ShiftState? _shift; // the store's cash drawer (S5.1); null until read, or when it could not be read
@@ -138,13 +139,21 @@ class _SellScreenState extends State<SellScreen> {
 
   Future<void> _requote() async {
     if (cart.isEmpty) {
-      setState(() => _quote = null);
+      setState(() {
+        _quote = null;
+        _lastTotal = null;
+      });
       return;
     }
     final mine = ++_quoteSeq;
     try {
       final q = await env.orders.quote(cart.lines, coupon: cart.couponCode);
-      if (mounted && mine == _quoteSeq) setState(() => _quote = q);
+      if (mounted && mine == _quoteSeq) {
+        setState(() {
+          _quote = q;
+          _lastTotal = q.total;
+        });
+      }
     } catch (_) {
       if (mounted && mine == _quoteSeq) setState(() => _quote = null);
     }
@@ -263,16 +272,8 @@ class _SellScreenState extends State<SellScreen> {
       backgroundColor: kBg,
       body: Column(children: [
         // ☰ is the side menu (as on every screen); the till's own pages are the shortcuts under the search.
-        SellTopBar(
-          title: tr('Bill'),
-          initials: env.initials,
-          action: Semantics(
-            button: true,
-            label: tr('Items'),
-            excludeSemantics: true,
-            child: IconButton(tooltip: tr('Search or scan items'), onPressed: _openSearch, icon: const Icon(LucideIcons.scanLine, size: 22, color: kInk)),
-          ),
-        ),
+        // no scanner on the banner (founder, 28 Oct 2026): the search below has its own; the banner carries the wallet like every screen
+        SellTopBar(title: tr('Bill'), initials: env.initials),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
           child: SellSearchField(
@@ -509,7 +510,7 @@ class _SellScreenState extends State<SellScreen> {
           Row(children: [
             Expanded(
               flex: 3,
-              child: DarkCta(label: _quote == null ? 'PAY' : 'PAY ${rupees(_quote!.total)}', onPressed: cart.isEmpty ? null : _pay),
+              child: DarkCta(label: 'PAY', labelStart: true, amount: cart.isEmpty || (_quote?.total ?? _lastTotal) == null ? null : rupees(_quote?.total ?? _lastTotal!), onPressed: cart.isEmpty ? null : _pay),
             ),
             const SizedBox(width: 12),
             Expanded(flex: 1, child: LightCta(label: tr('Hold'), onPressed: cart.isEmpty || _busy ? null : _hold)),
@@ -547,7 +548,8 @@ class _Shortcut extends StatelessWidget {
 }
 
 /// One product card (Figma "439 Sell" / "444 Discount"): SKU chip, picture, name, the MRP struck through when the price is lower, the
-/// price, a lime ADD, and whether it is in stock. An item that is not on sale, or that stock says is out, cannot be added.
+/// price, a lime ADD, and whether it is in stock. An item that is not on sale cannot be added. One with no stock still can (founder,
+/// 29 Oct 2026, negative stock): it is greyed and says so, the sale goes through, and its stock goes below zero until goods come in.
 /// A product on the till (founder, 27 Oct 2026): the whole card is the button (no ADD). In the cart it turns green, with a gradient
 /// border, the count in its corner and a small − to take one back. [why] tags a related product ("Bought together", "Popular").
 class ProductCard extends StatelessWidget {
@@ -559,7 +561,35 @@ class ProductCard extends StatelessWidget {
   final SellFacts? facts;
   final String? why;
 
-  bool get _out => !item.available || facts?.outOfStock == true;
+  /// Not on sale: the only thing that stops a tap.
+  bool get _off => !item.available;
+
+  bool get _known => facts?.stockKnown == true;
+
+  /// What stays on the shelf once this bill is paid: the stock less what is already in the cart (it can go below zero).
+  num get _left => (facts?.stockQty ?? 0) - inCart;
+
+  /// No stock to sell before this bill: greyed, but it still sells.
+  bool get _out => !_off && facts?.outOfStock == true;
+
+  static String _n(num v) => v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(1);
+
+  /// The stock line under the price, counting the cart as it fills (founder, 29 Oct 2026: show it going negative).
+  String _stockLine(bool low, bool picked) {
+    if (_off) return tr('Not on sale');
+    if (_known && _left < 0) return '${tr('Stock')} ${_n(_left)}${picked ? ' ${tr('after this bill')}' : ' · ${tr('still sells')}'}';
+    if (_out) return tr('No stock · still sells');
+    if (_known && picked && _left == 0) return tr('Stock 0 after this bill');
+    if (low) return 'Low stock${_known ? ' · ${_n(_left)} left' : ''}';
+    return picked ? tr('In cart · tap to add one more') : tr('Tap to add');
+  }
+
+  void _tap(BuildContext context) {
+    if (_off) return showToast(context, '${item.name} is not on sale.');
+    // the first one of an item with no stock: say what happens, then sell it anyway
+    if (_out && inCart == 0) showToast(context, '${item.name} has no stock. It is billed anyway; stock goes below zero until you restock.');
+    onAdd();
+  }
 
   static const _gradient = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF8BE800), Color(0xFF2F8F4E)]);
 
@@ -567,10 +597,11 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final mrp = facts?.mrp;
     final low = !_out && facts?.lowInventory == true;
+    final below = _known && _left < 0;
     final picked = inCart > 0;
     return Semantics(
       button: true,
-      enabled: !_out,
+      enabled: !_off,
       label: 'Add ${item.name}${picked ? ', $inCart in cart' : ''}',
       child: Container(
         key: ValueKey('product-${item.id}'),
@@ -583,11 +614,11 @@ class ProductCard extends StatelessWidget {
           boxShadow: picked ? const [BoxShadow(color: Color(0x332F8F4E), blurRadius: 10, offset: Offset(0, 3))] : null,
         ),
         child: Material(
-          color: picked ? const Color(0xFFF4FDE9) : Colors.white,
+          color: picked ? const Color(0xFFF4FDE9) : (_out || _off) ? const Color(0xFFF1F2EE) : Colors.white,
           borderRadius: BorderRadius.circular(18),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: _out ? () => showToast(context, '${item.name} is out of stock.') : onAdd,
+            onTap: () => _tap(context),
             child: Padding(
               padding: const EdgeInsets.all(6),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -597,9 +628,18 @@ class ProductCard extends StatelessWidget {
                     width: double.infinity,
                     decoration: BoxDecoration(color: const Color(0xFFF3F4F1), borderRadius: BorderRadius.circular(14)),
                     clipBehavior: Clip.antiAlias,
-                    child: item.imageUrl == null
-                        ? const Icon(LucideIcons.package, size: 30, color: kKicker)
-                        : Image.network(item.imageUrl!, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(LucideIcons.package, size: 30, color: kKicker)),
+                    // no stock: the picture greys out
+                    child: Opacity(
+                      opacity: (_out || _off) && !picked ? 0.45 : 1,
+                      child: ColorFiltered(
+                        colorFilter: (_out || _off) && !picked
+                            ? const ColorFilter.matrix([0.33, 0.33, 0.33, 0, 0, 0.33, 0.33, 0.33, 0, 0, 0.33, 0.33, 0.33, 0, 0, 0, 0, 0, 1, 0])
+                            : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+                        child: item.imageUrl == null
+                            ? const Icon(LucideIcons.package, size: 30, color: kKicker)
+                            : Image.network(item.imageUrl!, fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(LucideIcons.package, size: 30, color: kKicker)),
+                      ),
+                    ),
                   ),
                   if (item.sku.isNotEmpty)
                     Positioned(left: 6, top: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(8)), child: Text(item.sku, style: inter(10.5, 700, color: kMuted)))),
@@ -670,10 +710,11 @@ class ProductCard extends StatelessWidget {
                 ]),
                 const SizedBox(height: 4),
                 Text(
-                  _out ? 'Out of Stock' : low ? 'Low stock${facts?.stockKnown == true ? ' · ${facts!.stockQty} left' : ''}' : picked ? tr('In cart · tap to add one more') : tr('Tap to add'),
+                  _stockLine(low, picked),
+                  key: ValueKey('product-stock-${item.id}'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: inter(11.5, 600, color: _out ? kBadText : low ? kWarnText : picked ? const Color(0xFF2F8F4E) : kMuted),
+                  style: inter(11.5, below ? 700 : 600, color: _off || _out || below ? kBadText : low ? kWarnText : picked ? const Color(0xFF2F8F4E) : kMuted),
                 ),
               ]),
             ),

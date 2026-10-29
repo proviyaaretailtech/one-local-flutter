@@ -88,7 +88,11 @@ class _ReorderScreenState extends State<ReorderScreen> {
 
   void _purchase() {
     final open = widget.env.onOpenPurchase;
-    if (open != null) return open(context);
+    final picked = [
+      for (final l in _lines ?? const <_Line>[])
+        if ((num.tryParse(l.qty.text.trim()) ?? 0) > 0) (itemId: l.id, name: l.name, unit: l.unit, qty: num.parse(l.qty.text.trim())),
+    ];
+    if (open != null) return open(context, picked);
     showToast(context, 'Purchase orders open from the Purchase section in the side menu.');
   }
 
@@ -130,7 +134,7 @@ class _ReorderScreenState extends State<ReorderScreen> {
                 const SizedBox(height: 6),
                 InvPrimary(picked.isEmpty ? 'Create purchase order' : 'Create purchase order · ${qty(_total(lines))} units', onPressed: _purchase),
                 const SizedBox(height: 8),
-                InvNote(tr('Note the quantities above: the purchase order screen opens next, where you pick the supplier and add them.')),
+                InvNote(tr('These items and quantities go onto the purchase order; their usual supplier and price fill in.')),
               ];
             },
           ),
