@@ -1,6 +1,6 @@
 -- ============================================================================================================================
--- HOSTED PUSH 2 of 2: NIKS CAFE DATA (organization bd4d8ee9-5885-41e4-b6a1-ba2b9cb873dd), as ONE transaction.
--- Run AFTER 01_logic_0600_0628.sql, in the Supabase SQL editor of project ywylhzcxuoeilygzdonx.
+-- HOSTED PUSH 3 of 3: NIKS CAFE DATA (organization bd4d8ee9-5885-41e4-b6a1-ba2b9cb873dd), as ONE transaction.
+-- Run AFTER 01a and 01b (the logic), in the Supabase SQL editor of project ywylhzcxuoeilygzdonx.
 -- Copied by id from the local test DB (hosted-push/build.sh): categories, dishes (descriptions, sizes, photo links on hosted
 -- storage), ingredients, recipes, add-ons, add-on recipes, combos, channel prices, the five tables, suppliers and purchase orders.
 -- Not copied: orders, KOTs, payments, bills, test logins, closing-stock test counts, notifications.

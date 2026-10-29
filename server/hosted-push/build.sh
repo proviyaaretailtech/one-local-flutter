@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the two one-time hosted push files from this repo and the LOCAL test DB (reads only; never connects to hosted).
-#   01_logic_0600_0628.sql   migrations 0600-0628 in order, one transaction
+#   01a_logic_0600_0613.sql, 01b_logic_0614_0628.sql   migrations 0600-0628 in order, in two transactions
 #   02_niks_cafe_data.sql    Niks Cafe's menu set-up, ingredients, recipes, add-ons, combos, sizes, tables, suppliers and purchase
 #                            orders (copied by id from the local DB), dish photo links moved to hosted, and opening stock for 100 of
 #                            each dish (posted as receipts, worked out on hosted from the recipes)
@@ -10,35 +10,43 @@ cd "$(dirname "$0")/.."
 DB=supabase_db_onelocal-local-db
 OUT=hosted-push
 
-{
-  cat <<'EOF'
+# the logic in two halves (the SQL editor refuses one 370 KB script): part A 0600-0613, part B 0614-0628, each one transaction
+logic_part() { # name first last label
+  {
+    cat <<EOF
 -- ============================================================================================================================
--- HOSTED PUSH 1 of 2: LOGIC. Migrations 0600-0628 (29 files) in order, as ONE transaction: all of it applies, or none of it.
--- Built from server/migrations by hosted-push/build.sh. Run it in the Supabase SQL editor of project ywylhzcxuoeilygzdonx
--- BEFORE 02_niks_cafe_data.sql and before the server is deployed. Checked on a copy of the hosted DB (dump of 26 Oct 2026):
--- applies without errors and leaves the same tables, functions, triggers, indexes and policies as the local test DB.
--- Run it once. If it stops with an error, nothing has changed; send the error back.
+-- HOSTED PUSH $4: LOGIC, migrations $2-$3 in order, as ONE transaction: all of it applies, or none of it.
+-- Built from server/migrations by hosted-push/build.sh. Run in the Supabase SQL editor of project ywylhzcxuoeilygzdonx, in order:
+-- 01a_logic_0600_0613.sql, then 01b_logic_0614_0628.sql, then 02_niks_cafe_data.sql; all before the server is deployed.
+-- Checked on a copy of the hosted DB (dump of 26 Oct 2026): A then B apply without errors and leave the same tables, functions,
+-- triggers, indexes and policies as the local test DB. Run it once. If it stops with an error, nothing in it has changed.
 -- ============================================================================================================================
 begin;
 EOF
-  for f in migrations/06*.sql; do
-    printf '\n-- ----------------------------------------------------------------------------------------------------------------------------\n-- %s\n-- ----------------------------------------------------------------------------------------------------------------------------\n' "$(basename "$f")"
-    grep -viE '^\s*(begin|commit)\s*;\s*$' "$f"
-  done
-  cat <<'EOF'
+    for f in migrations/06*.sql; do
+      n=$(basename "$f" | cut -c1-4)
+      [[ "$n" < "$2" || "$n" > "$3" ]] && continue
+      printf '\n-- ----------------------------------------------------------------------------------------------------------------------------\n-- %s\n-- ----------------------------------------------------------------------------------------------------------------------------\n' "$(basename "$f")"
+      grep -viE '^\s*(begin|commit)\s*;\s*$' "$f"
+    done
+    cat <<'EOF'
 
 -- tell the API about the new functions and tables
 notify pgrst, 'reload schema';
 commit;
 EOF
-} > "$OUT/01_logic_0600_0628.sql"
+  } > "$OUT/$1"
+}
+logic_part 01a_logic_0600_0613.sql 0600 0613 '1a of 3'
+logic_part 01b_logic_0614_0628.sql 0614 0628 '1b of 3'
+rm -f "$OUT/01_logic_0600_0628.sql"
 
 docker cp "$OUT/gen_niks_data.sql" "$DB:/tmp/gen_niks_data.sql" > /dev/null
 {
   cat <<'EOF'
 -- ============================================================================================================================
--- HOSTED PUSH 2 of 2: NIKS CAFE DATA (organization bd4d8ee9-5885-41e4-b6a1-ba2b9cb873dd), as ONE transaction.
--- Run AFTER 01_logic_0600_0628.sql, in the Supabase SQL editor of project ywylhzcxuoeilygzdonx.
+-- HOSTED PUSH 3 of 3: NIKS CAFE DATA (organization bd4d8ee9-5885-41e4-b6a1-ba2b9cb873dd), as ONE transaction.
+-- Run AFTER 01a and 01b (the logic), in the Supabase SQL editor of project ywylhzcxuoeilygzdonx.
 -- Copied by id from the local test DB (hosted-push/build.sh): categories, dishes (descriptions, sizes, photo links on hosted
 -- storage), ingredients, recipes, add-ons, add-on recipes, combos, channel prices, the five tables, suppliers and purchase orders.
 -- Not copied: orders, KOTs, payments, bills, test logins, closing-stock test counts, notifications.
