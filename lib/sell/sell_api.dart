@@ -273,8 +273,9 @@ class SellApi {
   /// The hosted online checkout. Answers 503 `provider_not_configured` until a payment provider is set up.
   Future<Map<String, dynamic>> onlineCheckout(String orderId) => _call('pos_online_checkout', {'order_id': orderId});
 
-  Future<List<Receipt>> receipts({String q = '', String status = 'all', String? from, String? to}) async {
-    final r = await _rpc.call('pos_receipt_list', {if (q.trim().isNotEmpty) 'q': q.trim(), 'status': status, 'from': ?from, 'to': ?to}).catchError(_refuse);
+  /// [source]: offline (counter bills), online (orders customers placed) or all; [before] pages back from an order's created_at.
+  Future<List<Receipt>> receipts({String q = '', String status = 'all', String? from, String? to, String? source, String? before, int? limit}) async {
+    final r = await _rpc.call('pos_receipt_list', {if (q.trim().isNotEmpty) 'q': q.trim(), 'status': status, 'from': ?from, 'to': ?to, 'source': ?source, 'before': ?before, 'limit': ?limit}).catchError(_refuse);
     return ((r as List?) ?? const []).map((e) => Receipt((e as Map).cast<String, dynamic>())).toList();
   }
 

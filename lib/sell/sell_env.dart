@@ -6,6 +6,7 @@ import '../catalogue/item_sheets.dart' show showQuickAdd;
 import '../orders/orders_api.dart';
 import '../orders/orders_home.dart';
 import '../shift/shift_api.dart';
+import '../shift/daily_ops_screens.dart';
 import '../shift/shift_screens.dart';
 import 'carts_screen.dart';
 import 'history_screen.dart';
@@ -71,8 +72,9 @@ class SellEnv {
       'history' => HistoryScreen(env: this),
       'returns' => ReturnsScreen(env: this),
       'receipts' => ReceiptsScreen(env: this),
-      'orders' => OrdersHome(api: orders, onNavigate: (t) => tab(context, t)),
+      'orders' => OrdersHome(api: orders, onNavigate: (t) => tab(context, t), sellEnv: this),
       'shift' => ShiftScreen(api: shift, storeLine: storeLine, initials: initials),
+      'daily' => DailyOpsScreen(api: shift, storeLine: storeLine),
       _ => null,
     };
     if (page == null) return;

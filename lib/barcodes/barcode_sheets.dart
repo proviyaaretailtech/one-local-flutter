@@ -16,12 +16,13 @@ import 'barcodes_api.dart';
 // Printing is always optional and always the second button.
 
 /// Prints barcode stickers (50 × 30 mm) through the device's print screen. Tests replace [printLabelPdf].
-Future<void> printBarcodeLabels(List<(LabelData, int)> labels) async {
+/// [size]: Standard (the 50 × 30 mm sticker) or Large (3 × 2 in).
+Future<void> printBarcodeLabels(List<(LabelData, int)> labels, {LabelSize size = LabelSize.product}) async {
   pw.Font? font;
   try {
     font = pw.Font.ttf(await rootBundle.load('fonts/Inter.ttf'));
   } catch (_) {}
-  final pdf = await buildLabelsPdf(labels, size: LabelSize.product, font: font, bold: font);
+  final pdf = await buildLabelsPdf(labels, size: size, font: font, bold: font);
   await printLabelPdf(pdf, 'Barcode labels');
 }
 

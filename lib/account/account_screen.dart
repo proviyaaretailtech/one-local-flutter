@@ -8,6 +8,7 @@ import '../settings/settings_widgets.dart' show GroupCard, GroupTitle, RowAction
 import '../ui/theme.dart';
 import '../auth/partner_api.dart' show PartnerApiException;
 import 'account_api.dart';
+import 'delete_account_screen.dart';
 import '../ui/motion.dart';
 
 /// Side nav "Manage account": the signed-in person's name, email and mobile, how they can sign in, where they are signed in, and
@@ -198,6 +199,19 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
     }
   }
 
+  /// Delete account: its own screen with the warnings and the typed DELETE; once asked, every device is signed out.
+  Future<void> _deleteAccount() async {
+    final done = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => DeleteAccountScreen(api: _api, auth: _auth)));
+    if (done != true || !mounted) return;
+    showToast(context, 'Your account will be deleted in 30 days. Sign in again before then to keep it.');
+    final go = widget.onSignedOut;
+    if (go != null) {
+      go(context);
+    } else {
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    }
+  }
+
   // Laid out like the Settings page (Figma section P, there is no Manage account frame): a profile card, then grouped white
   // cards of rows (round green icon, title, status line, green action on the right).
   Widget _profile(AccountInfo a) => Container(
@@ -302,6 +316,11 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
                       danger: true,
                       busy: _busy,
                       onPressed: _signOutEverywhere),
+                  // apart from everything else, at the very end
+                  const SizedBox(height: 48),
+                  const Divider(color: Color(0xFFE3E5DF)),
+                  const SizedBox(height: 20),
+                  DeleteAccountCard(onPressed: _busy ? null : _deleteAccount),
                 ]),
         ),
       ]),

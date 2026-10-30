@@ -500,7 +500,7 @@ class InvPickBox extends StatelessWidget {
 
 /// Text / number box in the same style as [InvPickBox].
 class InvInput extends StatelessWidget {
-  const InvInput({super.key, required this.controller, this.number = false, this.hint, this.onChanged, this.label, this.prefixIcon, this.suffix, this.mobile = false});
+  const InvInput({super.key, required this.controller, this.number = false, this.hint, this.onChanged, this.label, this.prefixIcon, this.suffix, this.mobile = false, this.formatters});
 
   /// A mobile number: +91 in front, 10 digits.
   final bool mobile;
@@ -512,6 +512,9 @@ class InvInput extends StatelessWidget {
 
   /// A button at the end of the box (for example "Scan a barcode").
   final Widget? suffix;
+
+  /// What a text box accepts (for example an invoice number's capitals, numbers, - and /).
+  final List<TextInputFormatter>? formatters;
   @override
   Widget build(BuildContext context) => SizedBox(
         height: 46,
@@ -519,7 +522,7 @@ class InvInput extends StatelessWidget {
           controller: controller,
           onChanged: onChanged,
           keyboardType: mobile ? TextInputType.phone : number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
-          inputFormatters: mobile ? mobileFormatters : number ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))] : null,
+          inputFormatters: mobile ? mobileFormatters : number ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))] : formatters,
           style: inter(15, 400),
           decoration: InputDecoration(
             hintText: hint,

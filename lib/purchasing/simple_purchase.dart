@@ -6,13 +6,16 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../auth/partner_api.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart' hide qty;
-import '../inventory/receiving_screen.dart' show newItemForReceiving;
+import '../money/store_money.dart' show StoreMoneyApi;
 import '../ui/app_header.dart';
 import '../ui/barcode_scanner.dart';
 import '../ui/i18n.dart';
+import '../ui/invoice_input.dart';
 import '../ui/purchase_steps.dart';
 import '../ui/theme.dart';
 import 'add_supplier_sheet.dart' show pickPhoneContact, showAddSupplier, PickedContact;
+import '../catalogue/price_basis.dart';
+import 'purchase_item_entry.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
 import '../ui/motion.dart';
@@ -21,6 +24,8 @@ import '../ui/motion.dart';
 //   Generate PO (live at once) → it waits, with a day counter (3 days: needs attention, 7 days: late)
 //   → Received: the quantities as they came, any extra item (search, scan or new), the MRP of every line; stock goes up only with the MRP
 //   → the purchase bill: invoice, GST, payment, credit note. Past purchases list every delivery by date.
+// Items go on through the purchase entry (purchase_item_entry.dart, 30 Oct 2026): scan / search / category → the store's own item or a
+// new one made there → quantity and rate → the line; then Review → Confirm adds the stock once, and a summary says what changed.
 
 /// Tests replace the camera scanner.
 Future<String?> Function(BuildContext context) scanForPurchase = (context) => scanBarcode(context, allowTyping: true);
@@ -379,14 +384,26 @@ class _SupplierSheetState extends State<_SupplierSheet> {
 
 /// One line of a delivery as on the supplier's GST invoice: HSN, what came, MRP, rate, discount and GST.
 class _Line {
-  _Line({required this.itemId, required this.name, this.sku = '', this.ordered, required num qty, num? mrp, num? cost, String? hsn, num? gst})
-      : qty = TextEditingController(text: _rupees(qty)),
+  _Line({required this.itemId, required this.name, this.sku = '', this.unit = '', this.codes = '', this.item, this.ordered, required num qty, num? mrp, num? cost, String? hsn, num? gst, num? disc})
+      : qty = TextEditingController(text: qtyText(qty)),
         mrp = TextEditingController(text: mrp == null ? '' : _rupees(mrp)),
         cost = TextEditingController(text: cost == null ? '' : _rupees(cost)),
         hsn = TextEditingController(text: hsn ?? ''),
-        disc = TextEditingController(),
+        disc = TextEditingController(text: disc == null || disc == 0 ? '' : _rupees(disc)),
         gst = gstRates.contains(gst) ? gst! : 0;
   final String itemId, name, sku;
+
+  /// The unit its stock is counted in (kg for loose goods; '' when the order did not say) and its codes, named for what they are.
+  final String unit;
+  String codes;
+
+  /// The item as the search found it (null for an order's lines): what Make barcode needs.
+  Facts? item;
+
+  /// MRP-based or store-based, as chosen at the quantity step (null for an order's lines: MRP as before).
+  PriceBasis? get basis => item == null ? null : priceBasisOf(item!.raw['price_basis'], unit: unit);
+  bool get canMakeCode => item != null && item!.s('barcode').isEmpty && item!.s('menu_item_id').isNotEmpty;
+  bool get byMeasure => const {'kg', 'g', 'l', 'ml'}.contains(unit);
   final num? ordered;
   final TextEditingController qty, mrp, cost, hsn, disc;
   num gst;
@@ -489,100 +506,14 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
           gst: l.no('gst_pct'),
         ),
   ];
-  final _find = TextEditingController();
   final _supplier = TextEditingController(), _gstin = TextEditingController(), _invoice = TextEditingController();
   DateTime _date = DateTime.now();
   String _supplierPhone = '';
   final _key = PurchasingApi.newKey();
-  List<Facts> _hits = const [];
-
-  // Pick items by category (founder's sketch, 29 Oct 2026): choose a category, tick its items, add them all at once.
-  List<Facts>? _cats;
-  Facts? _cat;
-  List<Facts> _catItems = const [];
-  final _ticked = <String>{};
-  bool _catLoading = false;
-
   @override
   void initState() {
     super.initState();
     if (widget.replaces != null) _fromOldNote(widget.replaces!);
-    _loadCategories();
-  }
-
-  Future<void> _loadCategories() async {
-    try {
-      final b = await widget.api.browseItems();
-      if (mounted) setState(() => _cats = b.l('categories'));
-    } catch (_) {
-      if (mounted) setState(() => _cats = const []); // search and scan still work
-    }
-  }
-
-  Future<void> _chooseCategory() async {
-    final cats = _cats ?? const <Facts>[];
-    if (cats.isEmpty) return showToast(context, tr('No categories yet. Search or scan the items instead.'));
-    final picked = await showModalBottomSheet<Facts>(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: kBg,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (c) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(c).height * 0.7),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Center(child: Container(margin: const EdgeInsets.only(top: 10), width: 40, height: 4, decoration: BoxDecoration(color: kCardLine, borderRadius: BorderRadius.circular(99)))),
-            Padding(padding: const EdgeInsets.fromLTRB(20, 14, 20, 8), child: Text(tr('Choose a category'), style: inter(18, 800))),
-            Flexible(
-              child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(12, 0, 12, 12), children: [
-                for (final cat in cats)
-                  ListTile(
-                    key: ValueKey('recv-cat-${cat.s('id')}'),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    tileColor: cat.s('id') == _cat?.s('id') ? const Color(0xFFE8F5DC) : null,
-                    leading: Container(
-                      width: 34,
-                      height: 34,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(color: const Color(0xFFEFF3E6), borderRadius: BorderRadius.circular(10)),
-                      child: Icon(cat.s('id') == 'none' ? LucideIcons.package : LucideIcons.layoutGrid, size: 17, color: kPostedText),
-                    ),
-                    title: Text(cat.s('name'), style: inter(15, 600)),
-                    trailing: Text('${cat.n('count').toInt()} ${tr(cat.n('count') == 1 ? 'item' : 'items')}', style: inter(12.5, 500, color: kMuted)),
-                    onTap: () => Navigator.pop(c, cat),
-                  ),
-              ]),
-            ),
-          ]),
-        ),
-      ),
-    );
-    if (picked == null || !mounted) return;
-    setState(() {
-      _cat = picked;
-      _catItems = const [];
-      _ticked.clear();
-      _catLoading = true;
-    });
-    try {
-      final b = await widget.api.browseItems(picked.s('id'));
-      if (mounted && _cat?.s('id') == picked.s('id')) setState(() => _catItems = b.l('items'));
-    } catch (e) {
-      if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not load the items. Try again.'));
-    } finally {
-      if (mounted) setState(() => _catLoading = false);
-    }
-  }
-
-  /// Every ticked item onto the bill (one each; an item already there gets one more).
-  void _addTicked() {
-    final picked = _catItems.where((i) => _ticked.contains(i.s('id'))).toList();
-    for (final i in picked) {
-      _add(i);
-    }
-    setState(_ticked.clear);
-    showToast(context, '${picked.length} ${tr(picked.length == 1 ? 'item added' : 'items added')}. ${tr('Fill in the quantities below.')}');
   }
 
   /// The old note's supplier and items, with each item's MRP, price, HSN and GST as the catalogue has them.
@@ -605,6 +536,8 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
           itemId: l.s('inventory_item_id'),
           name: l.s('name'),
           sku: item?.s('sku') ?? '',
+          unit: item?.buyUnit ?? '',
+          codes: item?.codeLine ?? '',
           ordered: l.no('expected_qty'),
           qty: l.n('qty'),
           mrp: item?.no('mrp_minor') == null ? null : item!.n('mrp_minor') / 100,
@@ -618,77 +551,64 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
       if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not load that receipt note.'));
     }
   }
-  bool _busy = false, _searching = false;
-  int _seq = 0;
+  bool _busy = false;
 
   @override
   void dispose() {
     for (final l in _lines) {
       l.dispose();
     }
-    for (final c in [_find, _supplier, _gstin, _invoice]) {
+    for (final c in [_supplier, _gstin, _invoice]) {
       c.dispose();
     }
     super.dispose();
   }
 
-  Future<void> _search(String q) async {
-    final mine = ++_seq;
-    if (q.trim().isEmpty) return setState(() => _hits = const []); // from the first letter (founder, 29 Oct 2026)
-    setState(() => _searching = true);
-    try {
-      final r = await widget.api.findItems(q);
-      if (mounted && mine == _seq) setState(() => _hits = r);
-    } catch (_) {
-      if (mounted && mine == _seq) setState(() => _hits = const []);
-    } finally {
-      if (mounted && mine == _seq) setState(() => _searching = false);
-    }
+  Set<String> get _onPurchase => {for (final l in _lines) l.itemId};
+
+  /// A store barcode for a line's item that has none, made from the purchase itself.
+  Future<void> _makeCode(_Line l) async {
+    final made = await offerStoreCode(context, l.item!);
+    if (!mounted) return;
+    setState(() {
+      l.item = made;
+      l.codes = made.codeLine;
+    });
   }
 
-  void _add(Facts item) {
+  /// The quantity and rate of [item]; on the purchase already, the quantity is added to its line and the rate replaces it.
+  Future<void> _enter(Facts item) async {
+    final at = _lines.indexWhere((l) => l.itemId == item.s('id'));
+    final input = await showPurchaseLineSheet(context, item, already: at < 0 ? 0 : (_num(_lines[at].qty.text) ?? 0));
+    if (input == null || !mounted) return;
     setState(() {
-      final at = _lines.indexWhere((l) => l.itemId == item.s('id'));
       if (at >= 0) {
-        _lines[at].qty.text = _rupees((_num(_lines[at].qty.text) ?? 0) + 1); // the same item again: one more
+        final l = _lines[at];
+        l.qty.text = qtyText((_num(l.qty.text) ?? 0) + input.qty);
+        l.cost.text = _rupees(input.rate);
+        l.mrp.text = _rupees(input.mrp);
+        l.disc.text = input.disc == 0 ? '' : _rupees(input.disc);
+        l.gst = input.gst;
+        l.item = input.item;
+        l.codes = input.item.codeLine;
       } else {
         _lines.add(_Line(
           itemId: item.s('id'),
           name: item.s('name'),
           sku: item.s('sku'),
-          qty: 1,
-          mrp: item.no('mrp_minor') == null ? null : item.n('mrp_minor') / 100,
-          cost: item.no('cost_minor') == null ? null : item.n('cost_minor') / 100,
+          unit: item.buyUnit,
+          codes: input.item.codeLine,
+          item: input.item,
+          qty: input.qty,
+          mrp: input.mrp,
+          cost: input.rate,
           hsn: item.s('hsn'),
-          gst: item.no('gst_pct'),
+          gst: input.gst,
+          disc: input.disc,
         ));
       }
-      _find.clear();
-      _hits = const [];
     });
-  }
-
-  Future<void> _scan() async {
-    final code = await scanForPurchase(context);
-    if (code == null || code.trim().isEmpty || !mounted) return;
-    try {
-      final r = await widget.api.findItems(code.trim());
-      if (!mounted) return;
-      if (r.isEmpty) {
-        showToast(context, '${tr('No product with code')} ${code.trim()}. ${tr('Add it as a new product.')}');
-        _find.text = code.trim();
-        return;
-      }
-      _add(r.first);
-    } catch (e) {
-      if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not look that up. Try again.'));
-    }
-  }
-
-  Future<void> _newProduct() async {
-    final item = await newItemForReceiving(context);
-    if (item == null || !mounted) return;
-    _add(item);
+    showToast(context, '${item.s('name')} · ${qtyText(input.qty)} ${buyUnitWord(item.buyUnit, input.qty)} ${tr(at >= 0 ? 'more on the purchase' : 'on the purchase')}.');
   }
 
   /// The supplier comes from the saved list or the phone's contacts; its GSTIN fills in when it has one.
@@ -707,7 +627,8 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
   static final _gstinShape = RegExp(r'^[0-9]{2}[A-Z0-9]{10}[0-9A-Z]Z[0-9A-Z]$');
   static String _iso(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  Future<void> _receive() async {
+  /// Review purchase: the checks, then the whole purchase and its stock change to confirm. Nothing is saved before Confirm.
+  Future<void> _review() async {
     if (_busy) return;
     if (widget.po == null && _supplier.text.trim().isEmpty) return showToast(context, tr('Enter who the goods came from.'));
     final got = _lines.where((l) => (_num(l.qty.text) ?? 0) > 0).toList();
@@ -721,6 +642,28 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
       setState(() {}); // the lines without MRP turn red
       return showToast(context, '${tr('Add the MRP to add these to stock')}: ${noMrp.map((l) => l.name).join(', ')}');
     }
+    final split = got.where((l) => l.unit.isNotEmpty && !l.byMeasure && (_num(l.qty.text) ?? 0) != (_num(l.qty.text) ?? 0).roundToDouble()).toList();
+    if (split.isNotEmpty) return showToast(context, '${tr('These are counted whole: enter a whole number')}: ${split.map((l) => l.name).join(', ')}');
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: kBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (c) => _ReviewSheet(
+        supplier: widget.po?.supplierName ?? _supplier.text.trim(),
+        po: widget.po?.number,
+        invoice: _invoice.text.trim(),
+        date: _date,
+        gstin: gstin,
+        lines: got,
+      ),
+    );
+    if (ok == true && mounted) await _post(got, gstin);
+  }
+
+  Future<void> _post(List<_Line> got, String gstin) async {
+    if (_busy) return;
     setState(() => _busy = true);
     try {
       final r = await widget.api.receivePost(
@@ -734,6 +677,8 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
             {
               'inventory_item_id': l.itemId, 'qty': _num(l.qty.text), 'mrp': _num(l.mrp.text), 'cost': _num(l.cost.text), 'ordered_qty': l.ordered,
               'hsn': l.hsn.text.trim(), 'gst_pct': l.gst, 'discount_pct': _num(l.disc.text) ?? 0,
+              // store-based: the "MRP" is the store's own selling price, saved as the price too
+              if (l.basis != null) 'price_basis': l.basis!.name,
             },
         ],
       );
@@ -760,9 +705,18 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
         } catch (_) {} // the stock is in; the bill screen that opens next lets them save it again
       }
       if (!mounted) return;
-      showToast(context, '${r.s('doc_no')} · ${tr(billed ? 'stock added, bill saved' : 'stock added')}.');
       final open = widget.openBill ?? (c, id) => Navigator.of(c).pushReplacement(MaterialPageRoute(builder: (_) => PurchaseBillScreen(api: widget.api, receiptId: id, justReceived: true)));
-      open(context, r.s('document_id'));
+      await Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => PurchaseDoneScreen(
+          docNo: r.s('doc_no'),
+          supplier: widget.po?.supplierName ?? _supplier.text.trim(),
+          replayed: r.b('replayed'),
+          billed: billed,
+          stock: [for (final l in got) (name: l.name, qty: _num(l.qty.text) ?? 0, unit: l.unit)],
+          total: got.fold<num>(0, (s, l) => s + l.money.total).roundToDouble(),
+          onOpenBill: (c) => open(c, r.s('document_id')),
+        ),
+      ));
     } catch (e) {
       if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not save. Check your connection and try again.'));
     } finally {
@@ -799,7 +753,7 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Text(l.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(14.5, 700))),
-          if (l.extra)
+          if (l.extra && widget.po != null) // Add purchase has no order: nothing is "not on order"
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(color: const Color(0xFFFFF4E0), borderRadius: BorderRadius.circular(99)),
@@ -812,7 +766,11 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
             icon: const Icon(LucideIcons.x, size: 17, color: kMuted),
           ),
         ]),
-        Text([if (l.sku.isNotEmpty) l.sku, if (l.ordered != null) '${tr('Ordered')} ${_rupees(l.ordered!)}'].join(' · '), style: inter(12, 400, color: kMuted)),
+        Text(
+          [if (l.codes.isNotEmpty) l.codes else if (l.sku.isNotEmpty) '${tr('SKU')} ${l.sku}', if (l.ordered != null) '${tr('Ordered')} ${_rupees(l.ordered!)}'].join(' · '),
+          style: inter(12, 400, color: kMuted),
+        ),
+        if (l.canMakeCode) MakeCodeLink(key: ValueKey('recv-make-code-$i'), onTap: () => _makeCode(l)),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(
@@ -826,13 +784,13 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          _field(l.qty, 'Qty', key: ValueKey('recv-qty-$i')),
+          _field(l.qty, l.unit.isEmpty ? 'Qty' : '${tr('Qty')} (${buyUnitWord(l.unit)})', key: ValueKey('recv-qty-$i')),
           const SizedBox(width: 8),
-          _field(l.mrp, 'MRP', key: ValueKey('recv-mrp-$i'), wrong: noMrp, prefix: '₹ '),
+          _field(l.mrp, l.basis == PriceBasis.store ? 'Sell price' : 'MRP', key: ValueKey('recv-mrp-$i'), wrong: noMrp, prefix: '₹ '),
         ]),
         const SizedBox(height: 8),
         Row(children: [
-          _field(l.cost, 'Rate', key: ValueKey('recv-cost-$i'), prefix: '₹ '),
+          _field(l.cost, l.unit.isEmpty ? 'Rate' : '${tr('Rate')}/${buyUnitWord(l.unit, 1)}', key: ValueKey('recv-cost-$i'), prefix: '₹ '),
           const SizedBox(width: 8),
           _field(l.disc, 'Disc %', key: ValueKey('recv-disc-$i')),
           const SizedBox(width: 8),
@@ -914,7 +872,7 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
           ),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: TextField(key: const ValueKey('recv-invoice'), controller: _invoice, style: inter(14.5, 600), decoration: _dec('Invoice number'))),
+          Expanded(child: TextField(key: const ValueKey('recv-invoice'), controller: _invoice, inputFormatters: invoiceNoFormatters, textCapitalization: TextCapitalization.characters, style: inter(14.5, 600), decoration: _dec('Invoice number'))),
           const SizedBox(width: 8),
           Expanded(
             child: InkWell(
@@ -944,210 +902,10 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
     );
   }
 
-  /// The matches as a dropdown under the box (founder, 29 Oct 2026): one line each, a small photo, the name and the MRP; a tap adds it.
-  Widget _dropdown() => Container(
-        key: const ValueKey('recv-dropdown'),
-        margin: const EdgeInsets.only(top: 6),
-        constraints: const BoxConstraints(maxHeight: 6 * 48.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kCardLine),
-          boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 14, offset: Offset(0, 6))],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: ListView.separated(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            itemCount: _hits.length,
-            separatorBuilder: (_, _) => const Divider(height: 1, color: kCardLine),
-            itemBuilder: (_, i) {
-              final h = _hits[i];
-              return Material(
-                color: Colors.white,
-                child: InkWell(
-                  key: ValueKey('recv-hit-${h.s('id')}'),
-                  onTap: () => _add(h),
-                  child: SizedBox(
-                    height: 48,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Row(children: [
-                        _Thumb(url: h.s('image_url'), name: h.s('name')),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(h.s('name'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(14, 600))),
-                        const SizedBox(width: 8),
-                        Text(
-                          h.no('mrp_minor') == null ? tr('No MRP') : '${tr('MRP')} ${money(h.n('mrp_minor'))}',
-                          key: ValueKey('recv-hit-mrp-${h.s('id')}'),
-                          style: inter(13, h.no('mrp_minor') == null ? 500 : 700, color: h.no('mrp_minor') == null ? kMuted : kInk),
-                        ),
-                      ]),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      );
-
-  /// The category picker: a box with the chosen category and ▾.
-  Widget _categoryBox() => Material(
-        color: const Color(0xFFF7F8F4),
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          key: const ValueKey('recv-category'),
-          borderRadius: BorderRadius.circular(14),
-          onTap: _chooseCategory,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: _cat == null ? kCardLine : kPostedText)),
-            child: Row(children: [
-              Icon(LucideIcons.layoutGrid, size: 18, color: _cat == null ? kMuted : kPostedText),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _cat?.s('name') ?? tr('Category'),
-                  style: inter(14.5, _cat == null ? 500 : 700, color: _cat == null ? kMuted : kInk),
-                ),
-              ),
-              if (_cat != null) Text('${_cat!.n('count').toInt()} ${tr('items')}', style: inter(12.5, 500, color: kMuted)),
-              const SizedBox(width: 6),
-              const Icon(LucideIcons.chevronDown, size: 18, color: kMuted),
-            ]),
-          ),
-        ),
-      );
-
-  /// The chosen category's items to tick (several at once), then "Add N items".
-  Widget _categoryItems() {
-    if (_catLoading) return const Padding(padding: EdgeInsets.all(14), child: LinearProgressIndicator(minHeight: 2));
-    if (_catItems.isEmpty) return Padding(padding: const EdgeInsets.all(14), child: Text(tr('No items in this category.'), style: inter(13, 500, color: kMuted)));
-    final all = _catItems.every((i) => _ticked.contains(i.s('id')));
-    final onBill = {for (final l in _lines) l.itemId};
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SizedBox(height: 8),
-      Container(
-        key: const ValueKey('recv-cat-items'),
-        constraints: const BoxConstraints(maxHeight: 7 * 48.0 + 44),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: kCardLine)),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: ListView(shrinkWrap: true, padding: EdgeInsets.zero, children: [
-            InkWell(
-              key: const ValueKey('recv-cat-all'),
-              onTap: () => setState(() => all ? _ticked.clear() : _ticked.addAll(_catItems.map((i) => i.s('id')))),
-              child: Container(
-                height: 44,
-                color: const Color(0xFFF7F8F4),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(children: [
-                  Icon(all ? LucideIcons.squareCheck : LucideIcons.square, size: 20, color: all ? kPostedText : kMuted),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(tr('Select all'), style: inter(13.5, 700))),
-                  Text('${_ticked.length}/${_catItems.length}', style: inter(12.5, 600, color: kMuted)),
-                ]),
-              ),
-            ),
-            for (final h in _catItems) ...[
-              const Divider(height: 1, color: kCardLine),
-              InkWell(
-                key: ValueKey('recv-cat-item-${h.s('id')}'),
-                onTap: () => setState(() => _ticked.contains(h.s('id')) ? _ticked.remove(h.s('id')) : _ticked.add(h.s('id'))),
-                child: Container(
-                  height: 48,
-                  color: _ticked.contains(h.s('id')) ? const Color(0xFFF1FAE8) : Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(children: [
-                    Icon(_ticked.contains(h.s('id')) ? LucideIcons.squareCheck : LucideIcons.square, size: 20, color: _ticked.contains(h.s('id')) ? kPostedText : kMuted),
-                    const SizedBox(width: 10),
-                    _Thumb(url: h.s('image_url'), name: h.s('name')),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        onBill.contains(h.s('id')) ? '${h.s('name')} · ${tr('on the bill')}' : h.s('name'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: inter(14, 600),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(h.no('mrp_minor') == null ? tr('No MRP') : '${tr('MRP')} ${money(h.n('mrp_minor'))}', style: inter(12.5, 700, color: h.no('mrp_minor') == null ? kMuted : kInk)),
-                  ]),
-                ),
-              ),
-            ],
-          ]),
-        ),
-      ),
-      const SizedBox(height: 10),
-      SizedBox(
-        height: 48,
-        child: FilledButton.icon(
-          key: const ValueKey('recv-cat-add'),
-          onPressed: _ticked.isEmpty ? null : _addTicked,
-          icon: const Icon(LucideIcons.plus, size: 18),
-          label: Text(_ticked.isEmpty ? tr('Tick the items that came') : '${tr('Add')} ${_ticked.length} ${tr(_ticked.length == 1 ? 'item' : 'items')}', style: inter(15, 700)),
-          style: FilledButton.styleFrom(backgroundColor: kPrimary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-        ),
-      ),
-    ]);
-  }
-
-  /// The empty line at the end: type a name, scan, or make a new product.
-  Widget _addLine() => InvCard(
-        key: const ValueKey('recv-add-line'),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          _SectionHead(icon: LucideIcons.packagePlus, title: tr('Add items'), subtitle: tr('Pick from a category, search or scan')),
-          const SizedBox(height: 14),
-          _categoryBox(),
-          if (_cat != null) _categoryItems(),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(children: [
-              const Expanded(child: Divider(color: kCardLine)),
-              Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text(tr('or search'), style: inter(12, 600, color: kMuted))),
-              const Expanded(child: Divider(color: kCardLine)),
-            ]),
-          ),
-          Row(children: [
-            Expanded(
-              child: TextField(
-                key: const ValueKey('recv-find'),
-                controller: _find,
-                onChanged: _search,
-                style: inter(14.5, 500),
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: tr('Add an item that came: name or code'),
-                  prefixIcon: const Icon(LucideIcons.search, size: 18),
-                  filled: true,
-                  fillColor: kBg,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kCardLine)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kCardLine)),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filledTonal(
-              key: const ValueKey('recv-scan'),
-              onPressed: _scan,
-              tooltip: tr('Scan a barcode'),
-              icon: const Icon(LucideIcons.scanLine, size: 20),
-            ),
-          ]),
-          if (_searching) const Padding(padding: EdgeInsets.all(8), child: LinearProgressIndicator(minHeight: 2)),
-          if (_hits.isNotEmpty) _dropdown(),
-          if (_find.text.trim().length >= 2 && !_searching)
-            TextButton.icon(
-              key: const ValueKey('recv-new-product'),
-              onPressed: _newProduct,
-              icon: const Icon(LucideIcons.plus, size: 16, color: kLink),
-              label: Text('${tr('New product')}: "${_find.text.trim()}"', style: inter(13.5, 700, color: kLink)),
-            ),
-        ]),
+  /// The search bar over the whole catalogue (founder, 31 Oct 2026): what is picked goes to its quantity and rate.
+  Widget _entryBar() => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: PurchaseItemSearch(api: widget.api, onPurchase: _onPurchase, onPick: _enter),
       );
 
   @override
@@ -1180,25 +938,15 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
                   Expanded(
                     child: Text(
                       '${tr('Receipt note')} ${[widget.replaces!.s('doc_no'), if (widget.replaces!.s('po_ref').isNotEmpty) widget.replaces!.s('po_ref')].join(' · ')} '
-                      '${tr('was started earlier and never finished. Check the quantities and MRP, then Mark received to add the stock.')}',
+                      '${tr('was started earlier and never finished. Check the quantities and MRP, then Review purchase to add the stock.')}',
                       style: inter(13, 500, height: 1.35),
                     ),
                   ),
                 ]),
               ),
             _invoiceCard(),
-            Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(color: const Color(0xFFEFF7E6), borderRadius: BorderRadius.circular(14)),
-              child: Row(children: [
-                const Icon(LucideIcons.info, size: 16, color: kPostedText),
-                const SizedBox(width: 8),
-                Expanded(child: Text(tr('Enter what actually came, as on the bill. Stock goes up for every line with an MRP.'), style: inter(12.5, 500, color: kPostedText, height: 1.35))),
-              ]),
-            ),
+            _entryBar(),
             for (final (i, l) in _lines.indexed) _lineCard(i, l),
-            _addLine(),
             if (_lines.isNotEmpty)
               InvCard(
                 key: const ValueKey('recv-totals'),
@@ -1224,9 +972,9 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
               ),
               FilledButton(
                 key: const ValueKey('recv-mark-received'),
-                onPressed: _busy ? null : _receive,
+                onPressed: _busy ? null : _review,
                 style: FilledButton.styleFrom(backgroundColor: kPrimary, padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 22), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
-                child: Text(_busy ? '…' : tr('Mark received'), style: inter(15.5, 700, color: Colors.white)),
+                child: Text(_busy ? '…' : tr('Review purchase'), style: inter(15.5, 700, color: Colors.white)),
               ),
             ]),
           ),
@@ -1234,6 +982,178 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
       ]),
     );
   }
+}
+
+/// Review purchase: the supplier and invoice, every line (quantity × rate, discount, GST, total), the totals and what goes into stock.
+/// Confirm answers true; nothing is saved before it.
+class _ReviewSheet extends StatelessWidget {
+  const _ReviewSheet({required this.supplier, this.po, required this.invoice, required this.date, required this.gstin, required this.lines});
+  final String supplier, invoice, gstin;
+  final String? po;
+  final DateTime date;
+  final List<_Line> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget head(String t) => Padding(padding: const EdgeInsets.only(top: 14, bottom: 6), child: Text(tr(t), style: inter(13, 800, color: kMuted)));
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.88),
+        child: Column(key: const ValueKey('recv-review'), mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Center(child: Container(margin: const EdgeInsets.only(top: 10), width: 40, height: 4, decoration: BoxDecoration(color: kCardLine, borderRadius: BorderRadius.circular(99)))),
+          Padding(padding: const EdgeInsets.fromLTRB(20, 14, 20, 0), child: Text(tr('Review purchase'), style: inter(20, 800))),
+          Flexible(
+            child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(20, 4, 20, 8), children: [
+              head('Supplier and invoice'),
+              Text([if (po != null) po!, supplier].join(' · '), key: const ValueKey('review-supplier'), style: inter(15, 700)),
+              Text(
+                [invoice.isEmpty ? tr('No invoice number yet') : '${tr('Invoice')} $invoice', dayMonth(date, year: true), if (gstin.isNotEmpty) 'GSTIN $gstin'].join(' · '),
+                style: inter(12.5, 500, color: kMuted),
+              ),
+              head('Items'),
+              for (final (i, l) in lines.indexed)
+                Padding(
+                  key: ValueKey('review-line-$i'),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(l.name, style: inter(14, 700)),
+                        Text(
+                          [
+                            '${qtyText(l.money.qty)}${l.unit.isEmpty ? '' : ' ${buyUnitWord(l.unit, l.money.qty)}'} × ${_paise(l.money.rate)}',
+                            if (l.money.discountPct > 0) '${_rupees(l.money.discountPct)}% ${tr('off')}',
+                            'GST ${_rupees(l.money.gstPct)}%',
+                          ].join(' · '),
+                          style: inter(12, 500, color: kMuted),
+                        ),
+                      ]),
+                    ),
+                    Text(_paise(l.money.total), style: inter(14, 800)),
+                  ]),
+                ),
+              const Divider(height: 18),
+              GstTotals(lines: [for (final l in lines) l.money], keyPrefix: 'review'),
+              head('Stock after you confirm'),
+              Container(
+                key: const ValueKey('review-stock'),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xFFEFF7E6), borderRadius: BorderRadius.circular(12)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  for (final l in lines)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text('+ ${qtyText(l.money.qty)}${l.unit.isEmpty ? '' : ' ${buyUnitWord(l.unit, l.money.qty)}'}  ${l.name}', style: inter(13, 600, color: kPostedText)),
+                    ),
+                ]),
+              ),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: Row(children: [
+              TextButton(key: const ValueKey('review-back'), onPressed: () => Navigator.pop(context, false), child: Text(tr('Back to edit'), style: inter(14.5, 700, color: kMuted))),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
+                  key: const ValueKey('recv-confirm'),
+                  onPressed: () => Navigator.pop(context, true),
+                  style: FilledButton.styleFrom(backgroundColor: kPrimary, minimumSize: const Size.fromHeight(52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                  child: Text(tr('Confirm and add stock'), style: inter(15.5, 700, color: Colors.white)),
+                ),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// After Confirm: the purchase in a few lines — its number, supplier, total, what went into stock, and whether the bill is saved.
+/// A retried Confirm that the server had already saved says so (the stock was not added twice).
+class PurchaseDoneScreen extends StatelessWidget {
+  const PurchaseDoneScreen({super.key, required this.docNo, required this.supplier, required this.stock, required this.total, this.replayed = false, this.billed = false, required this.onOpenBill});
+  final String docNo, supplier;
+  final List<({String name, num qty, String unit})> stock;
+  final num total;
+  final bool replayed, billed;
+  final void Function(BuildContext context) onOpenBill;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: kBg,
+        body: Column(children: [
+          AppHeader(title: tr('Purchase saved'), onBack: () => Navigator.of(context).maybePop()),
+          Expanded(
+            child: ListView(key: const ValueKey('purchase-done'), padding: const EdgeInsets.fromLTRB(16, 20, 16, 24), children: [
+              const Center(child: CircleAvatar(radius: 34, backgroundColor: Color(0xFFE8F7EC), child: Icon(LucideIcons.check, size: 34, color: Color(0xFF15803D)))),
+              const SizedBox(height: 12),
+              Text(tr(replayed ? 'Already saved' : 'Stock added'), textAlign: TextAlign.center, style: inter(22, 800)),
+              Text('$docNo · $supplier', key: const ValueKey('done-doc'), textAlign: TextAlign.center, style: inter(14, 600, color: kMuted)),
+              if (replayed)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(tr('This purchase was saved before. The stock was not added again.'), textAlign: TextAlign.center, style: inter(13, 600, color: const Color(0xFFB45309))),
+                ),
+              const SizedBox(height: 16),
+              InvCard(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Row(children: [
+                    Expanded(child: Text('${stock.length} ${tr(stock.length == 1 ? 'item' : 'items')}', style: inter(15, 800))),
+                    Text(money((total * 100).round()), key: const ValueKey('done-total'), style: inter(16, 800)),
+                  ]),
+                  const SizedBox(height: 8),
+                  for (final l in stock)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(children: [
+                        const Icon(LucideIcons.packageCheck, size: 16, color: kPostedText),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(l.name, style: inter(13.5, 600))),
+                        Text('+${qtyText(l.qty)}${l.unit.isEmpty ? '' : ' ${buyUnitWord(l.unit, l.qty)}'}', style: inter(13.5, 800, color: kPostedText)),
+                      ]),
+                    ),
+                  const Divider(height: 20),
+                  Row(children: [
+                    Icon(billed ? LucideIcons.receiptText : LucideIcons.fileClock, size: 16, color: billed ? kPostedText : const Color(0xFFB45309)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(tr(billed ? 'Supplier bill saved with this purchase.' : 'Supplier bill not saved yet: add its details now or later.'),
+                          key: const ValueKey('done-bill-status'), style: inter(13, 600)),
+                    ),
+                  ]),
+                ]),
+              ),
+            ]),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    key: const ValueKey('done-close'),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                    child: Text(tr('Done'), style: inter(15, 700, color: kInk)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    key: const ValueKey('done-bill'),
+                    onPressed: () => onOpenBill(context),
+                    style: FilledButton.styleFrom(backgroundColor: kPrimary, minimumSize: const Size.fromHeight(52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                    child: Text(tr(billed ? 'View bill' : 'Add bill details'), style: inter(15, 700, color: Colors.white)),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ]),
+      );
 }
 
 class _BillLine {
@@ -1281,8 +1201,11 @@ const _reasons = {'short': 'Short supplied', 'damaged': 'Damaged', 'returned': '
 /// The purchase bill of a received delivery: invoice number and date, supplier GSTIN, every line with rate, discount and GST, the
 /// totals, how it was paid, and a credit note for anything short, damaged or returned.
 class PurchaseBillScreen extends StatefulWidget {
-  const PurchaseBillScreen({super.key, required this.api, required this.receiptId, this.justReceived = false});
+  const PurchaseBillScreen({super.key, required this.api, required this.receiptId, this.justReceived = false, this.money});
   final PurchasingApi api;
+
+  /// Paying the bill here records the money going out in Money (one payment, in both places).
+  final StoreMoneyApi? money;
   final String receiptId;
   final bool justReceived;
   @override
@@ -1294,7 +1217,14 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
   String? _error;
   final _supplier = TextEditingController(), _gstin = TextEditingController(), _invoice = TextEditingController(), _paid = TextEditingController(), _note = TextEditingController();
   DateTime? _date;
+  // what is paid already (Money's payments against this bill) and what is paid now
   String _pay = 'unpaid';
+  num _paidMinor = 0;
+  bool _payNow = false;
+  String _method = 'cash';
+  final _payAmount = TextEditingController();
+  final _payKey = StoreMoneyApi.newKey(); // a retried Save never pays twice
+  late final StoreMoneyApi _money = widget.money ?? StoreMoneyApi();
   List<_BillLine> _lines = [];
   List<_CreditLine> _credit = [];
   bool _busy = false, _saved = false;
@@ -1307,7 +1237,7 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
 
   @override
   void dispose() {
-    for (final c in [_supplier, _gstin, _invoice, _paid, _note]) {
+    for (final c in [_supplier, _gstin, _invoice, _paid, _note, _payAmount]) {
       c.dispose();
     }
     for (final l in _lines) {
@@ -1332,6 +1262,7 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
         _invoice.text = bill?.s('invoice_no') ?? '';
         _date = DateTime.tryParse(bill?.s('invoice_date') ?? '') ?? DateTime.now();
         _pay = bill?.so('payment_status') ?? 'unpaid';
+        _paidMinor = bill?.n('paid_minor') ?? 0;
         _paid.text = (bill?.n('paid_minor') ?? 0) > 0 ? _rupees(bill!.n('paid_minor') / 100) : '';
         _note.text = bill?.s('note') ?? '';
         _saved = bill?.b('saved') ?? false;
@@ -1349,10 +1280,16 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
   num get _total => (_taxable + _gstAmt).roundToDouble();
   num get _creditTotal => _credit.fold<num>(0, (s, c) => s + (_num(c.amount.text) ?? 0));
 
+  /// Still to pay, in rupees: the bill less its credit note and what is paid already.
+  num get _remaining => (_total - _creditTotal - _paidMinor / 100).clamp(0, double.infinity);
+
   Future<void> _save() async {
     if (_busy) return;
     if (_invoice.text.trim().isEmpty) return showToast(context, tr('Enter the invoice number.'));
     if (_lines.isEmpty) return showToast(context, tr('The bill needs its lines.'));
+    final payNow = _payNow ? _num(_payAmount.text) : null;
+    if (_payNow && (payNow == null || payNow <= 0)) return showToast(context, tr('Enter the amount you are paying now.'));
+    if (payNow != null && payNow > _remaining + 0.005) return showToast(context, '${tr('That is more than is left to pay')}: ${money((_remaining * 100).round())}');
     setState(() => _busy = true);
     try {
       final d = _date ?? DateTime.now();
@@ -1362,8 +1299,9 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
         'supplier_gstin': _gstin.text.trim().toUpperCase(),
         'invoice_no': _invoice.text.trim(),
         'invoice_date': '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
+        // what is paid comes from Money's payments; this keeps it as it is
         'payment_status': _pay,
-        'paid': _pay == 'partly_paid' ? _num(_paid.text) : null,
+        'paid': _pay == 'partly_paid' ? _paidMinor / 100 : null,
         'note': _note.text.trim(),
         'lines': [
           for (final l in _lines)
@@ -1375,7 +1313,20 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
         ],
       });
       if (!mounted) return;
-      showToast(context, tr('Purchase bill saved.'));
+      // paid now: the money goes out in Money, against this bill (which then shows it as paid)
+      if (payNow != null) {
+        try {
+          await _money.record({
+            'kind': 'supplier_payment', 'method': _method, 'amount_minor': (payNow * 100).round(), 'bill_receipt_id': widget.receiptId,
+            'party': _supplier.text.trim(), 'reference': _invoice.text.trim(),
+          }, key: _payKey);
+        } catch (e) {
+          if (mounted) showToast(context, '${tr('The bill is saved, but the payment was not recorded')}: ${e is PartnerApiException ? e.message : tr('check your connection')}');
+          return;
+        }
+      }
+      if (!mounted) return;
+      showToast(context, tr(payNow != null ? 'Purchase bill saved and the payment is in Money.' : 'Purchase bill saved.'));
       Navigator.of(context).maybePop();
     } catch (e) {
       if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not save. Check your connection and try again.'));
@@ -1455,7 +1406,7 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
                         TextField(key: const ValueKey('bill-supplier'), controller: _supplier, style: inter(14.5, 600), decoration: _dec('Supplier')),
                         const SizedBox(height: 8),
                         Row(children: [
-                          Expanded(child: TextField(key: const ValueKey('bill-invoice'), controller: _invoice, style: inter(14.5, 600), decoration: _dec('Invoice number'))),
+                          Expanded(child: TextField(key: const ValueKey('bill-invoice'), controller: _invoice, inputFormatters: invoiceNoFormatters, textCapitalization: TextCapitalization.characters, style: inter(14.5, 600), decoration: _dec('Invoice number'))),
                           const SizedBox(width: 8),
                           Expanded(
                             child: InkWell(
@@ -1524,17 +1475,39 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
                         const Divider(height: 18),
                         GstTotals(lines: [for (final l in _lines) l.money], keyPrefix: 'bill'),
                       ]),
+                      // Payment (31 Oct 2026): one payment in both places — paid here, it goes out of cash, UPI or bank in Money
                       _section('Payment', [
-                        Wrap(spacing: 8, children: [
-                          for (final (id, label) in const [('unpaid', 'Unpaid'), ('partly_paid', 'Partly paid'), ('paid', 'Paid')])
+                        Text(
+                          _paidMinor <= 0 ? tr('Nothing paid yet.') : '${tr('Paid')} ${money(_paidMinor.round())} · ${tr('to pay')} ${money((_remaining * 100).round())}',
+                          key: const ValueKey('bill-paid-so-far'),
+                          style: inter(13.5, 700),
+                        ),
+                        if (_remaining > 0) ...[
+                          const SizedBox(height: 8),
+                          Wrap(spacing: 8, children: [
+                            ChoiceChip(key: const ValueKey('bill-pay-later'), label: Text(tr('Pay later'), style: inter(13, 600)), selected: !_payNow, onSelected: (_) => setState(() => _payNow = false)),
                             ChoiceChip(
-                              key: ValueKey('bill-pay-$id'),
-                              label: Text(tr(label), style: inter(13, 600)),
-                              selected: _pay == id,
-                              onSelected: (_) => setState(() => _pay = id),
+                              key: const ValueKey('bill-pay-now'),
+                              label: Text(tr('Pay now'), style: inter(13, 600)),
+                              selected: _payNow,
+                              onSelected: (_) => setState(() {
+                                _payNow = true;
+                                if (_payAmount.text.trim().isEmpty) _payAmount.text = _rupees(_remaining);
+                              }),
                             ),
-                        ]),
-                        if (_pay == 'partly_paid') ...[const SizedBox(height: 8), Row(children: [_num2(_paid, 'Amount paid', prefix: '₹ ')])],
+                          ]),
+                          if (_payNow) ...[
+                            const SizedBox(height: 8),
+                            Row(children: [_num2(_payAmount, 'Paying now', prefix: '₹ ', key: const ValueKey('bill-pay-amount'))]),
+                            const SizedBox(height: 8),
+                            Wrap(spacing: 8, children: [
+                              for (final (id, label) in const [('cash', 'Cash'), ('upi', 'UPI'), ('bank', 'Bank')])
+                                ChoiceChip(key: ValueKey('bill-pay-method-$id'), label: Text(tr(label), style: inter(13, 600)), selected: _method == id, onSelected: (_) => setState(() => _method = id)),
+                            ]),
+                          ],
+                        ],
+                        const SizedBox(height: 6),
+                        Text(tr('Payments go into Money as money out. To undo one, void it in Money.'), style: inter(12, 500, color: kMuted)),
                       ]),
                       _section(
                         'Credit note',
@@ -1804,8 +1777,8 @@ class _PastPurchasesScreenState extends State<PastPurchasesScreen> {
 }
 
 /// A product's photo, 32 px with rounded corners; its first letter when there is no photo or it does not load.
-class _Thumb extends StatelessWidget {
-  const _Thumb({required this.url, required this.name});
+class PurchaseThumb extends StatelessWidget {
+  const PurchaseThumb({required this.url, required this.name});
   final String url, name;
   @override
   Widget build(BuildContext context) {

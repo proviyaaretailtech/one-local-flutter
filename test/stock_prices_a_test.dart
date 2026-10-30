@@ -241,7 +241,7 @@ void main() {
       expect(find.text('2 products changed · review before saving'), findsOneWidget);
       await tap(t, find.byKey(const ValueKey('stock-save')));
 
-      expect(f.body(f.calls('cat_item_save').single), {'mode': 'quick', 'version': 3, 'price_minor': 4200, 'id': 'm-cola'});
+      expect(f.body(f.calls('cat_item_save').single), {'mode': 'quick', 'version': 3, 'price_basis': 'mrp', 'price_minor': 4200, 'id': 'm-cola'}); // the price type is recorded on its first save
       expect(f.body(f.calls('rst_menu_stock_set').single), {'id': 'm-cola', 'in_stock': false});
       expect(f.body(f.calls('sf_product_save').single), {'id': 'm-salt', 'visible': true});
       final draft = f.body(f.calls('inv_document_save').single);

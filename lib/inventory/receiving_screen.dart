@@ -6,6 +6,7 @@ import '../catalogue/quick_add_screen.dart';
 import '../catalogue/grn_screens.dart' show GrnDashboardScreen;
 import '../stock/lot_labels_screen.dart' show offerLotLabels;
 import '../ui/purchase_steps.dart';
+import '../ui/invoice_input.dart';
 import '../ui/theme.dart';
 import 'document_flow.dart';
 import 'inv_env.dart';
@@ -19,11 +20,16 @@ void Function(BuildContext context, String receiptId) openMatchBill = (context, 
 
 /// A product that is not in the shop yet, made while receiving (founder, 26 Oct 2026): Quick add without "In stock now", since the
 /// receipt note counts it. Answers the new stock item (id, name, System Code), or null when closed. Tests replace it.
-Future<Facts?> Function(BuildContext context) newItemForReceiving = (context) async {
-  final made = await Navigator.of(context).push<CatItem>(MaterialPageRoute(builder: (_) => QuickAddScreen(api: CatalogueApi(), receiving: true)));
+Future<Facts?> Function(BuildContext context, {String? name, String? barcode}) newItemForReceiving = (context, {name, barcode}) async {
+  final made = await Navigator.of(context).push<CatItem>(MaterialPageRoute(builder: (_) => QuickAddScreen(api: CatalogueApi(), receiving: true, name: name, barcode: barcode)));
   final inv = made?.raw['inventory_item_id']?.toString();
   if (made == null || inv == null) return null;
-  return Facts({'id': inv, 'name': made.name, 'sku': made.sku});
+  // as the purchase search describes an item: the stock item, its menu item, its unit, codes and prices
+  return Facts({
+    'id': inv, 'name': made.name, 'sku': made.sku, 'menu_item_id': made.id, 'selling_unit': made.sellingUnit, 'unit': made.sellingUnit,
+    'barcode': made.barcode, 'barcode_source': made.raw['barcode_source'], 'mrp_minor': made.mrpMinor, 'cost_minor': made.costMinor, 'price_minor': made.priceMinor, 'hsn': made.hsn,
+    'gst_pct': made.gstPct, 'image_url': made.imageUrl, 'category': made.category,
+  });
 };
 
 /// A receipt note (Figma "Receiving", founder's receiving rules of 26 Oct 2026): count a delivery, with or without a purchase order.
@@ -316,7 +322,7 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
           Row(children: [
             Expanded(child: InvInput(key: const ValueKey('receiving-supplier'), controller: _supplier, hint: tr('Supplier'), onChanged: (_) => setState(() {}))),
             const SizedBox(width: 8),
-            Expanded(child: InvInput(key: const ValueKey('receiving-invoice'), controller: _invoice, hint: tr('Invoice no.'), onChanged: (_) => setState(() {}))),
+            Expanded(child: InvInput(key: const ValueKey('receiving-invoice'), controller: _invoice, formatters: invoiceNoFormatters, hint: tr('Invoice no.'), onChanged: (_) => setState(() {}))),
           ]),
         ],
         const SizedBox(height: 8),

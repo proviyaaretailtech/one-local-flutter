@@ -171,3 +171,39 @@ Widget unitTag(BcItem i) => BcTag(i.loose ? 'Loose' : 'Piece', bg: const Color(0
 
 /// "₹90/kg · Sold loose" or "₹28/pack".
 String priceLine(BcItem i, String Function(num) money) => i.loose ? '${money(i.price)}/kg · ${tr('Sold loose')}' : '${money(i.price)}/${tr('pack')}';
+
+/// How many labels to print (founder, 31 Oct 2026: not just one): − count +, 0 = none, up to 500. [keyPrefix]-less, -more, -value.
+class LabelCountStepper extends StatelessWidget {
+  const LabelCountStepper({super.key, required this.value, required this.onChanged, this.keyPrefix = 'labels', this.hint, this.enabled = true});
+  final int value;
+  final ValueChanged<int> onChanged;
+  final String keyPrefix;
+  final String? hint;
+  final bool enabled;
+  @override
+  Widget build(BuildContext context) {
+    Widget btn(String id, IconData icon, int to) => Material(
+          color: Colors.white,
+          shape: const CircleBorder(side: BorderSide(color: kBcBorder)),
+          child: InkWell(
+            key: ValueKey('$keyPrefix-$id'),
+            customBorder: const CircleBorder(),
+            onTap: enabled && to >= 0 && to <= 500 ? () => onChanged(to) : null,
+            child: SizedBox(width: 40, height: 40, child: Icon(icon, size: 18, color: kInk)),
+          ),
+        );
+    return Row(children: [
+      const Icon(LucideIcons.printer, size: 18, color: kInk),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr('Labels to print'), style: inter(14, 700)),
+          Text(tr(hint ?? (value == 0 ? 'No label will be printed.' : 'Printed when it is saved.')), style: inter(11.5, 500, color: kMuted)),
+        ]),
+      ),
+      btn('less', LucideIcons.minus, value - 1),
+      SizedBox(width: 44, child: Text('$value', key: ValueKey('$keyPrefix-value'), textAlign: TextAlign.center, style: inter(17, 800))),
+      btn('more', LucideIcons.plus, value + 1),
+    ]);
+  }
+}

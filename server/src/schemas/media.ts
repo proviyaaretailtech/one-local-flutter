@@ -20,4 +20,6 @@ export const Decide = z.object({
   pool_id: pool,
   decision: z.enum(['approve', 'reject'], { message: 'Decide approve or reject.' }),
   note: z.string().trim().max(300, 'Keep the note under 300 characters.').optional(),
+  // approving the photo also approves its product (barcode, brand, unit, SKU) as standard in the Master library (31 Oct 2026)
+  map_product: z.boolean().optional(),
 }).strict();

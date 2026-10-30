@@ -12,13 +12,17 @@ import 'item_photo.dart';
 import '../media/media_api.dart';
 import '../media/product_photos_screen.dart' show pickStandardPhoto;
 import 'item_sheets.dart' show parsePriceMinor;
+import 'price_basis.dart';
+import 'sku_api.dart';
+import 'sku_picker.dart';
+import '../ui/item_name.dart';
 import '../ui/i18n.dart';
 
 /// Figma "Item Creation" (Store Standard / Screens): identity, units and storage, tax and pricing, then a save checklist.
 /// Also used to change an existing item (Quick edit, Edit catalogue details): [item] pre-fills the form and carries its version.
 /// The screen only collects and sends; the database decides what is valid (tax needed to save, price not above MRP, unique SKU and barcode).
 class ItemFormScreen extends StatefulWidget {
-  const ItemFormScreen({super.key, this.api, this.item, this.onNavigate, this.photos = const DeviceItemPhotos(), this.scan = scanBarcode, this.barcode, this.media});
+  const ItemFormScreen({super.key, this.api, this.item, this.onNavigate, this.photos = const DeviceItemPhotos(), this.scan = scanBarcode, this.barcode, this.media, this.skus});
   final CatalogueApi? api;
   final CatItem? item;
   final ValueChanged<String>? onNavigate;
@@ -31,6 +35,9 @@ class ItemFormScreen extends StatefulWidget {
 
   /// The Standard pool of approved photos (30 Oct 2026); null: the live one.
   final MediaApi? media;
+
+  /// The SKU's lists (tests pass their own).
+  final SkuApi? skus;
 
   /// The barcode field's scan button: opens the camera and answers the code read (null when closed).
   final Future<String?> Function(BuildContext) scan;
@@ -50,6 +57,17 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   bool _photoBusy = false;
   late final String _saveKey = CatalogueApi.newKey();
   String _unit = 'pc', _netUnit = 'g';
+
+  /// MRP-based (printed MRP) or store-based (own price, cost + markup %); it follows the selling unit until it is picked.
+  late PriceBasis _basis = priceBasisOf(widget.item?.raw['price_basis'], unit: widget.item?.sellingUnit ?? 'pc');
+  late bool _basisTouched = widget.item?.raw['price_basis'] != null;
+  final _markup = TextEditingController();
+
+  /// A new item's SKU parts (founder's OL SKU sheet): the database makes the SKU; an existing item's SKU never changes.
+  SkuParts? _parts;
+  late final SkuApi _skus = widget.skus ?? SkuApi(rpc: _api.rpc);
+  bool _syncing = false;
+  String _lastMrp = '';
   num? _gst;
   String _storage = '';
   bool _busy = false, _bannerOpen = true;
@@ -66,7 +84,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     super.initState();
     final i = widget.item;
     if (i != null) {
-      _name.text = i.name;
+      _name.text = i.name.toUpperCase(); // typed in capitals; saved in Title Case
       _sku.text = i.sku;
       _category.text = i.category;
       _brand.text = i.brand ?? '';
@@ -87,12 +105,18 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     for (final c in [_name, _sku, _category, _barcode, _netQty, _hsn, _cost, _price, _mrp]) {
       c.addListener(() => setState(() {}));
     }
+    _lastMrp = _mrp.text;
+    _syncMarkup();
+    _mrp.addListener(_mrpChanged);
+    _price.addListener(_syncMarkup);
+    _cost.addListener(_costChanged);
+    _markup.addListener(_markupChanged);
     _scroll.addListener(_followScroll);
   }
 
   @override
   void dispose() {
-    for (final c in [_name, _sku, _category, _brand, _barcode, _netQty, _packUnits, _hsn, _cost, _price, _mrp]) {
+    for (final c in [_name, _sku, _category, _brand, _barcode, _netQty, _packUnits, _hsn, _cost, _price, _mrp, _markup]) {
       c.dispose();
     }
     _scroll.dispose();
@@ -151,12 +175,45 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     _jumping = false;
   }
 
+  void _quietly(TextEditingController c, String v) {
+    if (c.text == v) return;
+    _syncing = true;
+    c.text = v;
+    _syncing = false;
+  }
+
+  /// MRP-based: the selling price follows the MRP until it is typed differently.
+  void _mrpChanged() {
+    if (_syncing || _mrp.text == _lastMrp) return;
+    if (_basis == PriceBasis.mrp && (_price.text.trim().isEmpty || _price.text == _lastMrp)) _quietly(_price, _mrp.text);
+    _lastMrp = _mrp.text;
+  }
+
+  /// The markup a typed price (and cost) makes.
+  void _syncMarkup() {
+    if (_syncing) return;
+    final m = markupPct(num.tryParse(_cost.text.trim()), num.tryParse(_price.text.trim()));
+    _quietly(_markup, m == null ? '' : pctText(m));
+  }
+
+  /// Store-based: cost + markup % sets the price.
+  void _markupChanged() {
+    if (_syncing) return;
+    final cost = num.tryParse(_cost.text.trim()), pct = num.tryParse(_markup.text.trim());
+    if (cost == null || cost <= 0 || pct == null) return setState(() {});
+    final v = priceFromMarkup(cost, pct);
+    _quietly(_price, v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(2));
+    setState(() {});
+  }
+
+  void _costChanged() => _basis == PriceBasis.store && _markup.text.trim().isNotEmpty && !_syncing ? _markupChanged() : _syncMarkup();
+
   String? _nullIfBlank(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
 
   Future<void> _save({required bool draft}) async {
     final price = parsePriceMinor(_price.text);
     if (_name.text.trim().isEmpty) return showToast(context, tr('Enter the product name.'));
-    if (_sku.text.trim().isEmpty) return showToast(context, 'Enter the System Code.');
+    if (!_editing && _parts == null) return showToast(context, tr(skuProblem(_parts)!));
     if (price == null) return showToast(context, tr('Enter the selling price.'));
     final mrp = _mrp.text.trim().isEmpty ? null : parsePriceMinor(_mrp.text);
     final cost = _cost.text.trim().isEmpty ? null : parsePriceMinor(_cost.text);
@@ -169,13 +226,16 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     final fields = <String, dynamic>{
       'mode': 'full',
       'draft': draft,
-      'name': _name.text.trim(),
-      'sku': _sku.text.trim(),
+      'name': titleCase(_name.text),
+      // the SKU is made by the database from its parts (new items) and never changes after
+      if (!_editing) 'sku_parts': _parts!.toJson(),
       'category': _nullIfBlank(_category),
       'brand': _nullIfBlank(_brand),
       'barcode': _nullIfBlank(_barcode),
       'price_minor': price,
-      'mrp_minor': mrp,
+      'price_basis': _basis.name,
+      // store-based: no printed MRP; the database keeps the selling price as the MRP
+      if (_basis == PriceBasis.mrp) 'mrp_minor': mrp,
       'cost_minor': cost,
       'hsn': _nullIfBlank(_hsn),
       'gst_pct': _gst,
@@ -451,7 +511,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
       margin = '${money((net - cost).round())} · ${((net - cost) / net * 100).toStringAsFixed(1)}%';
     }
     // Which sections have their required fields filled (the steps tick off as the person goes).
-    final identityDone = _name.text.trim().isNotEmpty && _sku.text.trim().isNotEmpty && _category.text.trim().isNotEmpty && _barcode.text.trim().isNotEmpty;
+    final identityDone = _name.text.trim().isNotEmpty && (_editing || _parts != null) && _category.text.trim().isNotEmpty && _barcode.text.trim().isNotEmpty;
     final unitsDone = netQty != null && num.tryParse(_packUnits.text.trim()) != null;
     final pricingDone = !taxOpen && price != null;
     final title = _editing ? 'Edit Item' : 'Item Creation';
@@ -492,8 +552,18 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
             _section(_keyIdentity, 1, 'Item identity', 'Photo, name and the codes that find this product', identityDone, [
               const SizedBox(height: 6),
               _photoBox(),
-              _field('Product name *', _input(_name, 'Product name')),
-              _field('System Code *', _input(_sku, 'Unique System Code, for example OC-200-PK')),
+              _field('Product name * · capitals, up to $kItemNameMax', _input(_name, 'PRODUCT NAME', formatters: itemNameFormatters)),
+              if (_editing)
+                _field('SKU · never changes', Container(
+                  key: const ValueKey('item-sku'),
+                  height: 46,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(color: kSoftField, borderRadius: BorderRadius.circular(12)),
+                  child: Text(_sku.text, style: inter(14, 700)),
+                ))
+              else
+                _field('SKU *', SkuPicker(key: const ValueKey('item-sku-picker'), api: _skus, basis: _basis, barcode: _nullIfBlank(_barcode), onChanged: (p) => setState(() => _parts = p))),
               _pair(_field('Category *', _input(_category, 'Snacks')), _field('Brand', _input(_brand, 'Add brand'))),
               _field('Barcode *', _input(_barcode, 'Scan or type the barcode', trailing: _scanButton())),
               const SizedBox(height: 6),
@@ -502,7 +572,10 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
             ]),
             _section(_keyUnits, 2, 'Units & storage', 'How it is sold, packed and kept', unitsDone, [
               _pair(
-                _field('Selling unit *', _dropdown<String>(value: _unit, items: sellingUnits, onChanged: (v) => setState(() => _unit = v ?? 'pc'))),
+                _field('Selling unit *', _dropdown<String>(value: _unit, items: sellingUnits, onChanged: (v) => setState(() {
+                  _unit = v ?? 'pc';
+                  if (!_basisTouched) _basis = basisForUnit(_unit);
+                }))),
                 _field('Storage', _dropdown<String>(value: _storage.isEmpty ? null : _storage, items: [for (final s in _storages) (s, s)], hint: 'Dry shelf', onChanged: (v) => setState(() => _storage = v ?? ''))),
               ),
               _label(tr('Net quantity *')),
@@ -529,8 +602,25 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
                 _field('GST rate *',
                     _dropdown<num>(value: _gst, items: [for (final g in gstSlabs) (g, '${qty(g)}%')], hint: tr('Required'), bad: _gst == null && _error != null, onChanged: (v) => setState(() => _gst = v))),
               ),
-              _pair(_field('Purchase cost · ex tax (₹)', _input(_cost, '₹24.00', type: _decimal, formatters: _money)), _field('MRP (₹)', _input(_mrp, '₹45.00', type: _decimal, formatters: _money))),
-              _field('Selling price · tax inclusive (₹) *', _input(_price, '₹40.00', type: _decimal, formatters: _money)),
+              _field(
+                'How is it priced?',
+                PriceBasisPicker(
+                  key: const ValueKey('item-basis'),
+                  keyPrefix: 'item-basis',
+                  value: _basis,
+                  onChanged: (b) => setState(() {
+                    _basis = b;
+                    _basisTouched = true;
+                  }),
+                ),
+              ),
+              if (_basis == PriceBasis.mrp)
+                _pair(_field('Purchase cost · ex tax (₹)', _input(_cost, '₹24.00', type: _decimal, formatters: _money)), _field('MRP (₹)', _input(_mrp, '₹45.00', type: _decimal, formatters: _money)))
+              else
+                _pair(_field('Purchase cost · ex tax (₹)', _input(_cost, '₹24.00', type: _decimal, formatters: _money)),
+                    _field('Markup on cost (%)', KeyedSubtree(key: const ValueKey('item-markup'), child: _input(_markup, '25', type: _decimal, formatters: _money)))),
+              _field(_basis == PriceBasis.mrp ? 'Selling price · tax inclusive (₹) *' : 'Selling price · tax inclusive (₹) * · used as the MRP',
+                  _input(_price, '₹40.00', type: _decimal, formatters: _money)),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -558,7 +648,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
               ),
             _section(_keyReview, 4, 'Save checklist', 'What is still needed before this item can be sold', identityDone && unitsDone && pricingDone, [
               const SizedBox(height: 4),
-              _check(_name.text.trim().isNotEmpty && _category.text.trim().isNotEmpty && _sku.text.trim().isNotEmpty, 'Name, category and System Code completed'),
+              _check(_name.text.trim().isNotEmpty && _category.text.trim().isNotEmpty && (_editing || _parts != null), 'Name, category and SKU completed'),
               _check(_barcode.text.trim().isNotEmpty, 'Barcode entered'),
               _check(mrp != null && cost != null && !taxOpen, 'Verify pack MRP, cost and tax'),
               _check(_photo != null || _savedUrl != null, 'Product photo added (optional)'),

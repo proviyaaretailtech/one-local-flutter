@@ -7,6 +7,7 @@ import '../catalogue/catalogue_api.dart';
 import '../catalogue/catalogue_widgets.dart' show ItemTile;
 import '../catalogue/item_parts.dart';
 import '../catalogue/item_sheets.dart' show parsePriceMinor;
+import '../catalogue/price_basis.dart';
 import '../inventory/inventory_api.dart';
 import '../ui/barcode_scanner.dart';
 import '../ui/theme.dart';
@@ -39,9 +40,34 @@ class _Edit {
         mrp = TextEditingController(text: _rs(item.mrpMinor)),
         price = TextEditingController(text: _rs(item.priceMinor)),
         cost = TextEditingController(text: _rs(item.costMinor)),
-        shop = item.available;
+        shop = item.available,
+        basis = priceBasisOf(item.raw['price_basis'], unit: item.sellingUnit) {
+    _syncMarkup();
+  }
   final CatItem item;
   final TextEditingController stock, mrp, price, cost;
+
+  /// MRP-based (printed MRP) or store-based (own price; cost + markup % sets it).
+  PriceBasis basis;
+  final markup = TextEditingController();
+  PriceBasis get savedBasis => priceBasisOf(item.raw['price_basis'], unit: item.sellingUnit);
+  bool get basisChanged => basis != savedBasis;
+
+  void _syncMarkup() {
+    final m = markupPct(num.tryParse(cost.text.trim()), num.tryParse(price.text.trim()));
+    markup.text = m == null ? '' : pctText(m);
+  }
+
+  void markupChanged() {
+    final c = num.tryParse(cost.text.trim()), pct = num.tryParse(markup.text.trim());
+    if (c == null || c <= 0 || pct == null) return;
+    final v = priceFromMarkup(c, pct);
+    price.text = v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(2);
+  }
+
+  /// A typed price shows its markup; a new cost keeps a store-based item's markup and moves its price.
+  void onPriceTyped() => _syncMarkup();
+  void onCostTyped() => basis == PriceBasis.store && markup.text.trim().isNotEmpty ? markupChanged() : _syncMarkup();
   bool shop;
   bool? app; // null: the OneLocal page switch could not be read for this person
 
@@ -51,10 +77,10 @@ class _Edit {
   num? get newStock => num.tryParse(stock.text.trim());
 
   bool get stockChanged => item.stockQty != null && newStock != null && newStock != item.stockQty;
-  bool get mrpChanged => _minor(mrp) != item.mrpMinor;
+  bool get mrpChanged => basis == PriceBasis.mrp && _minor(mrp) != item.mrpMinor;
   bool get priceChanged => _minor(price) != item.priceMinor;
   bool get costChanged => _minor(cost) != item.costMinor;
-  bool get pricesChanged => mrpChanged || priceChanged || costChanged;
+  bool get pricesChanged => basisChanged || mrpChanged || priceChanged || costChanged;
   bool get shopChanged => shop != item.available;
   bool appChanged(bool? was) => app != null && was != null && app != was;
   bool changed(bool? appWas) => stockChanged || pricesChanged || shopChanged || appChanged(appWas);
@@ -66,6 +92,8 @@ class _Edit {
     cost.text = _rs(item.costMinor);
     shop = item.available;
     app = appWas;
+    basis = savedBasis;
+    _syncMarkup();
   }
 
   void dispose() {
@@ -73,6 +101,7 @@ class _Edit {
     mrp.dispose();
     price.dispose();
     cost.dispose();
+    markup.dispose();
   }
 }
 
@@ -221,7 +250,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
         if (c.text.trim().isNotEmpty && parsePriceMinor(c.text) == null) return showToast(context, 'Check the amounts for ${e.item.name}.');
       }
       final p = parsePriceMinor(e.price.text), m = e.mrp.text.trim().isEmpty ? null : parsePriceMinor(e.mrp.text);
-      if (p != null && m != null && p > m) return showToast(context, 'The price of ${e.item.name} is above its MRP. Lower the price or raise the MRP.');
+      if (e.basis == PriceBasis.mrp && p != null && m != null && p > m) return showToast(context, 'The price of ${e.item.name} is above its MRP. Lower the price or raise the MRP.');
       if (e.stock.text.trim().isNotEmpty && (e.newStock == null || e.newStock! < 0)) return showToast(context, 'Check the stock quantity for ${e.item.name}.');
     }
     setState(() => _saving = true);
@@ -238,6 +267,8 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
             'mode': 'quick',
             'version': e.item.version,
             if (e.priceChanged) 'price_minor': parsePriceMinor(e.price.text),
+            if (e.basisChanged || e.item.raw['price_basis'] == null) 'price_basis': e.basis.name,
+            // store-based: no printed MRP; the database keeps the selling price as the MRP
             if (e.mrpChanged) 'mrp_minor': e.mrp.text.trim().isEmpty ? null : parsePriceMinor(e.mrp.text),
             if (e.costChanged) 'cost_minor': e.cost.text.trim().isEmpty ? null : parsePriceMinor(e.cost.text),
           }, id: e.item.id);
@@ -814,7 +845,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
           setState(() {});
         }
 
-        Widget field(String label, TextEditingController c, String key, {bool enabled = true, (Color, Color, String)? tone}) => Expanded(
+        Widget field(String label, TextEditingController c, String key, {bool enabled = true, (Color, Color, String)? tone, VoidCallback? then}) => Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 InvLabel(label),
                 if (!enabled)
@@ -831,7 +862,10 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
                     child: TextField(
                       key: ValueKey(key),
                       controller: c,
-                      onChanged: changed,
+                      onChanged: (v) {
+                        then?.call();
+                        changed(v);
+                      },
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       style: inter(15, tone == null ? 400 : 700, color: tone?.$2 ?? kInk),
                       decoration: InputDecoration(
@@ -849,7 +883,8 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
             );
 
         final price = minor(e.price), mrp = minor(e.mrp), cost = minor(e.cost);
-        final tone = UpdateStockScreenTones.tone(price, mrp);
+        final store = e.basis == PriceBasis.store;
+        final tone = store ? null : UpdateStockScreenTones.tone(price, mrp);
         final m = UpdateStockScreenTones.margin(price, cost);
         final low = m != null && m.pct < 5;
         return Padding(
@@ -866,18 +901,28 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
                   ]),
                 ),
               ]),
-              const SizedBox(height: 14),
-              // the sketch: Stock | Cost, then MRP | Price, then the margin under them
+              const SizedBox(height: 12),
+              PriceBasisPicker(
+                key: const ValueKey('sheet-basis'),
+                keyPrefix: 'sheet-basis',
+                value: e.basis,
+                onChanged: (b) {
+                  setSheet(() => e.basis = b);
+                  setState(() {});
+                },
+              ),
+              const SizedBox(height: 10),
+              // the sketch: Stock | Cost, then MRP (or markup) | Price, then the margin under them
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 field('Stock (${item.sellingUnit})', e.stock, 'sheet-stock', enabled: item.stockQty != null),
                 const SizedBox(width: 10),
-                field('Cost ₹', e.cost, 'sheet-cost'),
+                field('Cost ₹', e.cost, 'sheet-cost', then: e.onCostTyped),
               ]),
               const SizedBox(height: 8),
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                field('MRP ₹', e.mrp, 'sheet-mrp'),
+                if (store) field('Markup %', e.markup, 'sheet-markup', then: e.markupChanged) else field('MRP ₹', e.mrp, 'sheet-mrp'),
                 const SizedBox(width: 10),
-                field('Price ₹', e.price, 'sheet-price', tone: tone),
+                field(store ? 'Selling price ₹ (as MRP)' : 'Price ₹', e.price, 'sheet-price', tone: tone, then: e.onPriceTyped),
               ]),
               const SizedBox(height: 12),
               Center(

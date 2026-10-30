@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../orders/order_widgets.dart';
 import '../ui/barcode_scanner.dart';
 import '../orders/orders_api.dart';
+import '../shift/day_api.dart';
 import '../ui/theme.dart';
 import 'cart_customer.dart';
 import '../barcodes/barcode_sheets.dart';
@@ -57,6 +58,10 @@ class _SellScreenState extends State<SellScreen> {
   String _relatedFor = '-';
   Timer? _relatedWait;
 
+  /// The first POS activity starts the store's business day when its opening time has not already (founder, 31 Oct 2026). Nothing
+  /// waits on it and a failure changes nothing here: the Daily operations page says what needs doing.
+  void _startDay() => env.shift.dayToday().then((_) {}, onError: (_) {});
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +69,7 @@ class _SellScreenState extends State<SellScreen> {
     _load();
     _loadFacts();
     _loadShift();
+    _startDay();
     _loadHeld();
     _loadRelated();
     _requote();
@@ -368,6 +374,7 @@ class _SellScreenState extends State<SellScreen> {
                 ('returns', LucideIcons.undo2, 'Returns'),
                 ('receipts', LucideIcons.receiptText, 'Invoices'),
                 ('shift', LucideIcons.wallet, 'Cash shift'),
+                ('daily', LucideIcons.calendarClock, 'Daily operations'),
               ])
                 _Shortcut(icon: icon, label: label, onTap: () => env.open(context, id)),
             ]),

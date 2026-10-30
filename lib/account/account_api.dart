@@ -69,6 +69,15 @@ class AccountApi {
   Future<void> saveName(String name) => _call('acct_save_name', {'name': name});
   Future<void> syncContact() => _call('acct_sync_contact');
   Future<void> recordSignOutEverywhere() => _call('acct_signed_out_everywhere');
+
+  /// Delete account: memberships, businesses the person is the only owner of (sole_owner_of), and a request already waiting (pending).
+  Future<Map<String, dynamic>> deletePreview() => _call('acct_delete_preview');
+
+  /// Asks for the account to be deleted in 30 days ({reference, due_at}). The database checks the typed DELETE again.
+  Future<Map<String, dynamic>> requestDelete({String? reason}) => _call('acct_delete_request', {'confirm': 'DELETE', if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim()});
+
+  /// Signing in again within the 30 days: answers whether a waiting deletion was cancelled.
+  Future<bool> cancelDelete() async => (await _call('acct_delete_cancel'))['cancelled'] == true;
 }
 
 /// The login's own changes, done by Supabase auth (confirmation mail, OTP, token revocation). An interface so screens can be tested.

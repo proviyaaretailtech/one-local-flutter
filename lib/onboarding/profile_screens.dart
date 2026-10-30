@@ -32,7 +32,13 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
   late final _name = TextEditingController(text: widget.app?.businessName ?? '');
   late final _owner = TextEditingController(text: (widget.app?.ownerName ?? '').isNotEmpty ? widget.app!.ownerName : (widget.name ?? ''));
   late final _phone = TextEditingController(text: _tenDigits(widget.app?.phone ?? widget.phone ?? ''));
-  String? _category, _sub, _mode;
+  String? _category, _mode;
+
+  /// Store (founder, 31 Oct 2026): several categories, each with the subcategories picked in it; the first category is the main one.
+  List<String> _storeCats = [];
+  final Map<String, List<String>> _storeSubs = {};
+  List<String> _savedSubs = const []; // a saved application's subcategories, sorted into their categories once the lists load
+  bool get _store => widget.type == 'store';
   late String? _plan = widget.app?.sellPlan; // pos_and_onelocal | pos_only (onelocal_app: older applications)
   final _draft = OnbDraft('profile');
   List<String> _cuisines = []; // restaurant: every cuisine it serves, first = main
@@ -45,7 +51,11 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
     if (a != null) {
       _category = a['category'] as String?;
       final subs = (a['subcategories'] as List?)?.cast<String>() ?? const [];
-      _sub = widget.type == 'store' && subs.isNotEmpty ? subs.first : null;
+      if (_store) {
+        final cats = (a['categories'] as List?)?.cast<String>() ?? const [];
+        _storeCats = cats.isNotEmpty ? List.of(cats) : [?_category];
+        _savedSubs = subs;
+      }
       if (widget.type == 'restaurant') _cuisines = subs.isNotEmpty ? List.of(subs) : [?_category];
       _mode = a['selling_mode'] as String?;
     }
@@ -57,7 +67,13 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
         if (_owner.text.isEmpty) _owner.text = d['owner'] ?? '';
         if (_phone.text.isEmpty) _phone.text = d['phone'] ?? '';
         _category ??= d['category'];
-        _sub ??= d['sub'];
+        if (_store && _storeCats.isEmpty && (d['cats'] ?? '').isNotEmpty) {
+          _storeCats = d['cats']!.split('|');
+          for (final pair in (d['picks'] ?? '').split('|').where((x) => x.contains('>'))) {
+            final [c, sc] = pair.split('>');
+            (_storeSubs[c] ??= []).add(sc);
+          }
+        }
         _mode ??= d['mode'];
         _plan ??= d['plan'];
         if (_cuisines.isEmpty && (d['cuisines'] ?? '').isNotEmpty) _cuisines = d['cuisines']!.split('|');
@@ -66,11 +82,25 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
     for (final c in [_name, _owner, _phone]) {
       c.addListener(_keep);
     }
+    // a saved store's subcategories go back under the categories they belong to
+    if (_savedSubs.isNotEmpty) {
+      _tax.then((t) {
+        if (!mounted || _storeSubs.isNotEmpty) return;
+        setState(() {
+          for (final c in _storeCats) {
+            final mine = t.storeCategories.where((x) => x.name == c).expand((x) => x.subs).toSet();
+            _storeSubs[c] = _savedSubs.where(mine.contains).toList();
+          }
+        });
+      }).catchError((_) {});
+    }
   }
 
   void _keep() => _draft.keep({
-        'name': _name.text, 'owner': _owner.text, 'phone': _phone.text, 'category': _category, 'sub': _sub, 'mode': _mode, 'plan': _plan,
+        'name': _name.text, 'owner': _owner.text, 'phone': _phone.text, 'category': _category, 'mode': _mode, 'plan': _plan,
         'cuisines': _cuisines.join('|'),
+        'cats': _storeCats.join('|'),
+        'picks': [for (final c in _storeCats) for (final sc in _storeSubs[c] ?? const <String>[]) '$c>$sc'].join('|'),
       });
 
   void _set(VoidCallback change) {
@@ -102,8 +132,12 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
     if (_saving) return;
     if (_name.text.trim().length < 2) return showToast(context, 'Enter your ${_noun.toLowerCase()} name.');
     if (_rst && _cuisines.isEmpty) return showToast(context, 'Choose the cuisines you serve.');
-    if (!_rst && _category == null) return showToast(context, widget.type == 'service' ? 'Choose your service.' : 'Choose your category.');
-    if (widget.type == 'store' && _sub == null) return showToast(context, 'Choose your subcategory.');
+    if (_store && _storeCats.isEmpty) return showToast(context, 'Choose your category.');
+    if (widget.type == 'service' && _category == null) return showToast(context, 'Choose your service.');
+    if (_store) {
+      final missing = _storeCats.where((c) => (_storeSubs[c] ?? const []).isEmpty).firstOrNull;
+      if (missing != null) return showToast(context, 'Choose your subcategories.');
+    }
     final ownerProblem = nameProblem(_owner.text, empty: "Enter the owner's full name.");
     if (ownerProblem != null) return showToast(context, ownerProblem);
     if (!RegExp(r'^[6-9]\d{9}$').hasMatch(_phone.text)) return showToast(context, 'Enter a 10-digit mobile number.');
@@ -118,8 +152,12 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
         'owner_name': _owner.text.trim(),
         'phone': _phone.text,
         'selling_mode': _mode,
-        if (_rst) 'categories': _cuisines else 'category': _category,
-        if (widget.type == 'store') 'subcategory': _sub,
+        if (_rst) 'categories': _cuisines,
+        if (widget.type == 'service') 'category': _category,
+        if (_store) ...{
+          'category': _storeCats.first,
+          'store_picks': [for (final c in _storeCats) {'category': c, 'subcategories': _storeSubs[c] ?? const <String>[]}],
+        },
       }),
     );
     if (saved == null || !mounted) {
@@ -164,7 +202,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
           'service' => t.serviceCategories.map((c) => c.name).toList(),
           _ => t.storeCategories.map((c) => c.name).toSet().toList(),
         };
-        final subs = widget.type == 'store' ? t.storeCategories.where((c) => c.name == _category).expand((c) => c.subs).toList() : <String>[];
+        List<String> subsOf(String c) => t.storeCategories.where((x) => x.name == c).expand((x) => x.subs).toList();
         return OnbPage(
           kicker: _kicker,
           title: _title,
@@ -181,18 +219,30 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                 selected: _cuisines,
                 onChanged: (v) => _set(() => _cuisines = v),
               )
-            else
+            else if (_store) ...[
+              // one category (founder, 31 Oct 2026), and as many of its subcategories as fit the shop
               SelectField(
-                label: widget.type == 'service' ? 'Services' : 'Category',
-                value: _category,
+                key: const ValueKey('store-category'),
+                label: 'Category',
+                value: _storeCats.firstOrNull,
                 options: cats,
                 onChanged: (v) => _set(() {
-                  if (v != _category) _sub = null;
-                  _category = v;
+                  if (v == _storeCats.firstOrNull) return;
+                  _storeCats = [v];
+                  _storeSubs.removeWhere((c, _) => c != v); // another category: its subcategories start empty
                 }),
               ),
-            if (widget.type == 'store')
-              SelectField(label: 'Subcategory', value: _sub, options: subs, hint: _category == null ? 'Choose a category first' : 'Choose', onChanged: (v) => _set(() => _sub = v)),
+              for (final c in _storeCats)
+                MultiChipField(
+                  key: ValueKey('store-subs-$c'),
+                  label: 'Subcategories',
+                  hint: 'Pick all that your shop sells.',
+                  options: subsOf(c),
+                  selected: _storeSubs[c] ?? const [],
+                  onChanged: (v) => _set(() => _storeSubs[c] = v),
+                ),
+            ] else
+              SelectField(label: 'Services', value: _category, options: cats, onChanged: (v) => _set(() => _category = v)),
             LabeledField(label: '$_noun owner', controller: _owner, inputFormatters: nameFormatters, labelSize: 14, labelWeight: 500, textInputAction: TextInputAction.next),
             LabeledField(
               label: 'Owner mobile',

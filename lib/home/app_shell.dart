@@ -60,6 +60,10 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
     HomeNav.shell = this;
     // the store's language (Settings → Me & app): every screen shows in it from the start
     HomeNav.loadLanguage?.call();
+    // signed in again within 30 days of Delete account: the deletion is cancelled
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) HomeNav.afterSignIn?.call(context);
+    });
   }
 
   @override
@@ -91,8 +95,11 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
     // Anything opened over the shell (setup, a full-screen page) closes first.
     final route = ModalRoute.of(context);
     if (route != null && !route.isCurrent) Navigator.of(context).popUntil((r) => r == route);
+    // A tab opens on its own first screen, never on a page left open in it earlier (founder, 31 Oct 2026: Home and Item stayed
+    // stuck on Barcodes or Add purchase). A page a caller opens in the tab is pushed after this, so it still shows.
+    _navigators[label]?.currentState?.popUntil((r) => r.isFirst);
     if (label == _current) {
-      _navigators[label]?.currentState?.popUntil((r) => r.isFirst);
+      // already here: back to its first screen (above)
     } else {
       setState(() {
         _current = label;

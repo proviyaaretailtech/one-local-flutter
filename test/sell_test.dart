@@ -677,10 +677,13 @@ void main() {
       await t.pump(const Duration(seconds: 1)); // the toast has risen
       await t.tap(find.text('Link it'));
       await t.pumpAndSettle();
-      expect(find.text('No item found for this code'), findsOneWidget);
+      expect(find.text('Link Unknown Barcode'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('link-item-m1')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('link-confirm')));
+      await t.pumpAndSettle();
+      expect(find.text('Code linked!'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('link-done')));
       await t.pumpAndSettle();
       final sent = jsonDecode(till.where('POST', '/rpc/bc_link').single.body) as Map<String, dynamic>;
       expect([sent['menu_item_id'], sent['code']], ['m1', '8901000000001']);
@@ -748,11 +751,17 @@ void main() {
       await t.pumpAndSettle();
       expect(jsonDecode(till.where('POST', '/rpc/bc_make').single.body)['menu_item_id'], 'm2');
       expect(find.text('2000000000022'), findsWidgets);
+      await t.pump(const Duration(seconds: 6)); // the toast has gone
       await t.tap(find.byKey(const ValueKey('details-print')));
       await t.pumpAndSettle();
-      expect(printed, ['Barcode labels']);
-      await t.tap(find.byKey(const ValueKey('app-header-back')));
+      await t.tap(find.byKey(const ValueKey('print-label-go')));
       await t.pumpAndSettle();
+      expect(printed, ['Barcode labels']);
+      for (var i = 0; i < 2; i++) {
+        await t.pump(const Duration(seconds: 6));
+        await t.tap(find.byKey(const ValueKey('app-header-back')));
+        await t.pumpAndSettle();
+      }
       expect(find.text('Barcode Details'), findsNothing);
     });
   });
@@ -922,31 +931,80 @@ void main() {
     });
   });
 
-  group('Transaction history', () {
-    testWidgets('lists bills that took money; View card opens the lines and the sum', (t) async {
+  group('Order history', () {
+    DateTime now() => DateTime(2026, 10, 31, 15);
+    Map<String, dynamic> lastQuery(Till till) => jsonDecode(till.where('POST', '/pos_receipt_list').last.body) as Map<String, dynamic>;
+
+    testWidgets('Bill → History lists today\'s counter orders, paid or not; View card opens the lines and the sum', (t) async {
       final till = Till();
       till.receipts = [receipt('r1', 'P-00087', 'Rahul Patil', 1740, coupon: 'WELCOME10', discount: 100), receipt('r3', 'P-00089', 'Held one', 100, status: 'unpaid', label: 'Unpaid', paid: 0)];
-      await tall(t, HistoryScreen(env: till.env()));
-      expect(find.text('Transaction History'), findsOneWidget);
-      expect(find.text('1 transaction'), findsOneWidget); // the unpaid bill took no money
+      await tall(t, HistoryScreen(env: till.env(), now: now));
+      expect(find.text('Order History'), findsOneWidget);
       expect(find.text('Rahul Patil'), findsOneWidget);
-      expect(find.text('Order P-00087'), findsOneWidget);
+      expect(find.text('Held one'), findsOneWidget); // every order, not only bills that took money
+      expect(t.widget<Text>(find.byKey(const ValueKey('hist-count'))).data, '2 orders · ₹1,740');
       expect(find.text('Paid at 6:23 PM'), findsOneWidget);
-      await t.tap(find.text('View card'));
+      final q = lastQuery(till);
+      expect([q['source'], q['from'], q['to']], ['offline', '2026-10-31', '2026-10-31']);
+      await t.tap(find.text('View card').first);
       await t.pumpAndSettle();
       expect(find.text('Amul Butter 500g'), findsOneWidget);
-      expect(find.text('2×'), findsOneWidget);
       expect(find.text('Discount · WELCOME10'), findsOneWidget);
-      expect(find.text('Total Amount'), findsOneWidget);
-      final q = jsonDecode(till.where('POST', '/pos_receipt_list').single.body);
-      expect(q['from'], q['to']);
+      expect(find.text('Open order'), findsNothing); // counter bills open here
+    });
+
+    testWidgets('Today, Yesterday, Last week, Last month, or a chosen month', (t) async {
+      final till = Till();
+      await tall(t, HistoryScreen(env: till.env(), now: now));
+      Future<void> pick(String key) async {
+        await t.ensureVisible(find.byKey(ValueKey(key)));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(ValueKey(key)));
+        await t.pumpAndSettle();
+      }
+
+      await pick('hist-range-yesterday');
+      expect([lastQuery(till)['from'], lastQuery(till)['to']], ['2026-10-30', '2026-10-30']);
+      await pick('hist-range-week');
+      expect([lastQuery(till)['from'], lastQuery(till)['to']], ['2026-10-25', '2026-10-31']);
+      expect(t.widget<Text>(find.byKey(const ValueKey('hist-span'))).data, '25 Oct – 31 Oct 2026');
+      await pick('hist-range-month');
+      expect([lastQuery(till)['from'], lastQuery(till)['to']], ['2026-10-02', '2026-10-31']);
+      await pick('hist-range-pick');
+      await pick('hist-month-2026-8');
+      expect([lastQuery(till)['from'], lastQuery(till)['to']], ['2026-08-01', '2026-08-31']);
+      expect(find.text('Aug 2026 ⌄'), findsOneWidget);
+    });
+
+    testWidgets('a full page shows "Show older orders", which asks for the ones before the last', (t) async {
+      final till = Till()..receipts = [for (var i = 0; i < 100; i++) receipt('r$i', 'P-$i', 'Guest $i', 10)];
+      await tall(t, HistoryScreen(env: till.env(), now: now));
+      expect(t.widget<Text>(find.byKey(const ValueKey('hist-count'))).data, startsWith('100+ orders'));
+      await t.scrollUntilVisible(find.byKey(const ValueKey('hist-more')), 2000, scrollable: find.byType(Scrollable).first);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('hist-more')));
+      await t.pumpAndSettle();
+      expect(lastQuery(till)['before'], '2026-10-09T12:53:00Z');
+    });
+
+    testWidgets('online: the same list of online orders, each opens its own page; no refund here', (t) async {
+      final till = Till()..receipts = [receipt('o1', 'P-00120', 'Asha (app)', 450)];
+      String? opened;
+      await tall(t, HistoryScreen(env: till.env(), source: 'online', onOpen: (id) => opened = id, now: now));
+      expect(find.text('Past online orders'), findsWidgets);
+      expect(lastQuery(till)['source'], 'online');
+      await t.tap(find.text('View card'));
+      await t.pumpAndSettle();
+      expect(find.text('Refund this bill'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('hist-open-o1')));
+      expect(opened, 'o1');
     });
 
     testWidgets('refund: the server\'s refusal is shown (manager only); a good refund asks with a key and reloads', (t) async {
       final till = Till();
       var allow = false;
       till.override = (r) => r.url.path.endsWith('/pos_refund') ? (allow ? ok(view('completed')) : err(403, 'Only a manager can give a refund.', 'forbidden')) : null;
-      await tall(t, HistoryScreen(env: till.env()));
+      await tall(t, HistoryScreen(env: till.env(), now: now));
       await t.tap(find.text('View card').first);
       await t.pumpAndSettle();
       await t.tap(find.text('Refund this bill').first);
@@ -969,12 +1027,12 @@ void main() {
       expect(jsonDecode(last.body), {'order_id': 'r1', 'amount': 50, 'method': 'cash', 'kind': 'goodwill', 'reason': 'Goodwill'});
     });
 
-    testWidgets('nothing that day: a plain message; a failure has Retry', (t) async {
+    testWidgets('nothing in that time: a plain message; a failure has Retry', (t) async {
       final till = Till()..receipts = [];
-      await tall(t, HistoryScreen(env: till.env()));
-      expect(find.text('No transactions'), findsOneWidget);
+      await tall(t, HistoryScreen(env: till.env(), now: now));
+      expect(find.text('No orders'), findsOneWidget);
       till.override = (_) => err(500, 'Something went wrong. Please try again.');
-      await t.tap(find.byTooltip('Previous day'));
+      await t.tap(find.byKey(const ValueKey('hist-range-yesterday')));
       await t.pumpAndSettle();
       expect(find.text('History could not load'), findsOneWidget);
     });

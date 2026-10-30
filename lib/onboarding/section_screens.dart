@@ -454,7 +454,7 @@ class _IdentityScreenState extends State<IdentityScreen> {
           action: 'Add proof',
           onAction: _next,
           lines: [
-            '${_structure ?? 'Business type not chosen'} · ${_app.partnerType == 'restaurant' ? ((_app.app['subcategories'] as List?) ?? const []).join(', ') : (_app.app['subcategories'] as List?)?.firstOrNull ?? _app.app['category'] ?? ''}',
+            '${_structure ?? 'Business type not chosen'} · ${_app.partnerType != 'service' ? ((_app.app['subcategories'] as List?) ?? const []).join(', ') : (_app.app['subcategories'] as List?)?.firstOrNull ?? _app.app['category'] ?? ''}',
             proof == null ? 'Business proof: not yet uploaded' : 'Business proof: ${proof['file_name']}',
             'Shop Act or other applicable business proof',
           ],

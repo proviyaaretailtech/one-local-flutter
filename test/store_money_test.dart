@@ -29,6 +29,11 @@ class Fake {
     requests.add(r);
     if (r.method == 'PUT') return http.Response('', 200); // the proof photo to its signed slot
     return switch (fnOf(r)) {
+      'smoney_stock' => ok({
+          'stock_value_minor': 4334500, 'items': 16, 'no_cost': 1, 'losses_minor': 52000,
+          'top': [{'name': 'Amul Butter 500g', 'qty': 52, 'unit': 'pc', 'value_minor': 1352000}],
+          'losses': [{'reason': 'Damaged in store', 'value_minor': 52000, 'lines': 2}],
+        }),
       'smoney_home' => ok({
           'today': {'in_minor': 120000, 'out_minor': 50000, 'net_minor': 70000},
           'accounts': [
@@ -118,6 +123,18 @@ void main() {
   });
 
   group('home', () {
+    testWidgets('Stock in Money: what the stock is worth at cost and what was lost this month, with the detail', (t) async {
+      final f = Fake();
+      await show(t, StoreMoneyScreen(api: f.api, plan: 'pos_only'));
+      expect(t.widget<Text>(find.byKey(const ValueKey('money-stock-value'))).data, '₹43,345');
+      expect(t.widget<Text>(find.byKey(const ValueKey('money-stock-lost'))).data, 'Lost this month ₹520');
+      await t.tap(find.byKey(const ValueKey('money-stock')));
+      await t.pumpAndSettle();
+      expect(find.text('Amul Butter 500g'), findsOneWidget);
+      expect(find.byKey(const ValueKey('loss-Damaged in store')), findsOneWidget);
+      expect(find.textContaining('1 without a cost price'), findsOneWidget);
+    });
+
     testWidgets('the wallet balance with its accounts, and Money in / Money out / Transfer', (t) async {
       final f = Fake();
       await show(t, StoreMoneyScreen(api: f.api, plan: 'pos_only'));

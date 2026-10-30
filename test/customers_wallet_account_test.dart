@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/settings/settings_api.dart';
 import 'package:vinii_pos/account/account_api.dart';
+import 'package:vinii_pos/account/delete_account_screen.dart' show cancelAccountDeletionOnSignIn;
 import 'package:vinii_pos/account/account_screen.dart';
 import 'package:vinii_pos/account/wallet_api.dart';
 import 'package:vinii_pos/account/wallet_screen.dart';
@@ -477,6 +478,77 @@ void main() {
       expect(s.calls.map((c) => c.$1), contains('acct_signed_out_everywhere'));
       expect(auth.calls, ['signOutEverywhere']);
       expect(left, 1);
+    });
+
+    Future<void> tapDown(WidgetTester t, String key) async {
+      await t.ensureVisible(find.byKey(ValueKey(key)));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(ValueKey(key)));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('Delete account: at the very end, apart; warnings, are you sure, type DELETE; then the request and every device signs out', (t) async {
+      final auth = FakeAccountAuth();
+      final s = FakeRpc((fn, b) => switch (fn) {
+            'acct_get' => ok(acct()),
+            'acct_delete_preview' => ok({'memberships': 1, 'sole_owner_of': ['Satya Stores'], 'pending': null}),
+            'acct_delete_request' => ok({'reference': 'AD-261031-ABC123', 'due_at': '2026-11-30T10:00:00Z', 'replayed': false}),
+            _ => ok({'sessions': 2, 'recorded': true}),
+          });
+      var left = 0;
+      await show(t, ManageAccountScreen(api: s.account, auth: auth, onSignedOut: (_) => left++));
+      // the last thing on the page, below Sign out of all devices
+      expect(t.getTopLeft(find.byKey(const ValueKey('acct-danger'))).dy, greaterThan(t.getTopLeft(find.byKey(const ValueKey('acct-signout-all'))).dy));
+      await tapDown(t, 'acct-delete');
+      // warning one: what happens, and the business nobody else can run
+      expect(find.textContaining('You are the only owner of Satya Stores'), findsOneWidget);
+      expect(t.widget<FilledButton>(find.byKey(const ValueKey('del-continue'))).onPressed, isNull); // tick first
+      await tapDown(t, 'del-understand');
+      await tapDown(t, 'del-continue');
+      // warning two
+      expect(find.text('Are you really sure?'), findsOneWidget);
+      await tapDown(t, 'del-sure-no');
+      expect(find.byKey(const ValueKey('del-type')), findsNothing);
+      await tapDown(t, 'del-continue');
+      await tapDown(t, 'del-sure-yes');
+      // warning three: the typed word, exactly
+      FilledButton last() => t.widget<FilledButton>(find.byKey(const ValueKey('del-final')));
+      expect(last().onPressed, isNull);
+      await t.enterText(find.byKey(const ValueKey('del-confirm')), 'delete');
+      await t.pump();
+      expect(last().onPressed, isNull);
+      await t.enterText(find.byKey(const ValueKey('del-confirm')), 'DELETE');
+      await t.pump();
+      expect(s.calls.map((c) => c.$1), isNot(contains('acct_delete_request'))); // nothing asked yet
+      await tapDown(t, 'del-final');
+      expect(s.bodies('acct_delete_request').single, {'confirm': 'DELETE'});
+      expect(auth.calls, ['signOutEverywhere']);
+      expect(left, 1);
+    });
+
+    testWidgets('Keep my account at any step: nothing is asked for', (t) async {
+      final auth = FakeAccountAuth();
+      final s = FakeRpc((fn, b) => switch (fn) {
+            'acct_get' => ok(acct()),
+            'acct_delete_preview' => ok({'memberships': 1, 'sole_owner_of': [], 'pending': null}),
+            _ => ok({}),
+          });
+      await show(t, ManageAccountScreen(api: s.account, auth: auth));
+      await tapDown(t, 'acct-delete');
+      expect(find.textContaining('only owner'), findsNothing);
+      await tapDown(t, 'del-keep');
+      expect(find.byType(ManageAccountScreen), findsOneWidget);
+      expect(s.calls.map((c) => c.$1), isNot(contains('acct_delete_request')));
+      expect(auth.calls, isEmpty);
+    });
+
+    testWidgets('signing in again within 30 days cancels the deletion, and says so', (t) async {
+      final s = FakeRpc((fn, b) => ok({'cancelled': fn == 'acct_delete_cancel', 'reference': 'AD-261031-ABC123'}));
+      await show(t, Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => cancelAccountDeletionOnSignIn(c, s.account), child: const Text('signed in')))));
+      await t.tap(find.text('signed in'));
+      await t.pumpAndSettle();
+      expect(s.calls.single.$1, 'acct_delete_cancel');
+      expect(find.text('Welcome back. You signed in, so your account will not be deleted.'), findsOneWidget);
     });
   });
 

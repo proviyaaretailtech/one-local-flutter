@@ -82,6 +82,11 @@ class MediaApi {
     return (items: _photos(r), groups: ((r['groups'] as List?) ?? const []).map((e) => (e as Map).cast<String, dynamic>()).toList());
   }
 
-  Future<PoolPhoto> decide(String poolId, {required bool approve, String? note}) async =>
-      PoolPhoto(await _rpc.callMap('media_admin_decide', {'pool_id': poolId, 'decision': approve ? 'approve' : 'reject', if (note != null && note.trim().isNotEmpty) 'note': note.trim()}));
+  /// [mapProduct]: approving the photo also approves its product (barcode, brand, unit, SKU) as standard in the Master library.
+  Future<PoolPhoto> decide(String poolId, {required bool approve, String? note, bool? mapProduct}) async => PoolPhoto(await _rpc.callMap('media_admin_decide', {
+        'pool_id': poolId,
+        'decision': approve ? 'approve' : 'reject',
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        'map_product': ?mapProduct,
+      }));
 }

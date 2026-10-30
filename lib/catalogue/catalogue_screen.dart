@@ -8,7 +8,9 @@ import '../home/home_nav.dart';
 import '../orders/order_widgets.dart';
 import '../ui/barcode_scanner.dart';
 import '../ui/theme.dart';
+import '../stock/closing_stock_screen.dart' show saveSpreadsheet;
 import 'catalogue_api.dart';
+import 'catalogue_import.dart';
 import 'catalogue_format.dart';
 import 'catalogue_widgets.dart';
 import 'item_form_screen.dart';
@@ -200,8 +202,19 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                 Text(tr('Catalogue'), style: inter(20, 800)),
                 if (d != null) ...[const SizedBox(width: 8), Text('${d.count('total')} ${d.count('total') == 1 ? 'item' : 'items'}', style: inter(13, 500, color: kMuted))],
                 const Spacer(),
-                _IconAction(LucideIcons.upload, 'Import', () => showToast(context, 'Import is not in this release.')),
-                _IconAction(LucideIcons.download, 'Sample template', () => showToast(context, 'The sample template is not in this release.')),
+                // Import from Excel (31 Oct 2026): many products at once, every row checked first; the template shows the columns
+                _IconAction(LucideIcons.upload, 'Import', () async {
+                  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CatalogueImportScreen(api: _api)));
+                  if (mounted) _load();
+                }),
+                _IconAction(LucideIcons.download, 'Sample template', () async {
+                  try {
+                    await saveSpreadsheet(catalogueTemplate(), 'catalogue-template.xlsx');
+                    if (context.mounted) showToast(context, 'Sample template saved: catalogue-template.xlsx');
+                  } catch (_) {
+                    if (context.mounted) showToast(context, 'The template could not be saved.');
+                  }
+                }),
                 const SizedBox(width: 4),
                 _ViewToggle(grid: _grid, onChanged: (g) => setState(() => _grid = g)),
               ]),

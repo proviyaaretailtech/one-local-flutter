@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
+import '../sell/history_screen.dart';
+import '../sell/sell_env.dart';
 import '../ui/theme.dart';
 import 'cart_screen.dart';
 import 'order_screen.dart';
@@ -17,9 +19,13 @@ import '../ui/wallet.dart';
 /// Cancelled ones are a small link under the piles. Counter bills are not online orders, so they are not here (they live in Carts).
 /// Tapping a pile fans its orders out; tapping a card opens its details. Search narrows every pile.
 /// [onNavigate] receives the bottom-bar tabs this section does not own ('home', 'item', 'online', 'stock'); 'bill' opens a new cart.
+/// Past orders (31 Oct 2026) lists the online orders of a day, a week, a month or a chosen month.
 class OrdersHome extends StatefulWidget {
-  const OrdersHome({super.key, this.api, this.onNavigate, this.onMenu});
+  const OrdersHome({super.key, this.api, this.onNavigate, this.onMenu, this.sellEnv});
   final OrdersApi? api;
+
+  /// What Past orders reads the orders with (tests pass a fake).
+  final SellEnv? sellEnv;
   final ValueChanged<String>? onNavigate;
   final VoidCallback? onMenu;
   @override
@@ -106,6 +112,19 @@ class _OrdersHomeState extends State<OrdersHome> {
     if (mounted) _load();
   }
 
+  /// Past orders: the online orders by date; one opens its own page.
+  Future<void> _past() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => HistoryScreen(
+        env: widget.sellEnv ?? SellEnv(),
+        source: 'online',
+        onOpen: _open,
+        bottomNav: PosBottomNav(active: 'online', onTap: _tab),
+      ),
+    ));
+    if (mounted) _load();
+  }
+
   void _tab(String id) async {
     if (id == 'bill') {
       await Navigator.of(context).push(
@@ -147,6 +166,8 @@ class _OrdersHomeState extends State<OrdersHome> {
                       children: [
                         const Expanded(child: Kick('Online orders')),
                         if (_orders != null) Text('${_online.length} ${_online.length == 1 ? 'order' : 'orders'}', style: inter(11.5, 400, color: kKicker)),
+                        const SizedBox(width: 10),
+                        SmallPill('Past orders', key: const ValueKey('orders-past'), onTap: _past),
                       ],
                     ),
                     const SizedBox(height: 10),

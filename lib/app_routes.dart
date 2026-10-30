@@ -2,6 +2,8 @@ import 'storefront/menu_link_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'account/account_api.dart' show AccountApi;
+import 'account/delete_account_screen.dart' show cancelAccountDeletionOnSignIn;
 import 'account/routes.dart';
 import 'ads/advertiser_screens.dart' show AdvertiserApi, AdvertiserHomeScreen;
 import 'auth/auth_repository.dart';
@@ -116,6 +118,7 @@ void installRoutes() {
   // the side menu's search: the Bill's own pages, and Quick add (it adds the product, its stock and its supplier in one screen)
   HomeNav.billPage = (c, page) => SellEnv(onTab: (id) => _tab(c, id)).open(c, page);
   HomeNav.quickAdd = (c) => showQuickAdd(c, CatalogueApi());
+  HomeNav.afterSignIn = (c) => cancelAccountDeletionOnSignIn(c, AccountApi());
   HomeNav.loadLanguage = () async {
     try {
       setAppLanguage((await SettingsApi().get()).language);

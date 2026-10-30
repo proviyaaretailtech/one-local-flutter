@@ -11,19 +11,41 @@ import 'sell_env.dart';
 import 'sell_widgets.dart';
 import '../ui/i18n.dart';
 
-/// Figma "Transaction History": the bills that took money on one day, newest first; "View card" opens the lines and the sum.
-/// A manager can refund from an opened bill (capped to the money taken; the database refuses anyone else and any excess).
+/// Order history (founder, 31 Oct 2026; was Transaction History): Bill → History lists the counter (offline) orders, the Online order
+/// tab's Past orders lists the online ones. Today, Yesterday, Last week (7 days), Last month (30 days) or a chosen month; newest first,
+/// 100 at a time. "View card" opens the lines and the sum; a manager can refund a counter bill (capped to the money taken; the database
+/// refuses anyone else and any excess).
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key, required this.env, this.day});
+  const HistoryScreen({super.key, required this.env, this.source = 'offline', this.onOpen, this.bottomNav, this.now});
   final SellEnv env;
-  final DateTime? day;
+
+  /// offline: counter bills; online: orders customers placed.
+  final String source;
+
+  /// Online: opens an order's own page (accept, pack, return…).
+  final void Function(String orderId)? onOpen;
+
+  /// The bottom bar of the section that opened it (the Bill's by default).
+  final Widget? bottomNav;
+
+  /// Tests set the clock.
+  final DateTime Function()? now;
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
   SellEnv get env => widget.env;
-  late DateTime _day = widget.day ?? DateTime.now();
+  bool get _online => widget.source == 'online';
+  DateTime get _today {
+    final n = (widget.now ?? DateTime.now)();
+    return DateTime(n.year, n.month, n.day);
+  }
+
+  /// today | yesterday | week | month | pick (with [_month]).
+  String _range = 'today';
+  DateTime? _month;
+  bool _more = false, _loadingMore = false;
   List<Receipt>? _rows;
   String? _error;
   final _open = <String>{};
@@ -35,29 +57,85 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _load();
   }
 
-  bool get _isToday {
-    final n = DateTime.now();
-    return n.year == _day.year && n.month == _day.month && n.day == _day.day;
+  /// The first and last day of the chosen range.
+  (DateTime, DateTime) get _span {
+    final t = _today;
+    return switch (_range) {
+      'yesterday' => (t.subtract(const Duration(days: 1)), t.subtract(const Duration(days: 1))),
+      'week' => (t.subtract(const Duration(days: 6)), t),
+      'month' => (t.subtract(const Duration(days: 29)), t),
+      'pick' => (_month!, DateTime(_month!.year, _month!.month + 1, 0)),
+      _ => (t, t),
+    };
   }
+
+  String get _spanText {
+    final (a, b) = _span;
+    return a == b ? fmtDay(a) : '${a.day} ${_mon(a)}${a.year == b.year ? '' : ' ${a.year}'} – ${fmtDay(b)}';
+  }
+
+  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  static String _mon(DateTime d) => _months[d.month - 1];
+  static const _pageSize = 100;
 
   Future<void> _load() async {
     final mine = ++_seq;
     setState(() {
       _error = null;
       _rows = null;
+      _more = false;
     });
     try {
-      final all = await env.sell.receipts(from: isoDay(_day), to: isoDay(_day));
+      final (a, b) = _span;
+      final all = await env.sell.receipts(from: isoDay(a), to: isoDay(b), source: widget.source, limit: _pageSize);
       if (!mounted || mine != _seq) return;
-      setState(() => _rows = all.where((r) => r.paid > 0).toList()); // bills that took money; held and cancelled bills are not transactions
+      setState(() {
+        _rows = all;
+        _more = all.length >= _pageSize;
+      });
     } catch (e) {
       if (!mounted || mine != _seq) return;
       setState(() => _error = sellErrorText(e));
     }
   }
 
-  void _step(int days) {
-    _day = _day.add(Duration(days: days));
+  /// The next 100, older than the last one shown.
+  Future<void> _loadMore() async {
+    final rows = _rows;
+    if (rows == null || rows.isEmpty || _loadingMore) return;
+    final mine = _seq;
+    setState(() => _loadingMore = true);
+    try {
+      final (a, b) = _span;
+      final next = await env.sell.receipts(from: isoDay(a), to: isoDay(b), source: widget.source, limit: _pageSize, before: rows.last.createdAt);
+      if (!mounted || mine != _seq) return;
+      setState(() {
+        _rows = [...rows, ...next];
+        _more = next.length >= _pageSize;
+      });
+    } catch (e) {
+      if (mounted) showToast(context, sellErrorText(e));
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _pickRange(String r) {
+    if (r == _range) return;
+    setState(() => _range = r);
+    _load();
+  }
+
+  /// Select month: the last 12 months, this one first.
+  Future<void> _pickMonth() async {
+    final t = _today;
+    final months = [for (var i = 0; i < 12; i++) DateTime(t.year, t.month - i, 1)];
+    final picked = await pickMonthSheet(context, months, current: _range == 'pick' ? _month : null);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _range = 'pick';
+      _month = picked;
+    });
     _load();
   }
 
@@ -123,26 +201,66 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(title: tr('Transaction history'), initials: env.initials),
+        SellTopBar(title: tr(_online ? 'Past online orders' : 'Order history'), initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
-            SellTitle('Transaction History', sub: env.storeLine),
+            SellTitle(_online ? 'Past online orders' : 'Order History', sub: env.storeLine),
+            const SizedBox(height: 10),
+            _ranges(),
             const SizedBox(height: 10),
             Row(children: [
-              IconButton(tooltip: tr('Previous day'), onPressed: () => _step(-1), icon: const Icon(LucideIcons.chevronLeft, size: 18)),
-              Text('${_isToday ? 'Today · ' : ''}${fmtDay(_day)}', style: inter(15, 700, color: kMuted)),
-              IconButton(tooltip: tr('Next day'), onPressed: _isToday ? null : () => _step(1), icon: const Icon(LucideIcons.chevronRight, size: 18)),
-              const Spacer(),
-              Text(rows == null ? '' : '${rows.length} ${rows.length == 1 ? 'transaction' : 'transactions'}', style: inter(14, 400, color: kMuted)),
+              Expanded(child: Text(_spanText, key: const ValueKey('hist-span'), style: inter(15, 700, color: kMuted))),
+              if (rows != null)
+                Text(
+                  '${rows.length}${_more ? '+' : ''} ${rows.length == 1 ? 'order' : 'orders'} · ${rupees(rows.fold<num>(0, (s, r) => s + r.paid - r.refunded))}',
+                  key: const ValueKey('hist-count'),
+                  style: inter(14, 400, color: kMuted),
+                ),
             ]),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             if (_error != null) StateCard(icon: LucideIcons.database, danger: true, title: tr('History could not load'), body: _error!, primary: 'Retry', onPrimary: _load),
             if (_error == null && rows == null) const SkeletonRows(),
-            if (rows != null && rows.isEmpty) StateCard(icon: LucideIcons.history, title: tr('No transactions'), body: tr('No bill took money on this day.')),
+            if (rows != null && rows.isEmpty)
+              StateCard(icon: LucideIcons.history, title: tr('No orders'), body: tr(_online ? 'No online orders in this time.' : 'No counter orders in this time.')),
             if (rows != null) for (final r in rows) ...[_card(r), const SizedBox(height: 12)],
+            if (_more)
+              Center(
+                child: TextButton(
+                  key: const ValueKey('hist-more'),
+                  onPressed: _loadingMore ? null : _loadMore,
+                  child: Text(tr(_loadingMore ? 'Loading…' : 'Show older orders'), style: inter(14, 700, color: kLink)),
+                ),
+              ),
           ]),
         ),
-        PosBottomNav(active: 'bill', onTap: (id) => env.tab(context, id)),
+        widget.bottomNav ?? PosBottomNav(active: 'bill', onTap: (id) => env.tab(context, id)),
+      ]),
+    );
+  }
+
+  /// Today · Yesterday · Last week · Last month · Select month.
+  Widget _ranges() {
+    Widget chip(String id, String label, VoidCallback onTap) => Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: ChoiceChip(
+            key: ValueKey('hist-range-$id'),
+            label: Text(label, style: inter(13, _range == id ? 700 : 500)),
+            selected: _range == id,
+            showCheckmark: false,
+            selectedColor: const Color(0xFFA5FF2D),
+            backgroundColor: Colors.white,
+            side: BorderSide(color: _range == id ? const Color(0xFFA5FF2D) : kLine),
+            onSelected: (_) => onTap(),
+          ),
+        );
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(children: [
+        chip('today', tr('Today'), () => _pickRange('today')),
+        chip('yesterday', tr('Yesterday'), () => _pickRange('yesterday')),
+        chip('week', tr('Last week'), () => _pickRange('week')),
+        chip('month', tr('Last month'), () => _pickRange('month')),
+        chip('pick', _range == 'pick' && _month != null ? '${_mon(_month!)} ${_month!.year} ⌄' : '${tr('Select month')} ⌄', _pickMonth),
       ]),
     );
   }
@@ -158,7 +276,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
           Text(rupees(r.total), style: inter(24, 800, color: const Color(0xFF3DB800))),
         ]),
         const SizedBox(height: 10),
-        Row(children: [DotChip(r.statusLabel == 'Paid' ? 'Paid' : r.statusLabel, bg: kChipGreen, fg: kGreenText), const Spacer(), Text(r.paidAtLabel ?? '', style: inter(14, 400, color: kMuted))]),
+        Row(children: [
+          DotChip(r.statusLabel, bg: r.paid > 0 ? kChipGreen : const Color(0xFFF1F2EE), fg: r.paid > 0 ? kGreenText : kMuted),
+          const Spacer(),
+          Text(r.paidAtLabel ?? r.when, style: inter(14, 400, color: kMuted)),
+        ]),
         const Divider(height: 22, color: kLine),
         Semantics(
           button: true,
@@ -187,10 +309,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
               showToast(context, 'Receipt text copied.');
             }, child: Text(tr('Copy receipt'))),
             const Spacer(),
-            if (r.paid > r.refunded) TextButton(onPressed: () => _refund(r), child: Text(tr('Refund this bill'))),
+            if (widget.onOpen != null) TextButton(key: ValueKey('hist-open-${r.id}'), onPressed: () => widget.onOpen!(r.id), child: Text(tr('Open order'))),
+            if (!_online && r.paid > r.refunded) TextButton(onPressed: () => _refund(r), child: Text(tr('Refund this bill'))),
           ]),
         ],
       ]),
     );
   }
 }
+
+/// Select month: the months to pick from (newest first); answers the first day of the one picked.
+Future<DateTime?> pickMonthSheet(BuildContext context, List<DateTime> months, {DateTime? current}) => showOrderSheet<DateTime>(
+      context,
+      title: tr('Select month'),
+      body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (final m in months)
+          ListTile(
+            key: ValueKey('hist-month-${m.year}-${m.month}'),
+            contentPadding: EdgeInsets.zero,
+            title: Text('${_HistoryScreenState._months[m.month - 1]} ${m.year}', style: inter(15, current == m ? 700 : 500)),
+            trailing: current == m ? const Icon(LucideIcons.check, size: 18, color: kLink) : null,
+            onTap: () => Navigator.pop(ctx, m),
+          ),
+      ]),
+    );

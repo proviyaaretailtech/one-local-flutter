@@ -15,6 +15,8 @@ const method = z.enum(['cash', 'upi', 'card', 'bank', 'other'], { message: 'Unkn
 export const Options = obj({});
 export const Window = obj({ ...window });
 export const Day = obj({ day: day.optional() });
+// Money ↔ Stock: losses between these days (default this month)
+export const StockRange = obj({ from: day.optional(), to: day.optional() });
 export const IdOnly = z.object({ id }).loose();
 export const Payments = obj({ ...window, ...page, method: z.string().max(20).optional(), status: z.string().max(20).optional() });
 export const Transactions = obj({ ...window, ...page, type: z.string().max(20).optional(), status: z.string().max(20).optional(), q: z.string().max(100).optional(), party: z.string().max(60).optional() });
