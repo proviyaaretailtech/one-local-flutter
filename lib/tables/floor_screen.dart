@@ -651,7 +651,8 @@ class _FloorScreenState extends State<FloorScreen> {
         ],
       ]);
 
-  /// "Table T3 · 3 items · ₹420", Send to kitchen and Hold, above the floating table bars.
+  /// "Takeaway · 3 items" and the total on one line, then Hold and Send to kitchen side by side (founder, 30 Oct 2026: the old
+  /// one-line bar squeezed "Send to kitchen" onto two lines), above the floating table bars.
   Widget _cartBar() => Container(
         key: const ValueKey('bill-cart'),
         margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
@@ -662,23 +663,29 @@ class _FloorScreenState extends State<FloorScreen> {
           border: Border.all(color: kLine),
           boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 10, offset: Offset(0, 2))],
         ),
-        child: Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              Text('$_cartFor · $_cartUnits item${_cartUnits == 1 ? '' : 's'}${_onTable && _takeawayUnits > 0 ? ' · $_takeawayUnits takeaway' : ''}',
-                  key: const ValueKey('bill-cart-for'), style: inter(14, 700)),
-              Text(rupees(_cartTotal), key: const ValueKey('bill-cart-total'), style: inter(16, 800, color: kLink)),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              const Icon(LucideIcons.shoppingBag, size: 18, color: kInk),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('$_cartFor · $_cartUnits item${_cartUnits == 1 ? '' : 's'}${_onTable && _takeawayUnits > 0 ? ' · $_takeawayUnits takeaway' : ''}',
+                    key: const ValueKey('bill-cart-for'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(14, 700)),
+              ),
+              const SizedBox(width: 8),
+              Text(rupees(_cartTotal), key: const ValueKey('bill-cart-total'), style: inter(18, 800, color: kLink)),
             ]),
           ),
-          SizedBox(
-            width: 70,
-            child: OutlineButtonT('Hold', key: const ValueKey('bill-hold'), height: 42, onPressed: _sending ? null : () => _sendCart(false)),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 120,
-            child: LimeButton('Send to kitchen', key: const ValueKey('bill-send'), height: 42, busy: _sending, onPressed: () => _sendCart(true)),
-          ),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: OutlineButtonT('Hold', key: const ValueKey('bill-hold'), icon: LucideIcons.pause, height: 46, onPressed: _sending ? null : () => _sendCart(false))),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: LimeButton('Send to kitchen', key: const ValueKey('bill-send'), icon: LucideIcons.send, height: 46, busy: _sending, onPressed: () => _sendCart(true)),
+            ),
+          ]),
         ]),
       );
 }
