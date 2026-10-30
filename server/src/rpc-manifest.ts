@@ -413,6 +413,13 @@ export const MANIFEST: Entry[] = [
   db('ads_profile', { args: ads.None, map: P, rate: 'read', roles: STAFF }),
   db('ads_profile_save', { args: ads.ProfileSave, map: P, rate: 'write', roles: STOREFRONT }),
   db('ads_topup', { args: ads.TopUp, map: P, rate: 'write', idem: true, roles: STOREFRONT }),
+  // 0635: ad credits in rupees, moved in from the OneLocal wallet; OneLocal's side (the database checks for a platform admin)
+  db('ads_wallet_move', { args: ads.WalletMove, map: P, rate: 'money', idem: true, roles: 'owner (org_owner, org_admin)' }),
+  db('ol_admin_me', { args: ads.None, map: P, rate: 'read', roles: ANY }),
+  db('ads_admin_queue', { args: ads.AdminQueue, map: P, rate: 'read', roles: 'OneLocal platform admins' }),
+  db('ads_admin_review', { args: ads.AdminReview, map: P, rate: 'write', roles: 'OneLocal platform admins' }),
+  db('ads_admin_offer', { args: ads.AdminOffer, map: P, rate: 'write', roles: 'OneLocal platform admins' }),
+  db('ads_grant', { args: ads.Grant, map: P, rate: 'write', roles: 'OneLocal platform admins' }),
   sec('ads_media_slot', { args: ads.MediaAsk, rate: 'secure', roles: STOREFRONT }),
   sec('ads_media_link', { args: ads.MediaLink, rate: 'secure', roles: STOREFRONT }),
   db('sf_draft_save', { args: sf.DraftSave, map: P, rate: 'write', roles: STOREFRONT }),

@@ -85,7 +85,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
       builder: (c) => AlertDialog(
         title: Text(tr(_stage == 'draft' ? 'Delete this draft?' : 'Cancel this campaign?'), style: inter(18, 800)),
         content: Text(
-          tr(_stage == 'draft' ? 'Nothing was sent or held.' : 'Days already started are spent. The rest of the held coins come back to you.'),
+          tr(_stage == 'draft' ? 'Nothing was sent or held.' : 'Days already started are spent. The rest of the held amount comes back to you.'),
           style: inter(14, 500, height: 1.4),
         ),
         actions: [
@@ -113,9 +113,9 @@ class _CampaignScreenState extends State<CampaignScreen> {
     try {
       final r = await widget.api.report(_id);
       final days = ((r['days'] as List?) ?? const []).cast<Map>();
-      final csv = StringBuffer('Day,Views,Clicks,Valid clicks,Visits,Leads,Coins spent\n');
+      final csv = StringBuffer('Day,Views,Clicks,Valid clicks,Visits,Leads,Spent (Rs)\n');
       for (final d in days) {
-        csv.writeln([d['day'], d['views'], d['clicks'], d['valid_clicks'], d['visits'], d['leads'], coinText(d['spent'])].join(','));
+        csv.writeln([d['day'], d['views'], d['clicks'], d['valid_clicks'], d['visits'], d['leads'], numOf(d['spent'])].join(','));
       }
       await Clipboard.setData(ClipboardData(text: csv.toString()));
       if (mounted) showToast(context, days.isEmpty ? tr('Nothing to report yet.') : '${tr('Report copied (CSV)')}: ${days.length} ${tr(days.length == 1 ? 'day' : 'days')}.');
@@ -145,7 +145,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
               const SizedBox(height: 4),
               Text(
                 tr(dispute
-                    ? 'The coins you name show as disputed until OneLocal checks. If OneLocal agrees, they come back to you.'
+                    ? 'The amount you name shows as disputed until OneLocal checks. If OneLocal agrees, it comes back to you.'
                     : 'Say what to change (dates, photo, text). OneLocal checks it like a new ad; the price you accepted stays.'),
                 style: inter(13, 500, color: kMuted, height: 1.35),
               ),
@@ -185,7 +185,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
                   decoration: InputDecoration(
-                    hintText: '${tr('Coins in question (optional), up to')} ${coinText(_a['spent'])}',
+                    hintText: '${tr('Amount in question (optional), up to')} ${coinText(_a['spent'])}',
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kCardLine)),
@@ -316,11 +316,11 @@ class _CampaignScreenState extends State<CampaignScreen> {
       'awaiting_funding' => '${tr('Needs')} ${coinsWord(a['budget_coins'])} ${tr('held before it starts. You have')} ${coinText(_available)}.',
       'scheduled' => '${tr('Approved. Starts on')} ${dayMonth(a['starts_on']?.toString())}.',
       'active' => tr('Running now.'),
-      'paused' => tr('Paused. No coins are spent while it is paused.'),
-      'completed' => tr('Finished. Unused coins came back to you.'),
-      'cancelled' => tr('Cancelled. Unused coins came back to you.'),
-      'rejected' => '${tr('Not approved')}${note.isEmpty ? '' : ': $note'}. ${tr('Any held coins came back.')}',
-      'failed' => tr('Did not run: it was not ready before its end date. Any held coins came back.'),
+      'paused' => tr('Paused. Nothing is spent while it is paused.'),
+      'completed' => tr('Finished. What was not used came back to your ad credits.'),
+      'cancelled' => tr('Cancelled. What was not used came back to your ad credits.'),
+      'rejected' => '${tr('Not approved')}${note.isEmpty ? '' : ': $note'}. ${tr('Any held amount came back.')}',
+      'failed' => tr('Did not run: it was not ready before its end date. Any held amount came back.'),
       _ => '',
     };
     final (_, bg, fg) = stageLook(_stage);
@@ -340,7 +340,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
       ('Ad checked', a['creative_status'] == 'approved'),
       ('Price', a['rate_coins'] != null),
       ('Accepted', a['accepted_at'] != null),
-      ('Coins held', a['funded'] == true),
+      ('Amount held', a['funded'] == true),
       ('Live', live),
       ('Done', _over),
     ];
@@ -384,12 +384,12 @@ class _CampaignScreenState extends State<CampaignScreen> {
       padding: const EdgeInsets.all(16),
       decoration: moneyCard(),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(tr('Price & coins'), style: inter(15.5, 800)),
+        Text(tr('Price & ad credits'), style: inter(15.5, 800)),
         const SizedBox(height: 6),
         if (rate == null)
           Text(tr('No price yet. OneLocal sends one after checking your ad.'), style: inter(13.5, 500, color: kMuted))
         else ...[
-          _row('Price', '${coinText(rate)} ${tr('coins')} ${modelUnit(model)}${a['rule_version'] == null ? ' · ${tr('offer from OneLocal')}' : ' · v${a['rule_version']}'}'),
+          _row('Price', '${coinText(rate)} ${modelUnit(model)}${a['rule_version'] == null ? ' · ${tr('offer from OneLocal')}' : ' · v${a['rule_version']}'}'),
           _row(isBudgetModel(model) ? 'Budget' : 'Booking', coinsWord(a['budget_coins']), key: const ValueKey('campaign-budget')),
         ],
         _row('Held now', coinsWord(a['held'] ?? 0), key: const ValueKey('campaign-held')),
@@ -482,10 +482,10 @@ class _CampaignScreenState extends State<CampaignScreen> {
         }),
       if (_stage == 'awaiting_funding')
         short
-            ? _primary('ad-topup', 'Top up to hold ${coinsWord(a['budget_coins'])}', _topUp, icon: LucideIcons.plus)
+            ? _primary('ad-topup', 'Add credits to hold ${coinsWord(a['budget_coins'])}', _topUp, icon: LucideIcons.plus)
             : _primary('ad-fund', 'Hold ${coinsWord(a['budget_coins'])} now', () => _run(() => widget.api.fund(_id), tr('Coins held. The campaign is scheduled.')), icon: LucideIcons.lock),
       if (_stage == 'active' && budgetModel)
-        _secondary('ad-pause', 'Pause', LucideIcons.pause, () => _run(() => widget.api.pause(_id, pause: true), tr('Paused. No coins are spent while paused.'))),
+        _secondary('ad-pause', 'Pause', LucideIcons.pause, () => _run(() => widget.api.pause(_id, pause: true), tr('Paused. Nothing is spent while paused.'))),
       if (_stage == 'paused') _primary('ad-resume', 'Resume', () => _run(() => widget.api.pause(_id, pause: false), tr('Running again.')), icon: LucideIcons.play),
       if (!_over && _stage != 'draft' && _stage != 'changes_requested') _secondary('ad-change', 'Ask for a change', LucideIcons.messageSquare, () => _ask(dispute: false)),
       if (numOf(a['spent']) > 0) _secondary('ad-dispute', 'Problem with charges or clicks?', LucideIcons.flag, () => _ask(dispute: true)),
@@ -495,7 +495,7 @@ class _CampaignScreenState extends State<CampaignScreen> {
           key: const ValueKey('ad-stop'),
           onPressed: _busy ? null : _cancel,
           child: Text(
-            tr(_stage == 'draft' ? 'Delete draft' : 'Cancel campaign · unused coins come back'),
+            tr(_stage == 'draft' ? 'Delete draft' : 'Cancel campaign · the unused amount comes back'),
             style: inter(14, 700, color: const Color(0xFFC62828)),
           ),
         ),

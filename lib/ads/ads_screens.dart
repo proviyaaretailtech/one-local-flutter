@@ -7,9 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../auth/partner_api.dart';
 import '../inventory/inventory_widgets.dart' show kCardLine;
-import '../money/money_flow.dart' show openMoneyLink;
 import '../money/money_style.dart';
-import '../money/money_transfer.dart' show upiPayLink;
 import '../money/store_money.dart' show rs, dayMonth, isoDay;
 import '../onboarding/document_picker.dart';
 import '../storefront/growth_screens.dart' show OffersScreen;
@@ -84,15 +82,13 @@ const objectives = [
 int _int(Object? v) => v is num ? v.round() : int.tryParse('$v') ?? 0;
 num numOf(Object? v) => v is num ? v : num.tryParse('$v') ?? 0;
 
-/// Coins as people read them: 120, 2.5, 0.75.
-String coinText(Object? v) {
-  final n = numOf(v);
-  if (n == n.roundToDouble()) return '${n.round()}';
-  return n.toStringAsFixed(2).replaceFirst(RegExp(r'0$'), '');
-}
+/// Ad credits as people read them (one credit is ₹1, 0635): ₹1,250, ₹2.50.
+String coinText(Object? v) => rs((numOf(v) * 100).round());
 
-String _coinWord(int n) => '$n ${n == 1 ? tr('coin') : tr('coins')}';
-String coinsWord(Object? v) => '${coinText(v)} ${numOf(v) == 1 ? tr('coin') : tr('coins')}';
+/// The amount without the ₹, next to the ₹ badge: 1,250.
+String creditPlain(Object? v) => coinText(v).replaceFirst('₹', '');
+
+String coinsWord(Object? v) => coinText(v);
 
 /// The stage of a campaign in words and colours.
 (String, Color, Color) stageLook(Object? s) => switch ('$s') {
@@ -101,7 +97,7 @@ String coinsWord(Object? v) => '${coinText(v)} ${numOf(v) == 1 ? tr('coin') : tr
       'changes_requested' => ('Changes asked', const Color(0xFFFFF4E0), const Color(0xFFB45309)),
       'approved' => ('Waiting for price', const Color(0xFFFFF4E0), const Color(0xFFB45309)),
       'awaiting_acceptance' => ('Price to accept', const Color(0xFFE8F0FE), const Color(0xFF1D4ED8)),
-      'awaiting_funding' => ('Needs coins', const Color(0xFFFDECEC), const Color(0xFFC62828)),
+      'awaiting_funding' => ('Needs credits', const Color(0xFFFDECEC), const Color(0xFFC62828)),
       'scheduled' => ('Upcoming', const Color(0xFFE8F0FE), const Color(0xFF1D4ED8)),
       'active' => ('Live', const Color(0xFFE8F7EC), const Color(0xFF15803D)),
       'paused' => ('Paused', const Color(0xFFEFF0EC), kMuted),
@@ -130,7 +126,7 @@ List<Map<String, dynamic>> rulesOf(Map<String, dynamic> home, String format) {
   return ((f?['rules'] as List?) ?? const []).cast<Map>().map((r) => r.cast<String, dynamic>()).toList();
 }
 
-/// The coin, drawn: a lime disc with a dark "C".
+/// Ad credits, drawn: a lime disc with a dark "₹".
 class CoinMark extends StatelessWidget {
   const CoinMark({super.key, this.size = 22});
   final double size;
@@ -144,7 +140,7 @@ class CoinMark extends StatelessWidget {
           gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFE6FF7A), Color(0xFFB7E021)]),
           border: Border.all(color: kMoneyDeep, width: size / 14),
         ),
-        child: Text('C', style: inter(size * 0.5, 900, color: kMoneyDeep)),
+        child: Text('₹', style: inter(size * 0.55, 900, color: kMoneyDeep)),
       );
 }
 
@@ -271,7 +267,7 @@ class _AdsHomeScreenState extends State<AdsHomeScreen> {
 
   Widget _coinsCard(Map<String, dynamic> h) {
     final b = ((h['balances'] as Map?) ?? const {}).cast<String, dynamic>();
-    final coins = numOf(b['available'] ?? h['coins']), rupee = _int(h['coin_rupees']).clamp(1, 1000);
+    final coins = numOf(b['available'] ?? h['coins']);
     final pending = numOf(b['pending'] ?? h['pending_coins']), held = numOf(b['reserved']), spent = numOf(b['consumed']);
     final expired = numOf(b['expired']), disputed = numOf(b['disputed']), promo = numOf(b['promotional']);
     Widget stat(String key, String label, num v) => Expanded(
@@ -283,20 +279,23 @@ class _AdsHomeScreenState extends State<AdsHomeScreen> {
     return MoneyDarkCard(
       key: const ValueKey('ads-coins-card'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Text(tr('AD CREDITS'), style: inter(12, 700, color: const Color(0xFFB8BCC4)).copyWith(letterSpacing: 1.2)),
-          const Spacer(),
-          Text('1 ${tr('coin')} = ${rs(rupee * 100)}', style: inter(12, 600, color: const Color(0xFFB8BCC4))),
-        ]),
+        Text(tr('AD CREDITS'), style: inter(12, 700, color: const Color(0xFFB8BCC4)).copyWith(letterSpacing: 1.2)),
         const SizedBox(height: 10),
         Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           const CoinMark(size: 34),
           const SizedBox(width: 10),
-          Text(coinText(coins), key: const ValueKey('ads-coins'), style: inter(38, 800, color: Colors.white)),
+          // a big balance shrinks to fit a phone instead of running off the card
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(creditPlain(coins), key: const ValueKey('ads-coins'), style: inter(38, 800, color: Colors.white)),
+            ),
+          ),
           const SizedBox(width: 8),
           Padding(padding: const EdgeInsets.only(top: 10), child: Text(tr('available'), style: inter(15, 600, color: const Color(0xFFB8BCC4)))),
         ]),
-        Text('= ${rs((coins * rupee * 100).round())}${promo > 0 ? ' · ${coinText(promo)} ${tr('promotional')}' : ''}', style: inter(13.5, 600, color: kMoneyLime)),
+        if (promo > 0) Text('${coinText(promo)} ${tr('given by OneLocal')}', style: inter(13.5, 600, color: kMoneyLime)),
         const SizedBox(height: 12),
         Row(children: [
           stat('ads-held', 'Held for campaigns', held),
@@ -310,7 +309,7 @@ class _AdsHomeScreenState extends State<AdsHomeScreen> {
             key: const ValueKey('ads-pending'),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(color: kMoneyDeepSoft, borderRadius: BorderRadius.circular(99)),
-            child: Text('+${coinsWord(pending)} ${tr('waiting for OneLocal to confirm your payment')}', style: inter(12, 600, color: Colors.white)),
+            child: Text('+${coinsWord(pending)} ${tr('waiting for OneLocal')}', style: inter(12, 600, color: Colors.white)),
           ),
         ],
         const SizedBox(height: 14),
@@ -320,7 +319,7 @@ class _AdsHomeScreenState extends State<AdsHomeScreen> {
               key: const ValueKey('ads-topup'),
               onPressed: () => _open(TopUpScreen(api: _api, home: h)),
               icon: const Icon(LucideIcons.plus, size: 17, color: kMoneyDeep),
-              label: Text(tr('Top up'), style: inter(14, 800, color: kMoneyDeep)),
+              label: Text(tr('Add credits'), style: inter(14, 800, color: kMoneyDeep)),
               style: FilledButton.styleFrom(backgroundColor: kMoneyLime, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
             ),
           ),
@@ -330,7 +329,7 @@ class _AdsHomeScreenState extends State<AdsHomeScreen> {
               key: const ValueKey('ads-wallet'),
               onPressed: _wallet,
               icon: const Icon(LucideIcons.wallet, size: 17, color: Colors.white),
-              label: Text(tr('Coins & history'), style: inter(14, 700, color: Colors.white)),
+              label: Text(tr('Credits & history'), style: inter(14, 700, color: Colors.white)),
               style: FilledButton.styleFrom(backgroundColor: kMoneyDeepSoft, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
             ),
           ),
@@ -393,7 +392,7 @@ class _AdsHomeScreenState extends State<AdsHomeScreen> {
                   const Icon(LucideIcons.bellRing, size: 18, color: Color(0xFFB45309)),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text('$need ${tr(need == 1 ? 'campaign needs you: a price to accept, coins to hold or changes to make' : 'campaigns need you: prices to accept, coins to hold or changes to make')}',
+                    child: Text('$need ${tr(need == 1 ? 'campaign needs you: a price to accept, credits to hold or changes to make' : 'campaigns need you: prices to accept, credits to hold or changes to make')}',
                         style: inter(12.5, 700, color: const Color(0xFFB45309))),
                   ),
                   const Icon(LucideIcons.chevronRight, size: 16, color: Color(0xFFB45309)),
@@ -448,7 +447,7 @@ class _AdsHomeScreenState extends State<AdsHomeScreen> {
         const SizedBox(height: 8),
         Row(key: const ValueKey('ads-analytics-more'), children: [
           total('Valid clicks', '$valid'),
-          total('Coins spent', coinText(spent)),
+          total('Spent', coinText(spent)),
           // leads and visits only once something measures them (the spec: no made-up numbers)
           total(leads > 0 ? 'Leads' : 'Store visits', leads > 0 ? '$leads' : (visits > 0 ? '$visits' : '—')),
         ]),
@@ -696,7 +695,6 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
   }
 
   int get _days => _to.difference(_from).inDays + 1;
-  int get _rupee => _int(widget.home['coin_rupees']).clamp(1, 1000);
   num get _budgetCoins => num.tryParse(_budget.text.trim()) ?? 0;
 
   /// What the campaign holds now, or null when there is no price yet.
@@ -776,7 +774,7 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
       if (!_hasMedia) return showToast(context, tr('Add a 9:16 photo or video first.'));
       if (_title.text.trim().isEmpty) return showToast(context, tr('Give the ad a title.'));
       if (_days > 90) return showToast(context, tr('An ad runs for at most 90 days.'));
-      if (isBudgetModel(_model) && _rule != null && _budgetCoins <= 0) return showToast(context, tr('Set the most coins this campaign can spend.'));
+      if (isBudgetModel(_model) && _rule != null && _budgetCoins <= 0) return showToast(context, tr('Set the most this campaign can spend.'));
       if (_rule != null && !_accept) return showToast(context, tr('Tick that you accept the price and terms.'));
     }
     setState(() => _busy = true);
@@ -794,7 +792,7 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
                 ? tr('Sent to OneLocal. They check your ad and send you a price; nothing is held until you accept it.')
                 : ad['funded'] == true
                     ? '${tr('Sent to OneLocal for a check.')} ${coinsWord(_cost)} ${tr('held')}; ${coinsWord(left)} ${tr('left')}.'
-                    : '${tr('Sent to OneLocal for a check.')} ${tr('Top up before it starts so the coins can be held.')}',
+                    : '${tr('Sent to OneLocal for a check.')} ${tr('Add ad credits before it starts so they can be held.')}',
       );
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -875,7 +873,7 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
             ]),
             if (isBudgetModel(_model) && rule != null) ...[
               const SizedBox(height: 16),
-              _label('Most coins it can spend'),
+              _label('Most it can spend (₹)'),
               TextField(
                 key: const ValueKey('ad-budget'),
                 controller: _budget,
@@ -977,7 +975,7 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
     final id = '${f['id']}';
     final on = _format == id;
     final rules = rulesOf(widget.home, id);
-    final price = rules.isEmpty ? tr('Price on request') : '${coinText(rules.first['rate_coins'])} ${tr('coins')} ${modelUnit(rules.first['pricing_model'])}';
+    final price = rules.isEmpty ? tr('Price on request') : '${coinText(rules.first['rate_coins'])} ${modelUnit(rules.first['pricing_model'])}';
     return Material(
       color: on ? kMoneyDeep : Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -1157,8 +1155,8 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
     final cost = _cost ?? 0, rate = numOf(rule['rate_coins']);
     final short = cost > _coins;
     final how = switch (_model) {
-      'per_day' => '$_days ${tr('days')} × ${coinText(rate)} ${tr('coins')}',
-      'per_week' => '${(_days / 7).ceil()} ${tr('weeks')} × ${coinText(rate)} ${tr('coins')}',
+      'per_day' => '$_days ${tr('days')} × ${coinText(rate)}',
+      'per_week' => '${(_days / 7).ceil()} ${tr('weeks')} × ${coinText(rate)}',
       'fixed' => tr('One fee for the campaign'),
       'cpc' => '${tr('Up to')} ${rate == 0 ? 0 : (cost / rate).floor()} ${tr('valid clicks')} × ${coinText(rate)}',
       'cpm' => '${tr('Up to')} ${rate == 0 ? 0 : (cost * 1000 / rate).floor()} ${tr('views')}',
@@ -1181,12 +1179,11 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
           Expanded(child: Text(how, style: inter(13.5, 500, color: kMuted))),
           const CoinMark(size: 18),
           const SizedBox(width: 4),
-          Text(coinText(cost), key: const ValueKey('ad-cost'), style: inter(20, 800)),
+          Text(creditPlain(cost), key: const ValueKey('ad-cost'), style: inter(20, 800)),
         ]),
-        Align(alignment: Alignment.centerRight, child: Text('= ${rs((cost * _rupee * 100).round())}', key: const ValueKey('ad-cost-rupees'), style: inter(13, 700, color: kMuted))),
         const Divider(height: 18),
         Row(children: [
-          Expanded(child: Text(tr('Your coins'), style: inter(13.5, 500, color: kMuted))),
+          Expanded(child: Text(tr('Your ad credits'), style: inter(13.5, 500, color: kMuted))),
           Text(coinText(_coins), style: inter(14, 700)),
         ]),
         const SizedBox(height: 2),
@@ -1197,15 +1194,15 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
         if (short) ...[
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: Text(tr('You can send it now; the coins are held once you top up.'), style: inter(12, 500, color: kMuted))),
-            TextButton(key: const ValueKey('ad-topup'), onPressed: _topUp, child: Text(tr('Top up'), style: inter(13.5, 800, color: kMoneyDeep))),
+            Expanded(child: Text(tr('You can send it now; the credits are held once you add them.'), style: inter(12, 500, color: kMuted))),
+            TextButton(key: const ValueKey('ad-topup'), onPressed: _topUp, child: Text(tr('Add credits'), style: inter(13.5, 800, color: kMoneyDeep))),
           ]),
         ],
         const SizedBox(height: 8),
         Text(
           isBudgetModel(_model)
-              ? tr('Coins are held now and spent only on valid events; what is left comes back when the campaign ends.')
-              : tr('Coins are held now and spent day by day as the ad runs. Days not started come back if you cancel.'),
+              ? tr('The amount is held now and spent only on valid events; what is left comes back when the campaign ends.')
+              : tr('The amount is held now and spent day by day as the ad runs. Days not started come back if you cancel.'),
           style: inter(12, 500, color: kMuted, height: 1.35),
         ),
         if ('${rule['terms'] ?? ''}'.isNotEmpty) ...[
@@ -1258,7 +1255,7 @@ class _CoinsScreenState extends State<CoinsScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = e is PartnerApiException ? e.message : tr('Could not load your coins.'));
+      if (mounted) setState(() => _error = e is PartnerApiException ? e.message : tr('Could not load your ad credits.'));
     }
   }
 
@@ -1295,7 +1292,7 @@ class _CoinsScreenState extends State<CoinsScreen> {
 
   Widget _card(Map<String, dynamic> h) {
     final b = _b(h);
-    final coins = numOf(b['available']), pending = numOf(b['pending']), rupee = _int(h['coin_rupees']).clamp(1, 1000);
+    final coins = numOf(b['available']), pending = numOf(b['pending']);
     final used = numOf(b['consumed']) + numOf(b['reserved']);
     final share = coins + used == 0 ? 0.0 : (coins / (coins + used)).toDouble();
     return Container(
@@ -1310,9 +1307,15 @@ class _CoinsScreenState extends State<CoinsScreen> {
               Row(children: [
                 const CoinMark(size: 30),
                 const SizedBox(width: 8),
-                Text(coinText(coins), key: const ValueKey('coins-balance'), style: inter(36, 800, color: kMoneyDeep)),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(creditPlain(coins), key: const ValueKey('coins-balance'), style: inter(36, 800, color: kMoneyDeep)),
+                  ),
+                ),
               ]),
-              Text('${tr('worth')} ${rs((coins * rupee * 100).round())} · 1 ${tr('coin')} = ${rs(rupee * 100)}', style: inter(12.5, 600, color: const Color(0xFF3F4A12))),
+              Text(tr('From your OneLocal wallet, or given by OneLocal'), style: inter(12.5, 600, color: const Color(0xFF3F4A12))),
             ]),
           ),
           Material(
@@ -1338,7 +1341,7 @@ class _CoinsScreenState extends State<CoinsScreen> {
         Text(used == 0 ? tr('Nothing used for ads yet') : '${coinsWord(used)} ${tr('held or spent on ads')}', style: inter(12, 600, color: const Color(0xFF3F4A12))),
         if (pending > 0) ...[
           const SizedBox(height: 6),
-          Text('+${coinsWord(pending)} ${tr('waiting for OneLocal to confirm your payment')}', key: const ValueKey('coins-pending'), style: inter(12, 700, color: kMoneyDeep)),
+          Text('+${coinsWord(pending)} ${tr('waiting for OneLocal')}', key: const ValueKey('coins-pending'), style: inter(12, 700, color: kMoneyDeep)),
         ],
       ]),
     );
@@ -1349,8 +1352,8 @@ class _CoinsScreenState extends State<CoinsScreen> {
     final b = _b(h);
     final available = numOf(b['available']), promo = numOf(b['promotional']);
     final rows = [
-      ('coins-bought', 'Bought coins', available - promo, 'Yours to use on any campaign.'),
-      ('coins-promo', 'Promotional coins', promo, 'From OneLocal; used first.'),
+      ('coins-bought', 'From your wallet', available - promo, 'Yours to use on any campaign.'),
+      ('coins-promo', 'Given by OneLocal', promo, 'Used first.'),
       ('coins-held', 'Held for campaigns', numOf(b['reserved']), 'Waiting to be spent by booked days or valid clicks.'),
       ('coins-spent', 'Spent', numOf(b['consumed']), 'Delivered days, valid clicks, views or leads.'),
       ('coins-disputed', 'Disputed', numOf(b['disputed']), 'Waiting for OneLocal to decide.'),
@@ -1414,7 +1417,7 @@ class _CoinsScreenState extends State<CoinsScreen> {
   List<Widget> _history(Map<String, dynamic> h) {
     final ledger = ((h['ledger'] as List?) ?? const []).cast<Map>();
     return [
-      Text(tr('Coin history'), style: inter(17, 800)),
+      Text(tr('Ad credits history'), style: inter(17, 800)),
       const SizedBox(height: 8),
       if (ledger.isEmpty)
         Text(tr('Top-ups and campaigns show here.'), style: inter(13.5, 500, color: kMuted))
@@ -1437,8 +1440,8 @@ class _CoinsScreenState extends State<CoinsScreen> {
     final title0 = '${l['ad_title'] ?? l['note'] ?? ''}';
     // what each line does to the available coins: + in, − out, spent comes out of coins already held
     final (title, icon, sign) = switch (l['kind']) {
-      'topup' => ('${tr('Top-up')}${l['ref'] == null ? '' : ' · ${l['ref']}'}', LucideIcons.plus, 1),
-      'promo' => ('${tr('Promotional coins')}${'${l['note'] ?? ''}'.isEmpty ? '' : ' · ${l['note']}'}', LucideIcons.gift, 1),
+      'topup' => ('${tr(l['method'] == 'wallet' ? 'From your OneLocal wallet' : 'Top-up')}${l['ref'] == null ? '' : ' · ${l['ref']}'}', LucideIcons.plus, 1),
+      'promo' => ('${tr('Given by OneLocal')}${'${l['note'] ?? ''}'.isEmpty ? '' : ' · ${l['note']}'}', LucideIcons.gift, 1),
       'reserve' => ('${tr('Held for')}: $title0', LucideIcons.lock, -1),
       'release' => ('${tr('Back from')}: $title0', LucideIcons.undo2, 1),
       'consume' => ('${tr('Spent')}: $title0', LucideIcons.megaphone, 0),
@@ -1463,7 +1466,7 @@ class _CoinsScreenState extends State<CoinsScreen> {
             Text(
               [
                 dayMonth(l['created_at']?.toString()),
-                if (sign == 0) tr('from held coins'),
+                if (sign == 0) tr('from the held amount'),
                 if (l['bucket'] == 'promotional' && l['kind'] != 'promo') tr('promotional'),
                 if (pending) tr('Waiting for payment check'),
                 if (cancelled) tr('Not received'),
@@ -1481,25 +1484,33 @@ class _CoinsScreenState extends State<CoinsScreen> {
 }
 
 
-// ============================================================================ top up
+// ============================================================================ add ad credits
+/// Add ad credits (0635, founder 30 Oct 2026: no coin top-ups, every wallet in rupees): move rupees from the OneLocal wallet, the money
+/// OneLocal owes the business for app orders and has not settled yet. The move comes off the next weekly settlement. OneLocal can also
+/// give credits; those arrive on their own. Only the owner can move money; the database checks and says so.
 class TopUpScreen extends StatefulWidget {
   const TopUpScreen({super.key, required this.api, required this.home, this.suggest});
   final AdsApi api;
   final Map<String, dynamic> home;
 
-  /// Coins to start with (what an ad still needs).
+  /// Rupees to start with (what an ad still needs).
   final int? suggest;
   @override
   State<TopUpScreen> createState() => _TopUpScreenState();
 }
 
 class _TopUpScreenState extends State<TopUpScreen> {
-  late final int _rupee = _int(widget.home['coin_rupees']).clamp(1, 1000);
-  // what an ad still needs, in rupees; otherwise ₹5,000
-  late final _amount = TextEditingController(text: '${widget.suggest == null ? 5000 : math.max(widget.suggest!, 10) * _rupee}');
-  String _method = 'gpay';
+  late final _amount = TextEditingController(text: widget.suggest == null ? '' : '${math.max(widget.suggest!, 100)}');
+  Map<String, dynamic>? _w;
+  String? _error;
   bool _busy = false;
   String _key = AdsApi.newKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
@@ -1507,71 +1518,90 @@ class _TopUpScreenState extends State<TopUpScreen> {
     super.dispose();
   }
 
-  int get _rupees => int.tryParse(_amount.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-  int get _coinsFor => _rupees ~/ _rupee;
-
-  static const _methods = [
-    ('gpay', 'GPay', LucideIcons.smartphone, true),
-    ('phonepe', 'PhonePe', LucideIcons.smartphone, true),
-    ('upi', 'Any UPI', LucideIcons.qrCode, true),
-    ('card', 'Card', LucideIcons.creditCard, false),
-    ('netbanking', 'Net banking', LucideIcons.landmark, false),
-  ];
-
-  Future<void> _pay() async {
-    if (_busy) return;
-    if (_coinsFor < 10) return showToast(context, '${tr('Top up at least')} ${rs(10 * _rupee * 100)} (10 ${tr('coins')}).');
-    setState(() => _busy = true);
+  Future<void> _load() async {
     try {
-      final r = await widget.api.topUp(_coinsFor, _method, key: _key);
-      if (!mounted) return;
-      final upi = '${r['upi_id'] ?? ''}';
-      if (upi.isEmpty) {
-        // OneLocal's UPI ID is not set up yet: the request stays, and the team gets in touch
-        await _done(r, opened: false);
-        return;
+      final w = await widget.api.walletOverview();
+      if (mounted) {
+        setState(() {
+          _w = w;
+          _error = null;
+        });
       }
-      final opened = await openMoneyLink(upiPayLink(_method, upiId: upi, name: '${r['payee_name'] ?? 'OneLocal'}', amountMinor: _int(r['amount_minor']), note: 'Coins ${r['ref']}'));
-      if (!mounted) return;
-      await _done(r, opened: opened);
     } catch (e) {
-      if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not start the payment. Try again.'));
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _error = e is PartnerApiException ? e.message : tr('Could not load your OneLocal wallet.'));
     }
   }
 
-  Future<void> _done(Map<String, dynamic> r, {required bool opened}) async {
-    _key = AdsApi.newKey();
-    setState(() => _busy = false); // the request is in; no spinner behind the message
-    await showOlDialog<void>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Row(children: [const CoinMark(size: 24), const SizedBox(width: 8), Expanded(child: Text('${_coinWord(_int(r['coins']))} ${tr('on the way')}', style: inter(18, 800)))]),
-        content: Text(
-          opened
-              ? '${tr('Once OneLocal sees your payment of')} ${rs(_int(r['amount_minor']))}, ${tr('the coins are added. Reference')}: ${r['ref']}.'
-              : '${tr('Your top-up of')} ${rs(_int(r['amount_minor']))} ${tr('is saved (reference')} ${r['ref']}). ${tr('OneLocal will share how to pay and add the coins once paid.')}',
-          style: inter(14, 500, height: 1.4),
+  int _minor(Object? v) => v is num ? v.round() : int.tryParse('$v') ?? 0;
+
+  /// What can be moved now: what OneLocal owes for app orders not settled yet, less what the business owes OneLocal.
+  int get _free => math.max(0, _minor((_w?['unsettled'] as Map?)?['due_minor']) - _minor((_w?['owed_to_onelocal'] as Map?)?['amount_minor']));
+  int get _rupees => int.tryParse(_amount.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
+  Future<void> _move() async {
+    if (_busy) return;
+    if (_rupees < 100) return showToast(context, tr('Move at least ₹100.'));
+    if (_rupees * 100 > _free) return showToast(context, '${tr('Only')} ${rs(_free)} ${tr('can be moved from your OneLocal wallet now.')}');
+    setState(() => _busy = true);
+    try {
+      await widget.api.walletMove(_rupees * 100, key: _key);
+      if (!mounted) return;
+      _key = AdsApi.newKey();
+      setState(() => _busy = false);
+      await showOlDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Row(children: [const CoinMark(size: 24), const SizedBox(width: 8), Expanded(child: Text('${rs(_rupees * 100)} ${tr('added to ad credits')}', style: inter(18, 800)))]),
+          content: Text(tr('It comes off your next weekly OneLocal settlement.'), style: inter(14, 500, height: 1.4)),
+          actions: [TextButton(key: const ValueKey('topup-ok'), onPressed: () => Navigator.pop(c), child: Text(tr('OK'), style: inter(14, 800)))],
         ),
-        actions: [TextButton(key: const ValueKey('topup-ok'), onPressed: () => Navigator.pop(c), child: Text(tr('OK'), style: inter(14, 800)))],
-      ),
-    );
-    if (mounted) Navigator.of(context).pop(true);
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        showToast(context, e is PartnerApiException ? e.message : tr('Could not move the money. Try again.'));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: kBg,
         body: Column(children: [
-          AppHeader(title: tr('Top up coins'), onBack: () => Navigator.of(context).maybePop()),
+          AppHeader(title: tr('Add ad credits'), onBack: () => Navigator.of(context).maybePop()),
           Expanded(
             child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+              if (_error != null)
+                Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, key: const ValueKey('topup-error'), style: inter(14, 500, color: kError))),
+              // where the money comes from
+              Container(
+                key: const ValueKey('topup-wallet'),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(color: kMoneyDeep, borderRadius: BorderRadius.circular(kMoneyCardRadius)),
+                child: Row(children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(color: kMoneyDeepSoft, borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(LucideIcons.wallet, color: kMoneyLime, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(tr('OneLocal wallet · can be moved'), style: inter(12.5, 700, color: const Color(0xFFB8BCC4))),
+                      Text(_w == null ? '…' : rs(_free), key: const ValueKey('topup-free'), style: inter(26, 800, color: Colors.white)),
+                      Text(tr('What OneLocal owes you for app orders, not settled yet'), style: inter(12, 500, color: const Color(0xFFB8BCC4))),
+                    ]),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 14),
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: moneyCard(),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Text(tr('Amount'), style: inter(13.5, 700, color: kMuted)),
+                  Text(tr('Amount to move'), style: inter(13.5, 700, color: kMuted)),
                   TextField(
                     key: const ValueKey('topup-amount'),
                     controller: _amount,
@@ -1579,13 +1609,8 @@ class _TopUpScreenState extends State<TopUpScreen> {
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(7)],
                     onChanged: (_) => setState(() {}),
                     style: inter(34, 800),
-                    decoration: InputDecoration(prefixText: '₹ ', prefixStyle: inter(34, 800), border: InputBorder.none, isDense: true),
+                    decoration: InputDecoration(prefixText: '₹ ', prefixStyle: inter(34, 800), hintText: '0', border: InputBorder.none, isDense: true),
                   ),
-                  Row(children: [
-                    const CoinMark(size: 18),
-                    const SizedBox(width: 6),
-                    Text('= $_coinsFor ${tr('coins')}', key: const ValueKey('topup-coins'), style: inter(15, 800, color: const Color(0xFF15803D))),
-                  ]),
                   const SizedBox(height: 12),
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     for (final v in const [500, 1000, 2000, 5000])
@@ -1595,23 +1620,19 @@ class _TopUpScreenState extends State<TopUpScreen> {
                         selected: _rupees == v,
                         onSelected: (_) => setState(() => _amount.text = '$v'),
                       ),
+                    if (_free >= 10000)
+                      ChoiceChip(
+                        key: const ValueKey('topup-all'),
+                        label: Text('${tr('All')} ${rs(_free ~/ 100 * 100)}', style: inter(13, 700)),
+                        selected: _rupees * 100 == _free ~/ 100 * 100,
+                        onSelected: (_) => setState(() => _amount.text = '${_free ~/ 100}'),
+                      ),
                   ]),
                 ]),
               ),
-              const SizedBox(height: 16),
-              Text(tr('Pay with'), style: inter(13.5, 700, color: kMuted)),
-              const SizedBox(height: 8),
-              GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 1.25,
-                children: [for (final m in _methods) _methodTile(m)],
-              ),
               const SizedBox(height: 12),
-              Text(tr('You pay OneLocal by UPI. The coins show as waiting until OneLocal sees the payment, usually the same day.'), style: inter(12.5, 500, color: kMuted, height: 1.4)),
+              Text(tr('The amount moves to your ad credits now and comes off your next weekly OneLocal settlement. OneLocal can also give you ad credits.'),
+                  style: inter(12.5, 500, color: kMuted, height: 1.4)),
             ]),
           ),
           SafeArea(
@@ -1620,45 +1641,19 @@ class _TopUpScreenState extends State<TopUpScreen> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
               decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: kCardLine))),
               child: SizedBox(
-                width: double.infinity, // the whole bar, not just the label
+                width: double.infinity,
                 height: 52,
                 child: FilledButton(
                   key: const ValueKey('topup-pay'),
-                  onPressed: _busy ? null : _pay,
+                  onPressed: _busy || _w == null ? null : _move,
                   style: FilledButton.styleFrom(backgroundColor: kMoneyDeep, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                   child: _busy
                       ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: kMoneyLime))
-                      : Text('${tr('Make payment')} · ${rs(_rupees * 100)}', style: inter(16, 800, color: kMoneyLime)),
+                      : Text('${tr('Move')} ${rs(_rupees * 100)} ${tr('to ad credits')}', style: inter(16, 800, color: kMoneyLime)),
                 ),
               ),
             ),
           ),
         ]),
       );
-
-  Widget _methodTile((String, String, IconData, bool) m) {
-    final (id, name, icon, ready) = m;
-    final on = _method == id;
-    return Material(
-      color: on ? kMoneyDeep : Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        key: ValueKey('topup-method-$id'),
-        borderRadius: BorderRadius.circular(16),
-        onTap: ready ? () => setState(() => _method = id) : () => showToast(context, tr('Card and net banking are coming soon. Pay by UPI for now.')),
-        child: Container(
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: on ? kMoneyDeep : kCardLine)),
-          child: Opacity(
-            opacity: ready ? 1 : 0.45,
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(icon, size: 20, color: on ? kMoneyLime : kInk),
-              const SizedBox(height: 4),
-              Text(tr(name), style: inter(13, 800, color: on ? Colors.white : kInk)),
-              if (!ready) Text(tr('Soon'), style: inter(10.5, 600, color: kMuted)),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
 }

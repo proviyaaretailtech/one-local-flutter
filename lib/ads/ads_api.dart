@@ -62,8 +62,31 @@ class AdsApi {
   /// One campaign's numbers day by day. {ad, days: [{day, views, clicks, valid_clicks, visits, leads, spent}]}
   Future<Map<String, dynamic>> report(String id) => _call('ads_report', {'id': id});
 
-  /// Asks to top up [coins], paid by [method] (gpay, phonepe, upi). {id, ref, coins, amount_minor, status, upi_id, payee_name}
-  Future<Map<String, dynamic>> topUp(int coins, String method, {required String key}) => _call('ads_topup', {'coins': coins, 'method': method}, key: key);
+  /// Ad credits are rupees (0635): no top-ups. The OneLocal wallet: {unsettled: {due_minor}, owed_to_onelocal: {amount_minor}, ad_credits_moved}.
+  Future<Map<String, dynamic>> walletOverview() => _call('wallet_overview', {});
+
+  /// Moves [amountMinor] (whole rupees, at least ₹100) from the OneLocal wallet into ad credits; it comes off the next weekly settlement.
+  Future<Map<String, dynamic>> walletMove(int amountMinor, {required String key}) => _call('ads_wallet_move', {'amount_minor': amountMinor}, key: key);
+
+  // ---- OneLocal's side: platform admins only (the database checks)
+
+  /// {admin: true} for a OneLocal platform admin.
+  Future<bool> adminMe() async => (await _call('ol_admin_me', {}))['admin'] == true;
+
+  /// {review: [ads waiting for OneLocal, each with business], businesses: [{id, name, credits}] matching [q], grants: [{business, amount, note, created_at}]}.
+  Future<Map<String, dynamic>> adminQueue({String q = ''}) => _call('ads_admin_queue', {'q': q.trim().isEmpty ? null : q.trim()});
+
+  /// The check of an ad: approved, changes_requested or rejected, with a note.
+  Future<Map<String, dynamic>> adminReview(String id, String decision, {String note = ''}) =>
+      _call('ads_admin_review', {'id': id, 'decision': decision, 'note': note.trim().isEmpty ? null : note.trim()});
+
+  /// The price OneLocal offers: an active rule, or a rate (₹) for a pricing model; budget for per-click/view/lead.
+  Future<Map<String, dynamic>> adminOffer(String id, {String? ruleId, String? model, num? rate, num? budget}) =>
+      _call('ads_admin_offer', {'id': id, 'rule_id': ruleId, 'pricing_model': model, 'rate_coins': rate, 'budget_coins': budget});
+
+  /// Gives a business [rupees] of ad credits from OneLocal.
+  Future<Map<String, dynamic>> grant(String organizationId, num rupees, {String note = ''}) =>
+      _call('ads_grant', {'organization_id': organizationId, 'coins': rupees, 'note': note.trim().isEmpty ? null : note.trim()});
 
   /// Sends the ad's photo or video to a signed slot under the shop's folder. (path, media_kind)
   Future<({String path, String kind})> uploadMedia(PickedDocument d) async {
