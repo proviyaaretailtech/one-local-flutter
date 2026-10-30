@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/net_guard.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/mobile_input.dart';
 import 'cart_screen.dart';
@@ -238,7 +239,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
   }
 
   /// Delivered with money due: how it was collected at the door (cash, UPI or card).
-  Future<String?> _askPaid(ChannelOrder o) => showDialog<String>(
+  Future<String?> _askPaid(ChannelOrder o) => showOlDialog<String>(
         context: context,
         builder: (d) => AlertDialog(
           title: Text('Collect ${rupees(o.due)}', style: inter(18, 700)),
@@ -260,7 +261,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
   Future<(String?, String?, int?)?> _askRider(ChannelOrder o) {
     final name = TextEditingController(text: o.riderName ?? ''), phone = TextEditingController(text: localMobile(o.riderPhone));
     var eta = o.etaMinutes ?? 20;
-    return showDialog<(String?, String?, int?)>(
+    return showOlDialog<(String?, String?, int?)>(
       context: context,
       builder: (d) => StatefulBuilder(
         builder: (d, set) => AlertDialog(

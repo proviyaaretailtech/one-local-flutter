@@ -5,6 +5,7 @@ import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../menu/menu_widgets.dart' show CanMakeLabel, FoodTypeMark;
 import '../ui/mobile_input.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'dish_options_sheet.dart';
 import 'guest_orders.dart';
@@ -137,7 +138,7 @@ class _FloorScreenState extends State<FloorScreen> {
   Future<void> _addDish(Facts item) async {
     if (!item.b('available')) return showToast(context, '${item.s('name')} is out of stock.');
     if (_dineIn && _orderTable == null) {
-      final choose = await showDialog<bool>(
+      final choose = await showOlDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
           title: const Text('Choose a table first'),
@@ -244,7 +245,7 @@ class _FloorScreenState extends State<FloorScreen> {
     final phone = TextEditingController(text: _delivery?['phone']);
     final address = TextEditingController(text: _delivery?['address']);
     String? problem;
-    return showDialog<Map<String, String>>(
+    return showOlDialog<Map<String, String>>(
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (c, set) => AlertDialog(
@@ -448,16 +449,21 @@ class _FloorScreenState extends State<FloorScreen> {
         bool canAdd(Facts t) => withAddItems && t.s('status') == 'occupied';
         final h = tables.any(canAdd) ? 150.0 : 112.0;
         return Wrap(spacing: gap, runSpacing: gap, children: [
-          for (final t in tables)
-            SizedBox(
-              width: w,
-              child: TableCard(
-                table: t,
-                compact: true,
-                height: h,
-                selected: _orderTable?.s('id') == t.s('id') && widget.pickFor == null,
-                onTap: () => onTap(t),
-                onAddItems: canAdd(t) ? () => _addItems(t) : null,
+          // the tables build in one after another (lib/ui/motion.dart)
+          for (final (i, t) in tables.indexed)
+            Entrance(
+              key: ValueKey('floor-in-${t.s('id')}'),
+              index: i,
+              child: SizedBox(
+                width: w,
+                child: TableCard(
+                  table: t,
+                  compact: true,
+                  height: h,
+                  selected: _orderTable?.s('id') == t.s('id') && widget.pickFor == null,
+                  onTap: () => onTap(t),
+                  onAddItems: canAdd(t) ? () => _addItems(t) : null,
+                ),
               ),
             ),
         ]);
@@ -527,7 +533,13 @@ class _FloorScreenState extends State<FloorScreen> {
           const gap = 10.0;
           final w = (box.maxWidth - 2 * gap) / 3;
           return Wrap(spacing: gap, runSpacing: gap, children: [
-            for (final i in shown) SizedBox(width: w, child: _DishSquare(item: i, qty: _qtyOf(i.s('id')), onAdd: () => _addDish(i), onRemove: () => _removeDish(i.s('id')))),
+            // the dishes build in one after another; a new category builds in again (lib/ui/motion.dart)
+            for (final (n, i) in shown.indexed)
+              Entrance(
+                key: ValueKey('dish-in-$_menuCat-${i.s('id')}'),
+                index: n,
+                child: SizedBox(width: w, child: _DishSquare(item: i, qty: _qtyOf(i.s('id')), onAdd: () => _addDish(i), onRemove: () => _removeDish(i.s('id')))),
+              ),
           ]);
         }),
     ]);

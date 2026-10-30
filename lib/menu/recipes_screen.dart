@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'ingredients_screen.dart' show LibraryPickerScreen;
 import 'menu_api.dart' show MenuApiException;
@@ -232,7 +233,7 @@ class _RecipeEditorScreenState extends State<RecipeEditorScreen> {
     final others = {for (final z in s.sizes) if (!z.isDefault) z.id: TextEditingController(text: fmt(z.price))};
     final small = s.sizes.where((z) => z.isDefault).firstOrNull;
     String? problem;
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (c, set) {
@@ -329,7 +330,7 @@ class _RecipeEditorScreenState extends State<RecipeEditorScreen> {
       canPop: !_dirty,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        final leave = await showDialog<bool>(
+        final leave = await showOlDialog<bool>(
           context: context,
           builder: (c) => AlertDialog(
             title: const Text('Leave without saving?'),

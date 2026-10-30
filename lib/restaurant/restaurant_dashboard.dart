@@ -6,6 +6,7 @@ import '../home/home_widgets.dart';
 import '../outlets/outlet_header.dart';
 import '../outlets/outlet_scope.dart';
 import '../service/service_widgets.dart' show svcRupees;
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'home_insights.dart';
 import 'restaurant_api.dart';
@@ -164,11 +165,13 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
+          key: ValueKey('rst-tab-body-$_tab'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: switch (_tab) {
+          // the tab's sections build in one after another; switching tabs plays it again (lib/ui/motion.dart)
+          children: staggered(switch (_tab) {
             0 => _feed(d),
             _ => _salesTab(d),
-          },
+          }),
         ),
       ),
     ],
@@ -236,7 +239,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text('${d.orders.i('live')}', style: inter(24, 800, height: 1)),
+                        CountUp(d.orders.i('live'), style: inter(24, 800, height: 1)),
                         const SizedBox(width: 6),
                         Flexible(child: Text('Live orders', overflow: TextOverflow.ellipsis, style: inter(10.5, 500, color: kMuted))),
                       ],
@@ -269,7 +272,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(pending == null ? '—' : '$pending', style: inter(24, 800, height: 1)),
+                        pending == null ? Text('—', style: inter(24, 800, height: 1)) : CountUp(pending, style: inter(24, 800, height: 1)),
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(pending == null ? _notReported : 'Pending', overflow: TextOverflow.ellipsis, style: inter(10.5, 500, color: kMuted)),

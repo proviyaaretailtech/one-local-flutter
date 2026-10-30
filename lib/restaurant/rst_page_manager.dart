@@ -12,6 +12,7 @@ import '../storefront/menu_link_screen.dart';
 import '../storefront/settings_screens.dart';
 import '../storefront/storefront_api.dart';
 import '../ui/app_header.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'restaurant_more_screen.dart';
 
@@ -154,7 +155,8 @@ class _RstPageManagerScreenState extends State<RstPageManagerScreen> {
                 )
               : RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 10, 16, 28), children: [
+                  // the page builds in, section by section (lib/ui/motion.dart)
+                  child: ListView(padding: const EdgeInsets.fromLTRB(16, 10, 16, 28), children: staggered([
                     _ready(s),
                     const SizedBox(height: 26),
                     Text('Grow your sales', style: inter(18, 800)),
@@ -170,7 +172,7 @@ class _RstPageManagerScreenState extends State<RstPageManagerScreen> {
                     Text('Your page', style: inter(18, 800)),
                     const SizedBox(height: 12),
                     ..._tiles(s),
-                  ]),
+                  ])),
                 ),
         ),
       ]),
@@ -223,13 +225,10 @@ class _RstPageManagerScreenState extends State<RstPageManagerScreen> {
         const SizedBox(height: 20),
         Row(children: [
           Expanded(child: Text('Your page is $done/${checks.length} ready', key: const ValueKey('pm-ready'), style: inter(14.5, 700, color: Colors.white))),
-          Text('${(done * 100 / checks.length).round()}%', style: inter(14.5, 800, color: kRmLime)),
+          CountUp(done * 100 / checks.length, format: (v) => '${v.round()}%', style: inter(14.5, 800, color: kRmLime)),
         ]),
         const SizedBox(height: 10),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(value: done / checks.length, minHeight: 7, backgroundColor: kRmDeepSoft, valueColor: const AlwaysStoppedAnimation(kRmLime)),
-        ),
+        FillBar(fraction: done / checks.length, color: kRmLime, track: kRmDeepSoft),
         const SizedBox(height: 10),
         Text(missing.isEmpty ? 'Everything is in place.' : 'Still to add: ${missing.join(', ')}', key: const ValueKey('pm-missing'), style: inter(12.5, 500, color: const Color(0xFFB8BCC4))),
         const SizedBox(height: 18),

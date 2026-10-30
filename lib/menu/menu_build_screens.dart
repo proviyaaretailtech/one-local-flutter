@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
 import '../catalogue/item_photo.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'menu_api.dart' show MenuApiException;
 import 'menu_build_api.dart';
@@ -603,7 +604,7 @@ class _ComboGroupEditorState extends State<ComboGroupEditor> {
   }
 
   Future<void> _delete() async {
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text('Delete "${widget.group!.name}"?'),
@@ -859,7 +860,7 @@ class _AddonGroupEditorState extends State<AddonGroupEditor> {
   }
 
   Future<void> _delete() async {
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text('Delete "${widget.group!.name}"?'),

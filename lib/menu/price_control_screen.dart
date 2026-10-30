@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
 import '../ui/app_header.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'menu_build_api.dart';
 import 'menu_build_widgets.dart';
@@ -71,7 +72,7 @@ class _PriceControlScreenState extends State<PriceControlScreen> {
   Future<void> _editChannel(Recipe r, String channel, String label) async {
     final now = r.channelPrice(channel);
     final c = TextEditingController(text: now == null ? '' : (now == now.roundToDouble() ? '${now.toInt()}' : '$now'));
-    final result = await showDialog<(bool, double?)>(
+    final result = await showOlDialog<(bool, double?)>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('$label price · ${r.name}', style: inter(17, 700)),

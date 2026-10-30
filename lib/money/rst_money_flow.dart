@@ -11,6 +11,7 @@ import '../api/net_guard.dart';
 import '../home/home_nav.dart';
 import '../ui/app_header.dart';
 import '../ui/mobile_input.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'rst_money.dart';
 import 'rst_money_api.dart';
@@ -703,7 +704,7 @@ class _RstTransferScreenState extends State<RstTransferScreen> {
       return;
     }
     final utr = TextEditingController();
-    final paid = await showDialog<bool>(
+    final paid = await showOlDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text('Did the payment of ${rs(paiseOf(_amount.text))} to ${_to!.name} go through?', style: inter(17, 700)),

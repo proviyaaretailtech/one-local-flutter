@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
 import '../inventory/inventory_api.dart' show Facts;
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'kitchen_api.dart';
 import 'kitchen_widgets.dart';
@@ -521,8 +522,12 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
     }
     final blink = DateTime.now().second.isEven;
     return Column(children: [
-      for (final c in cards)
-        Padding(
+      // each ticket builds in once; a new ticket (or one that moved here) builds in on its own (lib/ui/motion.dart)
+      for (final (i, c) in cards.indexed)
+        Entrance(
+          key: ValueKey('kds-in-${c.s('card_id')}-${_status(c)}'),
+          index: i,
+          child: Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760),
@@ -537,6 +542,7 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
               onPrint: () => _act(c, 'print'),
             ),
           ),
+        ),
         ),
     ]);
   }
@@ -575,8 +581,12 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
     final w = (width - (cols - 1) * gap) / cols;
     final blink = DateTime.now().second.isEven; // late tickets blink with the clock
     return Wrap(spacing: gap, runSpacing: gap, children: [
-      for (final c in cards)
-        SizedBox(
+      // a ticket that changes stage builds in again where it now sits (lib/ui/motion.dart)
+      for (final (i, c) in cards.indexed)
+        Entrance(
+          key: ValueKey('kds-in-${c.s('card_id')}-${_status(c)}'),
+          index: i,
+          child: SizedBox(
           width: w,
           child: compact
               ? _MiniTicket(
@@ -590,11 +600,12 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
                 )
               : _fullCard(c),
         ),
+        ),
     ]);
   }
 
   /// The full ticket in a pop-up: switches, Hand over and print work there, and it follows the latest data; once handed over it closes.
-  Future<void> _openTicket(Facts card) => showDialog<void>(
+  Future<void> _openTicket(Facts card) => showOlDialog<void>(
         context: context,
         builder: (ctx) => Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),

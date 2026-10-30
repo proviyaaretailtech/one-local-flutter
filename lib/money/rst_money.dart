@@ -8,6 +8,7 @@ import '../account/wallet_api.dart';
 import '../account/wallet_screen.dart';
 import '../api/net_guard.dart';
 import '../ui/app_header.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'rst_money_api.dart';
 import 'rst_money_flow.dart';
@@ -104,17 +105,29 @@ class RmPills extends StatelessWidget {
           for (final (id, label) in options)
             Padding(
               padding: const EdgeInsets.only(right: 6),
-              child: Material(
-                color: selected == id ? kRmDeep : Colors.white,
-                borderRadius: BorderRadius.circular(40),
-                child: InkWell(
-                  key: ValueKey('$keyPrefix-$id'),
+              // the highlight moves smoothly from the old pill to the picked one (lib/ui/motion.dart)
+              child: AnimatedContainer(
+                duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(
+                  color: selected == id ? kRmDeep : Colors.white,
                   borderRadius: BorderRadius.circular(40),
-                  onTap: () => onSelect(id),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(40), border: Border.all(color: selected == id ? kRmDeep : kLine)),
-                    child: Text(label, style: inter(14, 700, color: selected == id ? Colors.white : kInk)),
+                  border: Border.all(color: selected == id ? kRmDeep : kLine),
+                ),
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    key: ValueKey('$keyPrefix-$id'),
+                    borderRadius: BorderRadius.circular(40),
+                    onTap: () => onSelect(id),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      child: AnimatedDefaultTextStyle(
+                        duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 260),
+                        style: inter(14, 700, color: selected == id ? Colors.white : kInk),
+                        child: Text(label),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -227,7 +240,8 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
       child: Column(children: [
         Text('Your wallet balance', style: inter(13.5, 500, color: const Color(0xFFB8BCC4))),
         const SizedBox(height: 6),
-        FittedBox(fit: BoxFit.scaleDown, child: Text(rs(h['total_minor'] as num?), key: const ValueKey('rm-total'), style: inter(38, 800, color: Colors.white))),
+        // the balance counts up (lib/ui/motion.dart)
+        FittedBox(fit: BoxFit.scaleDown, child: CountUp((h['total_minor'] as num?) ?? 0, format: rs, textKey: const ValueKey('rm-total'), style: inter(38, 800, color: Colors.white))),
         const SizedBox(height: 10),
         Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 6, children: [
           for (final a in accounts)
@@ -383,9 +397,9 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
                         await _loadWallet();
                       },
                       child: ListView(key: const ValueKey('rst-money'), padding: const EdgeInsets.fromLTRB(14, 12, 14, 28), children: [
-                        _wallet(h),
+                        Entrance(index: 0, child: _wallet(h)),
                         const SizedBox(height: 12),
-                        _onelocalCards(),
+                        Entrance(index: 1, child: _onelocalCards()),
                         const SizedBox(height: 18),
                         RmPills(
                           keyPrefix: 'rm-part',
@@ -394,10 +408,12 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
                           onSelect: (id) => setState(() => _part = id),
                         ),
                         const SizedBox(height: 12),
-                        if (_part == 'dues')
-                          RmDuesPart(key: ValueKey('dues-$_reload'), api: _api, canRecord: _canRecord, onChanged: _load)
-                        else
-                          RmRegisterPart(key: ValueKey('register-$_reload'), api: _api, canRecord: _canRecord, onChanged: _load),
+                        // the picked part cross-fades in (lib/ui/motion.dart)
+                        SwapFade(
+                          child: _part == 'dues'
+                              ? RmDuesPart(key: ValueKey('dues-$_reload'), api: _api, canRecord: _canRecord, onChanged: _load)
+                              : RmRegisterPart(key: ValueKey('register-$_reload'), api: _api, canRecord: _canRecord, onChanged: _load),
+                        ),
                       ]),
                     ),
         ),
@@ -445,7 +461,7 @@ class _RmRegisterPartState extends State<RmRegisterPart> {
   Future<void> _close() async {
     final r = _r!;
     final counted = TextEditingController();
-    final paise = await showDialog<int>(
+    final paise = await showOlDialog<int>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text('Close day · count the cash', style: inter(18, 800)),

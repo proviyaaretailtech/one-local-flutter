@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 
 const kMbLime = Color(0xFFA1FE2F);
@@ -31,33 +32,30 @@ class SubMasterTabs extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         color: Colors.white,
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-        child: Row(children: [
-          for (var i = 0; i < labels.length; i++) ...[
-            if (i > 0) const SizedBox(width: 8),
-            Expanded(
-              child: Semantics(
+        // one track; the dark pill slides to the picked sub-master (lib/ui/motion.dart)
+        child: DecoratedBox(
+          decoration: BoxDecoration(color: kField, borderRadius: BorderRadius.circular(12), border: Border.all(color: kFieldBorder)),
+          child: Padding(
+            padding: const EdgeInsets.all(3),
+            child: SlidingTabs(
+              count: labels.length,
+              selected: selected,
+              onSelect: onSelect,
+              height: 38,
+              keyOf: (i) => ValueKey('sub-master-${labels[i].toLowerCase()}'),
+              highlight: DecoratedBox(decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(10))),
+              builder: (context, i, on) => Semantics(
                 button: true,
-                selected: i == selected,
-                child: InkWell(
-                  key: ValueKey('sub-master-${labels[i].toLowerCase()}'),
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () => onSelect(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    height: 42,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: i == selected ? kInk : kField,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: i == selected ? kInk : kFieldBorder),
-                    ),
-                    child: Text(labels[i], style: inter(14, 600, color: i == selected ? kMbLime : kInk)),
-                  ),
+                selected: on,
+                child: AnimatedDefaultTextStyle(
+                  duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 260),
+                  style: inter(14, 600, color: on ? kMbLime : kInk),
+                  child: Text(labels[i]),
                 ),
               ),
             ),
-          ],
-        ]),
+          ),
+        ),
       );
 }
 

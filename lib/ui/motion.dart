@@ -136,3 +136,125 @@ Future<T?> showOlDialog<T>({
     },
   );
 }
+
+// ---------------------------------------------------------------------------------------------------------------- numbers
+/// A number that counts up to [value] when it first shows, and glides to a new value when it changes (the reference video's stat
+/// tiles). [format] writes it (whole numbers by default); [textKey] goes on the Text, so a test finds the final value after settling.
+class CountUp extends StatelessWidget {
+  const CountUp(this.value, {super.key, required this.style, this.format, this.textKey, this.duration = const Duration(milliseconds: 700)});
+  final num value;
+  final TextStyle style;
+  final String Function(num v)? format;
+  final Key? textKey;
+  final Duration duration;
+  @override
+  Widget build(BuildContext context) {
+    String write(num v) => format == null ? '${v.round()}' : format!(v);
+    if (reduceMotion(context)) return Text(write(value), key: textKey, style: style);
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: value.toDouble()),
+      duration: duration,
+      curve: _ease,
+      // the last frame writes the exact value (no rounding drift for money)
+      builder: (_, v, _) => Text(v == value.toDouble() ? write(value) : write(v), key: textKey, style: style),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------- bars
+/// A bar that fills to [fraction] (0 to 1) when it first shows and glides when it changes.
+class FillBar extends StatelessWidget {
+  const FillBar({super.key, required this.fraction, required this.color, required this.track, this.height = 7, this.radius = 8});
+  final double fraction;
+  final Color color, track;
+  final double height, radius;
+  @override
+  Widget build(BuildContext context) {
+    final to = fraction.isNaN ? 0.0 : fraction.clamp(0.0, 1.0);
+    Widget bar(double f) => ClipRRect(
+          borderRadius: BorderRadius.circular(radius),
+          child: SizedBox(
+            height: height,
+            child: Stack(fit: StackFit.expand, children: [
+              ColoredBox(color: track),
+              FractionallySizedBox(alignment: Alignment.centerLeft, widthFactor: f, child: ColoredBox(color: color)),
+            ]),
+          ),
+        );
+    if (reduceMotion(context)) return bar(to);
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: to),
+      duration: const Duration(milliseconds: 650),
+      curve: _ease,
+      builder: (_, f, _) => bar(f),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------- swaps
+/// One part of the page swapped for another (a tab's content, the picked row's details): the old fades out while the new fades in
+/// and rises a little. Give [child] a key that changes with what it shows.
+class SwapFade extends StatelessWidget {
+  const SwapFade({super.key, required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    if (reduceMotion(context)) return child;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      switchInCurve: _ease,
+      switchOutCurve: Curves.easeInCubic,
+      // the new part on top, both from the top edge, so a shorter part does not jump
+      layoutBuilder: (current, previous) => Stack(alignment: Alignment.topCenter, children: [...previous, ?current]),
+      transitionBuilder: (child, a) => FadeTransition(
+        opacity: a,
+        child: SlideTransition(position: Tween<Offset>(begin: const Offset(0, 0.02), end: Offset.zero).animate(a), child: child),
+      ),
+      child: child,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------- tabs
+/// Tabs of equal width whose highlight slides to the picked one (the reference video's side rail and segmented switches).
+/// [builder] draws tab i's label (selected or not); [highlight] is the moving pill.
+class SlidingTabs extends StatelessWidget {
+  const SlidingTabs({super.key, required this.count, required this.selected, required this.onSelect, required this.builder, required this.highlight,
+      this.height = 40, this.keyOf});
+  final int count, selected;
+  final ValueChanged<int> onSelect;
+  final Widget Function(BuildContext context, int i, bool selected) builder;
+  final Widget highlight;
+  final double height;
+  /// Each tab's key (tests and Semantics find a tab by it).
+  final Key Function(int i)? keyOf;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: height,
+        child: LayoutBuilder(builder: (context, c) {
+          final w = c.maxWidth / count;
+          return Stack(children: [
+            AnimatedPositioned(
+              duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 300),
+              curve: _ease,
+              left: w * selected,
+              top: 0,
+              bottom: 0,
+              width: w,
+              child: highlight,
+            ),
+            Row(children: [
+              for (var i = 0; i < count; i++)
+                Expanded(
+                  child: InkWell(
+                    key: keyOf?.call(i),
+                    borderRadius: BorderRadius.circular(height / 2),
+                    onTap: () => onSelect(i),
+                    child: Center(child: builder(context, i, i == selected)),
+                  ),
+                ),
+            ]),
+          ]);
+        }),
+      );
+}

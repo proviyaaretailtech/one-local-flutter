@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'control_centre_screen.dart' show initials;
 import 'app_actions.dart';
@@ -282,15 +283,26 @@ class _StoreSideNavState extends State<_StoreSideNav> {
                               ? null
                               : () => _go(context, e.open!),
                     );
-                    if (e.children.isEmpty || (group && !open)) return row;
-                    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      row,
-                      for (final c in e.children)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 22, top: 6),
-                          child: _NavRow(icon: c.icon, label: c.label, sub: true, soon: c.open == null, onTap: c.open == null ? null : () => _go(context, c.open!)),
-                        ),
-                    ]);
+                    final body = e.children.isEmpty || (group && !open)
+                        ? row
+                        : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                            row,
+                            for (final c in e.children)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 22, top: 6),
+                                child: _NavRow(icon: c.icon, label: c.label, sub: true, soon: c.open == null, onTap: c.open == null ? null : () => _go(context, c.open!)),
+                              ),
+                          ]);
+                    // the rows build in one after another as the panel slides in; a group folds open and shut smoothly (lib/ui/motion.dart)
+                    return Entrance(
+                      index: i,
+                      child: AnimatedSize(
+                        duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 240),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: body,
+                      ),
+                    );
                   },
                 ),
               ),

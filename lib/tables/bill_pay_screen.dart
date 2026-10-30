@@ -184,7 +184,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
     final o = _order;
     if (o == null) return;
     final c = TextEditingController(text: localMobile(o.so('customer_phone')));
-    final to = await showDialog<String>(
+    final to = await showOlDialog<String>(
       context: context,
       builder: (d) => AlertDialog(
         title: Text(channel == 'whatsapp' ? 'Send bill on WhatsApp' : 'Send bill on SMS', style: inter(18, 700)),

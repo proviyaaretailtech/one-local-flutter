@@ -9,6 +9,7 @@ import '../orders/order_screen.dart';
 import '../orders/orders_api.dart' show rupees;
 import '../tables/table_order_screen.dart';
 import '../tables/table_widgets.dart' show TablesEnv;
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'kds_board_screen.dart';
 import 'kitchen_api.dart';
@@ -166,7 +167,7 @@ class _KotScreenState extends State<KotScreen> {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 7),
                           child: Column(children: [
-                            Text('${counts[k] ?? '–'}', style: inter(18, 800, color: on ? Colors.white : ink)),
+                            counts[k] is num ? CountUp(counts[k] as num, style: inter(18, 800, color: on ? Colors.white : ink)) : Text('–', style: inter(18, 800, color: on ? Colors.white : ink)),
                             Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 700, color: on ? Colors.white : kInk)),
                           ]),
                         ),
@@ -188,8 +189,12 @@ class _KotScreenState extends State<KotScreen> {
               )
             else
               Wrap(spacing: 12, runSpacing: 12, children: [
-                for (final o in _sorted(d.l('orders')))
-                  SizedBox(
+                // each card builds in once, by order; a new order arriving builds in on its own (lib/ui/motion.dart)
+                for (final (i, o) in _sorted(d.l('orders')).indexed)
+                  Entrance(
+                    key: ValueKey('kot-in-${o.s('id')}'),
+                    index: i,
+                    child: SizedBox(
                     width: w,
                     child: _OrderKotCard(
                       order: o,
@@ -200,6 +205,7 @@ class _KotScreenState extends State<KotScreen> {
                       onKds: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => KdsBoardScreen(env: widget.env))),
                       onView: () => _open(o),
                     ),
+                  ),
                   ),
               ]),
           ]);

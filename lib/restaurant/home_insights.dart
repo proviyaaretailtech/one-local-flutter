@@ -6,6 +6,7 @@ import '../home/home_widgets.dart';
 import '../orders/channel_orders.dart' show ChannelLogo, ChannelLook;
 import '../orders/orders_board_screen.dart' show OrdersBoardScreen;
 import '../service/service_widgets.dart' show svcRupees;
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'restaurant_api.dart';
 
@@ -106,7 +107,7 @@ class _RestaurantInsightsState extends State<RestaurantInsights> {
                 child: Column(children: [
                   ChannelLogo('${c['key']}', width: 44, height: 32, radius: 8),
                   const SizedBox(height: 6),
-                  Text('${_n(c['count']).toInt()}', style: inter(18, 800, height: 1)),
+                  CountUp(_n(c['count']), style: inter(18, 800, height: 1)),
                   Text(svcRupees(_n(c['total'])), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10.5, 600, color: kMuted)),
                   if (_n(c['new']) > 0)
                     Padding(
@@ -178,15 +179,9 @@ class _RestaurantInsightsState extends State<RestaurantInsights> {
               const SizedBox(width: 8),
               SizedBox(width: 54, child: Text(name('${p['method']}'), style: inter(12.5, 600))),
               Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: sum <= 0 ? 0 : (_n(p['amount']) / sum).toDouble(),
-                    minHeight: 8,
-                    backgroundColor: const Color(0xFFF1F2EE),
-                    color: const Color(0xFF3DB800),
-                  ),
-                ),
+                // the share fills in (lib/ui/motion.dart)
+                child: FillBar(fraction: sum <= 0 ? 0 : (_n(p['amount']) / sum).toDouble(), height: 8, radius: 4,
+                    track: const Color(0xFFF1F2EE), color: const Color(0xFF3DB800)),
               ),
               const SizedBox(width: 10),
               Text(svcRupees(_n(p['amount'])), key: ValueKey('rst-pay-${p['method']}'), style: inter(12.5, 700)),

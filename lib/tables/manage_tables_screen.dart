@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_api.dart' show Facts;
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'tables_api.dart';
 import 'table_widgets.dart';
@@ -67,7 +68,7 @@ class _ManageTablesScreenState extends State<ManageTablesScreen> {
 
   Future<void> _remove(Facts t) async {
     final label = t.s('label');
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text('Remove $label?'),

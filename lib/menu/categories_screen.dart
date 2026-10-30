@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'menu_api.dart' show MenuApiException;
 import 'menu_build_api.dart';
@@ -67,7 +68,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     final c = TextEditingController(text: name);
     var parent = parentId;
     final mains = _d?.main ?? const <MenuCat>[];
-    return showDialog<(String, String?)>(
+    return showOlDialog<(String, String?)>(
       context: context,
       builder: (d) => StatefulBuilder(
         builder: (d, set) => AlertDialog(
@@ -131,7 +132,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 
   Future<void> _delete(MenuCat c) async {
-    final ok = await showDialog<bool>(
+    final ok = await showOlDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
         title: Text('Delete ${c.name}?', style: inter(18, 700)),
