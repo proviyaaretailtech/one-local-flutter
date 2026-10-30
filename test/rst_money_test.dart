@@ -136,6 +136,37 @@ void main() {
     expect(b['amount_minor'], 50000);
   });
 
+  testWidgets('Dues: a purchase bill saved from Received is paid as money out against that bill; too much cash says what is in the drawer', (t) async {
+    var refuse = true;
+    final f = Fake((fn, body) => switch (fn) {
+          'rmoney_dues' => ok({
+              'to_collect': [],
+              'to_pay': [
+                {'kind': 'purchase_bill', 'bill_receipt_id': 'r1', 'reference': 'LD-77', 'name': 'Latur Dairy', 'amount_minor': 100000, 'paid_minor': 40000, 'left_minor': 60000},
+              ],
+              'collect_minor': 0, 'pay_minor': 60000,
+            }),
+          'rmoney_record' when refuse => http.Response(jsonEncode({'detail': 'Only ₹108 in the cash drawer.', 'code': 'not_enough_cash'}), 400,
+              headers: {'content-type': 'application/json'}),
+          _ => null,
+        });
+    await show(t, RstMoneyScreen(api: f.api, walletApi: f.wallet, today: today));
+    await tap(t, find.byKey(const ValueKey('rm-part-dues')));
+    await tap(t, find.byKey(const ValueKey('rm-pay-LD-77')));
+    expect(find.text('Purchase bill LD-77 · ₹600 left'), findsOneWidget);
+    await tap(t, find.byKey(const ValueKey('rm-invoice-method-cash')));
+    await tap(t, find.byKey(const ValueKey('rm-invoice-save')));
+    expect(find.text('Only ₹108 in the cash drawer.'), findsOneWidget);
+    await t.pumpAndSettle(const Duration(seconds: 4));
+    refuse = false;
+    await tap(t, find.byKey(const ValueKey('rm-invoice-method-upi')));
+    await tap(t, find.byKey(const ValueKey('rm-invoice-save')));
+    final b = f.of('rmoney_record').last;
+    expect(b, {'direction': 'out', 'bill_receipt_id': 'r1', 'amount_minor': 60000, 'method': 'upi'});
+    expect(f.of('money_invoice_pay'), isEmpty);
+    expect(find.byKey(const ValueKey('rm-invoice-save')), findsNothing, reason: 'saved: the sheet closes');
+  });
+
   testWidgets('Money in: the total and entries for today, the list; a method pill and the dates ask again; Add money saves once with a key', (t) async {
     final f = Fake();
     await show(t, RstMoneyFlowScreen(api: f.api, direction: 'in', today: today));

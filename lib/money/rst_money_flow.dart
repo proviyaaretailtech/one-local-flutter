@@ -547,7 +547,7 @@ class _EntrySheetState extends State<_EntrySheet> {
   }
 }
 
-/// Pay a supplier invoice from Dues: the amount (what is left by default) and how.
+/// Pay a supplier invoice, or a purchase bill saved from Received, from Dues: the amount (what is left by default) and how.
 Future<bool> showRmInvoicePaySheet(BuildContext context, {required RstMoneyApi api, required Map<String, dynamic> invoice}) async {
   final amount = TextEditingController(text: (((invoice['left_minor'] as num?) ?? 0) / 100).toStringAsFixed(((invoice['left_minor'] as num?) ?? 0) % 100 == 0 ? 0 : 2));
   var method = 'bank';
@@ -563,7 +563,8 @@ Future<bool> showRmInvoicePaySheet(BuildContext context, {required RstMoneyApi a
         padding: EdgeInsets.fromLTRB(18, 16, 18, 18 + MediaQuery.of(c).viewInsets.bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Pay ${invoice['name']}', style: inter(20, 800)),
-          Text('Invoice ${invoice['reference']} · ${rs(invoice['left_minor'] as num?)} left', style: inter(13, 500, color: kMuted)),
+          Text('${invoice['kind'] == 'purchase_bill' ? 'Purchase bill' : 'Invoice'}${invoice['reference'] == null ? '' : ' ${invoice['reference']}'} · ${rs(invoice['left_minor'] as num?)} left',
+              style: inter(13, 500, color: kMuted)),
           const SizedBox(height: 14),
           TextField(key: const ValueKey('rm-invoice-amount'), controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), inputFormatters: rupeeFormatters, decoration: _field('Amount', prefix: '₹ ')),
           const SizedBox(height: 12),
@@ -576,7 +577,11 @@ Future<bool> showRmInvoicePaySheet(BuildContext context, {required RstMoneyApi a
               final paise = paiseOf(amount.text);
               if (paise == null) return showToast(c, 'Enter the amount.');
               try {
-                await api.payInvoice('${invoice['invoice_id']}', paise, method, key: key);
+                if (invoice['kind'] == 'purchase_bill') {
+                  await api.payBill('${invoice['bill_receipt_id']}', paise, method, key: key);
+                } else {
+                  await api.payInvoice('${invoice['invoice_id']}', paise, method, key: key);
+                }
                 if (c.mounted) Navigator.pop(c, true);
               } catch (e) {
                 if (c.mounted) showToast(c, errorSentence(e));

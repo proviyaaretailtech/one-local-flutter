@@ -45,7 +45,7 @@ export const RmRecord = obj({ direction: z.enum(['in', 'out', 'move'], { message
   kind: z.string().trim().max(40).optional(), category: z.string().max(60).optional(),
   method: z.enum(['cash', 'upi', 'gpay', 'phonepe', 'card', 'bank'], { message: 'Choose how the money moved.' }).optional(),
   party: z.string().max(60).optional(), party_phone: z.string().max(20).optional(), reference: z.string().max(60).optional(), note: z.string().max(300).optional(),
-  from_account: rmAccount.optional(), to_account: rmAccount.optional(), entry_date: day.optional(), ...key });
+  from_account: rmAccount.optional(), to_account: rmAccount.optional(), entry_date: day.optional(), bill_receipt_id: id.optional(), ...key });
 export const RmVoid = z.object({ id, reason: z.string().trim().min(3, 'Say why (3 to 200 characters).').max(200) }).loose();
 export const RmClose = obj({ day: day.optional(), counted_minor: z.number({ message: 'Enter the cash you counted.' }).int().min(0).max(99_999_999_999) });
 export const RmContacts = z.object({ q: z.string().max(60).optional() }).loose();

@@ -37,4 +37,7 @@ class RstMoneyApi {
       _call('rmoney_contact_save', {'id': id, 'name': name, 'phone': phone, 'upi_id': upiId});
   Future<Map<String, dynamic>> payInvoice(String invoiceId, int amountMinor, String method, {required String key}) =>
       _call('money_invoice_pay', {'invoice_id': invoiceId, 'amount_minor': amountMinor, 'method': method}, key: key);
+  /// Pay a purchase bill saved from Received: the bill's paid amount and status move with it.
+  Future<Map<String, dynamic>> payBill(String receiptId, int amountMinor, String method, {required String key}) =>
+      record({'direction': 'out', 'bill_receipt_id': receiptId, 'amount_minor': amountMinor, 'method': method}, key: key);
 }
