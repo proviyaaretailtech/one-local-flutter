@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -18,8 +19,8 @@ if (keystorePropertiesFile.exists()) {
 // Maps SDK reads the key from the manifest. Empty: the app shows no live map (lib/ui/maps/maps_setup.dart).
 val dartDefines: Map<String, String> = (project.findProperty("dart-defines") as String?)
     ?.split(",")
-    ?.mapNotNull { runCatching { String(java.util.Base64.getDecoder().decode(it)) }.getOrNull() }
-    ?.mapNotNull { it.split("=", limit = 2).takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] } }
+    ?.mapNotNull<String, String> { runCatching { String(Base64.getDecoder().decode(it)) }.getOrNull() }
+    ?.mapNotNull<String, Pair<String, String>> { it.split("=", limit = 2).takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] } }
     ?.toMap()
     ?: emptyMap()
 
