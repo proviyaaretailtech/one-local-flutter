@@ -64,6 +64,8 @@ class Ingredient {
   String get name => _s(raw['name']);
   String get category => _s(raw['category']);
   String get unit => _s(raw['unit']);
+  /// Its barcode (0632), '' when none.
+  String get barcode => _s(raw['barcode']);
   int? get costMinor => _iN(raw['cost_minor']);
   String get costSource => _s(raw['cost_source']);
   double get onHand => _d(raw['on_hand']);
@@ -296,10 +298,11 @@ class MenuBuildApi {
   Future<List<LibraryIngredient>> library({String? q, String? category}) async =>
       _list((await _call('ing_library', {if (q != null && q.trim().isNotEmpty) 'q': q.trim(), 'category': ?category}))['items']).map(LibraryIngredient.new).toList();
   Future<IngredientList> addFromLibrary(List<String> codes) async => IngredientList(await _call('ing_add_from_library', {'codes': codes}));
-  Future<IngredientList> saveIngredient({String? id, required String name, String? category, required String unit, int? costMinor, double? reorderLevel, bool? active}) async =>
+  /// [barcode]: set it, '' clears it, null leaves it as it is (0632).
+  Future<IngredientList> saveIngredient({String? id, required String name, String? category, required String unit, int? costMinor, double? reorderLevel, bool? active, String? barcode}) async =>
       IngredientList(await _call('ing_save', {
         'id': ?id, 'name': name, 'category': (category == null || category.trim().isEmpty) ? null : category.trim(), 'unit': unit,
-        'cost_minor': costMinor, 'reorder_level': ?reorderLevel, 'active': ?active,
+        'cost_minor': costMinor, 'reorder_level': ?reorderLevel, 'active': ?active, 'barcode': ?barcode,
       }));
 
   // recipes

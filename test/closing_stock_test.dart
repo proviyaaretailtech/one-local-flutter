@@ -19,7 +19,7 @@ import 'package:vinii_pos/ui/xlsx.dart';
 
 final _items = [
   {'id': 'i-bp', 'name': 'Baking powder', 'sku': 'ING-BAK-13', 'unit': 'kg', 'category': 'Bakery', 'available': 0, 'reserved': 0, 'damaged': 0},
-  {'id': 'i-bell', 'name': 'Bell pepper (red/yellow)', 'sku': 'ING-VEG-05', 'unit': 'kg', 'category': 'Vegetables', 'available': 2.93, 'reserved': 0, 'damaged': 0},
+  {'id': 'i-bell', 'name': 'Bell pepper (red/yellow)', 'sku': 'ING-VEG-05', 'unit': 'kg', 'category': 'Vegetables', 'available': 2.93, 'reserved': 0, 'damaged': 0, 'barcode': '8901234567890'},
   {'id': 'i-bread', 'name': 'Sandwich bread', 'sku': 'ING-BAK-01', 'unit': 'pc', 'category': 'Bakery', 'available': 12, 'reserved': 0, 'damaged': 0},
 ];
 
@@ -47,7 +47,8 @@ void main() {
       final body = (jsonDecode(r.body) as Map).cast<String, dynamic>();
       calls.add((fn, body));
       final answer = switch (fn) {
-        'inv_stock_list' => {'items': _items, 'total': _items.length},
+        // the server matches a search on the code, the name or the barcode (exactly)
+        'inv_stock_list' => {'items': [for (final i in _items) if ((body['q'] ?? '') == '' || i['barcode'] == body['q'] || i['sku'] == body['q']) i], 'total': _items.length},
         'inv_document_list' => {'documents': current == null ? [] : [{'id': 'doc1', 'status': current!['status']}]},
         'inv_document_save' => current = doc('draft', body['lines'] as List, ((current?['version'] as int?) ?? 0) + 1),
         'inv_document_act' => current = {...current!, 'status': body['action'] == 'submit' ? 'review' : 'draft', 'version': (current!['version'] as int) + 1},
@@ -130,6 +131,35 @@ void main() {
     expect(sheet, contains('<v>2.5</v>'), reason: 'the count');
     expect(sheet, contains('<v>-0.43</v>'), reason: 'the difference');
     expect(utf8.decode(zip.findFile('xl/workbook.xml')!.content as List<int>), contains('Closing stock 2026-10-29'));
+  });
+
+  testWidgets('Scan counts: each scan of an item adds 1 to its count and brings its row up; an unknown code says what to do', (t) async {
+    final codes = ['8901234567890', '8901234567890', '0000000000'];
+    await show(t, ClosingStockScreen(env: env(), today: DateTime(2026, 10, 29), scan: (_) async => codes.removeAt(0)));
+    await tap(t, 'cs-scan');
+    expect(t.widget<TextField>(find.byKey(const ValueKey('cs-count-i-bell'))).controller!.text, '1');
+    expect(find.text('Sandwich bread'), findsNothing, reason: 'the scanned item is the one shown');
+    expect(find.text('Bell pepper (red/yellow) · counted 1'), findsOneWidget);
+    await t.pumpAndSettle(const Duration(seconds: 4));
+    await tap(t, 'cs-scan');
+    expect(t.widget<TextField>(find.byKey(const ValueKey('cs-count-i-bell'))).controller!.text, '2');
+    await t.pumpAndSettle(const Duration(seconds: 4));
+    await tap(t, 'cs-scan');
+    expect(find.textContaining('No item has the barcode 0000000000'), findsOneWidget);
+    await t.pumpAndSettle(const Duration(seconds: 4));
+    await tap(t, 'cs-save');
+    final saved = calls.lastWhere((c) => c.$1 == 'inv_document_save').$2;
+    expect([for (final l in saved['lines'] as List) (l['inventory_item_id'], l['counted_qty'])], [('i-bell', 2)]);
+  });
+
+  testWidgets('a finished count does not take scans until Edit counts', (t) async {
+    await show(t, ClosingStockScreen(env: env(), today: DateTime(2026, 10, 29), scan: (_) async => '8901234567890'));
+    await t.enterText(find.byKey(const ValueKey('cs-count-i-bell')), '2');
+    await t.pump();
+    await tap(t, 'cs-save');
+    await tap(t, 'cs-finish');
+    await tap(t, 'cs-scan');
+    expect(find.text('This count is finished. Tap Edit counts to change it.'), findsOneWidget);
   });
 
   test('buildXlsx: text is escaped, numbers stay numbers, header row is bold', () {

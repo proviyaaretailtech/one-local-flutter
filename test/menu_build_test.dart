@@ -410,6 +410,53 @@ void main() {
       expect(added, 2);
     });
 
+    testWidgets('scan at Ingredients (0632): a known barcode opens its ingredient; a new one is saved on the ingredient picked for it', (t) async {
+      final withCode = [for (final i in _ings) i['id'] == 'i-milk' ? {...i, 'barcode': '8906001234567'} : i];
+      final s = FakeServer((fn, b) => switch (fn) {
+            // the server finds a barcode exactly
+            'ing_list' => json(ingJson(items: (b['q'] as String?) == null ? withCode : [for (final i in withCode) if (i['barcode'] == b['q']) i])),
+            'ing_save' => json({'id': b['id'], ...ingJson(items: withCode)}),
+            _ => json({}),
+          });
+      final codes = ['8906001234567', '8900000000017'];
+      await show(t, Scaffold(body: IngredientsView(api: s.build, scan: (_) async => codes.removeAt(0))));
+      await t.tap(find.byKey(const ValueKey('ing-scan')));
+      await t.pumpAndSettle();
+      expect(find.text('Edit ingredient'), findsOneWidget);
+      expect(t.widget<TextField>(find.byKey(const ValueKey('ing-name'))).controller!.text, 'Full cream milk');
+      expect(t.widget<TextField>(find.byKey(const ValueKey('ing-barcode'))).controller!.text, '8906001234567');
+      Navigator.of(t.element(find.byKey(const ValueKey('ing-barcode')))).pop();
+      await t.pumpAndSettle();
+
+      await t.tap(find.byKey(const ValueKey('ing-scan')));
+      await t.pumpAndSettle();
+      expect(t.widget<Text>(find.byKey(const ValueKey('barcode-new-code'))).data, '8900000000017');
+      await t.enterText(find.byKey(const ValueKey('barcode-pick-search')), 'hazel');
+      await t.pump();
+      expect(find.byKey(const ValueKey('barcode-pick-Espresso coffee beans')), findsNothing);
+      await t.tap(find.byKey(const ValueKey('barcode-pick-Hazelnut syrup')));
+      await t.pumpAndSettle();
+      expect(s.last('ing_save'), allOf(containsPair('id', 'i-syrup'), containsPair('barcode', '8900000000017'), containsPair('name', 'Hazelnut syrup')));
+      expect(find.text('Barcode saved on Hazelnut syrup. Scan it again to find it.'), findsOneWidget);
+    });
+
+    testWidgets('the ingredient sheet saves its barcode; an emptied one is cleared', (t) async {
+      final s = FakeServer((fn, b) => switch (fn) { 'ing_list' => json(ingJson()), 'ing_save' => json({'id': b['id'], ...ingJson()}), _ => json({}) });
+      await show(t, Scaffold(body: IngredientsView(api: s.build)));
+      await t.tap(find.byKey(const ValueKey('ing-Hazelnut syrup')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('ing-barcode')), ' 8901 ');
+      await t.tap(find.byKey(const ValueKey('ing-save')));
+      await t.pumpAndSettle();
+      expect(s.last('ing_save'), containsPair('barcode', '8901'));
+      await t.tap(find.byKey(const ValueKey('ing-Hazelnut syrup')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('ing-barcode')), '');
+      await t.tap(find.byKey(const ValueKey('ing-save')));
+      await t.pumpAndSettle();
+      expect(s.last('ing_save'), containsPair('barcode', ''));
+    });
+
     testWidgets('edit an ingredient: cost in rupees goes as paise; Buy from supplier opens a purchase order', (t) async {
       var purchases = 0;
       HomeNav.newPurchase = (_) => purchases++;

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import 'motion.dart';
 import 'theme.dart';
 
 const _lime = Color(0xFFA1FE2F);
@@ -153,4 +154,26 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
         shape: const CircleBorder(),
         child: IconButton(tooltip: label, onPressed: onTap, icon: Icon(icon, color: Colors.white, size: 22)),
       );
+}
+
+/// The code typed in by hand ("Type the code instead" on the scanner); null when cancelled.
+Future<String?> askBarcode(BuildContext context) {
+  final c = TextEditingController();
+  return showOlDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('Type the barcode', style: inter(17, 700)),
+      content: TextField(
+        key: const ValueKey('barcode-typed'),
+        controller: c,
+        autofocus: true,
+        decoration: const InputDecoration(hintText: 'e.g. 8901234567890'),
+        onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        TextButton(key: const ValueKey('barcode-typed-ok'), onPressed: () => Navigator.pop(ctx, c.text.trim()), child: const Text('Use this code')),
+      ],
+    ),
+  );
 }

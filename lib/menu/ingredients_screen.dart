@@ -5,6 +5,7 @@ import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../home/home_nav.dart';
+import '../ui/barcode_scanner.dart';
 import '../ui/theme.dart';
 import 'menu_api.dart' show MenuApiException;
 import 'menu_build_api.dart';
@@ -15,8 +16,11 @@ import 'menu_widgets.dart' show MenuError;
 /// price, else the business's own figure), what is on hand, and how many recipes use it. Ingredients come from a preloaded library of
 /// ~200 (each added copy is the business's own and editable) or are typed in; "Buy from supplier" opens a purchase order.
 class IngredientsView extends StatefulWidget {
-  const IngredientsView({super.key, required this.api});
+  const IngredientsView({super.key, required this.api, this.scan = scanBarcodeOrType});
   final MenuBuildApi api;
+
+  /// The camera scanner (tests pass a fake): a code, '' to type it instead, or null when closed.
+  final Future<String?> Function(BuildContext context) scan;
   @override
   State<IngredientsView> createState() => _IngredientsViewState();
 }
@@ -75,6 +79,37 @@ class _IngredientsViewState extends State<IngredientsView> {
     }
   }
 
+  /// Scan a barcode (founder, 30 Oct 2026): a known one opens its ingredient; a new one is saved on the ingredient picked for it.
+  Future<void> _scan() async {
+    var code = await widget.scan(context);
+    if (!mounted || code == null) return;
+    if (code.isEmpty) code = await askBarcode(context);
+    if (!mounted || code == null || code.trim().isEmpty) return;
+    code = code.trim();
+    try {
+      final found = (await widget.api.ingredients(q: code)).items.where((i) => i.barcode == code).firstOrNull;
+      if (!mounted) return;
+      if (found != null) return await _edit(found);
+      final all = _last?.items ?? (await widget.api.ingredients()).items;
+      if (!mounted) return;
+      final pick = await showModalBottomSheet<Ingredient>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (_) => _PickForBarcode(code: code!, items: all),
+      );
+      if (pick == null || !mounted) return;
+      await widget.api.saveIngredient(id: pick.id, name: pick.name, category: pick.category, unit: pick.unit, costMinor: pick.costMinor,
+          reorderLevel: pick.reorderLevel.toDouble(), barcode: code);
+      if (!mounted) return;
+      showToast(context, 'Barcode saved on ${pick.name}. Scan it again to find it.');
+      _reload();
+    } on MenuApiException catch (e) {
+      if (mounted) showToast(context, e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<IngredientList>(
@@ -129,8 +164,15 @@ class _IngredientsViewState extends State<IngredientsView> {
               },
               style: inter(14, 500),
               decoration: InputDecoration(
-                hintText: 'Search ingredient',
+                hintText: 'Search or scan an ingredient',
                 prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
+                // the barcode scanner (founder, 30 Oct 2026)
+                suffixIcon: IconButton(
+                  key: const ValueKey('ing-scan'),
+                  tooltip: 'Scan a barcode',
+                  onPressed: _scan,
+                  icon: const Icon(LucideIcons.scanBarcode, size: 20, color: kInk),
+                ),
                 isDense: true,
                 filled: true,
                 fillColor: Colors.white,
@@ -240,6 +282,7 @@ class _IngredientSheetState extends State<IngredientSheet> {
   late final _cat = TextEditingController(text: widget.ingredient?.category ?? '');
   late final _cost = TextEditingController(text: widget.ingredient?.costMinor == null ? '' : (widget.ingredient!.costMinor! / 100).toStringAsFixed(2));
   late final _reorder = TextEditingController(text: widget.ingredient == null || widget.ingredient!.reorderLevel == 0 ? '' : _qty(widget.ingredient!.reorderLevel));
+  late final _barcode = TextEditingController(text: widget.ingredient?.barcode ?? '');
   late String _unit = widget.ingredient?.unit.isNotEmpty == true ? widget.ingredient!.unit : 'kg';
   bool _busy = false;
   String? _error;
@@ -258,6 +301,7 @@ class _IngredientSheetState extends State<IngredientSheet> {
         unit: _unit,
         costMinor: cost == null ? null : (cost * 100).round(),
         reorderLevel: numOf(_reorder.text) ?? 0,
+        barcode: _barcode.text.trim(), // '' clears it (0632)
       );
       if (mounted) Navigator.of(context).pop(true);
     } on MenuApiException catch (e) {
@@ -301,6 +345,24 @@ class _IngredientSheetState extends State<IngredientSheet> {
           ),
           MbField(label: 'Cost per $_unit', controller: _cost, number: true, prefix: '₹ ', hint: '0.00', fieldKey: const ValueKey('ing-cost')),
           MbField(label: 'Reorder when stock falls to ($_unit)', controller: _reorder, number: true, hint: 'Optional', fieldKey: const ValueKey('ing-reorder')),
+          // its barcode: typed, or read with the camera (founder, 30 Oct 2026)
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(child: MbField(label: 'Barcode', controller: _barcode, hint: 'Optional', fieldKey: const ValueKey('ing-barcode'), maxLength: 48)),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 30),
+              child: OutlinedButton.icon(
+                key: const ValueKey('ing-barcode-scan'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48), side: const BorderSide(color: kInk), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                onPressed: () async {
+                  final code = await scanBarcode(context);
+                  if (code != null && code.trim().isNotEmpty && mounted) setState(() => _barcode.text = code.trim());
+                },
+                icon: const Icon(LucideIcons.scanBarcode, size: 18, color: kInk),
+                label: Text('Scan', style: inter(14, 700)),
+              ),
+            ),
+          ]),
           if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_error!, style: inter(13, 500, color: kError))),
           MbPrimaryButton(i == null ? 'Add ingredient' : 'Save', busy: _busy, onPressed: _save, key: const ValueKey('ing-save')),
           if (i != null) ...[
@@ -413,6 +475,81 @@ class _LibraryPickerScreenState extends State<LibraryPickerScreen> {
               minimum: const EdgeInsets.fromLTRB(14, 8, 14, 12),
               child: MbPrimaryButton('Add ${_picked.length} ingredient${_picked.length == 1 ? '' : 's'}', busy: _busy, onPressed: _add, key: const ValueKey('lib-add')),
             ),
+    );
+  }
+}
+
+
+/// A new barcode: which ingredient is it? A search over the ingredients; a tap answers that ingredient.
+class _PickForBarcode extends StatefulWidget {
+  const _PickForBarcode({required this.code, required this.items});
+  final String code;
+  final List<Ingredient> items;
+  @override
+  State<_PickForBarcode> createState() => _PickForBarcodeState();
+}
+
+class _PickForBarcodeState extends State<_PickForBarcode> {
+  String _q = '';
+  @override
+  Widget build(BuildContext context) {
+    final q = _q.toLowerCase();
+    final shown = [for (final i in widget.items) if (q.isEmpty || i.name.toLowerCase().contains(q)) i];
+    return Padding(
+      padding: EdgeInsets.fromLTRB(18, 16, 18, 12 + MediaQuery.viewInsetsOf(context).bottom),
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.7,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: kMbLime, borderRadius: BorderRadius.circular(12)),
+              child: const Icon(LucideIcons.scanBarcode, size: 20, color: kInk),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('New barcode', style: inter(18, 800)),
+                Text(widget.code, key: const ValueKey('barcode-new-code'), style: inter(13, 600, color: kMuted)),
+              ]),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Text('Which ingredient is it? Its barcode is saved, so the next scan finds it.', style: inter(13, 500, color: kMuted, height: 1.35)),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey('barcode-pick-search'),
+            onChanged: (v) => setState(() => _q = v.trim()),
+            decoration: InputDecoration(
+              hintText: 'Search ingredient',
+              prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
+              isDense: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kLine)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: shown.isEmpty
+                ? Center(child: Text('No ingredient called "$_q".', style: inter(13, 500, color: kMuted)))
+                : ListView.separated(
+                    itemCount: shown.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1, color: kLine),
+                    itemBuilder: (_, n) {
+                      final i = shown[n];
+                      return ListTile(
+                        key: ValueKey('barcode-pick-${i.name}'),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                        title: Text(i.name, style: inter(14.5, 600)),
+                        subtitle: Text([if (i.category.isNotEmpty) i.category, if (i.barcode.isNotEmpty) 'has barcode ${i.barcode}'].join(' · '),
+                            style: inter(12, 400, color: kMuted)),
+                        trailing: const Icon(LucideIcons.chevronRight, size: 18, color: kMuted),
+                        onTap: () => Navigator.of(context).pop(i),
+                      );
+                    },
+                  ),
+          ),
+        ]),
+      ),
     );
   }
 }

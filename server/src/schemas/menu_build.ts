@@ -19,6 +19,8 @@ export const IngSave = obj({
   id: id.optional(), name: name(80, 'Enter the ingredient name.'), category: z.string().max(40).nullish(), unit,
   cost_minor: z.number().int().min(0).max(100_000_000).nullish(), reorder_level: z.number().min(0).max(1_000_000).optional(),
   is_veg: z.boolean().optional(), active: z.boolean().optional(),
+  // 0632: the ingredient's barcode; '' clears it
+  barcode: z.string({ message: 'The barcode is text.' }).trim().max(48, 'A barcode is up to 48 characters.').regex(/^[A-Za-z0-9._-]*$/, 'A barcode is letters and digits.').optional(),
 });
 
 // ---- recipes

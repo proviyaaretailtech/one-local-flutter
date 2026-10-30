@@ -6,6 +6,7 @@ import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_api.dart';
+import '../ui/barcode_scanner.dart';
 import '../ui/theme.dart';
 import '../ui/xlsx.dart';
 import 'damage_flow.dart' show problem;
@@ -29,9 +30,12 @@ Future<void> Function(Uint8List bytes, String name) saveSpreadsheet = (bytes, na
 /// counts are one stock count (an audit): Save keeps them, Finish count closes it, Fix the difference sends one correction for approval,
 /// and Edit counts opens a finished one again. Export Excel writes the table as an .xlsx.
 class ClosingStockScreen extends StatefulWidget {
-  const ClosingStockScreen({super.key, required this.env, this.today});
+  const ClosingStockScreen({super.key, required this.env, this.today, this.scan = scanBarcodeOrType});
   final StockEnv env;
   final DateTime? today;
+
+  /// The camera scanner (tests pass a fake): a code, '' to type it instead, or null when closed.
+  final Future<String?> Function(BuildContext context) scan;
   @override
   State<ClosingStockScreen> createState() => _ClosingStockScreenState();
 }
@@ -46,6 +50,41 @@ class _ClosingStockScreenState extends State<ClosingStockScreen> {
   final _typed = <String, TextEditingController>{}; // item id → counted
   final _search = TextEditingController();
   String _q = '', _show = 'all';
+  String? _flash; // the row a scan just counted, highlighted
+
+  /// Count by scanning (founder, 30 Oct 2026): each scan of an item adds 1 to its count and brings its row up, highlighted.
+  Future<void> _scan() async {
+    var code = await widget.scan(context);
+    if (!mounted || code == null) return;
+    if (code.isEmpty) code = await askBarcode(context);
+    if (!mounted || code == null || code.trim().isEmpty) return;
+    code = code.trim();
+    if (!_open) return showToast(context, 'This count is finished. Tap Edit counts to change it.');
+    try {
+      // the server matches a barcode exactly (and a code or name); a code of one item is the item
+      final hits = (await widget.env.inv.api.stock(q: code, pageSize: 5)).l('items');
+      if (!mounted) return;
+      final known = {for (final it in _items ?? const <Facts>[]) it.s('id')};
+      final it = hits.where((h) => h.s('sku') == code).firstOrNull ?? (hits.length == 1 ? hits.first : null);
+      if (it == null || !known.contains(it.s('id'))) {
+        return showToast(context, hits.isEmpty
+            ? 'No item has the barcode $code. Save it on the ingredient first (Ingredients → scan).'
+            : 'More than one item matches $code. Search it by name instead.');
+      }
+      final box = _box(it.s('id'));
+      final n = (num.tryParse(box.text.trim()) ?? 0) + 1;
+      setState(() {
+        box.text = n == n.roundToDouble() ? '${n.toInt()}' : '$n';
+        _search.text = it.s('name');
+        _q = it.s('name');
+        _show = 'all';
+        _flash = it.s('id');
+      });
+      showToast(context, '${it.s('name')} · counted ${box.text}');
+    } catch (e) {
+      if (mounted) showToast(context, problem(e));
+    }
+  }
   bool _busy = false;
   Object? _error;
 
@@ -213,8 +252,31 @@ class _ClosingStockScreenState extends State<ClosingStockScreen> {
                 style: inter(12.5, 600, color: kMuted)),
           ],
           const SizedBox(height: 12),
-          InvInput(key: const ValueKey('cs-search'), controller: _search, hint: 'Search item, code or category', prefixIcon: LucideIcons.search,
-              onChanged: (v) => setState(() => _q = v.trim())),
+          // search, or count by scanning (founder, 30 Oct 2026)
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: InvInput(key: const ValueKey('cs-search'), controller: _search, hint: 'Search item, code or category', prefixIcon: LucideIcons.search,
+                  onChanged: (v) => setState(() => _q = v.trim())),
+            ),
+            const SizedBox(width: 8),
+            Material(
+              color: kInk,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                key: const ValueKey('cs-scan'),
+                borderRadius: BorderRadius.circular(14),
+                onTap: _busy ? null : _scan,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(LucideIcons.scanBarcode, size: 20, color: Color(0xFFD2F64B)),
+                    const SizedBox(width: 6),
+                    Text('Scan', style: inter(14, 700, color: Colors.white)),
+                  ]),
+                ),
+              ),
+            ),
+          ]),
           const SizedBox(height: 10),
           Wrap(spacing: 8, children: [
             for (final (k, label) in [('all', 'All'), ('counted', 'Counted ($counted)'), ('diff', 'Differences ($diffs)')])
@@ -253,7 +315,11 @@ class _ClosingStockScreenState extends State<ClosingStockScreen> {
                 ],
                 rows: [
                   for (final it in rows)
-                    DataRow(key: ValueKey('cs-row-${it.s('id')}'), cells: [
+                    DataRow(
+                        key: ValueKey('cs-row-${it.s('id')}'),
+                        // the row a scan just counted
+                        color: _flash == it.s('id') ? const WidgetStatePropertyAll(Color(0xFFEFFAD0)) : null,
+                        cells: [
                       DataCell(ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 150),
                         child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
