@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../api/net_guard.dart';
 import '../inventory/inventory_api.dart' show Facts;
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
@@ -19,6 +21,9 @@ class KdsScreen extends StatefulWidget {
 }
 
 class _KdsScreenState extends State<KdsScreen> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
   KitchenEnv get env => widget.env;
   Facts? _d;
   String? _error;
@@ -30,6 +35,9 @@ class _KdsScreenState extends State<KdsScreen> {
   @override
   void initState() {
     super.initState();
+    _live = LiveSync.watch({'kitchen'}, () {
+      if (mounted) _load();
+    });
     _load();
     if (env.refreshEvery != null) _timer = Timer.periodic(env.refreshEvery!, (_) => _load());
   }
@@ -39,6 +47,7 @@ class _KdsScreenState extends State<KdsScreen> {
     _timer?.cancel();
     _debounce?.cancel();
     _search.dispose();
+    _live();
     super.dispose();
   }
 
@@ -52,7 +61,7 @@ class _KdsScreenState extends State<KdsScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = errorSentence(e));
     }
   }
 
@@ -243,6 +252,12 @@ class _TicketCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: Row(children: [
               Expanded(child: Text(i.s('name'), style: inter(17, 400, color: i.b('done') ? kMuted : kInk))),
+              // pack this one: a takeaway dish on a dine-in order (0606)
+              if (i.b('takeaway'))
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: KitchenTag('TAKEAWAY', key: ValueKey('kds-takeaway-${i.s('id')}'), bg: const Color(0xFFFFEDD5), fg: const Color(0xFFC2410C)),
+                ),
               Semantics(
                 label: '${i.s('name')} done',
                 toggled: i.b('done'),

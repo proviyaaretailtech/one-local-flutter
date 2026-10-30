@@ -7,6 +7,7 @@ import { parse } from '../../validate.ts';
 import { Bank, Tax } from '../../schemas/onboarding.ts';
 import { Payment } from '../../schemas/setup.ts';
 import { withImageLinks } from './storage.ts';
+import { checkTax } from './kyc.ts';
 import type { SecureCtx } from './index.ts';
 
 function piiKey(): string {
@@ -15,8 +16,15 @@ function piiKey(): string {
   return k;
 }
 
-export const saveTax = ({ userId, args }: SecureCtx) =>
-  rpc('partner_app_save_tax', { p_user_id: userId, p: parse(Tax, args), p_key: piiKey() });
+// PAN and GSTIN are checked with apitxt first (kyc.ts): a refused one is never saved. The answer is the application plus
+// `verification` (the name on the PAN, the GSTIN's legal name) so the screen can show what was confirmed; it is not stored.
+export async function saveTax({ userId, args }: SecureCtx, deps: { check?: typeof checkTax } = {}) {
+  const p = parse(Tax, args);
+  const key = piiKey();
+  const verification = await (deps.check ?? checkTax)(userId, p);
+  const saved = await rpc<Record<string, unknown>>('partner_app_save_tax', { p_user_id: userId, p, p_key: key });
+  return saved && typeof saved === 'object' && !Array.isArray(saved) ? { ...saved, verification } : saved;
+}
 
 export function saveBank({ userId, args }: SecureCtx) {
   const { draft, ...fields } = parse(Bank, args);

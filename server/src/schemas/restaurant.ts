@@ -7,6 +7,8 @@ const id = z.string({ message: 'Not a valid id.' }).regex(UUID, 'Not a valid id.
 export const Dashboard = z.object({ location_id: id.nullish() }).loose();
 // 0524: the restaurant home for one outlet or 'all' (summed over the outlets the person may see)
 export const DashboardScope = z.object({ location_id: z.union([id, z.literal('all')]).nullish() }).loose();
+// The KOT view (0609): today's kitchen orders, one card each; status all / preparing / ready / completed.
+export const KotOrders = z.object({ location_id: z.union([id, z.literal('all')]).nullish(), status: z.enum(['all', 'preparing', 'ready', 'completed', 'cancelled'], { message: 'Unknown status.' }).optional() }).loose();
 
 // Restaurant menu and dish detail (database: migrations 0540-0541). Every rule (menu.update, windows, 500-character description, stale
 // version, tenancy, rate limit) is checked again in the database.
@@ -58,3 +60,9 @@ export const ReceiptLog = obj({
   order_id: id, channel: z.enum(['print', 'whatsapp', 'sms', 'email'], { message: 'Print, WhatsApp, SMS or email.' }),
   to: z.string().trim().max(200).nullish(),
 });
+// The Activity log in Settings (0614): every order's operational timeline, newest first; 'before' pages back to older entries.
+export const ActivityLog = z.object({
+  location_id: z.union([id, z.literal('all')]).nullish(),
+  before: z.string().datetime({ offset: true, message: 'Not a valid time.' }).nullish(),
+  limit: z.number().int().min(1).max(100).optional(),
+}).loose();

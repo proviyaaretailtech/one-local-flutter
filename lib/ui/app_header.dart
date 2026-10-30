@@ -253,3 +253,8 @@ class _Profile extends StatelessWidget {
     );
   }
 }
+
+/// The header's round white button, for a page's own [AppHeader.trailing] (for example the wallet on Page Manager).
+class HeaderRound extends _Round {
+  const HeaderRound({super.key, required super.icon, required super.label, required super.onTap});
+}

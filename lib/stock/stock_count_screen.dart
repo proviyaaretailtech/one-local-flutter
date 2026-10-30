@@ -120,6 +120,25 @@ class _StockCountScreenState extends State<StockCountScreen> {
     });
   }
 
+  /// A finished count goes back to being counted, so its quantities can be changed before the difference is fixed.
+  Future<void> _reopen() async {
+    final d = _doc;
+    if (d == null) return;
+    await _run(() async {
+      final open = await env.api.act(d.id, 'reopen', version: d.version);
+      _show(await env.api.document(open.id));
+      if (mounted) showToast(context, 'Change the counts, then Finish count again.');
+    });
+  }
+
+  /// − / + on a count: one at a time (pieces) or a tenth (kg, litres), never below zero.
+  void _step(Facts l, num by) {
+    final c = _typed[l.s('id')]!;
+    final now = num.tryParse(c.text.trim()) ?? l.n('system_qty');
+    final next = (now + by) < 0 ? 0 : now + by;
+    c.text = qty(double.parse(next.toStringAsFixed(3)));
+  }
+
   Future<void> _fix() async {
     final d = _doc;
     if (d == null) return;
@@ -189,26 +208,66 @@ class _StockCountScreenState extends State<StockCountScreen> {
           const SizedBox(width: 10),
           Expanded(child: InvPrimary(tr('Finish count'), key: const ValueKey('count-finish'), busy: _busy, onPressed: _busy ? null : () => _save(finish: true))),
         ]),
-      ] else if (d.b('can_draft_adjustment') || d.status == 'review')
+      ] else if (d.b('can_draft_adjustment') || d.status == 'review') ...[
+        // a finished count can still be corrected before the difference is sent
+        if (d.status == 'review') ...[
+          InvSecondary(tr('Edit counts'), key: const ValueKey('count-reopen'), onPressed: _busy ? null : _reopen),
+          const SizedBox(height: 10),
+        ],
         InvPrimary(tr('Fix the difference'), key: const ValueKey('count-fix'), busy: _busy, onPressed: _busy ? null : _fix),
+      ],
     ];
   }
+
+  Widget _stepButton(IconData icon, String key, VoidCallback onTap) => Material(
+        color: kBg,
+        shape: const CircleBorder(),
+        child: InkWell(
+          key: ValueKey(key),
+          customBorder: const CircleBorder(),
+          onTap: _busy ? null : onTap,
+          child: SizedBox(width: 42, height: 42, child: Icon(icon, size: 18, color: kInk)),
+        ),
+      );
 
   Widget _line(Facts l, bool open) {
     final c = _typed[l.s('id')]!;
     final typed = num.tryParse(c.text.trim());
     final diff = typed == null ? null : typed - l.n('system_qty');
+    final unit = l.m('item').s('unit');
+    final step = const {'kg', 'l', 'litre', 'ltr'}.contains(unit.toLowerCase()) ? 0.1 : 1;
     return InvCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
           Expanded(child: Text(l.m('item').s('name'), style: inter(15, 700))),
           if (diff != null) StockStatusChip(diff == 0 ? 'healthy' : 'critical', label: diff == 0 ? 'Matches' : signed(diff)),
         ]),
-        StockRow(tr('In the app'), qty(l.n('system_qty'))),
+        StockRow(tr('In the app'), '${qty(l.n('system_qty'))} $unit'.trim()),
         if (open)
-          Padding(padding: const EdgeInsets.only(top: 8), child: InvInput(key: ValueKey('count-qty-${l.s('id')}'), controller: c, number: true, hint: tr('How many did you count?')))
+          // the count, typed or stepped, in the item's unit (0.5 kg, 12 pc)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(children: [
+              _stepButton(LucideIcons.minus, 'count-minus-${l.s('id')}', () => _step(l, -step)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: InvInput(
+                  key: ValueKey('count-qty-${l.s('id')}'),
+                  controller: c,
+                  number: true,
+                  label: tr('Counted'),
+                  hint: tr('How many did you count?'),
+                  suffix: unit.isEmpty
+                      ? null
+                      : Padding(padding: const EdgeInsets.only(right: 12, top: 13), child: Text(unit, key: ValueKey('count-unit-${l.s('id')}'), style: inter(14, 600, color: kMuted))),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _stepButton(LucideIcons.plus, 'count-plus-${l.s('id')}', () => _step(l, step)),
+            ]),
+          )
         else
-          StockRow(tr('Counted'), typed == null ? '—' : qty(typed)),
+          StockRow(tr('Counted'), typed == null ? '—' : '${qty(typed)} $unit'.trim()),
       ]),
     );
   }

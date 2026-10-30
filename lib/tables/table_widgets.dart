@@ -6,6 +6,7 @@ import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../outlets/outlet_header.dart';
 import '../ui/app_header.dart';
+import '../ui/app_tab_bar.dart' show TabShellScope;
 import '../ui/theme.dart';
 import 'table_qr_api.dart';
 import 'tables_api.dart';
@@ -55,7 +56,7 @@ const kTableDot = Color(0xFF10B981);
       'occupied' => ('OCCUPIED', kOccBorder, kOccBg, kOccText),
       'reserved' => ('RESERVED', kResBorder, kResBg, kResText),
       'cleaning' => ('CLEANING', kCleanBorder, kCleanBg, kCleanText),
-      _ => (status.toUpperCase(), kCleanBorder, kCleanBg, kCleanText),
+      _ => (status.isEmpty ? 'NO STATUS' : status.toUpperCase().replaceAll('_', ' '), kCleanBorder, kCleanBg, kCleanText),
     };
 
 /// "1h 15m" / "45m" / "2h". Display only; the minutes come from the server.
@@ -89,8 +90,11 @@ String pax(num seats) => '${seats.toInt()} Pax';
 
 /// Page shell of the tables screens: header (menu or back, title, subtitle, round initials badge), body, floating bottom bar.
 class TablesPage extends StatelessWidget {
-  const TablesPage({super.key, required this.env, required this.title, this.subtitle, required this.children, this.back = false, this.onRefresh, this.nav = true, this.footer});
+  const TablesPage({super.key, required this.env, required this.title, this.subtitle, required this.children, this.back = false, this.onRefresh, this.nav = true, this.footer, this.banner = false});
   final TablesEnv env;
+
+  /// With [back]: the app's green banner and round ← instead of the plain back row.
+  final bool banner;
   final String title;
   final String? subtitle;
   final List<Widget> children;
@@ -122,15 +126,21 @@ class TablesPage extends StatelessWidget {
               under: subtitle == null ? null : Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, 400, color: kMuted)),
             ),
           Expanded(child: list),
-          ?footer,
         ]),
       ),
-      bottomNavigationBar: nav ? TablesNav(onTap: (id) => env.onNavigate?.call(id)) : null,
+      // the footer sits in the bottom bar, so a toast rises above it instead of covering its buttons (founder, 30 Oct 2026)
+      bottomNavigationBar: footer == null
+          ? (nav ? TablesNav(onTap: (id) => env.onNavigate?.call(id)) : null)
+          : Column(mainAxisSize: MainAxisSize.min, children: [
+              SafeArea(top: false, bottom: !nav, child: footer!),
+              if (nav) TablesNav(onTap: (id) => env.onNavigate?.call(id)),
+            ]),
     );
   }
 }
 
-/// Floating dark bottom bar of the POS frames: Home, Menu, Bill (active), Orders, Stock.
+/// Floating dark bottom bar of the POS frames: Home, Menu, Bill (active), Orders, Stock. Inside the app shell (the restaurant's
+/// Bill tab) the shell draws the one bar, so this draws nothing, like [AppTabBar].
 class TablesNav extends StatelessWidget {
   const TablesNav({super.key, required this.onTap});
   final ValueChanged<String> onTap;
@@ -139,10 +149,10 @@ class TablesNav extends StatelessWidget {
     ('menu', 'Menu', LucideIcons.bookOpen),
     ('pos', 'Bill', LucideIcons.receiptText),
     ('orders', 'Orders', LucideIcons.shoppingBag),
-    ('stock', 'Stock', LucideIcons.boxes),
+    // no Stock tab for now (founder, 27 Oct 2026)
   ];
   @override
-  Widget build(BuildContext context) => SafeArea(
+  Widget build(BuildContext context) => TabShellScope.inside(context) ? const SizedBox.shrink() : SafeArea(
         top: false,
         minimum: const EdgeInsets.fromLTRB(14, 12, 14, 14), // 12 above: the last button of a page never touches the bar
         child: Container(
@@ -178,10 +188,16 @@ class TablesNav extends StatelessWidget {
 
 /// One card of the grid: "T1  4 Pax", status chip, elapsed or booking time.
 class TableCard extends StatelessWidget {
-  const TableCard({super.key, required this.table, required this.onTap, this.selected = false, this.busyLook = false, this.compact = false});
+  const TableCard({super.key, required this.table, required this.onTap, this.selected = false, this.busyLook = false, this.compact = false, this.onAddItems, this.height});
   final Facts table;
   final VoidCallback? onTap;
   final bool selected;
+
+  /// The floor: a table that already ordered gets "+ Add items" (more dishes on the same order, as a new KOT).
+  final VoidCallback? onAddItems;
+
+  /// A fixed card height (the floor keeps every card in a row the same height); null = the default.
+  final double? height;
 
   /// Merge screen: an occupied table is drawn orange.
   final bool busyLook;
@@ -209,7 +225,7 @@ class TableCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
-          height: compact ? 108 : 112,
+          height: height ?? (compact ? 108 : 112),
           decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16), border: Border.all(color: border, width: 2)),
           child: Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -223,6 +239,27 @@ class TableCard extends StatelessWidget {
                 child: Text(label, style: inter(compact ? 13 : 14.5, 700, color: text)),
               ),
               if (sub != null) Padding(padding: const EdgeInsets.only(top: 3), child: Text(sub, style: inter(14, 400, color: kMuted))),
+              if (onAddItems != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Material(
+                    color: kLimeBtn,
+                    borderRadius: BorderRadius.circular(999),
+                    child: InkWell(
+                      key: ValueKey('add-items-${table.s('label')}'),
+                      borderRadius: BorderRadius.circular(999),
+                      onTap: onAddItems,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(LucideIcons.plus, size: 14, color: kInk),
+                          const SizedBox(width: 3),
+                          Text('Add items', style: inter(12.5, 700)),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ),
             ]),
           ),
         ),

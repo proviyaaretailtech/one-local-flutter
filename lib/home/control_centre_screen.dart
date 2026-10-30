@@ -124,9 +124,9 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
       );
       return;
     }
-    // A restaurant gets the Figma More page (section D 45:7539).
+    // A restaurant gets the same side bar with its own links (founder, 29 Oct 2026).
     if (_kind == 'restaurant') {
-      Navigator.of(c).push(RestaurantMoreScreen.route(outletName: _outletName ?? 'My outlet', outletLine: 'Restaurant', onLogout: _signOut));
+      RestaurantMoreScreen.open(c, name: _personName ?? 'Partner', email: (widget.auth ?? AuthRepository()).currentEmail, outletName: _outletName ?? 'My outlet', onLogout: _signOut, onReports: () => _openHub(c));
       return;
     }
     showModalBottomSheet<void>(

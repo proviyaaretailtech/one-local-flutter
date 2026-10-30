@@ -23,7 +23,7 @@ class _Photos extends ItemPhotoService {
   }
 
   @override
-  Future<ItemPhoto> removeBackground(ItemPhoto p) async {
+  Future<ItemPhoto> removeBackground(ItemPhoto p, {String? bgColor}) async {
     cutOuts++;
     if (fail) throw const ItemPhotoUnavailable('No product was found in the photo. Try again with the product in the middle.');
     return ItemPhoto(bytes: p.bytes, contentType: 'image/png', backgroundRemoved: true);

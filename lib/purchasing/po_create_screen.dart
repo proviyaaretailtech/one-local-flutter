@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../api/net_guard.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
@@ -64,7 +65,7 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = errorSentence(e));
     }
   }
 
@@ -236,7 +237,7 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
       showToast(context, '${po.number} ${tr('generated')}. ${tr('Mark it Received when the goods come.')}');
       Navigator.of(context).maybePop(po);
     } catch (e) {
-      if (mounted) showToast(context, e.toString());
+      if (mounted) showToast(context, errorSentence(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -148,7 +148,7 @@ void main() {
       await t.pumpAndSettle();
       final saved = s.bodies('cust_save').single;
       expect(saved['first_name'], 'Ravi');
-      expect(saved['phone'], '98765 43211');
+      expect(saved['phone'], '9876543211', reason: 'the box keeps the 10 digits after +91');
       expect(saved.containsKey('id'), isFalse);
       expect(find.text('Customers'), findsOneWidget); // back on the list, which reloads
     });

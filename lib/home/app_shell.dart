@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../assistant/ol_bot.dart';
 import '../ui/app_tab_bar.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -151,7 +152,10 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
           ),
           ),
         ),
-        bottomNavigationBar: (_popups[_current] ?? 0) > 0 ? null : FloatingTabBar(tabs: tabs, onTap: _tap, current: _current),
+        // the restaurant bar ends with Ol, the helper (founder, 27 Oct 2026): tips for this tab, and "Ask Ol" to find anything
+        bottomNavigationBar: (_popups[_current] ?? 0) > 0
+            ? null
+            : FloatingTabBar(tabs: tabs, onTap: _tap, current: _current, trailing: _kind == 'restaurant' ? OlBot(current: _current, onNavigate: _tap) : null),
       ),
     );
   }

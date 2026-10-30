@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'control_centre_screen.dart' show initials;
 import 'app_actions.dart';
@@ -52,6 +53,21 @@ Future<void> showStoreSideNav(
     // the OneLocal plans and prices (founder, 28 Oct 2026), last
     SideNavEntry(LucideIcons.crown, 'Subscription plans', hook(HomeNav.plans)),
   ];
+  return showSideNav(context, name: name, email: email, entries: entries, onSignOut: onSignOut, onReports: onReports);
+}
+
+/// The side nav with any list of rows: the store's (above) and the restaurant's (founder, 29 Oct 2026: the restaurant side bar looks like
+/// the store's, with the restaurant's own links). Profile (Manage account), Search the app, the rows, Sign out.
+Future<void> showSideNav(
+  BuildContext context, {
+  required String name,
+  String? email,
+  String? line,
+  required List<SideNavEntry> entries,
+  required VoidCallback onSignOut,
+  Set<String> openGroups = const {},
+  VoidCallback? onReports,
+}) {
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
@@ -63,9 +79,11 @@ Future<void> showStoreSideNav(
       child: _StoreSideNav(
         name: name,
         email: email,
+        line: line,
         entries: entries,
+        openGroups: openGroups,
         actions: appActions(context, onReports: onReports),
-        onAccount: hook(HomeNav.account),
+        onAccount: HomeNav.account == null ? null : () => HomeNav.account!(context),
         onSignOut: onSignOut,
       ),
     ),
@@ -77,9 +95,15 @@ Future<void> showStoreSideNav(
 }
 
 class _StoreSideNav extends StatefulWidget {
-  const _StoreSideNav({required this.name, required this.email, required this.entries, required this.onSignOut, this.onAccount, this.actions = const []});
+  const _StoreSideNav({required this.name, required this.email, required this.entries, required this.onSignOut, this.onAccount, this.line, this.openGroups = const {}, this.actions = const []});
+
+  /// The folding rows open from the start (back from an Inventory page: Inventory).
+  final Set<String> openGroups;
   final String name;
   final String? email;
+
+  /// A line under the email (the restaurant's outlet).
+  final String? line;
   final List<SideNavEntry> entries;
   final VoidCallback onSignOut;
   final VoidCallback? onAccount;
@@ -93,6 +117,7 @@ class _StoreSideNav extends StatefulWidget {
 
 class _StoreSideNavState extends State<_StoreSideNav> {
   final _search = TextEditingController();
+  late final _openGroups = <String>{...widget.openGroups}; // the folding rows now open
 
   String get name => widget.name;
   String? get email => widget.email;
@@ -227,7 +252,8 @@ class _StoreSideNavState extends State<_StoreSideNav> {
                           name.trim().isEmpty
                               ? Text(tr('Add your name'), style: inter(15, 700, color: kLink))   // no name on the account yet: Manage account sets it
                               : Text(name, style: inter(15, 700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          if (email != null && email!.isNotEmpty) Text(email!, style: inter(12, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if ((email ?? '').isNotEmpty) Text(email!, style: inter(12, 400, color: kMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if ((widget.line ?? '').isNotEmpty) Text(widget.line!, key: const ValueKey('side-nav-line'), style: inter(12, 600, color: kLink), maxLines: 1, overflow: TextOverflow.ellipsis),
                         ]),
                       ),
                     ]),
@@ -244,21 +270,42 @@ class _StoreSideNavState extends State<_StoreSideNav> {
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final e = entries[i];
+                    // a row with sub-rows and no page of its own folds open and shut (Inventory, founder 29 Oct 2026); a search for a
+                    // sub-row opens its group
+                    final group = e.children.isNotEmpty && e.open == null;
+                    final open = group && _openGroups.contains(e.label);
                     final row = _NavRow(
+                      key: group ? ValueKey('side-nav-group-${e.label}') : null,
                       icon: e.icon,
                       label: e.label,
-                      soon: e.open == null,
-                      onTap: e.open == null ? null : () => _go(context, e.open!),
+                      soon: e.open == null && !group,
+                      expanded: group ? open : null,
+                      onTap: group
+                          ? () => setState(() => _openGroups.contains(e.label) ? _openGroups.remove(e.label) : _openGroups.add(e.label))
+                          : e.open == null
+                              ? null
+                              : () => _go(context, e.open!),
                     );
-                    if (e.children.isEmpty) return row;
-                    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      row,
-                      for (final c in e.children)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 22, top: 6),
-                          child: _NavRow(icon: c.icon, label: c.label, sub: true, soon: c.open == null, onTap: c.open == null ? null : () => _go(context, c.open!)),
-                        ),
-                    ]);
+                    final body = e.children.isEmpty || (group && !open)
+                        ? row
+                        : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                            row,
+                            for (final c in e.children)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 22, top: 6),
+                                child: _NavRow(icon: c.icon, label: c.label, sub: true, soon: c.open == null, onTap: c.open == null ? null : () => _go(context, c.open!)),
+                              ),
+                          ]);
+                    // the rows build in one after another as the panel slides in; a group folds open and shut smoothly (lib/ui/motion.dart)
+                    return Entrance(
+                      index: i,
+                      child: AnimatedSize(
+                        duration: reduceMotion(context) ? Duration.zero : const Duration(milliseconds: 240),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: body,
+                      ),
+                    );
                   },
                 ),
               ),
@@ -273,11 +320,14 @@ class _StoreSideNavState extends State<_StoreSideNav> {
 }
 
 class _NavRow extends StatelessWidget {
-  const _NavRow({required this.icon, required this.label, required this.onTap, this.soon = false, this.danger = false, this.sub = false});
+  const _NavRow({super.key, required this.icon, required this.label, required this.onTap, this.soon = false, this.danger = false, this.sub = false, this.expanded});
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
   final bool soon, danger;
+
+  /// A folding row: open (chevron up) or shut (chevron down); null for a plain row.
+  final bool? expanded;
 
   /// A section under a row (Stock management's three): lighter and a little smaller, with a lime edge.
   final bool sub;
@@ -333,6 +383,7 @@ class _NavRow extends StatelessWidget {
                   decoration: BoxDecoration(color: const Color(0xFFFEF0C7), borderRadius: BorderRadius.circular(10)),
                   child: Text(tr('Soon'), style: inter(10, 700, color: const Color(0xFFB54708))),
                 ),
+              if (expanded != null) Icon(expanded! ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18, color: kMuted),
             ]),
           ),
         ),

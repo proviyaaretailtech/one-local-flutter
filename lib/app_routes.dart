@@ -1,5 +1,6 @@
 import 'storefront/menu_link_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'account/routes.dart';
 import 'ads/advertiser_screens.dart' show AdvertiserApi, AdvertiserHomeScreen;
@@ -15,16 +16,21 @@ import 'home/control_centre_screen.dart';
 import 'home/home_nav.dart';
 import 'inventory/inv_env.dart';
 import 'inventory/receiving_screen.dart';
-import 'kitchen/kds_screen.dart';
+import 'kitchen/kds_board_screen.dart';
+import 'kitchen/kot_screen.dart';
 import 'kitchen/kitchen_setup_screen.dart';
 import 'kitchen/kitchen_widgets.dart';
 import 'money/money_env.dart';
 import 'money/money_home.dart';
+import 'money/rst_money.dart';
 import 'notices/feedback_screen.dart';
 import 'notices/notices_api.dart';
 import 'notices/notices_home.dart';
+import 'menu/menu_api.dart';
+import 'menu/menu_hub.dart';
+import 'menu/price_control_screen.dart';
 import 'menu/menu_screen.dart';
-import 'orders/cart_screen.dart';
+import 'notices/notification_centre.dart';
 import 'purchasing/po_create_screen.dart';
 import 'purchasing/purchase_hub_screen.dart';
 import 'purchasing/purchasing_api.dart';
@@ -56,6 +62,8 @@ import 'storefront/settings_screens.dart';
 import 'storefront/storefront_api.dart';
 import 'tables/floor_screen.dart';
 import 'tables/table_qr_screen.dart';
+import 'stock/closing_stock_screen.dart';
+import 'tables/manage_tables_screen.dart';
 import 'tables/table_widgets.dart';
 import 'team/team_screens.dart';
 import 'barcodes/barcodes_screen.dart';
@@ -89,7 +97,7 @@ void installRoutes() {
   HomeNav.items = (c) => _itemPart(c, 'products');
   HomeNav.menu = (c) {
     if (_inShell('Menu')) return;
-    Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuScreen()));
+    Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuHub()));
   };
   // A store's Stock and Purchase are parts of Item (founder, 25 Oct 2026); a restaurant keeps its Stock tab and receipts page.
   HomeNav.grn = (c) => _restaurant
@@ -115,7 +123,9 @@ void installRoutes() {
   };
   KitchenEnv kitchenEnv(BuildContext c) => KitchenEnv(onNavigate: (id) => _kitchenTab(c, id));
   HomeNav.kitchenSetup = (c) => Navigator.of(c).push(KitchenSetupScreen.route(kitchenEnv(c)));
-  HomeNav.kitchenDisplay = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => KdsScreen(env: kitchenEnv(c))));
+  // the KDS view is the kitchen board (founder, 27 Oct 2026); the older list display stays in kds_screen.dart
+  HomeNav.kitchenDisplay = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => KdsBoardScreen(env: kitchenEnv(c))));
+  HomeNav.kotView = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => KotScreen(env: kitchenEnv(c))));
   // The restaurant dashboard's "Open kitchen display" and the More page's Kitchen display tile open the same KDS.
   HomeNav.kitchen = HomeNav.kitchenDisplay;
   HomeNav.tables = (c) {
@@ -125,6 +135,35 @@ void installRoutes() {
   HomeNav.menuLink = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const MenuLinkScreen()));
   HomeNav.tableQr = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => TableQrScreen(env: TablesEnv())));
   HomeNav.lowStock = (c) => openStockPage(c, _stockEnv(c), StockPage.low);
+  HomeNav.newPurchase = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => PoCreateScreen(env: PurEnv(inv: _inventoryEnv(c)))));
+  HomeNav.purchases = (c) => _restaurant
+      ? Navigator.of(c).push(MaterialPageRoute(builder: (_) => PurchaseHubScreen(env: PurEnv(inv: _inventoryEnv(c)), stock: _stockEnv(c))))
+      : _itemPart(c, 'purchase');
+  // The restaurant side bar's Inventory (0627): each page it folds open. Recipe and Ingredients are sub-masters of the Menu tab.
+  // Each page opens on top and answers true once it is closed, so the side bar opens again on Back; a sub-master of the Menu tab only
+  // switches the tab (false: nothing to come back from).
+  HomeNav.inventory = (c, page) async {
+    Future<bool> push(Widget w) async {
+      await Navigator.of(c).push(MaterialPageRoute(builder: (_) => w));
+      return true;
+    }
+
+    switch (page) {
+      case 'purchase':
+        return push(PurchaseHubScreen(env: PurEnv(inv: _inventoryEnv(c)), stock: _stockEnv(c)));
+      case 'prices':
+        return push(const PriceControlScreen());
+      case 'closing':
+        return push(ClosingStockScreen(env: _stockEnv(c))); // the tabular closing stock with Excel export (0628)
+      case 'recipes' || 'ingredients':
+        MenuHub.requestedTab.value = page == 'recipes' ? 1 : 2;
+        if (_inShell('Menu')) return false;
+        return push(MenuHub(initial: page == 'recipes' ? 1 : 2));
+      case 'tables':
+        return push(ManageTablesScreen(env: TablesEnv()));
+    }
+    return false;
+  };
   HomeNav.service = (c) {
     if (HomeNav.shell?.kind == 'service' && _inShell('Bill')) return;   // a service partner's Bill tab is the calendar
     Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
@@ -133,7 +172,10 @@ void installRoutes() {
   // A store has its own minimal Money (founder, 28 Oct 2026): accounts, Record transaction, cash register, dues. Restaurants keep section K.
   HomeNav.money = (c) => _isStore
       ? Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: '/money'), builder: (_) => const StoreMoneyScreen()))
-      : Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
+      // a restaurant's Money is the store's design rebuilt on its own records (0622, founder 29 Oct 2026)
+      : HomeNav.shell?.kind == 'restaurant'
+          ? Navigator.of(c).push(RstMoneyScreen.route())
+          : Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id))));
   HomeNav.moneyScreen = (c, screen) => _isStore
       ? HomeNav.money!(c)
       : Navigator.of(c).push(MoneyHome.route(MoneyEnv(onNavigate: (id) => _tab(c, id)), start: screen));
@@ -148,9 +190,34 @@ void installRoutes() {
   HomeNav.deliverySettings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => DeliveryScreen(api: StorefrontApi())));
   // Section N: notification and announcement centres, customer messages and feedback.
   HomeNav.notifications = (c) => Navigator.of(c).push(NoticesHome.route());
+  // The menu's "Add images to items" / "Add descriptions" suggestions live in the Notification Centre (founder, 27 Oct 2026), worked out
+  // from the live menu each time it opens; a store (no restaurant menu) or a person who may not edit the menu gets none.
+  NotificationCentre.tips = () async {
+    if (!_restaurant) return const [];
+    final m = await MenuApi().menu();
+    if (!m.canEdit) return const [];
+    final total = m.count('total');
+    void openMenu(BuildContext c, {String? filter}) {
+      final nav = Navigator.of(c);
+      nav.maybePop();   // off the notifications page, onto the menu
+      if (filter != null) MenuScreen.requestedFilter.value = filter;
+      HomeNav.go(nav.context, HomeNav.menu, 'The menu');
+    }
+    return [
+      if (total > 0 && m.count('needs_image') > 0)
+        NoticeTip(icon: LucideIcons.image, title: 'Add images to items', line: '${m.count('with_image')}/$total items complete',
+            onTap: (c) => openMenu(c, filter: 'needs_image')),
+      if (total > 0 && m.count('missing_description') > 0)
+        NoticeTip(icon: LucideIcons.alignLeft, title: 'Add descriptions', line: 'Missing for ${m.count('missing_description')} items · Write with AI on the dish',
+            onTap: (c) => openMenu(c)),
+    ];
+  };
   HomeNav.reviews = HomeNav.complaints = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => FeedbackScreen(api: NoticesApi())));
   // Section P: the Settings page and Support & Help. The Team hook (users, roles, invites) belongs to section L.
   HomeNav.settings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SettingsScreen()));
+  HomeNav.outletTimings = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SettingsScreen(part: SettingsPart.timings)));
+  HomeNav.phoneNumbers = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SettingsScreen(part: SettingsPart.phones)));
+  HomeNav.outletInfo = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SettingsScreen(part: SettingsPart.outletInfo)));
   HomeNav.support = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => SupportScreen()));
   // Setup covers the whole screen, bar included.
   HomeNav.setup = (c) => Navigator.of(c, rootNavigator: true).push(MaterialPageRoute(builder: (_) => SetupEntry(onFinished: (ctx) => HomeNav.home!(ctx))));
@@ -208,7 +275,7 @@ Widget appShell({AuthRepository? auth}) => AppShell(rootFor: (kind, label) => sh
 Widget? shellTabRoot(String kind, String label, {AuthRepository? auth}) => switch (label) {
         'Home' => ControlCentreScreen(auth: auth),
         'Item' => Builder(builder: _itemHome),
-        'Menu' => const MenuScreen(),
+        'Menu' => const MenuHub(),
         'Bill' => Builder(
             builder: (c) => switch (kind) {
               'restaurant' => _floor(c),

@@ -227,6 +227,37 @@ void main() {
       expect(f.requests.first.headers['Authorization'], 'Bearer token-123');
     });
 
+    testWidgets('a section opened on its own (the side bar\'s Business profile): only its rows, no section cards', (t) async {
+      final f = Fake()..page = fx['full'] as Map<String, dynamic>;
+      Future<void> openPart(SettingsPart part) async {
+        await show(t, SettingsScreen(env: SettingsEnv(api: f.api, picker: FakePicker(_png), pickTime: null), part: part));
+        await settle(t);
+      }
+
+      await openPart(SettingsPart.timings);
+      expect(find.text('Opening: 9:00 AM · Closing: 10:30 PM'), findsOneWidget);
+      expect(find.text('12 Station Road, Latur 413512'), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-part-team')), findsNothing, reason: 'no section cards');
+      expect(find.text('Asha · +91 9876543210'), findsNothing);
+
+      await openPart(SettingsPart.phones);
+      expect(find.text('Asha · +91 9876543210'), findsOneWidget);
+      expect(find.text('+91 9000011111'), findsOneWidget);
+      expect(find.text('Opening: 9:00 AM · Closing: 10:30 PM'), findsNothing);
+
+      await openPart(SettingsPart.outletInfo);
+      expect(find.text('12 Station Road, Latur 413512'), findsOneWidget);
+    });
+
+    testWidgets('Outlet timings: Edit saves the hours from the focused page', (t) async {
+      final f = Fake();
+      final times = ['09:00', '22:30'];
+      await show(t, SettingsScreen(env: SettingsEnv(api: f.api, pickTime: (c, cur) async => times.removeAt(0)), part: SettingsPart.timings));
+      await settle(t);
+      await tapEdit(t, 'Opening & closing timings');
+      expect(find.text('Set when your store opens and closes.'), findsOneWidget);
+    });
+
     testWidgets('a saved business shows its times, readiness, contacts, address and an open QR switch', (t) async {
       final f = Fake()..page = fx['full'] as Map<String, dynamic>;
       await openSettings(t, f);
@@ -325,6 +356,55 @@ void main() {
       await openSettings(t, f);
       await section(t, 'orders');
       expect(find.text('Store Delivery'), findsNothing);
+    });
+
+    testWidgets('a restaurant\'s Settings holds Purchase orders, Menu link and Delivery settings (off the side bar), not Store Delivery', (t) async {
+      final opened = <String>[];
+      HomeNav.purchases = (_) => opened.add('purchases');
+      HomeNav.menuLink = (_) => opened.add('menuLink');
+      HomeNav.deliverySettings = (_) => opened.add('delivery');
+      HomeNav.shell = _Shell('restaurant');
+      addTearDown(() => HomeNav.shell = null);
+      await openSettings(t, Fake());
+      await section(t, 'restaurant'); // the restaurant's own section card
+      expect(find.text('Store Delivery'), findsNothing);
+      await tapText(t, 'Purchase orders');
+      await tapText(t, 'Menu link');
+      await tapText(t, 'Delivery settings');
+      expect(opened, ['purchases', 'menuLink', 'delivery']);
+    });
+
+    testWidgets('a store\'s Settings does not show the restaurant rows', (t) async {
+      await openSettings(t, Fake());
+      expect(find.byKey(const ValueKey('settings-purchase-orders')), findsNothing);
+      expect(find.byKey(const ValueKey('settings-menu-link')), findsNothing);
+    });
+
+    testWidgets('Activity log: every order\'s timeline, newest first by day, with its bill and table; Show older pages back', (t) async {
+      final f = Fake((r) {
+        if (fnOf(r) != 'rst_activity_log') return null;
+        final older = argsOf(r)['before'] != null;
+        return ok({
+          'entries': older
+              ? [{'id': 'e3', 'at': '2026-10-20T05:00:00Z', 'kind': 'paid', 'message': 'P-00010 paid by cash', 'display_no': 'P-00010', 'table_label': 'T2'}]
+              : [
+                  {'id': 'e1', 'at': DateTime.now().toUtc().toIso8601String(), 'kind': 'kot_fired', 'message': 'KOT 16 sent to the kitchen - 2 dishes', 'display_no': 'P-00026', 'table_label': 'T4'},
+                  {'id': 'e2', 'at': DateTime.now().toUtc().toIso8601String(), 'kind': 'placed', 'message': 'Order P-00026 placed - 2 items', 'display_no': 'P-00026', 'table_label': 'T4'},
+                ],
+          'more': !older,
+        });
+      });
+      await openSettings(t, f);
+      await tapText(t, 'Activity log');
+      expect(find.text('TODAY'), findsOneWidget);
+      expect(find.text('KOT 16 sent to the kitchen - 2 dishes'), findsOneWidget);
+      expect(find.text('Bill P-00026 · Table T4'), findsNWidgets(2));
+      expect(t.getRect(find.text('KOT 16 sent to the kitchen - 2 dishes')).top, lessThan(t.getRect(find.text('Order P-00026 placed - 2 items')).top));
+      await tapText(t, 'Show older');
+      expect(argsOf(f.calls('rst_activity_log').last)['before'], isNotNull);
+      expect(find.text('20 OCT 2026'), findsOneWidget);
+      expect(find.text('P-00010 paid by cash'), findsOneWidget);
+      expect(find.text('Show older'), findsNothing);
     });
   });
 
@@ -709,4 +789,14 @@ void main() {
       expect(s.canEdit, isTrue);
     });
   });
+}
+
+class _Shell implements TabShell {
+  _Shell(this.kind);
+  @override
+  String kind;
+  @override
+  void setKind(String k) => kind = k;
+  @override
+  bool show(String label) => false;
 }

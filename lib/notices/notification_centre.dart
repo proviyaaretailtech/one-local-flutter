@@ -7,7 +7,17 @@ import 'notices_api.dart';
 import 'notices_widgets.dart';
 import '../ui/i18n.dart';
 
+/// A suggestion shown above the notices ("Add images to items": 10/11 items complete). Worked out from live data each time the centre
+/// loads, so it is never "read" and disappears by itself once done.
+class NoticeTip {
+  const NoticeTip({required this.icon, required this.title, required this.line, this.onTap});
+  final IconData icon;
+  final String title, line;
+  final void Function(BuildContext context)? onTap;
+}
+
 /// Figma "Notification Centre": filter chips, "Mark all as read", rows grouped Today / Earlier. Read state lives in the database, per person.
+/// On "All", suggestions from other sections ([tips], plugged in app_routes.dart; the menu's "Add images" / "Add descriptions") come first.
 class NotificationCentre extends StatefulWidget {
   const NotificationCentre({
     super.key,
@@ -18,6 +28,10 @@ class NotificationCentre extends StatefulWidget {
   final NoticesApi api;
   final ValueChanged<int>? onUnread;
   final DateTime Function()? now;
+
+  /// Where the suggestions come from; null or failing = none (a store has no restaurant menu).
+  static Future<List<NoticeTip>> Function()? tips;
+
   @override
   State<NotificationCentre> createState() => _NotificationCentreState();
 }
@@ -33,6 +47,7 @@ class _NotificationCentreState extends State<NotificationCentre> {
   String? _cat;
   Facts? _data;
   String? _error;
+  List<NoticeTip> _tips = const [];
 
   @override
   void initState() {
@@ -40,7 +55,19 @@ class _NotificationCentreState extends State<NotificationCentre> {
     _load();
   }
 
+  Future<void> _loadTips() async {
+    final source = NotificationCentre.tips;
+    if (source == null) return;
+    try {
+      final t = await source();
+      if (mounted) setState(() => _tips = t);
+    } catch (_) {
+      if (mounted) setState(() => _tips = const []);   // a suggestion that cannot be worked out is simply not shown
+    }
+  }
+
   Future<void> _load() async {
+    _loadTips();
     try {
       final d = await widget.api.notices(category: _cat);
       if (!mounted) return;
@@ -127,6 +154,18 @@ class _NotificationCentreState extends State<NotificationCentre> {
                 ],
               ),
               const SizedBox(height: 18),
+              if (_cat == null && _tips.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10, top: 4),
+                  child: Text('Suggestions', style: inter(17, 700)),
+                ),
+                for (final tip in _tips)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _tipRow(tip),
+                  ),
+                const SizedBox(height: 8),
+              ],
               if (items.isEmpty)
                 OrderCardBox(
                   child: Text(
@@ -151,6 +190,55 @@ class _NotificationCentreState extends State<NotificationCentre> {
       },
     );
   }
+
+  Widget _tipRow(NoticeTip tip) => Semantics(
+    button: tip.onTap != null,
+    label: '${tip.title}. ${tip.line}',
+    child: Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: Color(0xFFECEDE8)),
+      ),
+      child: InkWell(
+        key: ValueKey('tip-${tip.title}'),
+        borderRadius: BorderRadius.circular(18),
+        onTap: tip.onTap == null ? null : () => tip.onTap!(context),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: kField,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(tip.icon, size: 21, color: kMuted),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tip.title, style: inter(15.5, 700)),
+                    const SizedBox(height: 3),
+                    Text(
+                      tip.line,
+                      style: inter(14, 400, color: kMuted, height: 1.35),
+                    ),
+                  ],
+                ),
+              ),
+              if (tip.onTap != null)
+                const Icon(Icons.chevron_right, color: kMuted),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 
   bool _isToday(DateTime? t, DateTime now) =>
       t != null &&

@@ -14,7 +14,10 @@ class PartnerApi {
 }
 
 class PartnerMe {
-  PartnerMe({required this.name, required this.email, required this.outlet, this.kind = 'store', this.sellPlan, this.advertising = false});
+  PartnerMe({required this.name, required this.email, required this.outlet, this.kind = 'store', this.sellPlan, this.advertising = false, this.organizationId});
+
+  /// The business (its live channels are named after it: lib/api/live_sync.dart).
+  final String? organizationId;
 
   /// An advertising-only partner (no store): its app is Ads.
   final bool advertising;
@@ -38,6 +41,7 @@ class PartnerMe {
       kind: (j['business_kind'] ?? 'store') as String,
       sellPlan: j['sell_plan'] as String?,
       advertising: j['advertising_only'] == true,
+      organizationId: (outlet['id'] ?? person['organization_id']) as String?,
     );
   }
 }

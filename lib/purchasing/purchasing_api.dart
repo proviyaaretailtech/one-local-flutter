@@ -53,6 +53,9 @@ class PurchasingApi {
   /// submit / approve / reject / cancel. The database decides who may, and refuses approving your own order above its limit.
   Future<PurchaseOrder> act(String id, String action, {String? note}) async => PurchaseOrder(await _call('pur_po_act', {'id': id, 'action': action, 'note': note}));
 
+  /// Records that the order was sent to the supplier on [channel] (whatsapp | sms) to [to] (0615); the database checks the number.
+  Future<PurchaseOrder> send(String id, {required String channel, required String to}) async => PurchaseOrder(await _call('pur_po_send', {'id': id, 'channel': channel, 'to': to}));
+
   /// Starts (or reopens) the receipt draft for an order. The answer names the receipt document ([Facts.s] `document_id`); section H's receiving screen takes it from there.
   Future<Facts> receive(String poId, {String? key}) async => Facts(await _call('pur_po_receive', {'id': poId}, key: key ?? newKey()));
 
@@ -124,6 +127,10 @@ class PurchaseOrder extends Facts {
   String get number => s('number');
   String get status => s('status');
   String get supplierName => m('supplier').s('name');
+  String? get supplierPhone => m('supplier').so('phone');
+
+  /// The last time it was sent to the supplier (at, channel, masked to, times), or null.
+  Facts? get sent => mo('sent');
   List<Facts> get lines => l('lines');
   Facts get totals => m('totals');
   List<String> get actions => ls('allowed_actions');

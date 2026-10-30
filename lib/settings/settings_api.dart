@@ -99,6 +99,9 @@ class SettingsApi {
   /// The link and its content type (a PDF opens; a photo shows).
   Future<Map<String, dynamic>> fileLinkInfo(String kind, {String? id}) => _rpc.callMap('pos_settings_file_link', {'kind': kind, 'id': ?id});
 
+  /// The Activity log (0614): every order's timeline, newest first. [before] (an entry's 'at') pages back to older entries.
+  Future<Map<String, dynamic>> activityLog({String? before, int limit = 50}) => _rpc.callMap('rst_activity_log', {'before': ?before, 'limit': limit});
+
   Future<Map<String, dynamic>> help() => _rpc.callMap('pos_help_content');
   Future<Map<String, dynamic>> supportList() => _rpc.callMap('pos_support_list');
   Future<Map<String, dynamic>> supportCreate({required String message, String kind = 'support', String? topic, String? attachmentPath, required String idempotencyKey}) =>

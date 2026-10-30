@@ -903,7 +903,7 @@ class _FakePhotos extends ItemPhotoService {
   @override
   Future<ItemPhoto?> capture(BuildContext context) => pick();
   @override
-  Future<ItemPhoto> removeBackground(ItemPhoto p) async => ItemPhoto(bytes: p.bytes, contentType: 'image/png', backgroundRemoved: true);
+  Future<ItemPhoto> removeBackground(ItemPhoto p, {String? bgColor}) async => ItemPhoto(bytes: p.bytes, contentType: 'image/png', backgroundRemoved: true);
   @override
   Future<void> attach(String itemId, ItemPhoto p) async => attached.add('$itemId${p.backgroundRemoved ? ' bg' : ''}');
   final removed = <String>[];

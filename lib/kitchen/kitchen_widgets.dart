@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_widgets.dart' show kNavyH, kGreyBg, kAmberText, kAmberBgH, kBlueIconBg, kGreenIconBg, kPostedText;
+import '../orders/order_alerts.dart';
 import '../ui/app_tab_bar.dart';
 import '../ui/theme.dart';
 import 'kitchen_api.dart';
 
 /// What the kitchen screens share: the API and the ways out of the section (the other bottom-bar tabs).
 class KitchenEnv {
-  KitchenEnv({KitchenApi? api, this.onNavigate, this.initials = '', this.refreshEvery = const Duration(seconds: 20)}) : api = api ?? KitchenApi();
+  KitchenEnv({KitchenApi? api, this.onNavigate, this.initials = '', this.refreshEvery = const Duration(seconds: 20), this.sounds = const OrderAlertSounds()})
+      : api = api ?? KitchenApi();
   final KitchenApi api;
+
+  /// The KDS board's sounds: a chime for a new ticket, a warning when one runs late, a beep when one is ready (tests pass a silent one).
+  final OrderAlertSounds sounds;
 
   /// Bottom-bar tabs this section does not own: 'money', 'menu', 'orders', 'stock'. 'pos' is the section itself.
   final ValueChanged<String>? onNavigate;
@@ -51,17 +56,19 @@ class KitchenPage extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(14, MediaQuery.paddingOf(context).top + 10, 14, 10),
             decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: kLine))),
             child: Row(children: [
+              // ← goes back to where the kitchen screen was opened from (it always did; it now looks like it)
               Semantics(
                 button: true,
-                label: 'Menu',
+                label: 'Back',
                 child: InkWell(
+                  key: const ValueKey('kitchen-back'),
                   borderRadius: BorderRadius.circular(10),
                   onTap: () => Navigator.of(context).maybePop(),
                   child: Container(
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(color: const Color(0xFFF3F4F1), borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(LucideIcons.menu, size: 18, color: kInk),
+                    child: const Icon(LucideIcons.arrowLeft, size: 18, color: kInk),
                   ),
                 ),
               ),
@@ -93,7 +100,7 @@ class KitchenBottomNav extends StatelessWidget {
     ('menu', 'Menu', LucideIcons.bookOpen),
     ('pos', 'POS', LucideIcons.receiptText),
     ('orders', 'Orders', LucideIcons.shoppingBag),
-    ('stock', 'Stock', LucideIcons.boxes),
+    // no Stock tab for now (founder, 27 Oct 2026)
   ];
   // The app's one bottom bar ([AppTabBar]); the kitchen sits under POS, and tabs keep their 'kit-tab-…' keys.
   @override

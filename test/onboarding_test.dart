@@ -390,6 +390,33 @@ void main() {
       await tapText(t, 'Save & continue');
       expect(api.bodies['tax'], {'pan': '', 'gst_registered': false});
     });
+    testWidgets('PAN refused by the Income Tax check: the server sentence shows and the screen stays', (t) async {
+      final api = FakeOnb()..failWith = const PartnerApiException(422, 'This PAN is not valid in Income Tax records. Check it and try again.');
+      await show(t, TaxScreen(api: api, app: sample(done: 3)));
+      await t.enterText(find.byType(TextField).first, 'abcde1234f');
+      await tapText(t, 'Not registered / not applicable');
+      await tapText(t, 'Save & continue');
+      expect(toast('This PAN is not valid in Income Tax records. Check it and try again.'), findsOneWidget);
+      expect(find.text('Tax information.'), findsOneWidget);
+    });
+    testWidgets('checked on save: what the records confirmed shows', (t) async {
+      final verified = {'pan': {'status': 'verified', 'name': 'RAVI SHARMA', 'holder_type': 'Individual or Person'}, 'gstin': {'status': 'active', 'legal_name': 'RAVI SHARMA', 'trade_name': 'SHARMA KIRANA', 'state': 'Maharashtra'}};
+      final api = FakeOnb(initial: Application({...sample().raw, 'verification': verified}));
+      // opened from the checklist as in the app: the screen closes on save and the line shows on the page below
+      await show(t, Scaffold(body: Builder(builder: (c) => TextButton(onPressed: () => Navigator.of(c).push(MaterialPageRoute(builder: (_) => TaxScreen(api: api, app: sample(done: 3)))), child: const Text('open')))));
+      await tapText(t, 'open');
+      await t.enterText(find.byType(TextField).first, 'abcde1234f');
+      await tapText(t, 'GST registered');
+      await t.enterText(find.byType(TextField).last, '27abcde1234f1z5');
+      await tapText(t, 'Save & continue');
+      expect(toast('PAN verified · RAVI SHARMA  ·  GSTIN active · SHARMA KIRANA'), findsOneWidget);
+    });
+    test('verifiedLine: only what was confirmed; nothing for unchecked', () {
+      expect(verifiedLine({'pan': {'status': 'verified', 'name': 'RAVI SHARMA'}}), 'PAN verified · RAVI SHARMA');
+      expect(verifiedLine({'gstin': {'status': 'active', 'legal_name': 'SHARMA TRADERS', 'trade_name': ''}}), 'GSTIN active · SHARMA TRADERS');
+      expect(verifiedLine({'pan': {'status': 'unchecked'}, 'gstin': {'status': 'unchecked'}}), isNull);
+      expect(verifiedLine(null), isNull);
+    });
   });
 
   group('Identity and documents', () {

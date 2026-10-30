@@ -37,10 +37,20 @@ abstract class ItemPhotoService {
   /// A new photo, camera first (founder, 26 Oct 2026): the camera opens at once, the latest gallery photo sits in its corner, and
   /// after the shot the background can be removed before it is used. Null when closed.
   Future<ItemPhoto?> capture(BuildContext context) => showPhotoCapture(context, this);
-  Future<ItemPhoto> removeBackground(ItemPhoto photo);
+  /// The photo cut out by AI: on transparency, or set on [bgColor] (hex, no #) for a clean studio backdrop.
+  Future<ItemPhoto> removeBackground(ItemPhoto photo, {String? bgColor});
   Future<void> attach(String itemId, ItemPhoto photo);
   /// Takes the saved photo off the item.
   Future<void> remove(String itemId);
+
+  /// The bytes of a photo already saved (the dish's own), to work on it. JPG, PNG or WebP, as served.
+  Future<ItemPhoto> load(String url) async {
+    final r = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 60));
+    if (r.statusCode != 200 || r.bodyBytes.isEmpty) throw const ItemPhotoUnavailable('The dish photo could not be loaded.');
+    if (r.bodyBytes.length > DeviceItemPhotos.maxBytes) throw const ItemPhotoUnavailable('This photo is over 5 MB. Choose a smaller one.');
+    final type = (r.headers['content-type'] ?? '').split(';').first.trim();
+    return ItemPhoto(bytes: r.bodyBytes, contentType: const ['image/png', 'image/webp'].contains(type) ? type : 'image/jpeg');
+  }
 }
 
 /// JPG, PNG or WebP up to 5 MB, the same limits the server uses for pictures.
@@ -64,13 +74,14 @@ class DeviceItemPhotos extends ItemPhotoService {
   // the phone — and answers a transparent PNG. In the browser the server sends it to remove.bg instead (its key stays on the server);
   // the server's own sentence is shown when it cannot (not set up, out of credits, busy, no product found in the photo).
   @override
-  Future<ItemPhoto> removeBackground(ItemPhoto photo) async {
-    if (!kIsWeb && Platform.isAndroid) return _cutOutOnPhone(photo);
+  Future<ItemPhoto> removeBackground(ItemPhoto photo, {String? bgColor}) async {
+    if (bgColor == null && !kIsWeb && Platform.isAndroid) return _cutOutOnPhone(photo);
     try {
-      final r = await (rpc ?? RpcClient()).callMap('cat_image_remove_bg', {'image_b64': base64Encode(photo.bytes), 'content_type': photo.contentType});
+      final r = await (rpc ?? RpcClient())
+          .callMap('cat_image_remove_bg', {'image_b64': base64Encode(photo.bytes), 'content_type': photo.contentType, 'bg_color': ?bgColor});
       final b64 = r['image_b64'];
       if (b64 is! String || b64.isEmpty) throw const ItemPhotoUnavailable('The background could not be removed.');
-      return ItemPhoto(bytes: base64Decode(b64), contentType: 'image/png', backgroundRemoved: true);
+      return ItemPhoto(bytes: base64Decode(b64), contentType: r['content_type'] == 'image/jpeg' ? 'image/jpeg' : 'image/png', backgroundRemoved: true);
     } on PartnerApiException catch (e) {
       throw ItemPhotoUnavailable(e.message);
     }

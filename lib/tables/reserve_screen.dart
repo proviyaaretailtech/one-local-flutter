@@ -104,7 +104,7 @@ class _ReserveScreenState extends State<ReserveScreen> {
         const InvLabel('GUEST NAME'),
         field(LucideIcons.user, _name, 'Guest name'),
         const InvLabel('PHONE NUMBER'),
-        InvInput(controller: _phone, hint: 'Phone number', prefixIcon: LucideIcons.phone, onChanged: (_) => setState(() {})),
+        InvInput(controller: _phone, hint: 'Mobile number', mobile: true, prefixIcon: LucideIcons.phone, onChanged: (_) => setState(() {})),
         const InvLabel('PARTY SIZE'),
         Row(children: [
           for (final n in const [2, 4, 6, 8])

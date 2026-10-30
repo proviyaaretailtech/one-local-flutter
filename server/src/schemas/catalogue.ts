@@ -33,6 +33,8 @@ export const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const RemoveBg = z.object({
   image_b64: z.string().min(16, 'That photo is empty.').max(Math.ceil(IMAGE_MAX_BYTES / 3) * 4 + 8, 'Each photo can be up to 5 MB.').regex(/^[A-Za-z0-9+/]+=*$/, 'That photo could not be read.'),
   content_type: z.enum(['image/jpeg', 'image/png', 'image/webp'], { message: 'Use a JPG, PNG or WebP photo.' }),
+  // "AI picture · With background" on the Menu: the dish cut out and set on this colour (hex, no #); without it, a transparent PNG
+  bg_color: z.string().regex(/^[0-9a-fA-F]{6}$/, 'Choose a background colour.').optional(),
 }).strict();
 
 // The item's saved photo (item-images bucket): ask for an upload slot, confirm the upload, or take the photo off.

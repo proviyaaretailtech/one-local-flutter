@@ -4,8 +4,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/orders/cart_screen.dart';
+import 'package:vinii_pos/orders/order_alerts.dart';
 import 'package:vinii_pos/orders/orders_api.dart';
+import 'package:vinii_pos/orders/order_screen.dart';
 import 'package:vinii_pos/orders/orders_board_screen.dart';
 import 'package:vinii_pos/orders/orders_outlet_header.dart';
 
@@ -127,17 +130,32 @@ void main() {
   });
 
   group('Live orders', () {
+    testWidgets('every channel and status chip is fully on screen at phone width (none cut off at the edge)', (t) async {
+      final s = tabServer(boardFor: (a) => board(orders: const []));
+      await openTab(t, s);
+      final width = t.view.physicalSize.width / t.view.devicePixelRatio;
+      final chips = find.byWidgetPredicate((w) => w.key is ValueKey<String> &&
+          RegExp(r'^(channel|status)-').hasMatch((w.key as ValueKey<String>).value));
+      expect(chips, findsAtLeastNWidgets(10), reason: '6 channels and at least 4 statuses');
+      for (final e in chips.evaluate()) {
+        final r = t.getRect(find.byWidget(e.widget));
+        expect(r.left, greaterThanOrEqualTo(0), reason: '${e.widget.key}');
+        expect(r.right, lessThanOrEqualTo(width), reason: '${e.widget.key}');
+      }
+    });
+
     testWidgets('header, tabs, chips with live counts, cards with status minutes and Delayed', (t) async {
       final s = tabServer(boardFor: (a) => board(orders: [
             live('o1', 'P-01086', 'new', 5, note: 'Less spicy'),
             live('o2', 'P-01085', 'new', 28, delayed: true, customer: 'Walk-in Guest', total: 820),
           ]));
       await openTab(t, s);
-      expect(find.text('NIKS BROWNI AND BURGER'), findsOneWidget);   // the banner's top line
-      expect(find.text('Online'), findsOneWidget);
-      expect(find.text('NB'), findsNothing, reason: 'the shared banner has the bell and ☰ instead of initials');
-      expect(find.text('Live orders'), findsOneWidget);
-      expect(find.text('Hold orders'), findsOneWidget);
+      // The banner every main tab shows (OutletHeader): ONELOCAL PARTNER over the business; the outlet's status comes from the
+      // outlets read (outlets_test.dart), not from the board.
+      expect(find.text('ONELOCAL PARTNER'), findsOneWidget);
+      expect(find.text('Niks Browni And Burger'), findsOneWidget);
+      expect(find.text('Live orders'), findsNothing, reason: 'no Live / Hold switch any more');
+      expect(find.text('Hold orders'), findsNothing);
       for (final c in ['All', 'Dine In', 'Takeaway', 'Delivery', 'Zomato', 'Swiggy']) {
         expect(find.text(c), findsOneWidget);
       }
@@ -216,7 +234,8 @@ void main() {
 
     testWidgets('a failed load says so and retries', (t) async {
       var n = 0;
-      final s = FakeServer((r) => ++n == 1 ? err(503, 'The database is not connected yet.') : ok(board()));
+      // the board's first load fails (the channel cards are a separate read, not counted)
+      final s = FakeServer((r) => !r.url.path.endsWith('/rpc/pos_orders_board') ? err(404, 'no') : ++n == 1 ? err(503, 'The database is not connected yet.') : ok(board()));
       await openTab(t, s);
       expect(find.text('The database is not connected yet.'), findsOneWidget);
       await t.tap(find.text('Try again'));
@@ -338,4 +357,350 @@ void main() {
       expect(find.byType(OrdersBoardScreen), findsOneWidget); // back on the hold list
     });
   });
+
+  group('Channel cards (OneLocal, Swiggy, Zomato, On call)', () {
+    Map<String, dynamic> sources() => {
+          'channels': [
+            {'key': 'onelocal', 'label': 'OneLocal', 'count': 2, 'open': 2, 'new': 1, 'total': 450, 'names': ['Priya (test)', 'Arjun (test)']},
+            {'key': 'swiggy', 'label': 'Swiggy', 'count': 1, 'open': 1, 'new': 0, 'total': 320, 'names': ['Kiran (test)']},
+            {'key': 'zomato', 'label': 'Zomato', 'count': 1, 'open': 0, 'new': 0, 'total': 210, 'names': ['Neha (test)']},
+            {'key': 'on_call', 'label': 'On call delivery', 'count': 0, 'open': 0, 'new': 0, 'total': 0, 'names': []},
+          ],
+          'cancelled': 1,
+          'orders': [
+            {'id': 'o1', 'display_no': 'P-00031', 'placed_at': '2026-10-27T17:40:00Z', 'customer': 'Priya (test)', 'phone': '9800000101', 'total': 250, 'source': 'onelocal', 'stage': 'new', 'items': '2 × Cappuccino'},
+            {'id': 'o2', 'display_no': 'P-00032', 'placed_at': '2026-10-27T17:30:00Z', 'customer': 'Arjun (test)', 'total': 200, 'source': 'onelocal', 'stage': 'on_way', 'items': '1 × Ice Blue'},
+            {'id': 'o3', 'display_no': 'P-00033', 'placed_at': '2026-10-27T17:20:00Z', 'customer': 'Kiran (test)', 'total': 320, 'source': 'swiggy', 'stage': 'ready', 'items': '1 × Salted Fries', 'ref': 'SW-48213'},
+            {'id': 'o4', 'display_no': 'P-00034', 'placed_at': '2026-10-27T16:20:00Z', 'customer': 'Neha (test)', 'total': 210, 'source': 'zomato', 'stage': 'delivered', 'items': '1 × Cappuccino', 'ref': 'ZO-77095'},
+          ],
+        };
+    FakeServer withSources() => FakeServer((r) {
+          final p = r.url.path;
+          if (p.endsWith('/rpc/rst_channel_orders')) return ok(sources());
+          if (p.endsWith('/rpc/pos_orders_board')) return ok(board());
+          return err(404, 'not in this fake: $p');
+        });
+
+    testWidgets('delivery updates: Out for delivery asks the rider and minutes, sends them, and the order shows the rider; Delivered next', (t) async {
+      final src = sources();
+      final orders = (src['orders'] as List).cast<Map<String, dynamic>>();
+      orders[0]
+        ..['stage'] = 'ready'
+        ..['customer'] = 'Priya (test)';
+      final s = FakeServer((r) {
+        final p = r.url.path;
+        if (p.endsWith('/rpc/rst_channel_delivery')) {
+          final b = jsonDecode(r.body) as Map<String, dynamic>;
+          if (b['step'] == 'out') {
+            orders[0]
+              ..['stage'] = 'on_way'
+              ..['delivery'] = {'stage': 'out', 'rider_name': b['rider_name'], 'rider_phone': b['rider_phone'], 'eta_minutes': b['eta_minutes']};
+          }
+          return ok({'message': 'P-00031 out for delivery with Ravi, about 15 min'});
+        }
+        if (p.endsWith('/rpc/rst_channel_orders')) return ok(src);
+        if (p.endsWith('/rpc/pos_orders_board')) return ok(board());
+        return err(404, 'not in this fake: $p');
+      });
+      final opened = <Uri>[];
+      await showTall(t, OrdersBoardScreen(api: s.api, initialTab: 'live', poll: Duration.zero, openUrl: (u) async {
+        opened.add(u);
+        return true;
+      }));
+      await tapChip(t, 'channel-card-onelocal');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('deliver-track-P-00031')), findsOneWidget);
+      expect(find.byKey(const ValueKey('deliver-filter-pending')), findsOneWidget);
+      await tapChip(t, 'deliver-out-P-00031');
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('rider-name')), 'Ravi');
+      await t.enterText(find.byKey(const ValueKey('rider-phone')), '98765 43210');
+      await t.tap(find.byKey(const ValueKey('rider-eta-15')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('rider-go')));
+      await t.pumpAndSettle();
+      final sent = jsonDecode(s.where('POST', '/rpc/rst_channel_delivery').single.body) as Map<String, dynamic>;
+      expect(sent, containsPair('step', 'out'));
+      expect(sent, containsPair('rider_name', 'Ravi'));
+      expect(sent, containsPair('rider_phone', '9876543210'));
+      expect(sent, containsPair('eta_minutes', 15));
+      expect(find.text('Ravi · +91 9876543210 · about 15 min'), findsOneWidget);
+      expect(find.byKey(const ValueKey('deliver-delivered-P-00031')), findsOneWidget, reason: 'next: Delivered');
+      // the customer hears where it is on WhatsApp
+      await tapChip(t, 'deliver-notify-P-00031');
+      await t.pumpAndSettle();
+      expect(opened.single.path, '/919800000101');
+      expect(opened.single.queryParameters['text'], contains('on its way with Ravi (+91 9876543210), reaching in about 15 min'));
+      // the filter: only what is out for delivery
+      await tapChip(t, 'deliver-filter-on_way');
+      await t.pumpAndSettle();
+      expect(find.text('Priya (test)'), findsOneWidget);
+      expect(find.text('Arjun (test)'), findsOneWidget, reason: 'also on its way');
+    });
+
+    testWidgets('Delivered completes the order: money due at the door asks Cash / UPI / Card and sends it; a paid one does not ask', (t) async {
+      final src = sources();
+      final orders = (src['orders'] as List).cast<Map<String, dynamic>>();
+      orders[1]
+        ..['due'] = 200
+        ..['prepaid'] = false; // Arjun, out for delivery, cash on delivery
+      final s = FakeServer((r) {
+        final p = r.url.path;
+        if (p.endsWith('/rpc/rst_channel_delivery')) return ok({'message': 'P-00032 delivered, ₹200.00 collected by cash'});
+        if (p.endsWith('/rpc/rst_channel_orders')) return ok(src);
+        if (p.endsWith('/rpc/pos_orders_board')) return ok(board());
+        return err(404, 'not in this fake: $p');
+      });
+      await openTab(t, s);
+      await tapChip(t, 'channel-card-onelocal');
+      await t.pumpAndSettle();
+      await tapChip(t, 'deliver-delivered-P-00032');
+      await t.pumpAndSettle();
+      expect(find.text('Collect ₹200'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('paid-cash')));
+      await t.pumpAndSettle();
+      final sent = jsonDecode(s.where('POST', '/rpc/rst_channel_delivery').single.body) as Map<String, dynamic>;
+      expect(sent, containsPair('step', 'delivered'));
+      expect(sent, containsPair('payment_method', 'cash'));
+    });
+
+    testWidgets('Delivered on an order paid in the app does not ask how it was paid', (t) async {
+      final src = sources();
+      final orders = (src['orders'] as List).cast<Map<String, dynamic>>();
+      orders[1]
+        ..['due'] = 200
+        ..['prepaid'] = true;
+      final s = FakeServer((r) {
+        final p = r.url.path;
+        if (p.endsWith('/rpc/rst_channel_delivery')) return ok({'message': 'P-00032 delivered'});
+        if (p.endsWith('/rpc/rst_channel_orders')) return ok(src);
+        if (p.endsWith('/rpc/pos_orders_board')) return ok(board());
+        return err(404, 'not in this fake: $p');
+      });
+      await openTab(t, s);
+      await tapChip(t, 'channel-card-onelocal');
+      await t.pumpAndSettle();
+      await tapChip(t, 'deliver-delivered-P-00032');
+      await t.pumpAndSettle();
+      expect(find.textContaining('Collect'), findsNothing);
+      expect(jsonDecode(s.where('POST', '/rpc/rst_channel_delivery').single.body) as Map, isNot(contains('payment_method')));
+    });
+
+    testWidgets('Delivery status asked for (from an order\'s page): the board opens that order\'s delivery list with the order opened and ringed', (t) async {
+      final s = withSources();
+      await openTab(t, s);
+      expect(find.byKey(const ValueKey('channel-card-onelocal')), findsOneWidget, reason: 'the cards first');
+      OrdersBoardScreen.requestedDelivery.value = (source: null, orderId: 'o2');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('channel-title')), findsOneWidget, reason: 'OneLocal\'s delivery list');
+      expect(find.text('1 × Ice Blue'), findsOneWidget, reason: 'the order is opened');
+      expect(find.byKey(const ValueKey('deliver-delivered-P-00032')), findsOneWidget, reason: 'its next step is right there');
+      expect(OrdersBoardScreen.requestedDelivery.value, isNull, reason: 'shown once');
+    });
+
+    testWidgets('a source asked for (Home\'s delivery tile) opens its list', (t) async {
+      final s = withSources();
+      await openTab(t, s);
+      OrdersBoardScreen.requestedDelivery.value = (source: 'swiggy', orderId: null);
+      await t.pumpAndSettle();
+      expect(find.text('Kiran (test)'), findsOneWidget);
+      expect(find.text('Priya (test)'), findsNothing);
+    });
+
+    testWidgets('an order page\'s Check delivery status goes to the delivery list, not the courier sheet', (t) async {
+      final s = FakeServer((r) => r.method == 'GET' ? ok(view('in_transit')) : err(404, 'not in this fake'));
+      var asked = 0;
+      await showTall(t, OrderScreen(api: s.api, orderId: 'o2', onDeliveryStatus: (_) => asked++));
+      await t.tap(find.text('Mark delivered')); // a restaurant moves delivery orders on from the delivery list
+      await t.pumpAndSettle();
+      expect(asked, 1);
+      expect(find.text('No courier tracking is connected. Confirm with the customer before closing the order.'), findsNothing);
+    });
+
+    testWidgets('an online order\'s Check delivery status (online_delivery) goes there too', (t) async {
+      final online = view('in_transit')..['actions'] = [{'id': 'online_delivery', 'label': 'Check delivery status', 'style': 'primary'}];
+      final s = FakeServer((r) => r.method == 'GET' ? ok(online) : err(404, 'not in this fake'));
+      var asked = 0;
+      await showTall(t, OrderScreen(api: s.api, orderId: 'o2', onDeliveryStatus: (_) => asked++));
+      await t.tap(find.text('Check delivery status'));
+      await t.pumpAndSettle();
+      expect(asked, 1);
+    });
+
+    testWidgets('Swiggy: the rider is theirs, so after Ready the step is Picked up by rider; no Out for delivery, no customer message', (t) async {
+      final s = withSources();
+      await openTab(t, s);
+      await tapChip(t, 'channel-card-swiggy');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('deliver-delivered-P-00033')), findsOneWidget);
+      expect(find.text('Picked up by rider'), findsOneWidget);
+      expect(find.byKey(const ValueKey('deliver-out-P-00033')), findsNothing);
+      expect(find.byKey(const ValueKey('deliver-notify-P-00033')), findsNothing);
+      expect(find.byKey(const ValueKey('deliver-filter-on_way')), findsNothing, reason: 'no Out for delivery filter for Swiggy');
+    });
+
+    testWidgets('four stacked cards above the counter orders: count, total, who, and the cancelled count', (t) async {
+      final s = withSources();
+      await openTab(t, s);
+      for (final k in ['onelocal', 'swiggy', 'zomato', 'on_call']) {
+        expect(find.byKey(ValueKey('channel-card-$k')), findsOneWidget, reason: k);
+      }
+      expect(find.text('OneLocal · 2'), findsOneWidget);
+      expect(find.text('1 new · Priya (test), Arjun (test)'), findsOneWidget);
+      expect(find.text('Swiggy · 1'), findsOneWidget);
+      expect(find.text('All done · Neha (test)'), findsOneWidget);
+      expect(find.text('On call delivery · 0'), findsOneWidget);
+      expect(find.text('Cancelled · 1'), findsOneWidget);
+      for (final k in ['onelocal', 'swiggy', 'zomato', 'on_call']) {
+        expect(find.descendant(of: find.byKey(ValueKey('channel-card-$k')), matching: find.byKey(ValueKey('channel-logo-$k'))), findsOneWidget, reason: '$k logo on its card');
+      }
+      final cards = ['onelocal', 'swiggy', 'zomato', 'on_call'].map((k) => t.getRect(find.byKey(ValueKey('channel-card-$k'))).top).toList();
+      expect(cards, [...cards]..sort(), reason: 'OneLocal, Swiggy, Zomato, On call, top to bottom');
+      // only the cards: no list of orders and no channel or status pills under them
+      expect(find.byKey(const ValueKey('channel-all')), findsNothing);
+      expect(find.byKey(const ValueKey('status-new')), findsNothing);
+      expect(find.text('Search order or customer...'), findsNothing);
+    });
+
+    testWidgets('a card opens its orders with the status and source; pills switch source; back returns to the cards', (t) async {
+      final s = withSources();
+      await openTab(t, s);
+      await tapChip(t, 'channel-card-onelocal');
+      await t.pumpAndSettle();
+      expect(find.text('OneLocal · 2'), findsWidgets);
+      expect(find.text('Priya (test)'), findsOneWidget);
+      expect(find.text('New · waiting to accept'), findsOneWidget);
+      expect(find.byKey(const ValueKey('channel-stage-P-00032')), findsOneWidget);
+      expect(t.widget<Text>(find.byKey(const ValueKey('channel-stage-P-00032'))).data, 'Out for delivery');
+      expect(find.text('Kiran (test)'), findsNothing, reason: 'only OneLocal orders');
+      await tapChip(t, 'channel-expand-P-00031');
+      await t.pumpAndSettle();
+      expect(find.text('2 × Cappuccino'), findsOneWidget);
+      // the switcher is the four logos only, side by side
+      for (final k in ['onelocal', 'swiggy', 'zomato', 'on_call']) {
+        expect(find.descendant(of: find.byKey(ValueKey('channel-pill-$k')), matching: find.byType(Text)), findsNothing, reason: '$k: logo only');
+        expect(find.descendant(of: find.byKey(ValueKey('channel-pill-$k')), matching: find.byKey(ValueKey('channel-logo-$k'))), findsOneWidget);
+      }
+      expect(t.getRect(find.byKey(const ValueKey('channel-pill-on_call'))).right, lessThanOrEqualTo(t.view.physicalSize.width / t.view.devicePixelRatio), reason: 'all four in view');
+      await tapChip(t, 'channel-pill-swiggy');
+      await t.pumpAndSettle();
+      expect(find.text('Kiran (test)'), findsOneWidget);
+      expect(find.text('Swiggy #SW-48213'), findsOneWidget);
+      expect(find.text('Ready · waiting for rider'), findsOneWidget);
+      await tapChip(t, 'channel-back');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('channel-card-zomato')), findsOneWidget);
+    });
+
+    testWidgets('KDS view and KOT view sit above the cards and open the kitchen display and the kitchen tickets', (t) async {
+      final opened = <String>[];
+      HomeNav.kitchenDisplay = (_) => opened.add('kds');
+      HomeNav.kotView = (_) => opened.add('kot');
+      addTearDown(HomeNav.reset);
+      final s = withSources();
+      await openTab(t, s);
+      expect(find.text('KDS view'), findsOneWidget);
+      expect(find.text('KOT view'), findsOneWidget);
+      expect(t.getRect(find.byKey(const ValueKey('open-kds'))).bottom, lessThan(t.getRect(find.byKey(const ValueKey('channel-card-onelocal'))).top));
+      await tapChip(t, 'open-kds');
+      await t.pumpAndSettle();
+      await tapChip(t, 'open-kot');
+      await t.pumpAndSettle();
+      expect(opened, ['kds', 'kot']);
+    });
+
+    group('accept within a minute', () {
+      // P-00031 (OneLocal, new) was placed at 17:40:00; 20 seconds later it has 40 seconds left
+      final placed = DateTime.utc(2026, 10, 27, 17, 40);
+      FakeServer server({bool auto = false}) => FakeServer((r) {
+            final p = r.url.path;
+            if (p.endsWith('/rpc/rst_channel_orders')) return ok({...sources(), 'accept_window': 60, 'auto_accept': auto});
+            if (p.endsWith('/rpc/rst_channel_accept')) return ok({'accepted': true});
+            if (p.endsWith('/rpc/rst_auto_accept_set')) return ok({'auto_accept': body(r)['on']});
+            if (p.endsWith('/rpc/pos_orders_board')) return ok(board());
+            return err(404, 'not in this fake: $p');
+          });
+
+      testWidgets('a new order: the card shows the timer and the chime sounds once', (t) async {
+        final sounds = _Sounds();
+        final s = server();
+        await showTall(t, OrdersBoardScreen(api: s.api, poll: Duration.zero, sounds: sounds, now: () => placed.add(const Duration(seconds: 20))));
+        expect(find.descendant(of: find.byKey(const ValueKey('channel-timer-onelocal')), matching: find.text('Accept in 0:40')), findsOneWidget);
+        expect(find.byKey(const ValueKey('channel-timer-swiggy')), findsNothing, reason: 'Swiggy has nothing new');
+        expect(sounds.calls, ['arrive']);
+        await tapChip(t, 'channel-card-onelocal');
+        await t.pumpAndSettle();
+        expect(find.byKey(const ValueKey('channel-accept-in-P-00031')), findsOneWidget);
+        expect(sounds.calls, ['arrive'], reason: 'the same order does not chime again');
+      });
+
+      testWidgets('the timer counts every second; the last 10 seconds sound the warning once; then it says late', (t) async {
+        final sounds = _Sounds();
+        var now = placed.add(const Duration(seconds: 48));
+        final s = server();
+        // the timers tick every second, so the screen never settles: frames are pumped by hand
+        ignoreOverflow();
+        t.view.physicalSize = const Size(780, 5600);
+        t.view.devicePixelRatio = 2;
+        addTearDown(t.view.reset);
+        await t.pumpWidget(MaterialApp(home: OrdersBoardScreen(api: s.api, poll: const Duration(hours: 1), sounds: sounds, now: () => now)));
+        for (var i = 0; i < 5; i++) {
+          await t.pump(const Duration(milliseconds: 20));
+        }
+        expect(find.text('Accept in 0:12'), findsOneWidget);
+        now = now.add(const Duration(seconds: 3));
+        await t.pump(const Duration(seconds: 1));
+        expect(find.text('Accept in 0:09'), findsOneWidget);
+        expect(sounds.calls, ['arrive', 'warning']);
+        now = now.add(const Duration(seconds: 1));
+        await t.pump(const Duration(seconds: 1));
+        expect(sounds.calls, ['arrive', 'warning'], reason: 'one warning per order');
+        now = now.add(const Duration(seconds: 20));
+        await t.pump(const Duration(seconds: 1));
+        expect(find.text('Accept now · late'), findsOneWidget);
+        await t.pumpWidget(const SizedBox()); // the screen goes, and its timers with it
+      });
+
+      testWidgets('Accept sends the order to the database; the auto-accept switch is saved there', (t) async {
+        final s = server();
+        await showTall(t, OrdersBoardScreen(api: s.api, poll: Duration.zero, sounds: _Sounds(), now: () => placed));
+        expect(find.text('Auto-accept orders'), findsOneWidget);
+        await tapChip(t, 'auto-accept');
+        await t.pumpAndSettle();
+        expect(body(s.where('POST', '/rpc/rst_auto_accept_set').single), {'on': true});
+        await tapChip(t, 'channel-card-onelocal');
+        await t.pumpAndSettle();
+        await tapChip(t, 'channel-accept-P-00031');
+        await t.pumpAndSettle();
+        expect(body(s.where('POST', '/rpc/rst_channel_accept').single), {'order_id': 'o1'});
+      });
+
+      testWidgets('with auto-accept on, a new order is accepted by itself; with it off, it waits', (t) async {
+        final on = server(auto: true);
+        await showTall(t, OrdersBoardScreen(api: on.api, poll: Duration.zero, sounds: _Sounds(), now: () => placed));
+        expect(body(on.where('POST', '/rpc/rst_channel_accept').first), {'order_id': 'o1', 'auto': true});
+        await t.pumpWidget(const SizedBox());
+        final off = server();
+        await showTall(t, OrdersBoardScreen(api: off.api, poll: Duration.zero, sounds: _Sounds(), now: () => placed));
+        expect(off.where('POST', '/rpc/rst_channel_accept'), isEmpty);
+      });
+    });
+
+    testWidgets('without the channel read (an older server) the board shows as before', (t) async {
+      final s = tabServer();
+      await openTab(t, s);
+      expect(find.byKey(const ValueKey('channel-card-swiggy')), findsNothing);
+      expect(find.byKey(const ValueKey('channel-all')), findsOneWidget, reason: 'the old board as before');
+      expect(find.byKey(const ValueKey('new-order')), findsOneWidget);
+    });
+  });
+}
+
+class _Sounds extends OrderAlertSounds {
+  _Sounds();
+  final calls = <String>[];
+  @override
+  Future<void> arrive() async => calls.add('arrive');
+  @override
+  Future<void> warning() async => calls.add('warning');
 }

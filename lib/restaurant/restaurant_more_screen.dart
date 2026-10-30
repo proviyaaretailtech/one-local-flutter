@@ -2,192 +2,113 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../home/home_nav.dart';
-import '../home/home_widgets.dart';
-import '../ui/app_header.dart';
-import '../ui/theme.dart';
+import '../home/side_nav.dart';
+import 'rst_page_manager.dart';
+import 'rst_plans_screen.dart';
 
-/// Figma section D "restraunt side nav bar" (45:7539): the restaurant's More page, opened from ☰ and
-/// from "Show all" on the dashboard. Outlet card, 17 quick links, Logout.
+/// The restaurant's side menu (Figma section D "restraunt side nav bar" 45:7539). Since 29 Oct 2026 it is the store's side bar: it slides
+/// in from the left with the profile, Search the app, the links and Sign out; ☰ and "Show all" on the dashboard open it.
 /// A link whose screen is not built (its HomeNav hook unplugged) shows a "Soon" tag and does nothing,
 /// instead of looking live and answering with a toast (control rule).
-class RestaurantMoreScreen extends StatelessWidget {
-  const RestaurantMoreScreen({super.key, required this.outletName, this.outletLine, required this.onLogout});
-  final String outletName;
-  final String? outletLine;
-  final VoidCallback onLogout;
+class RestaurantMoreScreen {
+  const RestaurantMoreScreen._();
 
-  static Route<void> route({required String outletName, String? outletLine, required VoidCallback onLogout}) => MaterialPageRoute(
-    builder: (_) => RestaurantMoreScreen(outletName: outletName, outletLine: outletLine, onLogout: onLogout),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    // (icon, label, hook). The hooks are the same ones the rest of the app plugs in app_routes.dart.
-    // A Money link opens that Money screen; no hook plugged = "Soon".
-    HomeRoute? moneyAt(String screen) => HomeNav.moneyScreen == null ? null : (c) => HomeNav.moneyScreen!(c, screen);
+  /// The restaurant's links, in order: the store's ten (founder, 29 Oct 2026: "keep these options, remove the others"). The rest live
+  /// elsewhere: KDS and KOT on Orders, table QR codes in the floor's ⋮, timings and phone numbers in Settings, payouts and invoices in
+  /// Money, notifications on the bell. The hooks are the ones app_routes.dart plugs; no hook plugged = "Soon".
+  /// [reopen] opens the side bar again with Inventory unfolded: Back from an Inventory page lands there, not on the dashboard
+  /// (founder, 29 Oct 2026).
+  static List<SideNavEntry> links(BuildContext context, {VoidCallback? onReports, VoidCallback? reopen, VoidCallback? reopenPlain}) {
+    // every page opened from the side bar comes back to it on Back (founder, 29 Oct 2026: "yes, all of them")
+    VoidCallback? back(VoidCallback? go) => go == null
+        ? null
+        : () {
+            go();
+            if (reopenPlain != null) whenUncovered(context, reopenPlain);
+          };
+    VoidCallback? open(HomeRoute? r) => r == null ? null : back(() => r(context));
     final settings = HomeNav.settings ?? HomeNav.setup;
-    final links = <(IconData, String, HomeRoute?)>[
-      (LucideIcons.clock, 'Outlet timings', settings),
-      (LucideIcons.info, 'Outlet info', HomeNav.setup),
-      (LucideIcons.phone, 'Phone numbers', settings),
-      (LucideIcons.users, 'Manage staff', HomeNav.team),
-      (LucideIcons.star, 'Feedback', HomeNav.reviews),
-      (LucideIcons.user, 'OneLocal manager', HomeNav.storefront),
-      (LucideIcons.house, 'Delivery settings', HomeNav.deliverySettings),
-      (LucideIcons.fileText, 'Order history', HomeNav.orderHistory ?? HomeNav.orders),
-      (LucideIcons.chefHat, 'Kitchen display', HomeNav.kitchen), // KDS; replaces "Share feedback" (founder, 2026-10-20)
-      (LucideIcons.qrCode, 'Table QR codes', HomeNav.tableQr), // codes guests scan to order (0560)
-      (LucideIcons.globe, 'Menu link', HomeNav.menuLink), // public menu, no sign-in (0571)
-      (LucideIcons.creditCard, 'Payout', moneyAt('payouts')),
-      (LucideIcons.circleQuestionMark, 'Customer support', HomeNav.support),
-      (LucideIcons.bell, 'Notifications', HomeNav.notifications),
-      (LucideIcons.file, 'Invoices', moneyAt('invoices')),
-      // No tax screen exists yet (Money has no GST view): stays "Soon".
-      (LucideIcons.chartPie, 'Taxes', null),
-      (LucideIcons.coffee, 'Menu', HomeNav.menu ?? HomeNav.items),
-      // Fees and charges are the commission lines of each settlement.
-      (LucideIcons.list, 'Fees & charges', moneyAt('settlements')),
-    ];
-    final initial = outletName.trim().isEmpty ? 'O' : outletName.trim()[0].toUpperCase();
-    return Scaffold(
-      key: const ValueKey('restaurant-more'),
-      backgroundColor: kBg,
-      body: Column(
-        children: [
-          // the banner (☰ always; its profile icon is the account) with the one back arrow under it
-          const AppHeader(title: 'More', back: true),
-          Expanded(
-            child: SafeArea(
-              top: false,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                children: [
-                  // Outlet card.
-                  Material(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: HomeNav.setup == null ? null : () => HomeNav.setup!(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: kLine),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 48,
-                              height: 48,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(color: const Color(0xFFFFE4DC), borderRadius: BorderRadius.circular(10)),
-                              child: Text(initial, style: inter(18, 700, color: const Color(0xFFEF5A3C))),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(outletName, style: inter(15, 700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  if (outletLine != null && outletLine!.isNotEmpty) Text(outletLine!, style: inter(12, 400, color: kMuted)),
-                                ],
-                              ),
-                            ),
-                            const Icon(LucideIcons.chevronRight, size: 18, color: kMuted),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  Text('Quick links', style: inter(16, 700)),
-                  const SizedBox(height: 14),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 0.72,
-                    children: [for (final (icon, label, hook) in links) _QuickLink(icon: icon, label: label, open: hook == null ? null : () => hook(context))],
-                  ),
-                  const SizedBox(height: 28),
-                  OutlinedButton.icon(
-                    key: const ValueKey('restaurant-logout'),
-                    onPressed: onLogout,
-                    icon: const Icon(LucideIcons.power, size: 18, color: kRed),
-                    label: Text('Logout', style: inter(14, 600, color: kRed)),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                      side: const BorderSide(color: kRed),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                      backgroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return [
+      SideNavEntry(LucideIcons.qrCode, 'All Orders', open(HomeNav.orderHistory ?? HomeNav.orders)),
+      SideNavEntry(LucideIcons.indianRupee, 'Money', open(HomeNav.money)),
+      // Inventory folds open (founder, 29 Oct 2026); each row opens its page
+      SideNavEntry(LucideIcons.package, 'Inventory', null, children: [
+        for (final (icon, label, page) in const [
+          (LucideIcons.truck, 'Purchase', 'purchase'),
+          (LucideIcons.table, 'Price control', 'prices'),
+          (LucideIcons.clipboardCheck, 'Closing stock check', 'closing'),
+          (LucideIcons.chefHat, 'Recipe', 'recipes'),
+          (LucideIcons.carrot, 'Ingredients', 'ingredients'),
+          (LucideIcons.layoutGrid, 'Table management', 'tables'),
+        ])
+          SideNavEntry(
+            icon,
+            label,
+            HomeNav.inventory == null
+                ? null
+                : () async {
+                    final cameBack = await HomeNav.inventory!(context, page);
+                    if (cameBack && context.mounted) reopen?.call();
+                  },
           ),
-        ],
-      ),
-    );
+      ]),
+      // the restaurant's OneLocal page: readiness, ads and offers, profile, hours, delivery, link and reviews (founder, 29 Oct 2026)
+      SideNavEntry(LucideIcons.layoutTemplate, 'Page Manager', back(() => Navigator.of(context).push(RstPageManagerScreen.route()))),
+      SideNavEntry(LucideIcons.circleUser, 'Customer', open(HomeNav.customers)),
+      // the outlet's name, address and contact (Settings → Outlet info)
+      SideNavEntry(LucideIcons.store, 'Business profile', open(HomeNav.outletInfo ?? settings)),
+      SideNavEntry(LucideIcons.fileText, 'Reports', back(onReports)),
+      SideNavEntry(LucideIcons.users, 'Team', open(HomeNav.team)),
+      SideNavEntry(LucideIcons.settings, 'Settings', open(settings)),
+      SideNavEntry(LucideIcons.wallet, 'One Local Wallet', open(HomeNav.wallet)),
+      SideNavEntry(LucideIcons.circleQuestionMark, 'Help & support', open(HomeNav.support)),
+      // the same prices as the store: ₹599 / ₹799 a month, 6 or 12 months (2 free)
+      SideNavEntry(LucideIcons.crown, 'Subscription plans', back(() => Navigator.of(context).push(RstPlansScreen.route()))),
+    ];
   }
-}
 
-class _QuickLink extends StatelessWidget {
-  const _QuickLink({required this.icon, required this.label, required this.open});
-  final IconData icon;
-  final String label;
-  final VoidCallback? open;
-  @override
-  Widget build(BuildContext context) {
-    final soon = open == null;
-    return Semantics(
-      button: true,
-      enabled: !soon,
-      label: soon ? '$label, coming soon' : label,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: open,
-        child: Column(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: kLine),
-                  ),
-                  child: Icon(icon, size: 22, color: soon ? kMuted : kInk),
-                ),
-                if (soon)
-                  Positioned(
-                    right: -6,
-                    top: -6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(color: const Color(0xFFFEF0C7), borderRadius: BorderRadius.circular(8)),
-                      child: Text('Soon', style: inter(8, 700, color: const Color(0xFFB54708))),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: inter(11, 500, color: soon ? kMuted : kInk),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
+  /// Calls [then] once a page opened on top of [context]'s page is closed again. Watches that page's secondary animation: it runs forward
+  /// when a page covers it and back to the start when that page is popped. A link that only switched a tab covers nothing; the watch then
+  /// stops once the next frames are drawn.
+  static void whenUncovered(BuildContext context, VoidCallback then) {
+    final anim = ModalRoute.of(context)?.secondaryAnimation;
+    if (anim == null) return;
+    var covered = anim.status != AnimationStatus.dismissed;
+    var done = false;
+    late final AnimationStatusListener listen;
+    void stop() {
+      if (done) return;
+      done = true;
+      anim.removeStatusListener(listen);
+    }
+
+    listen = (status) {
+      if (status == AnimationStatus.forward || status == AnimationStatus.completed) covered = true;
+      if (status == AnimationStatus.dismissed && covered) {
+        stop();
+        if (context.mounted) then();
+      }
+    };
+    anim.addStatusListener(listen);
+    // a link that only switched a tab covers nothing: stop watching once the frames after the tap are drawn
+    WidgetsBinding.instance.addPostFrameCallback((_) => WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!covered) stop();
+        }));
+  }
+
+  /// Opens the side bar: the person (Manage account), the outlet under them, Search the app, the links, Sign out.
+  /// [openGroups]: folding rows open from the start (Inventory, when coming back from one of its pages).
+  static Future<void> open(BuildContext context,
+      {required String name, String? email, required String outletName, required VoidCallback onLogout, VoidCallback? onReports, Set<String> openGroups = const {}}) {
+    void reopen() => open(context, name: name, email: email, outletName: outletName, onLogout: onLogout, onReports: onReports, openGroups: const {'Inventory'});
+    void reopenPlain() => open(context, name: name, email: email, outletName: outletName, onLogout: onLogout, onReports: onReports);
+    return showSideNav(context,
+        name: name,
+        email: email,
+        line: outletName,
+        entries: links(context, onReports: onReports, reopen: reopen, reopenPlain: reopenPlain),
+        onReports: onReports,
+        onSignOut: onLogout,
+        openGroups: openGroups);
   }
 }

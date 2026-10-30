@@ -415,9 +415,10 @@ void main() {
       expect(find.text('8.4%'), findsOneWidget);
       expect(find.text('1.2%'), findsOneWidget);
       expect(find.byType(SalesBars), findsOneWidget);
-      for (final l in ['Home', 'Menu', 'Bill', 'Orders', 'Stock']) {
+      for (final l in ['Home', 'Menu', 'Bill', 'Orders']) {
         expect(find.byKey(ValueKey('tab-$l')), findsOneWidget);
       }
+      expect(find.byKey(const ValueKey('tab-Stock')), findsNothing, reason: 'Stock is off the restaurant bar for now');
     });
 
     testWidgets('compare off asks without the previous period and hides the changes', (t) async {

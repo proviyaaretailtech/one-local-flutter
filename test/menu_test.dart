@@ -1,13 +1,18 @@
 import 'dart:convert';
 
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:vinii_pos/catalogue/item_photo.dart';
 import 'package:vinii_pos/home/control_centre_screen.dart';
 import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/menu/dish_screen.dart';
 import 'package:vinii_pos/menu/menu_api.dart';
+import 'package:vinii_pos/menu/menu_build_api.dart';
 import 'package:vinii_pos/menu/menu_screen.dart';
 
 import 'home_test.dart' show FakeHome, summaryJson, showTall;
@@ -72,16 +77,15 @@ class FakeGateway {
   FakeGateway(this.answer);
   final http.Response Function(String fn, Map<String, dynamic> body) answer;
   final calls = <(String, Map<String, dynamic>)>[];
-  late final api = MenuApi(
-    baseUrl: 'http://pos.test',
-    accessToken: () => 'token-123',
-    client: MockClient((r) async {
-      final body = (jsonDecode(r.body) as Map).cast<String, dynamic>();
-      final fn = r.url.pathSegments.last;
-      calls.add((fn, body));
-      return answer(fn, body);
-    }),
-  );
+  late final _client = MockClient((r) async {
+    final body = (jsonDecode(r.body) as Map).cast<String, dynamic>();
+    final fn = r.url.pathSegments.last;
+    calls.add((fn, body));
+    return answer(fn, body);
+  });
+  late final api = MenuApi(baseUrl: 'http://pos.test', accessToken: () => 'token-123', client: _client);
+  // The Menu module calls (add-ons, combos, quick add, settings) through the same fake.
+  late final build = MenuBuildApi(baseUrl: 'http://pos.test', accessToken: () => 'token-123', client: _client);
   List<Map<String, dynamic>> bodies(String fn) => [for (final c in calls) if (c.$1 == fn) c.$2];
 }
 
@@ -268,43 +272,192 @@ void main() {
     testWidgets('header, tabs, chips with server counts, categories, dish cards', (t) async {
       final g = FakeGateway((fn, b) => json(menuJson()));
       await showScreen(t, MenuScreen(api: g.api));
-      for (final l in ['EDIT MENU FOR', 'Niks Browni And Burger', 'All items', 'Add ons', 'Out of stock 1', 'In stock 2', 'Needs image 2', 'Hot Cafe (2)', 'Burgers (1)',
-          'All items in stock', 'Some items out of stock', 'Americano ( Large )', '₹125', 'Coffee shot with hot water', '2 Variants', 'ADD', 'Add images to items', '1/3 items complete']) {
+      // The banner every main tab shows (ONELOCAL PARTNER over the business / outlet), then the two tabs.
+      // laid out like the store catalogue: category pills (All first), then compact rows (name, "Category · Veg", availability, price, ⋮)
+      for (final l in ['ONELOCAL PARTNER', 'All items', 'Add-ons', 'Combos', 'All', 'Hot Cafe', 'Burgers',
+          'Americano ( Large )', '₹125', 'Quick add']) {
         expect(find.text(l), findsWidgets, reason: l);
       }
-      expect(find.text('Serving times set · not orderable now'), findsOneWidget);
+      expect(find.byKey(const ValueKey('cat-pill-all')), findsOneWidget);
+      expect(find.byKey(const ValueKey('cat-pill-Hot Cafe')), findsOneWidget);
+      expect(find.textContaining('Hot Cafe · Veg · 2 Variants'), findsOneWidget);
+      expect(find.textContaining('Available'), findsWidgets);
+      expect(find.textContaining('Out of stock', findRichText: true), findsWidgets);
+      expect(find.byKey(const ValueKey('more-d1')), findsOneWidget, reason: 'every row has ⋮ for its actions');
+      expect(find.byKey(const ValueKey('menu-quick-add')), findsOneWidget, reason: 'Quick add sits beside the search');
+      expect(find.byType(FloatingActionButton), findsNothing, reason: 'no floating ADD over the bottom bar');
+      for (final moved in ['RECOMMENDED IMPROVEMENTS', 'Add images to items', 'Add descriptions']) {
+        expect(find.text(moved), findsNothing, reason: '$moved now lives in the Notification Centre');
+      }
+      for (final gone in ['chip-out_of_stock', 'chip-in_stock', 'chip-needs_image']) {
+        expect(find.byKey(ValueKey(gone)), findsNothing, reason: 'no stock filter pills: stock shows as tags');
+      }
+      expect(find.byKey(const ValueKey('tag-out-d3')), findsOneWidget, reason: 'the switched-off burger: red Out of stock beside its row');
+      expect(find.byKey(const ValueKey('tag-out-d1')), findsNothing);
+      expect(find.byKey(const ValueKey('menu-filter-clear')), findsNothing, reason: 'no filter, no pill');
       expect(g.calls.map((c) => c.$1), ['rst_menu']);
       expect(g.calls.single.$2, {'filter': 'all'});
     });
 
-    testWidgets('chip filters and the in-stock switches go to the server', (t) async {
+    testWidgets('top left is ☰ (opens the side menu), not a back arrow', (t) async {
+      var opened = 0;
+      HomeNav.openMenu = (_) => opened++;
+      final g = FakeGateway((fn, b) => json(menuJson()));
+      await showScreen(t, MenuScreen(api: g.api));
+      expect(find.byIcon(LucideIcons.chevronLeft), findsNothing);
+      await t.tap(find.byKey(const ValueKey('menu-side-nav')));
+      await t.pump();
+      expect(opened, 1);
+    });
+
+    testWidgets('subcategories sit under their main pill: picking it shows a second row, and each subcategory filters its dishes', (t) async {
+      final m = jsonDecode(jsonEncode(menuJson())) as Map<String, dynamic>;
+      final cats = (m['categories'] as List).cast<Map<String, dynamic>>();
+      // Burgers becomes a subcategory of Hot Cafe, and a second one, Iced, lives under a main category with no dishes of its own
+      cats[1]
+        ..['parent_id'] = 'c1'
+        ..['parent_name'] = 'Hot Cafe';
+      cats.add({
+        'id': 'c3', 'name': 'Iced', 'count': 1, 'all_in_stock': true, 'parent_id': 'c9', 'parent_name': 'Cold drinks',
+        'items': [{'id': 'd4', 'name': 'Iced Latte', 'price_minor': 18000, 'food_type': 'veg', 'in_stock': true, 'variants': 0, 'has_windows': false, 'orderable_now': true}],
+      });
+      final g = FakeGateway((fn, b) => json(m));
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build));
+      expect(find.byKey(const ValueKey('cat-pill-Burgers')), findsNothing, reason: 'a subcategory has no main pill');
+      expect(find.byKey(const ValueKey('cat-pill-Cold drinks')), findsOneWidget, reason: 'a main category holding only subcategories still has its pill');
+      expect(find.byKey(const ValueKey('menu-categories')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('cat-pill-Hot Cafe')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('sub-pill-all')), findsOneWidget);
+      expect(find.text('Veg Burger'), findsOneWidget, reason: 'the main pill shows its subcategories\' dishes too');
+      expect(find.text('Cappuccino'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('sub-pill-Burgers')));
+      await t.pumpAndSettle();
+      expect(find.text('Veg Burger'), findsOneWidget);
+      expect(find.text('Cappuccino'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('cat-pill-Cold drinks')));
+      await t.pumpAndSettle();
+      expect(find.text('Iced Latte'), findsOneWidget);
+      expect(find.byKey(const ValueKey('sub-pill-Iced')), findsOneWidget);
+    });
+
+    testWidgets('a filter asked for elsewhere (Notification Centre "Add images") opens the menu on it, once', (t) async {
+      MenuScreen.requestedFilter.value = 'needs_image';
+      final g = FakeGateway((fn, b) => json(menuJson()));
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build));
+      expect(g.bodies('rst_menu').first, containsPair('filter', 'needs_image'));
+      expect(MenuScreen.requestedFilter.value, isNull, reason: 'applied once, then cleared');
+      // asked again while the menu is open
+      MenuScreen.requestedFilter.value = 'out_of_stock';
+      await t.pumpAndSettle();
+      expect(g.bodies('rst_menu').last, containsPair('filter', 'out_of_stock'));
+    });
+
+    testWidgets('stock tags beside Available: orange "Low in stock", red "Out of stock" from the ingredients, say which one', (t) async {
+      final g = FakeGateway((fn, b) => switch (fn) {
+            'menu_stock_signals' => json({'items': [
+                {'menu_item_id': 'd1', 'state': 'low', 'ingredient': 'Espresso coffee beans'},
+                {'menu_item_id': 'd2', 'state': 'out', 'ingredient': 'Full cream milk'},
+              ]}),
+            _ => json(menuJson(burgerInStock: true)),
+          });
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build));
+      expect(find.byKey(const ValueKey('tag-low-d1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('tag-out-d2')), findsOneWidget);
+      expect(find.byKey(const ValueKey('tag-out-d3')), findsNothing, reason: 'the burger is in stock and stock says nothing about it');
+      expect(find.text('Low in stock'), findsOneWidget);
+      expect(find.text('Out of stock'), findsOneWidget);
+      final low = t.widget<Text>(find.text('Low in stock'));
+      final out = t.widget<Text>(find.text('Out of stock'));
+      expect(low.style!.color, const Color(0xFFC2410C), reason: 'orange');
+      expect(out.style!.color, const Color(0xFFB42318), reason: 'red');
+      expect(find.byTooltip('Espresso coffee beans is running low'), findsOneWidget);
+      expect(find.byTooltip('Full cream milk has run out'), findsOneWidget);
+      expect(find.textContaining('Available'), findsNWidgets(3), reason: 'Available stays, the tag sits beside it');
+    });
+
+    testWidgets('a beverage with sizes shows Small, Medium and Large with their prices', (t) async {
+      final m = menuJson();
+      ((m['categories'] as List).first['items'] as List).first['sizes'] = [
+        {'name': 'Small', 'price': 69, 'recipe_factor': 1},
+        {'name': 'Medium', 'price': 89, 'recipe_factor': 2},
+        {'name': 'Large', 'price': 109, 'recipe_factor': 3},
+      ];
+      // 100 Smalls can be made: Medium uses the recipe twice (50), Large three times (33)
+      final g = FakeGateway((fn, b) => fn == 'menu_stock_signals' ? json({'items': [], 'can_make': [{'menu_item_id': 'd1', 'can_make': 100}]}) : json(m));
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build));
+      final sizes = find.byKey(const ValueKey('sizes-d1'));
+      expect(sizes, findsOneWidget);
+      // one quiet line (founder, 29 Oct 2026), not a chip per size; how many can be made shows once, for the smallest
+      expect(t.widget<Text>(sizes).data, 'S ₹69  ·  M ₹89  ·  L ₹109');
+      expect(find.byKey(const ValueKey('sizes-d2')), findsNothing, reason: 'a dish without sizes shows none');
+    });
+
+    testWidgets('each dish says how many can be made from its recipe and stock, or that it has no recipe', (t) async {
+      final g = FakeGateway((fn, b) => switch (fn) {
+            'menu_stock_signals' => json({'items': [], 'can_make': [
+                {'menu_item_id': 'd1', 'can_make': 200},
+                {'menu_item_id': 'd2', 'can_make': null},
+              ]}),
+            _ => json(menuJson(burgerInStock: true)),
+          });
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build));
+      expect(find.descendant(of: find.byKey(const ValueKey('can-make-d1')), matching: find.text('200 can be made')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('can-make-d2')), matching: find.text('Stock not counted')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('can-make-d3')), matching: find.text('No recipe yet')), findsOneWidget);
+    });
+
+    testWidgets('a filter set elsewhere shows as one "Showing" pill that clears it; the stock switches go to the server', (t) async {
       var on = false;
       final g = FakeGateway((fn, b) {
         if (fn == 'rst_menu_stock_set') on = b['in_stock'] as bool;
         return fn == 'rst_menu' ? json(menuJson(burgerInStock: on)) : json({'updated': 1, 'in_stock': on});
       });
+      MenuScreen.requestedFilter.value = 'needs_image';
       await showScreen(t, MenuScreen(api: g.api));
-      await t.tap(find.byKey(const ValueKey('chip-out_of_stock')));
-      await t.pumpAndSettle();
-      expect(g.bodies('rst_menu').last, {'filter': 'out_of_stock'});
-      await t.tap(find.byKey(const ValueKey('chip-out_of_stock')));
+      expect(g.bodies('rst_menu').last, {'filter': 'needs_image'});
+      expect(find.text('Showing: Needs image'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('menu-filter-clear')));
       await t.pumpAndSettle();
       expect(g.bodies('rst_menu').last, {'filter': 'all'});
+      expect(find.byKey(const ValueKey('menu-filter-clear')), findsNothing);
 
+      // one dish: ⋮ → Mark in stock
+      await t.tap(find.byKey(const ValueKey('more-d3')));
+      await t.pumpAndSettle();
+      expect(find.text('Mark in stock'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('stock-d3')));
       await t.pumpAndSettle();
       expect(g.bodies('rst_menu_stock_set').single, {'id': 'd3', 'in_stock': true});
-      expect(find.text('Burgers (1)'), findsOneWidget);
+
+      // a whole category: choose its pill, then its switch
+      await t.tap(find.byKey(const ValueKey('cat-pill-Burgers')));
+      await t.pumpAndSettle();
+      expect(find.text('Burgers (1) · All items in stock'), findsOneWidget);
+      expect(find.text('Americano ( Large )'), findsNothing, reason: 'only the chosen category is listed');
       expect(t.widget<Switch>(find.byKey(const ValueKey('cat-switch-Burgers'))).value, isTrue, reason: 'redrawn from the server');
 
+      await t.tap(find.byKey(const ValueKey('cat-pill-Hot Cafe')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('cat-switch-Hot Cafe')));
       await t.pumpAndSettle();
       expect(g.bodies('rst_menu_stock_set').last, {'category_id': 'c1', 'in_stock': false});
+
+      await t.tap(find.byKey(const ValueKey('cat-pill-all')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('cat-switch-Hot Cafe')), findsNothing, reason: 'All lists every dish without a category switch');
     });
 
-    testWidgets('View details opens the dish screen; Add ons says it is not set up', (t) async {
-      final g = FakeGateway((fn, b) => fn == 'rst_menu' ? json(menuJson()) : json(dishJson(description: 'Coffee shot with hot water')));
-      await showScreen(t, MenuScreen(api: g.api));
+    testWidgets('View details opens the dish screen; the Add-ons tab lists the add-on groups from the server', (t) async {
+      final g = FakeGateway((fn, b) => switch (fn) {
+            'rst_menu' => json(menuJson()),
+            'menu_addon_list' => json({'groups': []}),
+            _ => json(dishJson(description: 'Coffee shot with hot water')),
+          });
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build));
+      await t.tap(find.byKey(const ValueKey('more-d1')));
+      await t.pumpAndSettle();
+      expect(find.text('Settings'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('view-d1')));
       await t.pumpAndSettle();
       expect(find.text('Dish details'), findsOneWidget);
@@ -313,9 +466,11 @@ void main() {
       expect(g.bodies('rst_menu_item_view').single, {'id': 'd1', 'location_id': 'l1'});
       await t.tap(find.byKey(const ValueKey('dish-back')));
       await t.pumpAndSettle();
-      await t.tap(find.text('Add ons'));
+      await t.tap(find.text('Add-ons'));
       await t.pumpAndSettle();
-      expect(find.byKey(const ValueKey('addons-empty')), findsOneWidget);
+      expect(g.calls.map((c) => c.$1), contains('menu_addon_list'));
+      expect(find.text('No add-ons yet'), findsOneWidget);
+      expect(find.byKey(const ValueKey('addon-new')), findsOneWidget);
     });
   });
 
@@ -341,4 +496,114 @@ void main() {
       expect(opened, ['catalogue']);
     });
   });
+
+  group('AI picture (with / without background)', () {
+    // a real 1×1 PNG, so the previews draw
+    final png = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    Map<String, dynamic> withPhoto() {
+      final m = menuJson();
+      ((m['categories'] as List).first['items'] as List).first['image_url'] = 'http://img.test/americano.jpg';
+      return m;
+    }
+
+    testWidgets('⋮ → AI picture: With background sends the cream backdrop, Use this picture saves it on the dish and reloads', (t) async {
+      final photos = _FakeAiPhotos(png);
+      final g = FakeGateway((fn, b) => json(withPhoto()));
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build, photos: photos));
+      await t.tap(find.byKey(const ValueKey('more-d1')));
+      await t.pumpAndSettle();
+      expect(find.text('With or without background'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('ai-photo-d1')));
+      await t.pumpAndSettle();
+      expect(find.text('AI picture · Americano ( Large )'), findsOneWidget);
+      expect(find.text('With background'), findsOneWidget);
+      expect(find.text('Without background'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('ai-with-bg')));
+      await t.pumpAndSettle();
+      expect(photos.loaded, ['http://img.test/americano.jpg'], reason: 'works on the dish\'s own photo');
+      expect(photos.bg, ['f6efe2']);
+      expect(find.byKey(const ValueKey('ai-result')), findsOneWidget);
+      final before = g.calls.where((c) => c.$1 == 'rst_menu').length;
+      await t.tap(find.byKey(const ValueKey('ai-use')));
+      await t.pumpAndSettle();
+      expect(photos.attached.single.$1, 'd1');
+      expect(photos.attached.single.$2.contentType, 'image/jpeg');
+      expect(find.byKey(const ValueKey('ai-result')), findsNothing, reason: 'the sheet closes');
+      expect(g.calls.where((c) => c.$1 == 'rst_menu').length, greaterThan(before), reason: 'the menu reloads with the new photo');
+    });
+
+    testWidgets('Without background asks for a transparent cut-out; nothing is saved until Use this picture', (t) async {
+      final photos = _FakeAiPhotos(png);
+      final g = FakeGateway((fn, b) => json(withPhoto()));
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build, photos: photos));
+      await t.tap(find.byKey(const ValueKey('more-d1')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('ai-photo-d1')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('ai-without-bg')));
+      await t.pumpAndSettle();
+      expect(photos.bg, [null]);
+      expect(find.textContaining('Background removed'), findsOneWidget);
+      expect(photos.attached, isEmpty);
+    });
+
+    testWidgets('the server\'s sentence is shown when background removal is not set up', (t) async {
+      final photos = _FakeAiPhotos(png, refuse: 'Background removal is not set up yet. Your photo is kept as it is.');
+      final g = FakeGateway((fn, b) => json(withPhoto()));
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build, photos: photos));
+      await t.tap(find.byKey(const ValueKey('more-d1')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('ai-photo-d1')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('ai-with-bg')));
+      await t.pumpAndSettle();
+      expect(find.text('Background removal is not set up yet. Your photo is kept as it is.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('ai-use')), findsNothing);
+    });
+
+    testWidgets('a dish with no photo asks for one first; a chosen photo is what the AI works on', (t) async {
+      final photos = _FakeAiPhotos(png);
+      final g = FakeGateway((fn, b) => json(menuJson()));
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build, photos: photos));
+      await t.tap(find.byKey(const ValueKey('more-d2')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('ai-photo-d2')));
+      await t.pumpAndSettle();
+      expect(find.text('Choose a photo'), findsOneWidget);
+      expect(t.widget<OutlinedButton>(find.byKey(const ValueKey('ai-with-bg'))).onPressed, isNull);
+      await t.tap(find.byKey(const ValueKey('ai-pick')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('ai-without-bg')));
+      await t.pumpAndSettle();
+      expect(photos.loaded, isEmpty);
+      expect(photos.bg, [null]);
+    });
+  });
+}
+
+class _FakeAiPhotos extends ItemPhotoService {
+  _FakeAiPhotos(this.png, {this.refuse});
+  final List<int> png;
+  final String? refuse;
+  final loaded = <String>[];
+  final bg = <String?>[];
+  final attached = <(String, ItemPhoto)>[];
+  ItemPhoto get _p => ItemPhoto(bytes: Uint8List.fromList(png), contentType: 'image/png');
+  @override
+  Future<ItemPhoto?> pick() async => _p;
+  @override
+  Future<ItemPhoto> load(String url) async {
+    loaded.add(url);
+    return _p;
+  }
+  @override
+  Future<ItemPhoto> removeBackground(ItemPhoto photo, {String? bgColor}) async {
+    bg.add(bgColor);
+    if (refuse != null) throw ItemPhotoUnavailable(refuse!);
+    return ItemPhoto(bytes: photo.bytes, contentType: bgColor == null ? 'image/png' : 'image/jpeg', backgroundRemoved: true);
+  }
+  @override
+  Future<void> attach(String itemId, ItemPhoto photo) async => attached.add((itemId, photo));
+  @override
+  Future<void> remove(String itemId) async {}
 }

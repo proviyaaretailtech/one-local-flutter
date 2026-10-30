@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/partner_api.dart';
 import '../api/app_env.dart';
+import '../api/net_guard.dart';
 import '../api/rpc_client.dart';
 import '../onboarding/document_picker.dart';
 
@@ -137,6 +138,67 @@ class ChannelState {
   String? get reason => raw['reason'] as String?;
 }
 
+/// One source's card: OneLocal, Swiggy, Zomato or On call delivery, with today's count, total and latest customers.
+class ChannelSummary {
+  ChannelSummary(this.raw);
+  final Map<String, dynamic> raw;
+  String get key => '${raw['key'] ?? ''}';
+  String get label => '${raw['label'] ?? ''}';
+  int get count => _int(raw['count']);
+  int get open => _int(raw['open']);
+  int get fresh => _int(raw['new']);
+  num get total => (raw['total'] as num?) ?? 0;
+  List<String> get names => [for (final n in (raw['names'] as List?) ?? const []) '$n'];
+}
+
+/// One delivery order on a channel card's list.
+class ChannelOrder {
+  ChannelOrder(this.raw);
+  final Map<String, dynamic> raw;
+  String _s(String k) => (raw[k] ?? '').toString();
+  String get id => _s('id');
+  String get displayNo => _s('display_no');
+  DateTime? get placedAt => DateTime.tryParse(_s('placed_at'))?.toLocal();
+  String get customer => _s('customer');
+  String? get phone => raw['phone'] as String?;
+  num get total => (raw['total'] as num?) ?? 0;
+  String get source => _s('source');
+  /// new · preparing · ready · on_way · delivered
+  String get stage => _s('stage');
+  String get items => _s('items');
+  /// The aggregator's own order number (Swiggy / Zomato), when there is one.
+  String? get ref => raw['ref'] as String?;
+
+  /// The restaurant's delivery update (0619): stage out / delivered, the rider and number, the minutes promised, when; null before.
+  Map<String, dynamic>? get delivery => (raw['delivery'] as Map?)?.cast<String, dynamic>();
+  String? get riderName => delivery?['rider_name'] as String?;
+  String? get riderPhone => delivery?['rider_phone'] as String?;
+  int? get etaMinutes => (delivery?['eta_minutes'] as num?)?.toInt();
+
+  /// Swiggy and Zomato send their own riders: the restaurant only packs and hands over.
+  bool get aggregatorRider => source == 'swiggy' || source == 'zomato';
+
+  /// What is still to collect (0620): 0 once paid; and whether the customer paid in the OneLocal app.
+  num get due => (raw['due'] as num?) ?? 0;
+  bool get prepaid => raw['prepaid'] == true;
+
+  /// Delivered needs the restaurant to say how the money came in: something is due, and neither the aggregator nor the app took it.
+  bool get collectAtDoor => due > 0.005 && !aggregatorRider && !prepaid;
+}
+
+/// `rst_channel_orders`: the four cards in order, today's cancelled count, and every order.
+class ChannelOrders {
+  ChannelOrders(this.raw);
+  final Map<String, dynamic> raw;
+  List<ChannelSummary> get channels => [for (final c in (raw['channels'] as List?) ?? const []) ChannelSummary((c as Map).cast<String, dynamic>())];
+  int get cancelled => _int(raw['cancelled']);
+  /// Seconds a new order may wait to be accepted (the business's accept window; 60 by default).
+  int get acceptWindow => raw['accept_window'] == null ? 60 : _int(raw['accept_window']);
+  bool get autoAccept => raw['auto_accept'] == true;
+  List<ChannelOrder> get orders => [for (final o in (raw['orders'] as List?) ?? const []) ChannelOrder((o as Map).cast<String, dynamic>())];
+  int get total => channels.fold(0, (a, c) => a + c.count);
+}
+
 class OrdersBoard {
   OrdersBoard(this.raw);
   final Map<String, dynamic> raw;
@@ -240,9 +302,10 @@ class OrdersApi {
       if (body != null) 'Content-Type': 'application/json',
       'Idempotency-Key': ?key,
     };
-    final res = await (method == 'GET' ? _http.get(uri, headers: headers) : _http.post(uri, headers: headers, body: body == null ? null : jsonEncode(body)))
-        .timeout(const Duration(seconds: 30));
-    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
+    final res = await guardNet(
+        method == 'GET' ? _http.get(uri, headers: headers) : _http.post(uri, headers: headers, body: body == null ? null : jsonEncode(body)),
+        (s) => throw OrdersApiException(0, s, 'offline'));
+    final decoded = readJson(res, (s) => throw OrdersApiException(res.statusCode, s, 'unreadable'));
     final map = decoded is Map ? decoded.cast<String, dynamic>() : <String, dynamic>{};
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw OrdersApiException(res.statusCode, (map['detail'] as String?) ?? 'Something went wrong. Please try again.', map['code'] as String?);
@@ -292,17 +355,31 @@ class OrdersApi {
   Future<Map<String, dynamic>> _rpc(String fn, Map<String, dynamic> args, {String? key}) async {
     final token = _token();
     if (token == null) throw const PartnerApiException(401, 'Sign in to continue.');
-    final res = await _http
-        .post(Uri.parse('$_base/rpc/$fn'),
-            headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json', 'Idempotency-Key': ?key}, body: jsonEncode(args))
-        .timeout(const Duration(seconds: 30));
-    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
+    final res = await guardNet(
+        _http.post(Uri.parse('$_base/rpc/$fn'),
+            headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json', 'Idempotency-Key': ?key}, body: jsonEncode(args)),
+        (s) => throw OrdersApiException(0, s, 'offline'));
+    final decoded = readJson(res, (s) => throw OrdersApiException(res.statusCode, s, 'unreadable'));
     final map = decoded is Map ? decoded.cast<String, dynamic>() : <String, dynamic>{};
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw OrdersApiException(res.statusCode, (map['detail'] as String?) ?? 'Something went wrong. Please try again.', map['code'] as String?);
     }
     return map;
   }
+
+  /// The restaurant's channel cards (0607): today's OneLocal, Swiggy, Zomato and on-call delivery orders (`rst_channel_orders`).
+  Future<ChannelOrders> channelOrders({String? locationId}) async => ChannelOrders(await _rpc('rst_channel_orders', {'location_id': ?locationId}));
+
+  /// Accept one new delivery order (0610): a held order goes to the kitchen; a OneLocal app order is accepted. [auto] when auto-accept did it.
+  Future<void> acceptOrder(String orderId, {bool auto = false}) async => _rpc('rst_channel_accept', {'order_id': orderId, if (auto) 'auto': true});
+
+  /// Turn auto-accept on or off for the business (owner or manager).
+  /// A delivery update (0619): [step] ready | out | delivered; for out, the rider, their number and the minutes it will take.
+  /// For delivered, [paymentMethod] (cash | upi | card) is how the money due was collected at the door (0620).
+  Future<String> deliveryUpdate(String orderId, String step, {String? riderName, String? riderPhone, int? etaMinutes, String? paymentMethod}) async =>
+      '${(await _rpc('rst_channel_delivery', {'order_id': orderId, 'step': step, 'rider_name': ?riderName, 'rider_phone': ?riderPhone, 'eta_minutes': ?etaMinutes, 'payment_method': ?paymentMethod}))['message'] ?? ''}';
+
+  Future<bool> setAutoAccept(bool on) async => (await _rpc('rst_auto_accept_set', {'on': on}))['auto_accept'] == true;
 
   /// Live orders: counts per status, channel totals, Zomato / Swiggy state and the cards of one channel and status (`pos_orders_board`).
   Future<OrdersBoard> board({String channel = 'all', String status = 'new', String q = '', String? locationId}) async => OrdersBoard(await _rpc('pos_orders_board', {

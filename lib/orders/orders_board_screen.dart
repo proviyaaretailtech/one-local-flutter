@@ -1,14 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../api/net_guard.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
+import '../ui/mobile_input.dart';
 import 'cart_screen.dart';
+import 'channel_orders.dart';
+import 'order_alerts.dart';
 import 'order_screen.dart';
 import 'order_widgets.dart';
 import 'orders_api.dart';
-import 'orders_outlet_header.dart';
+import '../home/home_nav.dart';
+import '../outlets/outlet_header.dart';
 import '../ui/i18n.dart';
 
 // Badge and channel colours sampled from the Figma frames (FINAL PARTNER APP, sections E/H; assets/figma_ref_h/Section H Export).
@@ -27,7 +35,7 @@ const _statusLabel = {'new': 'New', 'preparing': 'Preparing', 'ready': 'Ready', 
 /// the status of each order, its minutes, whether it is delayed, whether Zomato or Swiggy is connected. Resume POS reopens a held bill in the
 /// cart as the SAME order; Cancel Order uses the existing cancel rule (a reason). Spec: specs/orders-live-hold/spec.md.
 class OrdersBoardScreen extends StatefulWidget {
-  const OrdersBoardScreen({super.key, this.api, this.onNavigate, this.onMenu, this.initialTab = 'live', this.poll = const Duration(seconds: 30)});
+  const OrdersBoardScreen({super.key, this.api, this.onNavigate, this.onMenu, this.initialTab = 'live', this.poll = const Duration(seconds: 30), this.sounds = const OrderAlertSounds(), this.now, this.openUrl});
   final OrdersApi? api;
   final ValueChanged<String>? onNavigate;
   final VoidCallback? onMenu;
@@ -35,16 +43,40 @@ class OrdersBoardScreen extends StatefulWidget {
 
   /// How often the open tab refreshes itself; [Duration.zero] = never (tests).
   final Duration poll;
+
+  /// The chime when a delivery order arrives and the warning in its last 10 seconds to be accepted.
+  final OrderAlertSounds sounds;
+
+  /// Opens WhatsApp for a delivery update to the customer (tests pass a fake).
+  final Future<bool> Function(Uri)? openUrl;
+
+  /// "Delivery status" asked for elsewhere (an order's page, Home's delivery tiles): the board opens that source's delivery list, with
+  /// the order (when one is named) opened and highlighted. Set it, then go to Orders; the board clears it once shown.
+  static final requestedDelivery = ValueNotifier<({String? source, String? orderId})?>(null);
+
+  /// The clock the accept timers count with (tests set it).
+  final DateTime Function()? now;
   @override
   State<OrdersBoardScreen> createState() => _OrdersBoardScreenState();
 }
 
 class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
   late final OrdersApi _api = widget.api ?? OrdersApi();
   late String _tab = widget.initialTab;
   String _channel = 'all', _status = 'new', _holdChannel = 'all';
   final _liveQ = TextEditingController(), _holdQ = TextEditingController();
   OrdersBoard? _board;
+  // the channel cards on top of Live orders (0607), and the source opened from them (null = the cards)
+  ChannelOrders? _sources;
+  String? _source;
+  // accepting delivery orders within the window (0610): new orders already chimed for, already warned for, being accepted
+  final _chimed = <String>{}, _warned = <String>{}, _accepting = <String>{};
+  final _autoTried = <String>{}; // auto-accept tries each order once; a refusal leaves it to the Accept button
+  bool _autoBusy = false;
+  Timer? _tick, _sourcePoll;
   HoldList? _holds;
   String? _liveError, _holdError;
   Timer? _debounce, _poll;
@@ -54,21 +86,35 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
   @override
   void initState() {
     super.initState();
+    _live = LiveSync.watch({'orders', 'kitchen'}, () {
+      if (mounted) _tab == 'live' ? _loadLive() : _loadHolds();
+    });
+    OrdersBoardScreen.requestedDelivery.addListener(_applyDeliveryRequest);
     _loadLive();
     if (_tab == 'hold') _loadHolds();
     if (widget.poll > Duration.zero) _poll = Timer.periodic(widget.poll, (_) => _tab == 'live' ? _loadLive() : _loadHolds());
+    if (widget.poll > Duration.zero) {
+      // new delivery orders show up within seconds, and their accept timers count every second
+      _sourcePoll = Timer.periodic(const Duration(seconds: 10), (_) => _loadSources());
+      _tick = Timer.periodic(const Duration(seconds: 1), (_) => _everySecond());
+    }
   }
 
   @override
   void dispose() {
+    OrdersBoardScreen.requestedDelivery.removeListener(_applyDeliveryRequest);
     _debounce?.cancel();
     _poll?.cancel();
+    _tick?.cancel();
+    _sourcePoll?.cancel();
     _liveQ.dispose();
     _holdQ.dispose();
+    _live();
     super.dispose();
   }
 
   Future<void> _loadLive() async {
+    _loadSources();
     final mine = ++_liveSeq;
     try {
       final b = await _api.board(channel: _channel, status: _status, q: _liveQ.text);
@@ -79,8 +125,220 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
       });
     } catch (e) {
       if (!mounted || mine != _liveSeq) return;
-      setState(() => _liveError = e.toString());
+      setState(() => _liveError = errorSentence(e));
     }
+  }
+
+  Future<void> _loadSources() async {
+    try {
+      final s = await _api.channelOrders();
+      if (!mounted) return;
+      setState(() => _sources = s);
+      _arrivals(s);
+      _applyDeliveryRequest();
+    } catch (_) {/* the cards are extra: without them the live board still shows every order */}
+  }
+
+  // ---------------------------------------------------------------- accepting delivery orders (founder, 28 Oct 2026)
+
+  DateTime _now() => (widget.now ?? DateTime.now)();
+
+  /// Seconds [o] has left to be accepted: the accept window from when it was placed (0 or less: late).
+  int _secondsLeft(ChannelOrder o) {
+    final at = o.placedAt;
+    final window = _sources?.acceptWindow ?? 60;
+    return at == null ? window : window - _now().difference(at).inSeconds;
+  }
+
+  List<ChannelOrder> get _waiting => [for (final o in _sources?.orders ?? const <ChannelOrder>[]) if (o.stage == 'new') o];
+
+  /// Per source, the most urgent new order's seconds left.
+  Map<String, int> get _countdown {
+    final out = <String, int>{};
+    for (final o in _waiting) {
+      final s = _secondsLeft(o);
+      if (!out.containsKey(o.source) || s < out[o.source]!) out[o.source] = s;
+    }
+    return out;
+  }
+
+  /// A new order that was not there before chimes (once, however many arrived together); with auto-accept on, each is accepted.
+  void _arrivals(ChannelOrders s) {
+    final fresh = [for (final o in _waiting) if (!_chimed.contains(o.id)) o];
+    _chimed.addAll(fresh.map((o) => o.id));
+    if (fresh.any((o) => _secondsLeft(o) > 0)) widget.sounds.arrive();
+    if (s.autoAccept) {
+      for (final o in _waiting) {
+        if (_autoTried.add(o.id)) _accept(o, auto: true);
+      }
+    }
+  }
+
+  /// Every second: the timers move on, and an order entering its last 10 seconds sounds the warning (once).
+  void _everySecond() {
+    if (!mounted || _waiting.isEmpty) return;
+    var warn = false;
+    for (final o in _waiting) {
+      final s = _secondsLeft(o);
+      if (s > 0 && s <= 10 && _warned.add(o.id)) warn = true;
+    }
+    if (warn) widget.sounds.warning();
+    setState(() {});
+  }
+
+  Future<void> _accept(ChannelOrder o, {bool auto = false}) async {
+    if (!_accepting.add(o.id)) return;
+    if (mounted) setState(() {});
+    try {
+      await _api.acceptOrder(o.id, auto: auto);
+      if (mounted) showToast(context, '${auto ? 'Auto-accepted' : 'Accepted'} #${o.displayNo} · ${o.customer}. Sent to the kitchen.');
+    } catch (e) {
+      if (mounted && !auto) showToast(context, errorSentence(e));
+    }
+    _accepting.remove(o.id);
+    await _loadSources();
+  }
+
+  // delivery updates (0619): orders being moved on, so their button shows it is busy
+  final _delivering = <String>{};
+
+  /// The order "Delivery status" brought here: opened and highlighted in its source's list.
+  String? _focus;
+
+  /// Shows the delivery list asked for (requestedDelivery) once the orders are here: the named source, or the order's own.
+  void _applyDeliveryRequest() {
+    final req = OrdersBoardScreen.requestedDelivery.value;
+    final src = _sources;
+    if (req == null || src == null || !mounted) return;
+    final source = req.source ?? src.orders.where((o) => o.id == req.orderId).firstOrNull?.source;
+    OrdersBoardScreen.requestedDelivery.value = null;
+    if (source == null) return showToast(context, 'This order is not a delivery order.');
+    setState(() {
+      _tab = 'live';
+      _source = source;
+      _focus = req.orderId;
+    });
+  }
+
+  /// Moves an online order on: ready, out for delivery (asks the rider, their number and the minutes first) or delivered / picked up.
+  Future<void> _deliver(ChannelOrder o, String step) async {
+    String? name, phone, paid;
+    int? eta;
+    if (step == 'out') {
+      final r = await _askRider(o);
+      if (r == null) return;
+      (name, phone, eta) = r;
+    }
+    // delivered completes the order (0620): money due at the door is recorded as it came in
+    if (step == 'delivered' && o.collectAtDoor) {
+      paid = await _askPaid(o);
+      if (paid == null) return;
+    }
+    if (!_delivering.add(o.id)) return;
+    if (mounted) setState(() {});
+    try {
+      final msg = await _api.deliveryUpdate(o.id, step, riderName: name, riderPhone: phone, etaMinutes: eta, paymentMethod: paid);
+      if (mounted) showToast(context, msg.isEmpty ? 'Updated.' : '$msg.');
+    } catch (e) {
+      if (mounted) showToast(context, errorSentence(e));
+    }
+    _delivering.remove(o.id);
+    await _loadSources();
+  }
+
+  /// Delivered with money due: how it was collected at the door (cash, UPI or card).
+  Future<String?> _askPaid(ChannelOrder o) => showOlDialog<String>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: Text('Collect ${rupees(o.due)}', style: inter(18, 700)),
+          content: Text('#${o.displayNo} · ${o.customer}. How did they pay?', style: inter(14, 500, color: kMuted)),
+          actionsAlignment: MainAxisAlignment.spaceBetween,
+          actions: [
+            for (final (k, label, icon) in const [('cash', 'Cash', LucideIcons.banknote), ('upi', 'UPI', LucideIcons.qrCode), ('card', 'Card', LucideIcons.creditCard)])
+              OutlinedButton.icon(
+                key: ValueKey('paid-$k'),
+                onPressed: () => Navigator.pop(d, k),
+                icon: Icon(icon, size: 16),
+                label: Text(label),
+              ),
+          ],
+        ),
+      );
+
+  /// Out for delivery: who takes it, their number, and about how long (all optional).
+  Future<(String?, String?, int?)?> _askRider(ChannelOrder o) {
+    final name = TextEditingController(text: o.riderName ?? ''), phone = TextEditingController(text: localMobile(o.riderPhone));
+    var eta = o.etaMinutes ?? 20;
+    return showOlDialog<(String?, String?, int?)>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, set) => AlertDialog(
+          title: Text('Out for delivery', style: inter(18, 700)),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('#${o.displayNo} · ${o.customer}', style: inter(13.5, 500, color: kMuted)),
+            const SizedBox(height: 8),
+            TextField(key: const ValueKey('rider-name'), controller: name, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Rider (optional)')),
+            TextField(
+              key: const ValueKey('rider-phone'),
+              controller: phone,
+              keyboardType: TextInputType.phone,
+              inputFormatters: mobileFormatters,
+              decoration: const InputDecoration(labelText: 'Rider\'s mobile (optional)', prefixText: kMobilePrefix),
+            ),
+            const SizedBox(height: 12),
+            Text('Reaches in about', style: inter(13, 600, color: kMuted)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 6, children: [
+              for (final m in const [10, 15, 20, 30, 45])
+                ChoiceChip(
+                  key: ValueKey('rider-eta-$m'),
+                  label: Text('$m min'),
+                  selected: eta == m,
+                  showCheckmark: false,
+                  onSelected: (_) => set(() => eta = m),
+                ),
+            ]),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+            FilledButton(
+              key: const ValueKey('rider-go'),
+              onPressed: () => Navigator.pop(d, (name.text.trim().isEmpty ? null : name.text.trim(), phone.text.isEmpty ? null : phone.text, eta)),
+              child: const Text('Send out'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// WhatsApp the customer where their order is: packed, on its way with the rider and the minutes, or delivered.
+  Future<void> _updateCustomer(ChannelOrder o) async {
+    final digits = localMobile(o.phone);
+    if (digits.length != 10) return showToast(context, 'This order has no customer mobile number.');
+    final eta = o.etaMinutes;
+    final text = switch (o.stage) {
+      'ready' => 'Hi ${o.customer}, your order #${o.displayNo} is packed and leaves shortly.',
+      'on_way' => 'Hi ${o.customer}, your order #${o.displayNo} is on its way${o.riderName == null ? '' : ' with ${o.riderName}'}'
+          '${o.riderPhone == null ? '' : ' (+91 ${o.riderPhone})'}${eta == null ? '' : ', reaching in about $eta min'}.',
+      'delivered' => 'Hi ${o.customer}, your order #${o.displayNo} has been delivered. Enjoy your meal!',
+      _ => 'Hi ${o.customer}, your order #${o.displayNo} is being prepared.',
+    };
+    final uri = Uri.parse('https://wa.me/91$digits?text=${Uri.encodeComponent(text)}');
+    final open = widget.openUrl ?? (u) => launchUrl(u, mode: LaunchMode.externalApplication);
+    if (!await open(uri) && mounted) showToast(context, 'WhatsApp could not be opened.');
+  }
+
+  Future<void> _setAutoAccept(bool on) async {
+    setState(() => _autoBusy = true);
+    try {
+      await _api.setAutoAccept(on);
+      if (mounted) showToast(context, on ? 'Auto-accept is on. New orders are accepted as they arrive.' : 'Auto-accept is off. Accept each new order within the minute.');
+    } catch (e) {
+      if (mounted) showToast(context, errorSentence(e));
+    }
+    if (mounted) setState(() => _autoBusy = false);
+    await _loadSources();
   }
 
   Future<void> _loadHolds() async {
@@ -94,7 +352,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
       });
     } catch (e) {
       if (!mounted || mine != _holdSeq) return;
-      setState(() => _holdError = e.toString());
+      setState(() => _holdError = errorSentence(e));
     }
   }
 
@@ -130,7 +388,18 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
   }
 
   Future<void> _openOrder(String id) async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => OrderScreen(api: _api, orderId: id, onNavigate: widget.onNavigate)));
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => OrderScreen(
+        api: _api,
+        orderId: id,
+        onNavigate: widget.onNavigate,
+        // Delivery status on a delivery order: back here, on its delivery list with the order opened
+        onDeliveryStatus: (c) {
+          Navigator.of(c).pop();
+          OrdersBoardScreen.requestedDelivery.value = (source: null, orderId: id);
+        },
+      ),
+    ));
     if (mounted) _loadLive();
   }
 
@@ -154,7 +423,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
         ),
       ));
     } catch (e) {
-      if (mounted) showToast(context, e.toString());
+      if (mounted) showToast(context, errorSentence(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -170,7 +439,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
       await _api.cancel(h.id, reason: reason, version: h.version);
       if (mounted) showToast(context, '#${h.displayNo} cancelled.');
     } catch (e) {
-      if (mounted) showToast(context, e.toString());
+      if (mounted) showToast(context, errorSentence(e));
     }
     if (mounted) _loadHolds();
   }
@@ -182,8 +451,10 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        OrdersOutletHeader(name: b?.business ?? '', accepting: b?.accepting, onMenu: widget.onMenu),
-        _tabs(),
+        // The banner every main tab shows (the outlet's live One Local status comes from the outlets read, like Bill and Stock).
+        OutletHeader(title: b?.business.isNotEmpty == true ? b!.business : 'Orders', onMenu: widget.onMenu, menuKey: const ValueKey('orders-menu')),
+        // no Live / Hold switch (founder, 27 Oct 2026): Orders is the channel cards; held bills stay on their tables in Bill
+        if (widget.initialTab == 'hold') _tabs(),
         Expanded(
           child: Stack(children: [
             RefreshIndicator(
@@ -266,34 +537,55 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
         ]),
       );
 
+  // Every chip fully on screen: a row wraps onto a second line on a narrow phone instead of scrolling out of view.
   Widget _chips<T>(List<(T, String)> items, T selected, ValueChanged<T> onPick, {Color active = kLime, Color activeText = kInk, String keyPrefix = 'chip'}) =>
-      SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [
-          for (final (id, label) in items) ...[
-            Material(
-              color: id == selected ? active : Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999), side: BorderSide(color: id == selected ? active : _chipLine)),
-              child: InkWell(
-                key: ValueKey('$keyPrefix-$id'),
-                customBorder: const StadiumBorder(),
-                onTap: () => onPick(id),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  child: Text(label, style: inter(14, id == selected ? 600 : 500, color: id == selected ? activeText : kInk)),
-                ),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        for (final (id, label) in items)
+          Material(
+            color: id == selected ? active : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999), side: BorderSide(color: id == selected ? active : _chipLine)),
+            child: InkWell(
+              key: ValueKey('$keyPrefix-$id'),
+              customBorder: const StadiumBorder(),
+              onTap: () => onPick(id),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Text(label, style: inter(14, id == selected ? 600 : 500, color: id == selected ? activeText : kInk)),
               ),
             ),
-            const SizedBox(width: 8),
-          ],
-        ]),
-      );
+          ),
+      ]);
 
   // ---------------------------------------------------------------- Live orders
   bool get _aggregator => _channel == 'zomato' || _channel == 'swiggy';
 
   List<Widget> _liveBody() {
     final b = _board;
+    final src = _sources;
+    if (src != null && _source != null) {
+      return [
+        ChannelOrdersList(
+          data: src,
+          channel: _source!,
+          onChannel: (k) => setState(() => _source = k),
+          onBack: () => setState(() {
+            _source = null;
+            _focus = null;
+          }),
+          onOpenOrder: _openOrder,
+          secondsLeft: _secondsLeft,
+          onAccept: (o) => _accept(o),
+          accepting: _accepting,
+          onDeliver: _deliver,
+          onUpdateCustomer: _updateCustomer,
+          delivering: _delivering,
+          focusId: _focus,
+        ),
+      ];
+    }
+    // Live orders is the channel cards only (founder, 27 Oct 2026): each order lives in its own source's list, with no channel or
+    // status pills here. The board below is only what an older server (without the channel read) still shows.
+    if (src != null && src.channels.isNotEmpty) return [_kitchenViews(), const SizedBox(height: 16), ChannelStack(data: src, onOpen: (k) => setState(() => _source = k), countdown: _countdown, onAutoAccept: _setAutoAccept, autoBusy: _autoBusy)];
     final name = _channels.firstWhere((c) => c.$1 == _channel).$2;
     final out = <Widget>[];
     if (_aggregator) {
@@ -334,6 +626,44 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
       ...out,
       for (final o in orders) Padding(padding: const EdgeInsets.only(bottom: 12), child: _LiveCard(order: o, onOpen: () => _openOrder(o.id))),
     ];
+  }
+
+  /// "KDS view" and "KOT view" above the channel cards (founder, 27 Oct 2026): the kitchen display, and the kitchen tickets as slips.
+  Widget _kitchenViews() {
+    Widget button(String label, String sub, IconData icon, String key, VoidCallback onTap) => Expanded(
+          child: Material(
+            color: kInk,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              key: ValueKey(key),
+              borderRadius: BorderRadius.circular(16),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+                child: Row(children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(color: kLime, borderRadius: BorderRadius.circular(10)),
+                    child: Icon(icon, size: 19, color: kInk),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(label, style: inter(14.5, 800, color: Colors.white)),
+                      Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 500, color: Colors.white70)),
+                    ]),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        );
+    return Row(children: [
+      button('KDS view', 'Kitchen display', LucideIcons.monitor, 'open-kds', () => HomeNav.go(context, HomeNav.kitchenDisplay, 'The kitchen display')),
+      const SizedBox(width: 10),
+      button('KOT view', 'Kitchen tickets', LucideIcons.receiptText, 'open-kot', () => HomeNav.go(context, HomeNav.kotView, 'The KOT view')),
+    ]);
   }
 
   static const _emptyBody = {

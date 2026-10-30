@@ -1,10 +1,10 @@
-import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/partner_api.dart';
 import '../api/app_env.dart';
+import '../api/net_guard.dart';
 
 Map<String, dynamic> _map(Object? v) => (v as Map?)?.cast<String, dynamic>() ?? const {};
 List<Map<String, dynamic>> _list(Object? v) => ((v as List?) ?? const []).map((e) => (e as Map).cast<String, dynamic>()).toList();
@@ -154,8 +154,8 @@ class HomeApi {
     final token = _token();
     if (token == null) throw const PartnerApiException(401, 'Sign in to continue.');
     final uri = Uri.parse('$_base/api/partner$path').replace(queryParameters: query);
-    final res = await _http.get(uri, headers: {'Authorization': 'Bearer $token'}).timeout(const Duration(seconds: 30));
-    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
+    final res = await guardNet(_http.get(uri, headers: {'Authorization': 'Bearer $token'}), (s) => throw PartnerApiException(0, s));
+    final decoded = readJson(res, (s) => throw PartnerApiException(res.statusCode, s));
     final map = decoded is Map ? decoded.cast<String, dynamic>() : <String, dynamic>{};
     if (res.statusCode != 200) {
       throw PartnerApiException(res.statusCode, (map['detail'] as String?) ?? 'Something went wrong. Please try again.');

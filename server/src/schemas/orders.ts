@@ -18,6 +18,18 @@ export const Board = z.object({
   location_id: id.nullish(), channel, q,
   status: z.enum(['new', 'preparing', 'ready', 'dispatched', 'completed'], { message: 'Unknown status.' }).optional(),
 }).loose();
+// The restaurant Orders tab's channel cards (0607): today's OneLocal, Swiggy, Zomato and on-call delivery orders.
+export const ChannelOrders = z.object({ location_id: id.nullish() }).loose();
+// Accept a new delivery order (0610), by hand or by auto-accept; and turn auto-accept on or off.
+export const ChannelAccept = z.object({ location_id: id.nullish(), order_id: id, auto: z.boolean().optional() }).loose();
+// 0619: a delivery update on an online order: ready, out for delivery (rider, number, minutes) or delivered / picked up.
+export const ChannelDelivery = z.object({
+  location_id: id.nullish(), order_id: id, step: z.enum(['ready', 'out', 'delivered'], { message: 'Unknown step.' }),
+  rider_name: z.string().max(60).nullish(), rider_phone: z.string().max(20).nullish(), eta_minutes: z.number().int().min(1).max(240).nullish(),
+  // 0620: how money due at the door was collected, on delivered
+  payment_method: z.enum(['cash', 'upi', 'card'], { message: 'Paid by cash, UPI or card.' }).nullish(),
+}).loose();
+export const AutoAcceptSet = z.object({ location_id: id.nullish(), on: z.boolean({ message: 'on is true or false.' }) }).loose();
 export const HoldList = z.object({ location_id: id.nullish(), channel, q }).loose();
 export const HoldUpdate = z.object({
   order_id: id,

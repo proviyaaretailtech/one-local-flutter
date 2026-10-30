@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -10,6 +9,7 @@ import 'package:vinii_pos/inventory/inventory_api.dart';
 import 'package:vinii_pos/tables/bill_api.dart';
 import 'package:vinii_pos/tables/bill_paid_screen.dart';
 import 'package:vinii_pos/tables/bill_pay_screen.dart';
+import 'package:vinii_pos/tables/bill_receipt_popup.dart';
 import 'package:vinii_pos/tables/bill_receipt_screen.dart';
 import 'package:vinii_pos/tables/bill_split_screen.dart';
 import 'package:vinii_pos/tables/table_order_screen.dart';
@@ -128,9 +128,16 @@ Future<void> tapText(WidgetTester t, String text) async {
   await t.pumpAndSettle();
 }
 
+/// Taps a send button under Complete Payment and sends the bill to [phone].
+Future<void> sendBill(WidgetTester t, String button, String phone) async {
+  await tapKey(t, button);
+  await t.enterText(find.byKey(const ValueKey('send-to')), phone);
+  await tapKey(t, 'send-go');
+}
+
 void main() {
   group('Checkout (step 3)', () {
-    testWidgets('draws the bill of the table from the server: items, GST, total due, note and code', (t) async {
+    testWidgets('draws the bill of the table from the server: items, GST, total due and code; no kitchen note', (t) async {
       final s = Fake();
       await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
       expect(find.text('Checkout'), findsOneWidget);
@@ -139,10 +146,47 @@ void main() {
       expect(find.text('₹600'), findsOneWidget);
       expect(find.text('GST (5%)'), findsOneWidget);
       expect(tester(t, const ValueKey('total-due')), '₹1,050');
-      expect(find.text('Add a note for the kitchen'), findsOneWidget);
+      expect(find.text('Add a note for the kitchen'), findsNothing, reason: 'no kitchen note at payment');
+      expect(find.text('CODE'), findsNothing, reason: 'one label for the code box, not two');
       expect(find.text('DISCOUNT CODE'), findsOneWidget);
       expect(find.text('Complete Payment'), findsOneWidget);
-      expect(find.text('Print Bill'), findsOneWidget);
+      for (final k in ['bill-whatsapp', 'bill-sms', 'bill-print']) {
+        expect(find.byKey(ValueKey(k)), findsOneWidget);
+      }
+      expect(find.text('WhatsApp'), findsNothing, reason: 'the WhatsApp button is its icon only');
+      expect(find.text('Print Bill'), findsNothing);
+    });
+
+    testWidgets('the customer icon takes a name and number before the bill is paid and puts that customer on the bill', (t) async {
+      final s = Fake();
+      ((s.view1['orders'] as List).first as Map)['customer_phone'] = null; // a walk-in bill
+      s.on['cust_save'] = (r) => ok({'customer_id': 'c-77', 'created': true, 'duplicate': false, 'customer': {'id': 'c-77'}});
+      s.on['cust_attach_order'] = (r) {
+        final o = (s.view1['orders'] as List).first as Map;
+        o['customer_name'] = 'Ravi Kumar';
+        o['customer_phone'] = '+919812345678';
+        return ok({'order_id': o1, 'customer_id': 'c-77', 'walk_in': false});
+      };
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill, openUrl: s.open));
+      final views = s.calls('rst_bill_view').length;
+      expect(find.text('Add customer'), findsOneWidget);
+      expect(find.text('Name and mobile number'), findsOneWidget);
+      expect(t.getRect(find.byKey(const ValueKey('bill-customer'))).top, lessThan(t.getRect(find.text('CURRENT ITEMS (TABLE T1)')).top), reason: 'first on the Checkout');
+      await tapKey(t, 'bill-customer');
+      await t.enterText(find.byKey(const ValueKey('bill-customer-name-field')), 'Ravi Kumar');
+      await t.enterText(find.byKey(const ValueKey('bill-customer-phone-field')), '98123');
+      await tapKey(t, 'bill-customer-save');
+      expect(find.text('Enter a 10-digit mobile number.'), findsOneWidget);
+      expect(s.calls('cust_save'), isEmpty, reason: 'a short number is stopped on the phone');
+      await t.enterText(find.byKey(const ValueKey('bill-customer-phone-field')), '9812345678');
+      await tapKey(t, 'bill-customer-save');
+      expect(argsOf(s.calls('cust_save').single), {'first_name': 'Ravi Kumar', 'phone': '9812345678'});
+      expect(argsOf(s.calls('cust_attach_order').single), {'order_id': o1, 'customer_id': 'c-77'});
+      expect(s.calls('rst_bill_view').length, views + 1, reason: 'the bill is read again');
+      expect(t.widget<Text>(find.byKey(const ValueKey('bill-customer-name'))).data, 'Ravi Kumar');
+      expect(t.widget<Text>(find.byKey(const ValueKey('bill-customer-phone'))).data, contains('98123'));
+      await sendBill(t, 'bill-whatsapp', '9812345678');
+      expect(Uri.decodeComponent(s.opened.single.toString()), contains('Customer: Ravi Kumar'), reason: 'the bill sent names the customer');
     });
 
     testWidgets('cash below the amount due is stopped on the phone and nothing is sent', (t) async {
@@ -218,15 +262,6 @@ void main() {
       expect(find.text('A discount code is already on this bill.'), findsOneWidget);
     });
 
-    testWidgets('the kitchen note is saved through the server', (t) async {
-      final s = Fake();
-      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
-      await t.enterText(find.byKey(const ValueKey('bill-note')), 'Less spicy');
-      await tapKey(t, 'save-note');
-      expect(argsOf(s.calls('rst_bill_note').single)['note'], 'Less spicy');
-      expect(find.text('Note saved for the kitchen.'), findsOneWidget);
-    });
-
     testWidgets('a bill not generated yet cannot be paid and says why', (t) async {
       final s = Fake();
       await show(t, BillPayScreen(env: s.env, tableId: t3, bill: s.bill));
@@ -243,18 +278,89 @@ void main() {
       expect(tester(t, const ValueKey('total-due')), '₹300');
     });
 
-    testWidgets('Print Bill copies the bill text', (t) async {
+    testWidgets('takeaway dishes on the dine-in bill sit under their own TAKEAWAY heading, on screen and on the printed bill', (t) async {
       final s = Fake();
-      String? copied;
-      t.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (c) async {
-        if (c.method == 'Clipboard.setData') copied = (c.arguments as Map)['text'] as String;
-        return null;
-      });
-      addTearDown(() => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+      void mark(Object? j) {
+        if (j is Map) {
+          if (j['name'] == 'Chicken Tikka') j['takeaway'] = true;
+          j.values.forEach(mark);
+        } else if (j is List) {
+          j.forEach(mark);
+        }
+      }
+      mark(s.view1);
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill, openUrl: s.open));
+      expect(find.text('2 × Paneer Butter Masala'), findsOneWidget, reason: 'eaten here: no label');
+      expect(find.byKey(const ValueKey('bill-takeaway-head')), findsOneWidget);
+      expect(find.text('1 × Chicken Tikka (Takeaway)'), findsOneWidget);
+      expect(t.getRect(find.text('1 × Chicken Tikka (Takeaway)')).top, greaterThan(t.getRect(find.text('2 × Paneer Butter Masala')).top));
+      await sendBill(t, 'bill-whatsapp', '9876543210');
+      expect(s.opened.single.queryParameters['text'], contains('-- Takeaway --\n1 x Chicken Tikka (Takeaway)'));
+    });
+
+    testWidgets('add-ons and combos (0625) are listed under their dish with their price; the combo\'s ₹0 dishes are not listed again', (t) async {
+      final s = Fake();
+      void mark(Object? j) {
+        if (j is Map) {
+          if (j['name'] == 'Paneer Butter Masala' && j.containsKey('line_total')) {
+            j['add_ons'] = [
+              {'kind': 'addon', 'name': 'Cheese slice', 'qty': 2, 'price': 50},
+              {'kind': 'combo', 'name': 'fries & Cole', 'qty': 1, 'price': 325, 'items': 'Ice Blue, Salted Fries'},
+            ];
+          }
+          if (j['name'] == 'Chicken Tikka' && j.containsKey('line_total')) j['in_combo'] = true;
+          j.values.forEach(mark);
+        } else if (j is List) {
+          j.forEach(mark);
+        }
+      }
+      mark(s.view1);
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill, openUrl: s.open));
+      expect(find.text('    + 2 × Cheese slice'), findsOneWidget);
+      expect(find.text('    + fries & Cole combo: Ice Blue, Salted Fries'), findsOneWidget);
+      expect(find.text('₹325 each'), findsOneWidget);
+      expect(find.textContaining('Chicken Tikka'), findsNothing, reason: 'a combo\'s dish is under the combo, not a line of its own');
+      await sendBill(t, 'bill-whatsapp', '9876543210');
+      final text = s.opened.single.queryParameters['text']!;
+      expect(text, contains('2 x Paneer Butter Masala'));
+      expect(text, contains('   + 2 × Cheese slice  ₹100 each'));
+      expect(text, contains('   + fries & Cole combo: Ice Blue, Salted Fries  ₹325 each'));
+      expect(text, isNot(contains('Chicken Tikka')));
+    });
+
+    testWidgets('the WhatsApp button opens WhatsApp to the number with the bill', (t) async {
+      final s = Fake();
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill, openUrl: s.open));
+      await sendBill(t, 'bill-whatsapp', '98765 43210');
+      final u = s.opened.single;
+      expect(u.host, 'wa.me');
+      expect(u.path, '/919876543210');
+      expect(u.queryParameters['text'], contains('Bill R5501 · Table T1'));
+      expect(u.queryParameters['text'], contains('Total ₹1,050'));
+    });
+
+    testWidgets('the SMS button opens the SMS app with the bill; a short number is stopped', (t) async {
+      final s = Fake();
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill, openUrl: s.open));
+      await sendBill(t, 'bill-sms', '12345');
+      expect(s.opened, isEmpty);
+      expect(find.text('Enter a 10-digit mobile number.'), findsOneWidget);
+      await sendBill(t, 'bill-sms', '9876543210');
+      final u = s.opened.single;
+      expect(u.scheme, 'sms');
+      expect(u.path, '+919876543210');
+      expect(u.query, startsWith('body=Bill%20R5501'), reason: 'spaces as %20 so the SMS app shows them');
+    });
+
+    testWidgets('the print button sends the bill slip to the printer', (t) async {
+      final s = Fake();
+      final printed = <String>[];
+      final before = printReceiptPdf;
+      printReceiptPdf = (pdf, name) async => printed.add('$name ${pdf.isNotEmpty}');
+      addTearDown(() => printReceiptPdf = before);
       await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
-      await tapText(t, 'Print Bill');
-      expect(copied, contains('Bill R5501 · Table T1'));
-      expect(copied, contains('Total ₹1,050'));
+      await tapKey(t, 'bill-print');
+      expect(printed, ['Bill R5501.pdf true']);
     });
 
     testWidgets('a split bill sends the cashier to the split instead of taking it in one go', (t) async {
@@ -268,56 +374,71 @@ void main() {
   });
 
   group('Split the bill (step 2)', () {
-    testWidgets('equal: the guests are counted on the phone, the amounts come from the server', (t) async {
+    testWidgets('no guests: one amount each for Cash, Card and UPI, sent as a split by amount', (t) async {
       final s = Fake();
       s.on['rst_bill_split'] = (r) => ok(fx['split']);
       await show(t, BillSplitScreen(env: s.env, tableId: t1, orderId: o1, bill: s.bill));
       expect(find.text('Table T1 · ₹1,050'), findsOneWidget);
-      await tapKey(t, 'guests-plus');
-      expect(find.text('3'), findsOneWidget);
-      await tapKey(t, 'guest-0-method-upi');
+      for (final gone in ['guests-plus', 'guests-minus', 'mode-equal', 'mode-item', 'mode-amount']) {
+        expect(find.byKey(ValueKey(gone)), findsNothing, reason: gone);
+      }
+      expect(find.text('PAY BY'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('amount-cash')), '500');
+      await t.pump();
+      expect(tester(t, const ValueKey('left-to-pay')), '₹550');
+      await t.enterText(find.byKey(const ValueKey('amount-card')), '300');
+      await tapKey(t, 'fill-upi'); // UPI takes the rest
+      expect(tester(t, const ValueKey('left-to-pay')), '₹0');
       s.view1 = copy('view1s');
       await tapKey(t, 'save-split');
-      final a = argsOf(s.calls('rst_bill_split').single);
-      expect(a['mode'], 'equal');
-      expect(a['guests'], 3);
-      expect((a['parts'] as List).first, {'label': 'Guest 1', 'method': 'upi'});
-      expect(s.calls('rst_bill_split').single.headers['Idempotency-Key'], startsWith('rst-'));
-      expect(find.text('Paid by UPI'), findsOneWidget);
-      expect(find.text('Pays by Cash'), findsOneWidget);
-      expect(find.text('Take payment · Guest 2'), findsOneWidget);
-      expect(find.text('Change split'), findsNothing); // a guest has paid: the plan is fixed
+      final q = s.calls('rst_bill_split').single;
+      final a = argsOf(q);
+      expect(a['mode'], 'amount');
+      expect(a['parts'], [
+        {'label': 'Cash', 'method': 'cash', 'amount': 500},
+        {'label': 'Card', 'method': 'card', 'amount': 300},
+        {'label': 'UPI', 'method': 'upi', 'amount': 250},
+      ]);
+      expect(q.headers['Idempotency-Key'], startsWith('rst-'));
+      expect(find.byKey(const ValueKey('take-payment')), findsOneWidget);
     });
 
-    testWidgets('by item: each item goes to the guest chosen', (t) async {
+    testWidgets('two methods are enough; an empty method is left out', (t) async {
       final s = Fake();
       await show(t, BillSplitScreen(env: s.env, tableId: t1, orderId: o1, bill: s.bill));
-      await tapKey(t, 'mode-item');
-      await tapKey(t, 'item-55000000-0000-0000-0000-0000000000e2-1');
+      await t.enterText(find.byKey(const ValueKey('amount-card')), '1000');
+      await tapKey(t, 'fill-cash');
       await tapKey(t, 'save-split');
-      final parts = argsOf(s.calls('rst_bill_split').single)['parts'] as List;
-      expect(parts[0]['item_ids'], ['55000000-0000-0000-0000-0000000000e1']);
-      expect(parts[1]['item_ids'], ['55000000-0000-0000-0000-0000000000e2']);
+      expect(argsOf(s.calls('rst_bill_split').single)['parts'], [
+        {'label': 'Cash', 'method': 'cash', 'amount': 50},
+        {'label': 'Card', 'method': 'card', 'amount': 1000},
+      ]);
     });
 
-    testWidgets('by item: a guest with no item is stopped before sending', (t) async {
+    testWidgets('amounts that do not add up to the bill, or only one method, are stopped before sending', (t) async {
       final s = Fake();
       await show(t, BillSplitScreen(env: s.env, tableId: t1, orderId: o1, bill: s.bill));
-      await tapKey(t, 'mode-item');
+      await t.enterText(find.byKey(const ValueKey('amount-cash')), '1050');
       await tapKey(t, 'save-split');
-      expect(find.text('Give Guest 2 at least one item.'), findsOneWidget);
+      expect(find.textContaining('at least two of Cash, Card and UPI'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('amount-cash')), '600');
+      await t.enterText(find.byKey(const ValueKey('amount-upi')), '400');
+      await tapKey(t, 'save-split');
+      expect(find.text('₹50 is still left to pay.'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('amount-upi')), '500');
+      await t.pump();
+      expect(find.text('Over by'), findsOneWidget);
+      await tapKey(t, 'save-split');
+      expect(find.text('That is ₹50 more than the bill.'), findsOneWidget);
       expect(s.calls('rst_bill_split'), isEmpty);
     });
 
-    testWidgets('by amount: what is left to share is shown; the server refusal is shown as it says', (t) async {
+    testWidgets('a refusal from the server is shown as it says', (t) async {
       final s = Fake();
       s.on['rst_bill_split'] = (r) => err(400, 'the parts add up to 1000 but 1050 is due', 'bad_request');
       await show(t, BillSplitScreen(env: s.env, tableId: t1, orderId: o1, bill: s.bill));
-      await tapKey(t, 'mode-amount');
-      await t.enterText(find.byKey(const ValueKey('amount-0')), '600');
-      await t.pump();
-      expect(tester(t, const ValueKey('left-to-share')), '₹450');
-      await t.enterText(find.byKey(const ValueKey('amount-1')), '400');
+      await t.enterText(find.byKey(const ValueKey('amount-cash')), '600');
+      await t.enterText(find.byKey(const ValueKey('amount-card')), '450');
       await tapKey(t, 'save-split');
       expect(find.text('the parts add up to 1000 but 1050 is due'), findsOneWidget);
     });
@@ -375,6 +496,21 @@ void main() {
       expect(s.opened.single.queryParameters['text'], contains('Receipt R5501'));
     });
 
+    testWidgets('after the bill: the customer icon shows the number on the receipt; changing the customer is refused for a cashier and says why', (t) async {
+      final s = Fake();
+      s.on['cust_save'] = (r) => ok({'customer_id': 'c-78', 'created': true});
+      s.on['cust_attach_order'] = (r) => err(403, 'Only a manager can change the customer on this bill.', 'forbidden');
+      await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
+      expect(t.widget<Text>(find.byKey(const ValueKey('bill-customer-phone'))).data, contains('98765'));
+      expect(find.byKey(const ValueKey('bill-customer')), findsOneWidget);
+      await tapKey(t, 'bill-customer');
+      await t.enterText(find.byKey(const ValueKey('bill-customer-name-field')), 'Asha');
+      await t.enterText(find.byKey(const ValueKey('bill-customer-phone-field')), '9000000001');
+      await tapKey(t, 'bill-customer-save');
+      expect(find.text('Only a manager can change the customer on this bill.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('bill-customer-save')), findsOneWidget, reason: 'the sheet stays open');
+    });
+
     testWidgets('Email asks for the address and opens the mail app; Print is logged with the printer', (t) async {
       final s = Fake();
       await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
@@ -408,6 +544,7 @@ void main() {
       await show(t, _Floor(s));
       await tapKey(t, 'open-table');
       expect(find.text('Table T1 Order'), findsOneWidget);
+      expect(find.byKey(const ValueKey('bill-receipt')), findsOneWidget, reason: 'the bill is the page');
       await tapKey(t, 'take-payment');
       await tapKey(t, 'method-UPI / QR');
       await tapText(t, 'Complete Payment');
@@ -430,9 +567,33 @@ void main() {
         'can': {...s.orderView['can'] as Map, 'generate_bill': true},
       };
       await show(t, TableOrderScreen(env: s.env, tableId: t1, bill: s.bill));
-      await tapText(t, 'Generate Bill');
+      await tapKey(t, 'generate-bill');
       expect(argsOf(s.calls('pos_set_order_status').single), containsPair('to', 'awaiting_payment'));
       expect(find.text('Checkout'), findsOneWidget);
+    });
+
+    testWidgets('the order page is the printed bill: number, table, dishes, CGST and SGST, total, UNPAID; the order buttons sit under it', (t) async {
+      final s = Fake();
+      await show(t, _Floor(s));
+      await tapKey(t, 'open-table');
+      final slip = find.byKey(const ValueKey('bill-receipt'));
+      expect(slip, findsOneWidget);
+      expect(find.byType(Dialog), findsNothing, reason: 'on the page, not a pop-up');
+      expect(find.descendant(of: slip, matching: find.text('TAX INVOICE')), findsOneWidget);
+      expect(find.descendant(of: slip, matching: find.textContaining('Bill No: R5501')), findsOneWidget);
+      expect(find.descendant(of: slip, matching: find.text('Table: T1')), findsOneWidget);
+      expect(find.descendant(of: slip, matching: find.text('Paneer Butter Masala')), findsOneWidget);
+      expect(find.descendant(of: slip, matching: find.text('  2 x 300.00')), findsOneWidget);
+      expect(find.descendant(of: slip, matching: find.text('CGST @ 2.5%')), findsOneWidget);
+      expect(find.descendant(of: slip, matching: find.text('SGST @ 2.5%')), findsOneWidget);
+      expect(find.descendant(of: slip, matching: find.text('TOTAL')), findsOneWidget);
+      expect(find.descendant(of: slip, matching: find.text('UNPAID')), findsOneWidget);
+      for (final k in ['take-payment', 'act-add_items', 'act-send_kot', 'act-print_kot', 'act-change_table', 'act-merge_table', 'hand-to-guest']) {
+        expect(t.getRect(find.byKey(ValueKey(k))).top, greaterThan(t.getRect(slip).bottom), reason: '$k under the bill');
+      }
+      expect(find.byKey(const ValueKey('receipt-print')), findsNothing, reason: 'the slip\'s own Print and Take payment are gone');
+      expect(find.byKey(const ValueKey('receipt-pay')), findsNothing);
+      expect(find.text('OPERATIONAL TIMELINE'), findsNothing, reason: 'the timeline moved to Settings → Activity log');
     });
 
     testWidgets('New Order on the success card also goes back to the floor', (t) async {

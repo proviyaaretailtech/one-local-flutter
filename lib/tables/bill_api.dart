@@ -50,6 +50,13 @@ class BillApi {
 
   /// [channel] print | whatsapp | sms | email. The database keeps only a masked [to].
   Future<Facts> logReceipt(String orderId, String channel, {String? to}) => _call('rst_receipt_log', {'order_id': orderId, 'channel': channel, 'to': to});
+
+  /// Who the bill is for, before or after it is paid: the customer with this mobile number (added when new, `cust_save` answers the one on
+  /// file when the number is known) is put on the bill (`cust_attach_order`). Changing a customer already on the bill needs a manager.
+  Future<void> setCustomer(String orderId, {required String name, required String phone}) async {
+    final saved = await _call('cust_save', {'first_name': name.trim(), 'phone': phone});
+    await _call('cust_attach_order', {'order_id': orderId, 'customer_id': saved.s('customer_id')});
+  }
 }
 
 const _methodNames = {'cash': 'Cash', 'card': 'Card', 'upi': 'UPI', 'split': 'Split', 'wallet': 'Wallet', 'other': 'Other'};
@@ -77,14 +84,40 @@ String money(num? v) {
 }
 
 /// The plain-text bill / receipt (Print Bill, Print, WhatsApp, SMS, email). [bill] is one order as `rst_bill_view` or `rst_receipt_view` return it.
+/// The bill's lines (0625): a combo's dishes (₹0 rows that are there for the kitchen) are left out; the combo is listed under its dish.
+List<Facts> billItems(Facts order) => order.l('items').where((i) => !i.b('in_combo')).toList();
+
+/// What was chosen with a bill line (0625), each priced for one dish: ("+ Cheese slice", 50), ("+ fries & Cole combo: Ice Blue, Salted Fries", 325).
+List<(String, num)> billAddOns(Facts i) => [
+      for (final a in i.l('add_ons'))
+        (
+          '+ ${a.n('qty') > 1 ? '${a.n('qty').toInt()} × ' : ''}${a.s('name')}'
+              '${a.s('kind') == 'combo' ? ' combo${(a.so('items') ?? '').isEmpty ? '' : ': ${a.s('items')}'}' : ''}',
+          a.n('price') * (a.n('qty') == 0 ? 1 : a.n('qty')),
+        ),
+    ];
+
 String billText(Facts bill, {String? business, String? table, bool receipt = false}) {
   final out = <String>[
     if (business != null && business.isNotEmpty) business,
     '${receipt ? 'Receipt' : 'Bill'} ${bill.s('display_no')}${table == null ? '' : ' · Table $table'}',
+    if ((bill.so('customer_name') ?? '').isNotEmpty) 'Customer: ${bill.s('customer_name')}',
     '',
   ];
-  for (final i in bill.l('items')) {
-    out.add('${i.n('qty')} x ${i.s('name')}  ${money(i.n('line_total'))}');
+  for (final i in billItems(bill).where((i) => !i.b('takeaway'))) {
+    out.add('${i.n('qty')} x ${i.s('name')}${(i.so('variant') ?? '').isEmpty ? '' : ' (${i.s('variant')})'}  ${money(i.n('line_total'))}');
+    for (final (what, price) in billAddOns(i)) {
+      out.add('   $what  ${money(price)} each');
+    }
+  }
+  // takeaway dishes on the same dine-in bill (0606), under their own heading
+  final away = billItems(bill).where((i) => i.b('takeaway')).toList();
+  if (away.isNotEmpty) out.add('-- Takeaway --');
+  for (final i in away) {
+    out.add('${i.n('qty')} x ${i.s('name')}${(i.so('variant') ?? '').isEmpty ? '' : ' (${i.s('variant')})'} (Takeaway)  ${money(i.n('line_total'))}');
+    for (final (what, price) in billAddOns(i)) {
+      out.add('   $what  ${money(price)} each');
+    }
   }
   out.addAll(['', 'Subtotal ${money(bill.n('subtotal'))}']);
   if (bill.n('discount') != 0) out.add('Discount${bill.so('coupon_code') == null ? '' : ' ${bill.s('coupon_code')}'} -${money(bill.n('discount'))}');

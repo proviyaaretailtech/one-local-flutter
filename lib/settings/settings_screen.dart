@@ -7,6 +7,7 @@ import '../orders/order_widgets.dart' show OrdersTopBar, kChipGreen, kGreenText,
 import '../states/state_kit.dart' show StateTone, StatusCard;
 import '../ui/i18n.dart';
 import '../ui/theme.dart';
+import 'activity_log_screen.dart';
 import 'returns_screens.dart';
 import 'settings_api.dart';
 import 'settings_sheets.dart';
@@ -16,9 +17,20 @@ import '../ui/motion.dart';
 
 /// Settings and store profile (Figma section P "Settings"). Everything shown is what `pos_settings_get` says; every Edit opens one sheet
 /// that saves one field group. Who may save is the database's decision (`can_edit`); a person who may not sees the page read-only.
+/// A section opened on its own (the restaurant side bar's Business profile opens Store): its rows, and Back closes Settings.
+enum SettingsPart {
+  timings('store'),
+  phones('team'),
+  outletInfo('store');
+
+  const SettingsPart(this.id);
+  final String id;
+}
+
 class SettingsScreen extends StatefulWidget {
-  SettingsScreen({super.key, SettingsEnv? env}) : env = env ?? SettingsEnv();
+  SettingsScreen({super.key, SettingsEnv? env, this.part}) : env = env ?? SettingsEnv();
   final SettingsEnv env;
+  final SettingsPart? part;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -115,17 +127,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// The open section (one of [_parts]), or null for the section cards.
-  String? _part;
+  late String? _part = widget.part?.id;
 
-  /// Back closes an open section first, then Settings.
-  void _back() => _part != null ? setState(() => _part = null) : Navigator.of(context).maybePop();
+  @override
+  void didUpdateWidget(SettingsScreen old) {
+    super.didUpdateWidget(old);
+    if (old.part != widget.part) _part = widget.part?.id;
+  }
+
+  /// Back closes an open section first, then Settings (a section opened on its own closes with it).
+  void _back() => _part != null && widget.part == null ? setState(() => _part = null) : Navigator.of(context).maybePop();
 
   @override
   Widget build(BuildContext context) {
     final s = _s;
     final part = s == null ? null : _parts(s).where((p) => p.id == _part).firstOrNull;
     return PopScope(
-      canPop: _part == null,
+      canPop: _part == null || widget.part != null,
       onPopInvokedWithResult: (popped, _) {
         if (!popped) setState(() => _part = null);
       },
@@ -385,6 +403,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
+      // a restaurant's three pages that left the side bar (founder, 29 Oct 2026: "put them in Settings")
+      if (HomeNav.shell?.kind == 'restaurant')
+        _Part('restaurant', 'Purchases, menu link & delivery', LucideIcons.utensils, 'Purchase orders · public menu link · delivery settings', [
+          SettingRow(
+            key: const ValueKey('settings-purchase-orders'),
+            icon: LucideIcons.truck,
+            title: tr('Purchase orders'),
+            subtitle: tr('Order from suppliers, send on WhatsApp, receive stock'),
+            onTap: () => HomeNav.go(context, HomeNav.purchases, 'Purchase orders'),
+            actions: go,
+          ),
+          SettingRow(
+            key: const ValueKey('settings-menu-link'),
+            icon: LucideIcons.globe,
+            title: tr('Menu link'),
+            subtitle: tr('Your public menu page: share it, no sign-in needed'),
+            onTap: () => HomeNav.go(context, HomeNav.menuLink, 'Menu link'),
+            actions: go,
+          ),
+          SettingRow(
+            key: const ValueKey('settings-delivery'),
+            icon: LucideIcons.bike,
+            title: tr('Delivery settings'),
+            subtitle: tr('Delivery or pickup, radius, fee, minimum order'),
+            onTap: () => HomeNav.go(context, HomeNav.deliverySettings, 'Delivery settings'),
+            actions: go,
+          ),
+        ]),
+      // every order's timeline (0614): one tap opens its own page
+      _Part('activity', 'Activity log', LucideIcons.history, 'Every order’s timeline: placed, KOTs, ready, billed, paid', const [],
+          open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ActivityLogScreen(env: widget.env)))),
       // Returns, refunds & replacements (founder's spec, 29 Oct 2026): one tap opens its own page
       _Part('returns', 'Returns & refunds', LucideIcons.packageCheck, 'Policy for each category · always-covered claims', const [],
           open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReturnsHomeScreen(api: widget.env.returns)))),

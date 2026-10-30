@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../orders/order_widgets.dart';
+import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import 'service_api.dart';
 import 'service_menu.dart';
@@ -67,7 +68,7 @@ class _PlansScreenState extends State<PlansScreen> {
           TextField(key: const ValueKey('sell-name'), controller: name, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(hintText: 'Customer name')),
           const SizedBox(height: 10),
           TextField(key: const ValueKey('sell-phone'), controller: phone, keyboardType: TextInputType.phone,
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ]')), LengthLimitingTextInputFormatter(16)], decoration: const InputDecoration(hintText: 'Mobile number (the credits belong to it)')),
+              inputFormatters: mobileFormatters, decoration: const InputDecoration(hintText: 'Mobile number (the credits belong to it)', prefixText: kMobilePrefix)),
           const SizedBox(height: 8),
           Text('One customer only. Unused credits are not refunded.', style: inter(12.5, 400, color: kMuted)),
           const SizedBox(height: 14),
