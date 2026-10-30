@@ -6,6 +6,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../account/wallet_api.dart';
 import '../account/wallet_screen.dart';
+import '../ads/ads_api.dart';
+import '../ads/ads_screens.dart' show AdsHomeScreen;
 import '../api/net_guard.dart';
 import '../ui/app_header.dart';
 import '../ui/motion.dart';
@@ -145,9 +147,12 @@ BoxDecoration rmCard() => BoxDecoration(
 
 /// The restaurant's Money page.
 class RstMoneyScreen extends StatefulWidget {
-  const RstMoneyScreen({super.key, this.api, this.walletApi, this.today, this.openUrl});
+  const RstMoneyScreen({super.key, this.api, this.walletApi, this.adsApi, this.today, this.openUrl});
   final RstMoneyApi? api;
   final WalletApi? walletApi;
+
+  /// Ad credits (rupees, 0635): the balance on the card and the ads pages it opens.
+  final AdsApi? adsApi;
 
   /// Tests fix "today".
   final DateTime? today;
@@ -165,6 +170,7 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
   Map<String, dynamic>? _home;
   String? _error;
   num? _onelocal; // what OneLocal owes the restaurant (rupees)
+  num? _adCredits; // ad credits available (rupees, 0635)
   String _part = 'register';
   int _reload = 0; // rebuilds the part below after a change
 
@@ -173,6 +179,7 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
     super.initState();
     _load();
     _loadWallet();
+    _loadCredits();
   }
 
   Future<void> _load() async {
@@ -195,6 +202,16 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
       if (mounted) setState(() => _onelocal = w.unsettledDue + w.onTheWay);
     } catch (_) {
       // the card shows a dash; the wallet page says why
+    }
+  }
+
+  Future<void> _loadCredits() async {
+    try {
+      final h = await (widget.adsApi ?? AdsApi()).home();
+      final b = (h['balances'] as Map?) ?? const {};
+      if (mounted) setState(() => _adCredits = (b['available'] ?? h['coins']) as num?);
+    } catch (_) {
+      // the card shows a dash; Ads says why
     }
   }
 
@@ -268,9 +285,10 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
     );
   }
 
-  /// The OneLocal wallet (what OneLocal owes for app orders), then the ad and discount credits (not open yet: "Soon").
+  /// The OneLocal wallet (what OneLocal owes for app orders), then the ad credits (rupees, 0635: a tap opens Ads) and the discount
+  /// credits (not open yet: "Soon").
   Widget _onelocalCards() {
-    Widget credit(String key, String title, String value, String sub, IconData icon, {required bool dark}) {
+    Widget credit(String key, String title, String value, String sub, IconData icon, {required bool dark, VoidCallback? onTap}) {
       final bg = dark ? kRmDeep : kRmLime, fg = dark ? Colors.white : kRmDeep, soft = dark ? const Color(0xFFB8BCC4) : const Color(0xFF3F4A12);
       return Expanded(
         child: Container(
@@ -290,11 +308,14 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
                     child: Icon(icon, size: 17, color: kRmLime),
                   ),
                   const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(color: dark ? kRmDeepSoft : kRmDeep.withValues(alpha: .1), borderRadius: BorderRadius.circular(20)),
-                    child: Text('Soon', style: inter(10.5, 700, color: fg)),
-                  ),
+                  if (onTap == null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(color: dark ? kRmDeepSoft : kRmDeep.withValues(alpha: .1), borderRadius: BorderRadius.circular(20)),
+                      child: Text('Soon', style: inter(10.5, 700, color: fg)),
+                    )
+                  else
+                    Icon(LucideIcons.arrowUpRight, size: 18, color: fg),
                 ]),
                 const SizedBox(height: 12),
                 Text(title, style: inter(13, 700, color: soft)),
@@ -304,6 +325,8 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
                 Text(sub, style: inter(11.5, 500, color: soft)),
               ]),
             ),
+            // on top, so a tap anywhere on the card opens it
+            if (onTap != null) Positioned.fill(child: Material(color: Colors.transparent, child: InkWell(key: ValueKey('$key-open'), onTap: onTap))),
           ]),
         ),
       );
@@ -362,7 +385,14 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
       const SizedBox(height: 12),
       IntrinsicHeight(
         child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          credit('rm-ad-credits', 'Ad credits', '— coins', 'To promote your restaurant', LucideIcons.megaphone, dark: false),
+          credit('rm-ad-credits', 'Ad credits', _adCredits == null ? '—' : rs(_adCredits! * 100), 'To promote your restaurant', LucideIcons.megaphone, dark: false,
+              onTap: () async {
+            await Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdsHomeScreen(api: widget.adsApi)));
+            if (mounted) {
+              _loadCredits();
+              _loadWallet(); // money moved to ad credits leaves the OneLocal wallet
+            }
+          }),
           const SizedBox(width: 12),
           credit('rm-discount-credits', 'Discount credits', rs(0), 'Discount against commission', LucideIcons.badgePercent, dark: true),
         ]),
@@ -395,6 +425,7 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
                       onRefresh: () async {
                         await _load();
                         await _loadWallet();
+                        await _loadCredits();
                       },
                       child: ListView(key: const ValueKey('rst-money'), padding: const EdgeInsets.fromLTRB(14, 12, 14, 28), children: [
                         Entrance(index: 0, child: _wallet(h)),

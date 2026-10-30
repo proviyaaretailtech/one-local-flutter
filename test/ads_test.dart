@@ -8,7 +8,6 @@ import 'package:http/testing.dart';
 import 'package:vinii_pos/ads/ads_api.dart';
 import 'package:vinii_pos/ads/ads_campaign.dart';
 import 'package:vinii_pos/ads/ads_screens.dart';
-import 'package:vinii_pos/money/money_flow.dart' show openMoneyLink;
 import 'package:vinii_pos/onboarding/document_picker.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
@@ -33,7 +32,7 @@ Map<String, dynamic> _home({num coins = 120, num pending = 0, String upi = 'onel
       'balances': {'available': coins, 'promotional': 0, 'reserved': 30, 'consumed': 90, 'expired': 0, 'pending': pending, 'disputed': 0},
       'coins': coins,
       'pending_coins': pending,
-      'coin_rupees': 10,
+      'coin_rupees': 1,
       'upi_id': upi,
       'payee_name': 'OneLocal',
       'formats': [
@@ -51,7 +50,7 @@ Map<String, dynamic> _home({num coins = 120, num pending = 0, String upi = 'onel
             _ad('a2', 'Weekend offer', format: 'home_banner', stage: 'scheduled', phase: 'upcoming', more: {'spent': 0, 'held': 10, 'views': 0, 'clicks': 0}),
           ],
       'ledger': [
-        {'id': 'l1', 'kind': 'topup', 'coins': 200, 'status': 'done', 'ref': 'OLC-1A2B3C4D', 'created_at': '2026-10-20T10:00:00Z'},
+        {'id': 'l1', 'kind': 'topup', 'coins': 200, 'status': 'done', 'method': 'wallet', 'ref': 'OLW-1A2B3C4D', 'created_at': '2026-10-20T10:00:00Z'},
         {'id': 'l2', 'kind': 'reserve', 'coins': 90, 'status': 'done', 'ad_title': 'Diwali sweets', 'created_at': '2026-10-24T10:00:00Z'},
         {'id': 'l3', 'kind': 'consume', 'coins': 10, 'status': 'done', 'ad_title': 'Diwali sweets', 'created_at': '2026-10-25T10:00:00Z'},
       ],
@@ -75,7 +74,8 @@ class Fake {
       'ads_accept' => ok({'ad': {'id': b['id'], 'stage': 'scheduled', 'funded': true}}),
       'ads_dispute' => ok({'dispute': {'id': 'd1'}}),
       'ads_report' => ok({'days': [{'day': '2026-10-25', 'views': 100, 'clicks': 7, 'valid_clicks': 6, 'visits': 0, 'leads': 0, 'spent': 10}]}),
-      'ads_topup' => ok({'id': 't1', 'ref': 'OLC-77AA11BB', 'coins': b['coins'], 'amount_minor': (b['coins'] as int) * 1000, 'status': 'pending', 'upi_id': 'onelocal@upi', 'payee_name': 'OneLocal'}),
+      'wallet_overview' => ok({'unsettled': {'due_minor': 300000}, 'owed_to_onelocal': {'amount_minor': 20000}, 'ad_credits_moved': {'amount_minor': 0}}),
+      'ads_wallet_move' => ok({'id': 'm1', 'amount_minor': b['amount_minor'], 'replayed': false}),
       _ => ok({}),
     };
   }));
@@ -109,23 +109,23 @@ void main() {
   });
 
   group('Ads dashboard', () {
-    testWidgets('available, held and spent coins, live and upcoming counts, analytics and the campaigns; the tiles filter the list', (t) async {
+    testWidgets('available, held and spent ad credits in rupees, live and upcoming counts, analytics and the campaigns; the tiles filter the list', (t) async {
       final f = Fake();
       await show(t, AdsHomeScreen(api: f.api));
       expect(textOf(t, 'ads-coins'), '120');
-      expect(find.text('= ₹1,200'), findsOneWidget);
-      expect(find.descendant(of: find.byKey(const ValueKey('ads-held')), matching: find.text('30')), findsOneWidget);
-      expect(find.descendant(of: find.byKey(const ValueKey('ads-spent')), matching: find.text('90')), findsOneWidget);
+      expect(find.textContaining('coin'), findsNothing, reason: 'rupees, no coins');
+      expect(find.descendant(of: find.byKey(const ValueKey('ads-held')), matching: find.text('₹30')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('ads-spent')), matching: find.text('₹90')), findsOneWidget);
       expect(find.text('Live ads'), findsOneWidget);
       expect(find.text('3'), findsOneWidget);
       expect(find.textContaining("waiting for OneLocal's check"), findsOneWidget);
       expect(find.text('910'), findsOneWidget); // views over 14 days
       expect(find.text('91'), findsWidgets); // clicks and valid clicks
       expect(find.text('10.0%'), findsOneWidget);
-      expect(find.text('14'), findsOneWidget); // coins spent
+      expect(find.text('₹14'), findsOneWidget); // spent
       expect(find.text('Diwali sweets'), findsOneWidget);
-      expect(find.text('50 spent'), findsOneWidget);
-      expect(find.text('10 held'), findsOneWidget);
+      expect(find.text('₹50 spent'), findsOneWidget);
+      expect(find.text('₹10 held'), findsOneWidget);
       await tapKey(t, 'ads-upcoming');
       expect(find.text('Diwali sweets'), findsNothing);
       expect(find.text('Weekend offer'), findsOneWidget);
@@ -138,11 +138,11 @@ void main() {
       expect(find.text('Price to accept'), findsOneWidget);
     });
 
-    testWidgets('waiting top-ups show on the coins card', (t) async {
+    testWidgets('credits still waiting show on the ad credits card', (t) async {
       final f = Fake(home: _home(pending: 500));
       await show(t, AdsHomeScreen(api: f.api));
       expect(find.byKey(const ValueKey('ads-pending')), findsOneWidget);
-      expect(find.textContaining('+500 coins'), findsOneWidget);
+      expect(find.textContaining('+₹500'), findsOneWidget);
     });
   });
 
@@ -154,14 +154,14 @@ void main() {
       expect(find.byType(CampaignScreen), findsOneWidget);
       expect(find.byKey(const ValueKey('campaign-steps')), findsOneWidget);
       expect(find.text('Running now.'), findsOneWidget);
-      expect(textOf(t, 'campaign-held'), '40 coins');
-      expect(textOf(t, 'campaign-spent'), '50 coins');
+      expect(textOf(t, 'campaign-held'), '₹40');
+      expect(textOf(t, 'campaign-spent'), '₹50');
       expect(find.byKey(const ValueKey('ad-media-open')), findsOneWidget);
       expect(find.byKey(const ValueKey('ad-pause')), findsNothing); // booked days cannot be paused
       await tapKey(t, 'ad-stop');
       await tapKey(t, 'ad-stop-confirm');
       expect(f.body('ads_stop'), {'id': 'a1'});
-      expect(find.textContaining('40 coins back in your credits'), findsOneWidget);
+      expect(find.textContaining('₹40 back in your credits'), findsOneWidget);
     });
 
     testWidgets('a price from OneLocal: accepted only after ticking the terms', (t) async {
@@ -199,14 +199,13 @@ void main() {
   });
 
   group('Create campaign', () {
-    testWidgets('a 9:16 photo, the format, the dates; the coins are worked out from the active price; the terms must be ticked', (t) async {
+    testWidgets('a 9:16 photo, the format, the dates; the amount is worked out from the active price; the terms must be ticked', (t) async {
       final f = Fake();
       pickAdMedia = ({required bool video}) async => PickedDocument(name: 'diwali.png', bytes: Uint8List.fromList(_png916), contentType: 'image/png');
       await show(t, AdCreateScreen(api: f.api, home: _home(), today: DateTime(2026, 10, 29)));
-      // Reel by default, 30 Oct – 5 Nov: 7 days × 10 coins
+      // Reel by default, 30 Oct – 5 Nov: 7 days × ₹10
       expect(textOf(t, 'ad-cost'), '70');
-      expect(textOf(t, 'ad-cost-rupees'), '= ₹700');
-      expect(textOf(t, 'ad-left'), '50');
+      expect(textOf(t, 'ad-left'), '₹50');
       await tapKey(t, 'ad-format-popup');
       expect(textOf(t, 'ad-cost'), '105');
       await tapKey(t, 'ad-format-home_banner');
@@ -262,13 +261,13 @@ void main() {
       expect(find.textContaining('Up to 25 valid clicks'), findsOneWidget);
     });
 
-    testWidgets('not enough coins: it can still be sent; Top up fills in what is missing', (t) async {
+    testWidgets('not enough ad credits: it can still be sent; Add credits fills in what is missing (at least ₹100)', (t) async {
       final f = Fake();
       await show(t, AdCreateScreen(api: f.api, home: _home(coins: 20), today: DateTime(2026, 10, 29)));
-      expect(textOf(t, 'ad-left'), '50 more');
+      expect(textOf(t, 'ad-left'), '₹50 more');
       await tapKey(t, 'ad-topup');
       expect(find.byType(TopUpScreen), findsOneWidget);
-      expect(t.widget<TextField>(find.byKey(const ValueKey('topup-amount'))).controller!.text, '500'); // the 50 coins still needed
+      expect(t.widget<TextField>(find.byKey(const ValueKey('topup-amount'))).controller!.text, '100'); // ₹50 still needed; ₹100 is the least that moves
     });
 
     testWidgets('Save draft sends nothing to review', (t) async {
@@ -279,44 +278,44 @@ void main() {
     });
   });
 
-  group('Coins', () {
+  group('Ad credits', () {
     testWidgets('the wallet: available, held and spent kept apart, the Ads and Discount tiles, and the history', (t) async {
       final f = Fake();
       await show(t, CoinsScreen(api: f.api));
       expect(textOf(t, 'coins-balance'), '120');
-      expect(textOf(t, 'coins-held'), '30');
-      expect(textOf(t, 'coins-spent'), '90');
+      expect(textOf(t, 'coins-held'), '₹30');
+      expect(textOf(t, 'coins-spent'), '₹90');
       expect(find.byKey(const ValueKey('coins-ads')), findsOneWidget);
       expect(find.byKey(const ValueKey('coins-discount')), findsOneWidget);
-      expect(find.text('Top-up · OLC-1A2B3C4D'), findsOneWidget);
-      expect(find.text('+200'), findsOneWidget);
+      expect(find.text('From your OneLocal wallet · OLW-1A2B3C4D'), findsOneWidget);
+      expect(find.text('+₹200'), findsOneWidget);
       expect(find.text('Held for: Diwali sweets'), findsOneWidget);
-      expect(find.text('-90'), findsOneWidget);
+      expect(find.text('-₹90'), findsOneWidget);
       expect(find.text('Spent: Diwali sweets'), findsOneWidget);
     });
 
-    testWidgets('top up: an amount becomes coins, Make payment opens the UPI app to OneLocal and the coins wait for the check', (t) async {
+    testWidgets('add ad credits: what the OneLocal wallet can give, the amount, and the move off the next settlement', (t) async {
       final f = Fake();
-      Uri? opened;
-      final before = openMoneyLink;
-      openMoneyLink = (u) async {
-        opened = u;
-        return true;
-      };
-      addTearDown(() => openMoneyLink = before);
       await show(t, TopUpScreen(api: f.api, home: _home()));
-      expect(textOf(t, 'topup-coins'), '= 500 coins');
-      await tapKey(t, 'topup-quick-1000');
-      expect(textOf(t, 'topup-coins'), '= 100 coins');
-      await tapKey(t, 'topup-method-card');
-      expect(find.textContaining('coming soon'), findsOneWidget);
-      await tapKey(t, 'topup-method-phonepe');
+      expect(textOf(t, 'topup-free'), '₹2,800', reason: '₹3,000 not settled less ₹200 owed to OneLocal');
+      await t.enterText(find.byKey(const ValueKey('topup-amount')), '50');
+      await t.pump();
       await tapKey(t, 'topup-pay');
-      expect(f.body('ads_topup'), {'coins': 100, 'method': 'phonepe'});
-      expect(opened.toString(), startsWith('phonepe://pay?pa=onelocal%40upi'));
-      expect(opened.toString(), contains('am=1000.00'));
-      expect(find.textContaining('OLC-77AA11BB'), findsOneWidget);
+      expect(f.calls('ads_wallet_move'), isEmpty, reason: 'at least ₹100');
+      await t.enterText(find.byKey(const ValueKey('topup-amount')), '5000');
+      await t.pump();
+      await tapKey(t, 'topup-pay');
+      expect(f.calls('ads_wallet_move'), isEmpty, reason: 'more than the wallet can give');
+      expect(find.textContaining('Only ₹2,800 can be moved'), findsOneWidget);
+      await tapKey(t, 'topup-quick-1000');
+      expect(textOf(t, 'topup-free'), '₹2,800');
+      await tapKey(t, 'topup-pay');
+      expect(f.body('ads_wallet_move'), {'amount_minor': 100000});
+      expect(f.calls('ads_wallet_move').single.headers['Idempotency-Key'], isNotEmpty);
+      expect(find.text('₹1,000 added to ad credits'), findsOneWidget);
+      expect(find.descendant(of: find.byType(AlertDialog), matching: find.textContaining('next weekly OneLocal settlement')), findsOneWidget);
       await tapKey(t, 'topup-ok');
+      expect(find.byType(TopUpScreen), findsNothing);
     });
   });
 }

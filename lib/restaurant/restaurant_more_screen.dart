@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../admin/ol_admin_screen.dart';
 import '../home/home_nav.dart';
 import '../home/side_nav.dart';
 import 'rst_page_manager.dart';
@@ -64,6 +65,8 @@ class RestaurantMoreScreen {
       SideNavEntry(LucideIcons.circleQuestionMark, 'Help & support', open(HomeNav.support)),
       // the same prices as the store: ₹599 / ₹799 a month, 6 or 12 months (2 free)
       SideNavEntry(LucideIcons.crown, 'Subscription plans', back(() => Navigator.of(context).push(RstPlansScreen.route()))),
+      // OneLocal's own people only (0635): check ads and give ad credits
+      if (OlAdmin.isAdmin.value) SideNavEntry(LucideIcons.shieldCheck, 'OneLocal Admin', back(() => Navigator.of(context).push(OlAdminScreen.route()))),
     ];
   }
 

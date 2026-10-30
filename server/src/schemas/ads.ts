@@ -85,3 +85,18 @@ export const AdvSave = z.object({
 });
 export const AdvSubmit = z.object({ agree: z.boolean() });
 export const ProfileSave = z.object({ ...brand, brand_name: z.string().trim().min(2, 'Enter your brand name.').max(80) });
+
+// Ad credits in rupees (0635, founder 30 Oct 2026): moved in from the OneLocal wallet, or given by OneLocal. One ad credit is ₹1.
+export const WalletMove = z.object({
+  amount_minor: z.number({ message: 'Enter the amount.' }).int().min(10000, 'Move at least ₹100.').max(10_000_000_00, 'That is too much at once.')
+    .refine(v => v % 100 === 0, 'Move whole rupees.'), ...key,
+});
+// OneLocal's side (platform admins only; the database checks)
+export const AdminQueue = z.object({ q: z.string().trim().max(80).optional() });
+export const AdminReview = z.object({ id, decision: z.enum(['approved', 'changes_requested', 'rejected'], { message: 'Approve, ask for changes or reject.' }),
+  note: z.string().trim().max(300).optional() });
+export const AdminOffer = z.object({ id, rule_id: id.optional(), pricing_model: z.string().trim().max(40).optional(),
+  rate_coins: z.number().positive('Set the rate.').max(10_000_000).optional(), budget_coins: z.number().positive().max(10_000_000).optional(),
+  terms: z.string().trim().max(2000).optional() });
+export const Grant = z.object({ organization_id: id, coins: z.number({ message: 'Enter the amount.' }).positive('Enter the amount.').max(1_000_000, 'That is too much at once.'),
+  note: z.string().trim().max(200).optional() });

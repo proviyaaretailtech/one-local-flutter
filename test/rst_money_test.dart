@@ -8,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/account/wallet_api.dart';
+import 'package:vinii_pos/ads/ads_api.dart';
+import 'package:vinii_pos/ads/ads_screens.dart' show AdsHomeScreen;
 import 'package:vinii_pos/api/rpc_client.dart';
 import 'package:vinii_pos/money/rst_money.dart';
 import 'package:vinii_pos/money/rst_money_api.dart';
@@ -103,6 +105,20 @@ void main() {
     expect(find.text('Cash drawer · 29 Oct'), findsOneWidget);
     expect(find.text('+ ₹790'), findsOneWidget, reason: 'cash sales');
     expect(t.widget<Text>(find.byKey(const ValueKey('rm-expected'))).data, '₹790');
+  });
+
+  testWidgets('Ad credits (0635): the rupees available, no "Soon"; a tap opens Ads', (t) async {
+    final f = Fake((fn, body) => fn == 'ads_home'
+        ? ok({'balances': {'available': 1250, 'promotional': 300, 'reserved': 0, 'consumed': 0, 'pending': 0}, 'coins': 1250, 'coin_rupees': 1,
+            'formats': [], 'counts': {}, 'series': [], 'ads': [], 'ledger': []})
+        : null);
+    await show(t, RstMoneyScreen(api: f.api, walletApi: f.wallet, adsApi: AdsApi(rpc: f.rpc), today: today));
+    final card = find.byKey(const ValueKey('rm-ad-credits'));
+    expect(find.descendant(of: card, matching: find.text('₹1,250')), findsOneWidget);
+    expect(find.descendant(of: card, matching: find.text('Soon')), findsNothing);
+    expect(find.descendant(of: find.byKey(const ValueKey('rm-discount-credits')), matching: find.text('Soon')), findsOneWidget, reason: 'discount credits are not open yet');
+    await tap(t, find.byKey(const ValueKey('rm-ad-credits-open')));
+    expect(find.byType(AdsHomeScreen), findsOneWidget);
   });
 
   testWidgets('Close day: the counted cash is sent; the drawer then says it is closed and how much was short', (t) async {

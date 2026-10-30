@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../admin/ol_admin_screen.dart';
 import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -52,6 +53,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
       if (mounted) _reload();
     });
     OutletScope.selected.addListener(_followScope);
+    OlAdmin.check(); // OneLocal's own people get "OneLocal Admin" in the side bar
   }
 
   @override

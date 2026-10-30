@@ -392,7 +392,7 @@ class AdvertiserStatusScreen extends StatelessWidget {
             '${tr('Status')}: ${tr(approved ? 'Approved' : rejected ? 'Not approved' : 'In review')}',
           ],
           noteTitle: tr('No selling needed'),
-          noteBody: tr('As an advertiser you do not list products, take orders or get sales payouts. You pay for ads with ad coins.'),
+          noteBody: tr('As an advertiser you do not list products, take orders or get sales payouts. You pay for ads with ad credits (₹).'),
         ),
       ],
       actions: [
@@ -553,8 +553,8 @@ class _BrandProfileScreenState extends State<BrandProfileScreen> {
               title: 'Your brand',
               subtitle: switch (kind) {
                 'advertising' => 'You advertise on OneLocal without selling here.',
-                'hybrid' => 'You sell and advertise on OneLocal. Ad coins are kept apart from your sales and payouts.',
-                _ => 'Add your brand to advertise it. Your business then sells and advertises; ad coins stay apart from your sales and payouts.',
+                'hybrid' => 'You sell and advertise on OneLocal. Ad credits are kept apart from your sales and payouts.',
+                _ => 'Add your brand to advertise it. Your business then sells and advertises; ad credits stay apart from your sales and payouts.',
               },
               children: [
                 Container(

@@ -397,9 +397,7 @@ class _StoreMoneyScreenState extends State<StoreMoneyScreen> {
                         ? Row(mainAxisSize: MainAxisSize.min, children: [
                             const CoinMark(size: 22),
                             const SizedBox(width: 6),
-                            Text(_adCoins == null ? '—' : '${_adCoins!}', key: const ValueKey('ad-credits-coins'), style: inter(26, 800, color: fg)),
-                            const SizedBox(width: 4),
-                            Text(tr('coins'), style: inter(13, 700, color: soft)),
+                            Text(_adCoins == null ? '—' : creditPlain(_adCoins), key: const ValueKey('ad-credits-coins'), style: inter(26, 800, color: fg)),
                           ])
                         : Text(rs(0), style: inter(26, 800, color: fg)),
                   ),

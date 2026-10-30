@@ -46,6 +46,7 @@ import * as sh from './schemas/shift.ts';
 import * as ord from './schemas/orders.ts';
 import * as gst from './schemas/guest.ts';
 import * as mp from './schemas/maps.ts';
+import * as rep from './schemas/reports.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -440,6 +441,13 @@ export const MANIFEST: Entry[] = [
   db('ads_profile', { args: ads.None, map: P, rate: 'read', roles: STAFF }),
   db('ads_profile_save', { args: ads.ProfileSave, map: P, rate: 'write', roles: STOREFRONT }),
   db('ads_topup', { args: ads.TopUp, map: P, rate: 'write', idem: true, roles: STOREFRONT }),
+  // 0635: ad credits in rupees, moved in from the OneLocal wallet; OneLocal's side (the database checks for a platform admin)
+  db('ads_wallet_move', { args: ads.WalletMove, map: P, rate: 'money', idem: true, roles: 'owner (org_owner, org_admin)' }),
+  db('ol_admin_me', { args: ads.None, map: P, rate: 'read', roles: ANY }),
+  db('ads_admin_queue', { args: ads.AdminQueue, map: P, rate: 'read', roles: 'OneLocal platform admins' }),
+  db('ads_admin_review', { args: ads.AdminReview, map: P, rate: 'write', roles: 'OneLocal platform admins' }),
+  db('ads_admin_offer', { args: ads.AdminOffer, map: P, rate: 'write', roles: 'OneLocal platform admins' }),
+  db('ads_grant', { args: ads.Grant, map: P, rate: 'write', roles: 'OneLocal platform admins' }),
   sec('ads_media_slot', { args: ads.MediaAsk, rate: 'secure', roles: STOREFRONT }),
   sec('ads_media_link', { args: ads.MediaLink, rate: 'secure', roles: STOREFRONT }),
   db('sf_draft_save', { args: sf.DraftSave, map: P, rate: 'write', roles: STOREFRONT }),
@@ -564,6 +572,14 @@ export const MANIFEST: Entry[] = [
   db('rst_home_insights', { args: rst.DashboardScope, map: P, rate: 'read', roles: STAFF }),
   db('rst_kot_orders', { args: rst.KotOrders, map: P, rate: 'read', roles: STAFF }),
   db('rst_activity_log', { args: rst.ActivityLog, map: P, rate: 'read', roles: STAFF }),
+  // 0636: restaurant reports V1 (read-only; the business and outlets of the caller only)
+  db('rst_report_sales', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_items', { args: rep.Items, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_categories', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_payments', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_cashiers', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_discounts', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_audit', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers with the audit (money:read, pos_audit_log:read)' }),
 ];
 
 const byAlias = new Map<string, Entry>(MANIFEST.map(e => [e.alias, e]));
