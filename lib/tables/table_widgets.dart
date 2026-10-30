@@ -126,10 +126,15 @@ class TablesPage extends StatelessWidget {
               under: subtitle == null ? null : Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, 400, color: kMuted)),
             ),
           Expanded(child: list),
-          ?footer,
         ]),
       ),
-      bottomNavigationBar: nav ? TablesNav(onTap: (id) => env.onNavigate?.call(id)) : null,
+      // the footer sits in the bottom bar, so a toast rises above it instead of covering its buttons (founder, 30 Oct 2026)
+      bottomNavigationBar: footer == null
+          ? (nav ? TablesNav(onTap: (id) => env.onNavigate?.call(id)) : null)
+          : Column(mainAxisSize: MainAxisSize.min, children: [
+              SafeArea(top: false, bottom: !nav, child: footer!),
+              if (nav) TablesNav(onTap: (id) => env.onNavigate?.call(id)),
+            ]),
     );
   }
 }

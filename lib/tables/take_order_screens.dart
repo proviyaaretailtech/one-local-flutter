@@ -54,7 +54,62 @@ Widget _letter(String name, {Color bg = const Color(0xFFFFF3D6)}) => Container(
       child: Text(name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(), style: inter(16, 700)),
     );
 
-/// Figma "Add dishes": category tabs, dish rows with quantity and note, Total so far, Send to kitchen, Save and hold.
+const _kTints = [Color(0xFFE3F1FC), Color(0xFFFDF0DC), Color(0xFFFBF3D0), Color(0xFFFCE9E7), Color(0xFFE9F2FB), Color(0xFFFFF7D6)];
+
+/// A dish's picture: its photo, or its first letter on a soft tint; the veg / non-veg mark in the corner (founder, 30 Oct 2026).
+Widget _thumb(Facts i) {
+  final name = i.s('name').trim();
+  final img = i.so('image_url');
+  final food = i.s('food_type');
+  final mark = food == 'non_veg' ? const Color(0xFFC62828) : food == 'egg' ? const Color(0xFFD97706) : const Color(0xFF15803D);
+  return SizedBox(
+    width: 58,
+    height: 58,
+    child: Stack(children: [
+      Positioned.fill(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: ColoredBox(
+            color: _kTints[(name.isEmpty ? 0 : name.codeUnitAt(0)) % _kTints.length],
+            child: img != null && img.isNotEmpty
+                ? Image.network(img, fit: BoxFit.cover, errorBuilder: (_, _, _) => Center(child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: inter(20, 800))))
+                : Center(child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: inter(20, 800))),
+          ),
+        ),
+      ),
+      // the square-with-dot of Indian menus
+      Positioned(
+        left: 4,
+        top: 4,
+        child: Container(
+          width: 14,
+          height: 14,
+          padding: const EdgeInsets.all(2.5),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(3), border: Border.all(color: mark, width: 1.2)),
+          child: DecoratedBox(decoration: BoxDecoration(color: mark, shape: BoxShape.circle)),
+        ),
+      ),
+    ]),
+  );
+}
+
+/// One dish as a card; lime edge once some of it is chosen.
+Widget _dishCard({required Key key, required bool chosen, required Widget child}) => AnimatedContainer(
+      key: key,
+      duration: const Duration(milliseconds: 220),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: chosen ? kLimeBtn : kLine, width: chosen ? 1.8 : 1),
+        boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 3))],
+      ),
+      child: child,
+    );
+
+/// Figma "Add dishes" (redesigned 30 Oct 2026): category pills with counts, each dish a card with its photo, + / steppers and size chips,
+/// then one compact card with the total, Hold (save and hold) and Send to kitchen.
 class AddDishesScreen extends StatefulWidget {
   const AddDishesScreen({super.key, required this.env, required this.tableId, required this.tableLabel, this.guests});
   final TablesEnv env;
@@ -138,6 +193,10 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
     });
   }
 
+  /// How many dishes are chosen here, all lines together; and in one category.
+  int get _units => _qty.values.fold(0, (a, q) => a + q);
+  int _inCat(String c) => _qty.entries.where((e) => _item(_dishOf(e.key))?.s('category') == c).fold(0, (a, e) => a + e.value);
+
   // Display only: what the dishes chosen here add to the bill so far; the bill itself is worked out by the database.
   num get _soFar => _already + _qty.entries.fold<num>(0, (a, e) => a + _priceOf(e.key) * e.value);
 
@@ -171,30 +230,28 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
   Widget _optionsRow(Facts i, {required bool last}) {
     final id = i.s('id');
     final keys = [for (final k in _qty.keys) if (_dishOf(k) == id) k];
-    return Container(
+    return _dishCard(
       key: ValueKey('dish-$id'),
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
-      decoration: BoxDecoration(border: last ? null : const Border(bottom: BorderSide(color: kLine))),
+      chosen: keys.isNotEmpty,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          _letter(i.s('name')),
+          _thumb(i),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(i.s('name'), style: inter(15, 600)),
-              Text('${rupees(i.n('price'))} · add-ons & combos', style: inter(12.5, 400, color: kMuted)),
+              Text(i.s('name'), maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(15.5, 700)),
+              const SizedBox(height: 2),
+              Text(rupees(i.n('price')), style: inter(14, 700, color: kInk)),
+              Text('Add-ons & combos', style: inter(11.5, 500, color: kMuted)),
             ]),
           ),
-          TextButton.icon(
-            key: ValueKey('options-$id'),
-            onPressed: _busy ? null : () => _addWithOptions(i),
-            icon: const Icon(LucideIcons.plus, size: 16, color: kLink),
-            label: Text('Add', style: inter(14, 700, color: kLink)),
-          ),
+          _pillButton(ValueKey('options-$id'), 'Add', () => _addWithOptions(i)),
         ]),
         for (final k in keys)
-          Padding(
-            padding: const EdgeInsets.only(left: 48, top: 6),
+          Container(
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+            decoration: BoxDecoration(color: kBg, borderRadius: BorderRadius.circular(14)),
             child: Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -206,44 +263,121 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
                   Text('${rupees(_priceOf(k))} each', style: inter(12, 500, color: kMuted)),
                 ]),
               ),
-              Text('${_qty[k]}', style: inter(14, 800)),
-              const SizedBox(width: 6),
-              _step(LucideIcons.minus, 'Less ${i.s('name')}', () => _set(k, (_qty[k] ?? 0) - 1), ValueKey('minus-$k')),
-              _step(LucideIcons.plus, 'More ${i.s('name')}', () => _set(k, (_qty[k] ?? 0) + 1), ValueKey('plus-$k')),
+              _stepper(_qty[k] ?? 0, 'Less ${i.s('name')}', 'More ${i.s('name')}', () => _set(k, (_qty[k] ?? 0) - 1), () => _set(k, (_qty[k] ?? 0) + 1),
+                  ValueKey('minus-$k'), ValueKey('plus-$k')),
             ]),
           ),
       ]),
     );
   }
 
+  /// A lime "+ Add" pill: the first tap on a dish.
+  Widget _pillButton(Key key, String label, VoidCallback onTap) => Semantics(
+        button: true,
+        label: label,
+        child: Material(
+          color: kLimeBtn,
+          borderRadius: BorderRadius.circular(40),
+          child: InkWell(
+            key: key,
+            borderRadius: BorderRadius.circular(40),
+            onTap: _busy ? null : onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(LucideIcons.plus, size: 16, color: kInk),
+                const SizedBox(width: 4),
+                Text(label, style: inter(14, 800)),
+              ]),
+            ),
+          ),
+        ),
+      );
+
+  /// The dark "− 2 +" of a chosen line; [qtyKey] goes on the count.
+  Widget _stepper(int q, String lessLabel, String moreLabel, VoidCallback less, VoidCallback more, Key minusKey, Key plusKey, {Key? qtyKey}) => Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        decoration: BoxDecoration(color: _kDarkBtn, borderRadius: BorderRadius.circular(40)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          _round(LucideIcons.minus, lessLabel, less, minusKey),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 24),
+            child: Text('$q', key: qtyKey, textAlign: TextAlign.center, style: inter(15, 800, color: Colors.white)),
+          ),
+          _round(LucideIcons.plus, moreLabel, more, plusKey),
+        ]),
+      );
+
+  Widget _round(IconData icon, String label, VoidCallback onTap, Key key) => Semantics(
+        button: true,
+        label: label,
+        child: InkWell(
+          key: key,
+          customBorder: const CircleBorder(),
+          onTap: _busy ? null : onTap,
+          child: SizedBox(width: 32, height: 32, child: Icon(icon, size: 17, color: _kLimeText)),
+        ),
+      );
+
   /// A dish with sizes: its name, then one line per size with its price and its own − / +.
   Widget _sizedRow(Facts i, {required bool last}) {
     final id = i.s('id');
-    return Container(
+    final variants = i.l('variants');
+    final chosen = variants.any((v) => (_qty['$id#${v.s('id')}'] ?? 0) > 0);
+    return _dishCard(
       key: ValueKey('dish-$id'),
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
-      decoration: BoxDecoration(border: last ? null : const Border(bottom: BorderSide(color: kLine))),
+      chosen: chosen,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          _letter(i.s('name')),
+          _thumb(i),
           const SizedBox(width: 12),
-          Expanded(child: Text(i.s('name'), style: inter(15, 600))),
-          Text('Choose a size', style: inter(12, 500, color: kMuted)),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(i.s('name'), maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(15.5, 700)),
+              const SizedBox(height: 2),
+              Text('Choose a size', style: inter(12, 500, color: kMuted)),
+            ]),
+          ),
         ]),
-        for (final v in i.l('variants'))
-          Builder(builder: (context) {
-            final k = '$id#${v.s('id')}', q = _qty[k] ?? 0;
-            return Padding(
-              padding: const EdgeInsets.only(left: 48, top: 4),
-              child: Row(children: [
-                Expanded(child: Text('${v.s('name')} · ${rupees(v.n('price'))}', style: inter(13.5, q > 0 ? 700 : 500, color: q > 0 ? kInk : kMuted))),
-                if (q > 0) Text('$q', key: ValueKey('qty-$id-${v.s('name')}'), style: inter(14, 800)),
-                const SizedBox(width: 6),
-                if (q > 0) _step(LucideIcons.minus, 'Less ${v.s('name')} ${i.s('name')}', () => _set(k, q - 1), ValueKey('minus-$id-${v.s('name')}')),
-                _step(LucideIcons.plus, 'More ${v.s('name')} ${i.s('name')}', () => _set(k, q + 1), ValueKey('plus-$id-${v.s('name')}')),
-              ]),
-            );
-          }),
+        const SizedBox(height: 10),
+        // one chip per size: tap to add; a chosen size turns lime with its own − / + (founder, 30 Oct 2026)
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final v in variants)
+            Builder(builder: (context) {
+              final k = '$id#${v.s('id')}', q = _qty[k] ?? 0;
+              final label = Text('${v.s('name')} · ${rupees(v.n('price'))}', style: inter(13, 700, color: kInk));
+              if (q == 0) {
+                return Semantics(
+                  button: true,
+                  label: 'More ${v.s('name')} ${i.s('name')}',
+                  child: Material(
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40), side: const BorderSide(color: kLine, width: 1.2)),
+                    child: InkWell(
+                      key: ValueKey('plus-$id-${v.s('name')}'),
+                      borderRadius: BorderRadius.circular(40),
+                      onTap: _busy ? null : () => _set(k, 1),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 9, 10, 9),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [label, const SizedBox(width: 6), const Icon(LucideIcons.plus, size: 15, color: kInk)]),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return Container(
+                padding: const EdgeInsets.fromLTRB(14, 3, 3, 3),
+                decoration: BoxDecoration(color: kLimeBtn, borderRadius: BorderRadius.circular(40)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  label,
+                  const SizedBox(width: 8),
+                  _stepper(q, 'Less ${v.s('name')} ${i.s('name')}', 'More ${v.s('name')} ${i.s('name')}', () => _set(k, q - 1), () => _set(k, q + 1),
+                      ValueKey('minus-$id-${v.s('name')}'), ValueKey('plus-$id-${v.s('name')}'), qtyKey: ValueKey('qty-$id-${v.s('name')}')),
+                ]),
+              );
+            }),
+        ]),
       ]),
     );
   }
@@ -294,22 +428,46 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
       onRefresh: _load,
       footer: _menu == null
           ? null
+          // one compact card (founder, 30 Oct 2026): the total and how many dishes, then Hold (save and hold) and Send to kitchen side by side
           : Container(
-              color: kBg,
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: kLine)),
+              margin: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: kLine),
+                boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 12, offset: Offset(0, 3))],
+              ),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
                   child: Row(children: [
-                    Expanded(child: Text('Total so far', style: inter(16, 600))),
-                    Text(rupees(_soFar), key: const ValueKey('total-so-far'), style: inter(20, 700, color: _kGreen)),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Total so far', style: inter(12, 600, color: kMuted)),
+                        Text(
+                          _units == 0 ? 'No dishes chosen yet' : '$_units dish${_units == 1 ? '' : 'es'} chosen',
+                          key: const ValueKey('dishes-chosen'),
+                          style: inter(13.5, 700),
+                        ),
+                      ]),
+                    ),
+                    Text(rupees(_soFar), key: const ValueKey('total-so-far'), style: inter(22, 800, color: _kGreen)),
                   ]),
                 ),
                 const SizedBox(height: 10),
-                DarkButton('Send to kitchen', key: const ValueKey('send-to-kitchen'), busy: _busy, onPressed: _qty.isEmpty ? null : () => _submit(true)),
-                const SizedBox(height: 10),
-                OutlineButtonT('Save and hold', key: const ValueKey('save-and-hold'), height: 52, enabledLook: _qty.isNotEmpty, onPressed: _busy || _qty.isEmpty ? null : () => _submit(false)),
+                Row(children: [
+                  Expanded(
+                    child: OutlineButtonT('Hold', key: const ValueKey('save-and-hold'), icon: LucideIcons.pause, height: 48, enabledLook: _qty.isNotEmpty,
+                        onPressed: _busy || _qty.isEmpty ? null : () => _submit(false)),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: LimeButton('Send to kitchen', key: const ValueKey('send-to-kitchen'), icon: LucideIcons.send, height: 48, busy: _busy,
+                        onPressed: _qty.isEmpty ? null : () => _submit(true)),
+                  ),
+                ]),
               ]),
             ),
       children: [
@@ -321,6 +479,7 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(children: [
+                // lime when picked, like the Bill's pills; a small count of the dishes chosen in that category
                 for (final c in cats)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
@@ -331,10 +490,22 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
                         key: ValueKey('cat-$c'),
                         borderRadius: BorderRadius.circular(999),
                         onTap: () => setState(() => _cat = c),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                          decoration: BoxDecoration(color: _cat == c ? _kDarkBtn : Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: _cat == c ? _kDarkBtn : kLine)),
-                          child: Text(c, style: inter(14, 600, color: _cat == c ? Colors.white : kInk)),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          padding: EdgeInsets.fromLTRB(16, 9, _inCat(c) > 0 ? 8 : 16, 9),
+                          decoration: BoxDecoration(color: _cat == c ? kLimeBtn : Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: _cat == c ? kLimeBtn : kLine)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Text(c, style: inter(14, 700, color: kInk)),
+                            if (_inCat(c) > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                constraints: const BoxConstraints(minWidth: 20),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(color: _kDarkBtn, borderRadius: BorderRadius.circular(20)),
+                                child: Text('${_inCat(c)}', key: ValueKey('cat-count-$c'), textAlign: TextAlign.center, style: inter(11.5, 800, color: Colors.white)),
+                              ),
+                            ],
+                          ]),
                         ),
                       ),
                     ),
@@ -342,10 +513,9 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
               ]),
             ),
           if (shown.isEmpty) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text('No dishes on sale here yet.', style: inter(15, 400, color: kMuted)))),
-          Container(
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
-            child: Column(children: [for (var k = 0; k < shown.length; k++) _row(shown[k], last: k == shown.length - 1)]),
-          ),
+          // each dish its own card, building in one after another; a new category builds in again (lib/ui/motion.dart)
+          for (var k = 0; k < shown.length; k++)
+            Entrance(key: ValueKey('add-in-$_cat-${shown[k].s('id')}'), index: k, child: _row(shown[k], last: k == shown.length - 1)),
         ],
       ],
     );
@@ -355,41 +525,51 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
     if (dishHasExtras(i)) return _optionsRow(i, last: last);
     if (i.l('variants').isNotEmpty) return _sizedRow(i, last: last);
     final id = i.s('id'), q = _qty[id] ?? 0, note = _note[id];
-    return Container(
+    return _dishCard(
       key: ValueKey('dish-$id'),
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-      decoration: BoxDecoration(border: last ? null : const Border(bottom: BorderSide(color: kLine))),
+      chosen: q > 0,
       child: Row(children: [
-        _letter(i.s('name')),
+        _thumb(i),
         const SizedBox(width: 12),
         Expanded(
           child: InkWell(
             onTap: q == 0 ? () => _set(id, 1) : () => _editNote(i),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(i.s('name'), style: inter(15, 600)),
-              Text(q == 0 ? rupees(i.n('price')) : ['Quantity $q', if (note != null) note].join(' · '), style: inter(12.5, 400, color: kMuted)),
-              if (q > 0) Text(note == null ? 'Add a note' : 'Change note', style: inter(12, 600, color: kLink)),
+              Text(i.s('name'), maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(15.5, 700)),
+              const SizedBox(height: 2),
+              Text(q == 0 ? rupees(i.n('price')) : rupees(i.n('price') * q), style: inter(14, 700, color: kInk)),
+              if (q > 0) ...[
+                Text(['Quantity $q', if (note != null) note].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11.5, 500, color: kMuted)),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(LucideIcons.pencilLine, size: 12, color: kLink),
+                  const SizedBox(width: 4),
+                  Text(note == null ? 'Add a note' : 'Change note', style: inter(12, 700, color: kLink)),
+                ]),
+              ],
             ]),
           ),
         ),
-        if (q > 0) Text(rupees(i.n('price') * q), style: inter(15, 700)),
-        const SizedBox(width: 6),
-        if (q > 0) _step(LucideIcons.minus, 'Less ${i.s('name')}', () => _set(id, q - 1), ValueKey('minus-$id')),
-        _step(LucideIcons.plus, 'More ${i.s('name')}', () => _set(id, q + 1), ValueKey('plus-$id')),
+        const SizedBox(width: 8),
+        if (q == 0)
+          Semantics(
+            button: true,
+            label: 'More ${i.s('name')}',
+            child: Material(
+              color: kLimeBtn,
+              shape: const CircleBorder(),
+              child: InkWell(
+                key: ValueKey('plus-$id'),
+                customBorder: const CircleBorder(),
+                onTap: _busy ? null : () => _set(id, 1),
+                child: const SizedBox(width: 40, height: 40, child: Icon(LucideIcons.plus, size: 20, color: kInk)),
+              ),
+            ),
+          )
+        else
+          _stepper(q, 'Less ${i.s('name')}', 'More ${i.s('name')}', () => _set(id, q - 1), () => _set(id, q + 1), ValueKey('minus-$id'), ValueKey('plus-$id')),
       ]),
     );
   }
-
-  Widget _step(IconData icon, String label, VoidCallback onTap, Key key) => Semantics(
-        button: true,
-        label: label,
-        child: InkWell(
-          key: key,
-          customBorder: const CircleBorder(),
-          onTap: _busy ? null : onTap,
-          child: Container(width: 36, height: 36, margin: const EdgeInsets.only(left: 4), decoration: const BoxDecoration(color: kBg, shape: BoxShape.circle), child: Icon(icon, size: 18, color: kInk)),
-        ),
-      );
 }
 
 /// Figma "Sent to kitchen": KOT #N sent, how many dishes, station and time, Back to tables.
