@@ -13,21 +13,24 @@ import 'receipts_screen.dart';
 import 'returns_screen.dart';
 import 'sell_api.dart';
 import 'sell_carts.dart';
+import '../barcodes/barcodes_api.dart';
 import 'sell_screen.dart';
 import 'sell_widgets.dart';
 
 /// What every till screen shares: the two API clients, the open carts, and where the other sections' tabs lead.
 /// Tests pass fakes; the app passes nothing and gets the live ones.
 class SellEnv {
-  SellEnv({SellApi? sell, OrdersApi? orders, ShiftApi? shift, SellCarts? carts, this.onTab, this.storeName = 'OneLocal', this.branchName, this.initials = 'RP', Future<bool> Function(Uri)? openUrl,
+  SellEnv({SellApi? sell, OrdersApi? orders, ShiftApi? shift, SellCarts? carts, BarcodesApi? barcodes, this.onTab, this.storeName = 'OneLocal', this.branchName, this.initials = 'RP', Future<bool> Function(Uri)? openUrl,
       Future<bool> Function(BuildContext context, String category)? addFirstItem})
       : addFirstItem = addFirstItem ?? ((context, category) async => await showQuickAdd(context, CatalogueApi(), category: category) != null),
         sell = sell ?? SellApi(),
+        barcodes = barcodes ?? BarcodesApi(),
         shift = shift ?? ShiftApi(),
         openUrl = openUrl ?? ((u) => launchUrl(u, mode: LaunchMode.externalApplication)),
         orders = orders ?? OrdersApi(),
         carts = carts ?? SellCarts.instance;
   final SellApi sell;
+  final BarcodesApi barcodes; // store codes, loose items, weigh labels (30 Oct 2026)
   final ShiftApi shift; // cash shift, payment pending, refund check (0500-0502)
   final OrdersApi orders;
   final SellCarts carts;

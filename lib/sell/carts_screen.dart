@@ -237,7 +237,6 @@ class _CartsScreenState extends State<CartsScreen> {
   @override
   Widget build(BuildContext context) {
     final held = _held;
-    final total = _quote?.total;
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
@@ -268,29 +267,6 @@ class _CartsScreenState extends State<CartsScreen> {
               child: _view == 'active' ? _activeView(held) : _holdView(held),
             ),
             if (_heldError != null) ...[const SizedBox(height: 10), Text(_heldError!, style: inter(13, 400, color: kBadText))],
-          ]),
-        ),
-        Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Row(children: [
-              Text('Cart ${cart.label}', style: inter(15, 600)),
-              const SizedBox(width: 8),
-              const TagChip('Unpaid', bg: Color(0xFFF3F4F1), fg: kMuted),
-              const Spacer(),
-              Text(total == null ? '' : 'Total ${rupees(total)}', style: inter(20, 800, color: kGreenText)),
-            ]),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(flex: 3, child: DarkCta(label: 'PAY', labelStart: true, amount: total == null ? null : rupees(total), onPressed: cart.isEmpty ? null : () async {
-                await Navigator.of(context).push(MaterialPageRoute(builder: (_) => PayScreen(env: env, cart: cart)));
-                if (mounted) {
-                  _requote();
-                  _loadHeld();
-                }
-              })),
-            ]),
           ]),
         ),
         PosBottomNav(active: 'bill', onTap: (id) => env.tab(context, id)),
@@ -352,6 +328,14 @@ class _CartsScreenState extends State<CartsScreen> {
         ),
       );
 
+  Future<void> _payNow() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => PayScreen(env: env, cart: cart)));
+    if (mounted) {
+      _requote();
+      _loadHeld();
+    }
+  }
+
   Widget _activeCard() {
     final q = _quote;
     return _walletCard(
@@ -391,6 +375,27 @@ class _CartsScreenState extends State<CartsScreen> {
           const SizedBox(width: 8),
           Expanded(child: _cardButton(_showItems ? 'Hide items' : 'Show items', () => setState(() => _showItems = !_showItems), solid: true)),
         ]),
+        // PAY on the cart itself, where the eye already is (founder, 30 Oct 2026)
+        const SizedBox(height: 10),
+        Material(
+          key: const ValueKey('cart-pay'),
+          color: cart.isEmpty ? Colors.white.withValues(alpha: 0.18) : kInk,
+          shape: const StadiumBorder(),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: cart.isEmpty ? null : _payNow,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+              child: Row(children: [
+                Text('PAY', style: inter(17, 800, color: cart.isEmpty ? Colors.white.withValues(alpha: 0.5) : kLime)),
+                const Spacer(),
+                if (!cart.isEmpty) Text(rupees(q?.total ?? cart.estimate), style: inter(18, 800, color: kLime)),
+                const SizedBox(width: 6),
+                Icon(LucideIcons.arrowRight, size: 18, color: cart.isEmpty ? Colors.white.withValues(alpha: 0.5) : kLime),
+              ]),
+            ),
+          ),
+        ),
       ]),
     );
   }
@@ -411,12 +416,19 @@ class _CartsScreenState extends State<CartsScreen> {
             child: Row(children: [
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(l.name, style: inter(15, 700)),
-                Text('${rupees(cart.unitPrice[l.menuItemId] ?? 0)} each', style: inter(12.5, 400, color: kMuted)),
+                Text(l.weightG != null ? '${rupees(cart.unitPrice[l.menuItemId] ?? 0)} per kg' : '${rupees(cart.unitPrice[l.menuItemId] ?? 0)} each', style: inter(12.5, 400, color: kMuted)),
               ])),
-              _step(LucideIcons.minus, 'One less ${l.name}', () => _qty(l, l.qty - 1)),
-              Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text('${l.qty}', style: inter(16, 700))),
-              _step(LucideIcons.plus, 'One more ${l.name}', () => _qty(l, l.qty + 1)),
-              SizedBox(width: 68, child: Text(rupees(num.tryParse('${priced[l.menuItemId]?['amount'] ?? ''}') ?? (cart.unitPrice[l.menuItemId] ?? 0) * l.qty), textAlign: TextAlign.right, style: inter(15, 800))),
+              // a weighed pack is one pack: only − (to take it off); weigh another pack for more
+              _step(l.weightG != null ? LucideIcons.trash2 : LucideIcons.minus, l.weightG != null ? 'Remove ${l.name}' : 'One less ${l.name}', () => _qty(l, l.qty - 1)),
+              if (l.weightG == null) ...[
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Text('${l.qty}', style: inter(16, 700))),
+                _step(LucideIcons.plus, 'One more ${l.name}', () => _qty(l, l.qty + 1)),
+              ],
+              SizedBox(
+                width: 68,
+                child: Text(rupees(l.weightG != null ? cart.lineEstimate(l) : (num.tryParse('${priced[l.menuItemId]?['amount'] ?? ''}') ?? cart.lineEstimate(l))),
+                    textAlign: TextAlign.right, style: inter(15, 800)),
+              ),
             ]),
           ),
         if (q != null)
@@ -610,7 +622,7 @@ class _CartsScreenState extends State<CartsScreen> {
                   if (c != null) ...[
                     if (_billItems.contains(c.id)) ...[
                       if (c.isEmpty) Text(tr('No items yet.'), style: inter(13, 400, color: kMuted)),
-                      for (final l in c.lines) line('${l.qty}× ${l.name}', (c.unitPrice[l.menuItemId] ?? 0) * l.qty),
+                      for (final l in c.lines) line('${l.qty}× ${l.name}', c.lineEstimate(l)),
                       const SizedBox(height: 6),
                     ],
                     Row(children: [

@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../catalogue/catalogue_api.dart';
 import '../orders/order_widgets.dart';
 import '../ui/barcode_scanner.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
 import 'cart_customer.dart';
+import '../barcodes/barcode_sheets.dart';
+import '../barcodes/barcodes_screen.dart' show BarcodeDetailsScreen, LinkCodeScreen;
+import '../barcodes/barcodes_api.dart';
+import '../auth/partner_api.dart';
 import 'carts_screen.dart';
 import '../shift/shift_api.dart';
 import '../shift/shift_screens.dart';
@@ -22,15 +25,6 @@ import '../ui/i18n.dart';
 
 /// The Bill's scan button: the camera reads a barcode (null when closed). Tests replace it.
 Future<String?> Function(BuildContext context) scanForSale = scanBarcode;
-
-/// A scanned barcode's System Code, from the catalogue (null when no product has it). Tests replace it.
-Future<String?> Function(String code) systemCodeForBarcode = (code) async {
-  try {
-    return (await CatalogueApi().lookup(code)).sku;
-  } catch (_) {
-    return null;
-  }
-};
 
 /// Figma "439 Sell" / "444 Discount": the till. Search or scan, pick a category, tap ADD; the Current Cart bar shows the server's total and
 /// leads to payment. A cart that is not paid can be held (saved unpaid on the server).
@@ -175,27 +169,61 @@ class _SellScreenState extends State<SellScreen> {
     if (ok == true && mounted) await _loadShift();
   }
 
-  /// Scan with the camera: the product with that barcode (or System Code) goes into the cart; anything else is left in the search box.
+  /// Scan with the camera (30 Oct 2026): a weigh label adds that pack at its weight; a store or pack code adds its item; a code no item has
+  /// can be linked to one of the store's items on the spot.
   Future<void> _scan() async {
     final code = (await scanForSale(context))?.trim() ?? '';
     if (code.isEmpty || !mounted) return;
-    final sku = await systemCodeForBarcode(code) ?? code;
     try {
-      final c = await env.sell.catalog(q: sku);
-      final hit = c.items.where((i) => i.sku.toLowerCase() == sku.toLowerCase()).firstOrNull;
+      final r = await env.barcodes.resolve(code);
       if (!mounted) return;
-      if (hit != null) {
+      final item = _sellItem(r.item);
+      if (r.weighed) {
         if (!await _haveCustomer() || !mounted) return;
-        await _add(hit);
-        if (mounted) showToast(context, '${hit.name} added.');
+        cart.addWeighed(item, r.weightG!);
+        _changedCart();
+        showToast(context, '${item.name} · ${weightText(r.weightG!)} added.');
         return;
       }
-      _search.text = code;
-      _load();
-      showToast(context, 'No product has the code $code.');
+      await _add(item);
+      if (mounted && !item.loose) showToast(context, '${item.name} added.');
+    } on PartnerApiException catch (e) {
+      if (!mounted) return;
+      if (e.status != 404 || RegExp(r'^21\d{11}$').hasMatch(code)) return showToast(context, e.message);
+      // a pack code the store has not saved yet: say so, and offer to link it to an item (store-level only)
+      showToast(context, 'No item has the code $code.', actionLabel: 'Link it', onAction: () => _link(code));
     } catch (e) {
       if (mounted) showToast(context, sellErrorText(e));
     }
+  }
+
+  SellItem _sellItem(BcItem i) =>
+      _catalog?.items.where((s) => s.id == i.id).firstOrNull ??
+      SellItem(id: i.id, name: i.name, sku: i.sku, price: i.price, category: '', available: true, imageUrl: i.imageUrl, loose: i.loose, plu: i.plu, barcode: i.barcode);
+
+  BcItem _bcItem(SellItem i) => BcItem({
+        'menu_item_id': i.id, 'name': i.name, 'sku': i.sku, 'price': i.price, 'image_url': i.imageUrl, 'barcode': i.barcode,
+        'loose': i.loose, 'plu': i.plu, 'mrp_minor': _facts[i.id]?.mrp == null ? null : (_facts[i.id]!.mrp! * 100).round(),
+      });
+
+  Future<void> _link(String code) async {
+    final saved = await Navigator.of(context).push<BcItem>(MaterialPageRoute(builder: (_) => LinkCodeScreen(api: env.barcodes, code: code)));
+    if (saved == null || !mounted) return;
+    showToast(context, '$code saved on ${saved.name}.');
+    await _load();
+    if (mounted) await _add(_sellItem(saved));
+  }
+
+  /// Long-press a product (30 Oct 2026): its Barcode Details: make one, see it, print it; loose items also weigh-and-label. Selling stays a tap.
+  Future<void> _barcodeFor(SellItem item) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => BarcodeDetailsScreen(api: env.barcodes, item: _bcItem(item), store: env.storeLine)));
+    if (mounted) _load(); // it may have a new code, or be sold loose now
+  }
+
+  void _changedCart() {
+    env.carts.changed();
+    _quote = null;
+    _requote();
   }
 
   /// A cart starts with its customer (founder, 29 Oct 2026): the mobile number first; the name is optional. A vendor in a hurry may skip it,
@@ -221,6 +249,15 @@ class _SellScreenState extends State<SellScreen> {
 
   Future<void> _add(SellItem item) async {
     if (!await _haveCustomer()) return;
+    if (item.loose) {
+      // sold loose: weigh this pack (or scan its weigh label); each pack is its own line
+      if (!mounted) return;
+      final g = await showWeighSheet(context, env.barcodes, _bcItem(item), store: env.storeLine);
+      if (g == null || !mounted) return;
+      cart.addWeighed(item, g);
+      _changedCart();
+      return;
+    }
     cart.add(item);
     env.carts.changed();
     _quote = null;
@@ -286,7 +323,7 @@ class _SellScreenState extends State<SellScreen> {
   /// Savings against MRP for what is in the cart ("Atta 5kg: ₹15 off MRP"): the selling price is below the printed MRP.
   List<(String, num)> get _savings => [
         for (final l in cart.lines)
-          if ((_facts[l.menuItemId]?.mrp ?? 0) > (cart.unitPrice[l.menuItemId] ?? double.infinity))
+          if (l.weightG == null && (_facts[l.menuItemId]?.mrp ?? 0) > (cart.unitPrice[l.menuItemId] ?? double.infinity))
             (l.name, (_facts[l.menuItemId]!.mrp! - cart.unitPrice[l.menuItemId]!) * l.qty),
       ];
 
@@ -424,7 +461,8 @@ class _SellScreenState extends State<SellScreen> {
                     inCart: cart.lines.where((l) => l.menuItemId == _items[i].id).firstOrNull?.qty ?? 0,
                     why: _why(_items[i]),
                     onAdd: () => _add(_items[i]),
-                    onLess: () => _less(_items[i])),
+                    onLess: () => _less(_items[i]),
+                    onLongPress: () => _barcodeFor(_items[i])),
               ),
       ),
     ]);
@@ -590,10 +628,13 @@ class _Shortcut extends StatelessWidget {
 /// A product on the till (founder, 27 Oct 2026): the whole card is the button (no ADD). In the cart it turns green, with a gradient
 /// border, the count in its corner and a small − to take one back. [why] tags a related product ("Bought together", "Popular").
 class ProductCard extends StatelessWidget {
-  const ProductCard({super.key, required this.item, required this.onAdd, this.onLess, this.inCart = 0, this.facts, this.why});
+  const ProductCard({super.key, required this.item, required this.onAdd, this.onLess, this.onLongPress, this.inCart = 0, this.facts, this.why});
   final SellItem item;
   final VoidCallback onAdd;
   final VoidCallback? onLess;
+
+  /// Long-press: the item's barcode sheet (make, see, print; weigh labels for loose items).
+  final VoidCallback? onLongPress;
   final int inCart;
   final SellFacts? facts;
   final String? why;
@@ -656,6 +697,7 @@ class ProductCard extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => _tap(context),
+            onLongPress: onLongPress,
             child: Padding(
               padding: const EdgeInsets.all(6),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -724,7 +766,7 @@ class ProductCard extends StatelessWidget {
                           Text(rupees(mrp), style: inter(12.5, 600, color: kKicker).copyWith(decoration: TextDecoration.lineThrough, decorationColor: kKicker)),
                           const SizedBox(width: 5),
                         ],
-                        Text(rupees(item.price), style: inter(15, 800)),
+                        Text(item.loose ? '${rupees(item.price)}/kg' : rupees(item.price), style: inter(15, 800)),
                       ]),
                     ),
                   ),

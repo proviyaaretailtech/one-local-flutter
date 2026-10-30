@@ -9,6 +9,8 @@ import 'catalogue_api.dart';
 import 'catalogue_format.dart';
 import 'catalogue_widgets.dart';
 import 'item_photo.dart';
+import '../media/media_api.dart';
+import '../media/product_photos_screen.dart' show pickStandardPhoto;
 import 'item_sheets.dart' show parsePriceMinor;
 import '../ui/i18n.dart';
 
@@ -16,7 +18,7 @@ import '../ui/i18n.dart';
 /// Also used to change an existing item (Quick edit, Edit catalogue details): [item] pre-fills the form and carries its version.
 /// The screen only collects and sends; the database decides what is valid (tax needed to save, price not above MRP, unique SKU and barcode).
 class ItemFormScreen extends StatefulWidget {
-  const ItemFormScreen({super.key, this.api, this.item, this.onNavigate, this.photos = const DeviceItemPhotos(), this.scan = scanBarcode, this.barcode});
+  const ItemFormScreen({super.key, this.api, this.item, this.onNavigate, this.photos = const DeviceItemPhotos(), this.scan = scanBarcode, this.barcode, this.media});
   final CatalogueApi? api;
   final CatItem? item;
   final ValueChanged<String>? onNavigate;
@@ -26,6 +28,9 @@ class ItemFormScreen extends StatefulWidget {
 
   /// Choosing the product photo, removing its background, attaching it to the saved item.
   final ItemPhotoService photos;
+
+  /// The Standard pool of approved photos (30 Oct 2026); null: the live one.
+  final MediaApi? media;
 
   /// The barcode field's scan button: opens the camera and answers the code read (null when closed).
   final Future<String?> Function(BuildContext) scan;
@@ -242,6 +247,24 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     }
   }
 
+  /// A photo OneLocal approved for this product (Standard pool), put on the saved item at once.
+  Future<void> _standardPhoto() async {
+    final item = widget.item;
+    if (item == null) return;
+    final url = await pickStandardPhoto(context, widget.media ?? MediaApi(), itemId: item.id, itemName: _name.text.trim().isEmpty ? item.name : _name.text.trim());
+    if (url == null || !mounted) return;
+    setState(() {
+      _savedUrl = url;
+      _photo = null;
+      _dropSaved = false;
+    });
+    showToast(context, 'Standard photo put on the item.');
+  }
+
+  Widget _standardLink() => widget.item == null
+      ? const SizedBox.shrink()
+      : _smallAction(LucideIcons.images, 'Use a standard photo', _photoBusy ? null : _standardPhoto, const ValueKey('item-photo-standard'));
+
   Widget _photoBox() {
     final p = _photo, saved = _savedUrl;
     Widget frame(Widget image) => Container(
@@ -260,6 +283,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             _smallAction(LucideIcons.refreshCw, 'Replace photo', _pickPhoto, const ValueKey('item-photo-replace')),
+            _standardLink(),
             _smallAction(LucideIcons.trash2, 'Remove photo', () => setState(() {
               _savedUrl = null;
               _dropSaved = true;
@@ -269,7 +293,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
       ]);
     }
     if (p == null) {
-      return AddPhotoBox(key: const ValueKey('item-photo-add'), onTap: _pickPhoto);
+      if (widget.item == null) return AddPhotoBox(key: const ValueKey('item-photo-add'), onTap: _pickPhoto);
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [AddPhotoBox(key: const ValueKey('item-photo-add'), onTap: _pickPhoto), _standardLink()]);
     }
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       frame(Image.memory(p.bytes, fit: BoxFit.contain, errorBuilder: (_, _, _) => broken)),

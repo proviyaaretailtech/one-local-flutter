@@ -19,6 +19,8 @@ import 'package:vinii_pos/sell/search_screen.dart';
 import 'package:vinii_pos/sell/sell_api.dart';
 import 'package:vinii_pos/sell/sell_carts.dart';
 import 'package:vinii_pos/sell/sell_screen.dart';
+import 'package:vinii_pos/barcodes/barcodes_api.dart' show weightText;
+import 'package:vinii_pos/stock/labels_screens.dart' show printLabelPdf;
 import 'package:vinii_pos/settings/store_qr.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
@@ -642,23 +644,16 @@ void main() {
 
   group('Bill search and scan', () {
     testWidgets('the scan button reads a barcode with the camera and puts that product in the cart; the cart bar opens the carts', (t) async {
-      final realScan = scanForSale, realLookup = systemCodeForBarcode;
-      addTearDown(() {
-        scanForSale = realScan;
-        systemCodeForBarcode = realLookup;
-      });
-      final scanned = <String>[];
+      final realScan = scanForSale;
+      addTearDown(() => scanForSale = realScan);
       scanForSale = (_) async => '8901262150019';
-      systemCodeForBarcode = (code) async {
-        scanned.add(code);
-        return 'AB500';
-      };
-      final env = Till().env();
+      final till = Till();
+      final env = till.env();
       await tall(t, SellScreen(env: env));
       expect(find.byIcon(LucideIcons.search), findsWidgets); // search on the left
       await t.tap(find.byKey(const ValueKey('sell-scan'))); // the barcode button on the right
       await t.pumpAndSettle();
-      expect(scanned, ['8901262150019']);
+      expect(jsonDecode(till.where('POST', '/rpc/bc_resolve').single.body)['code'], '8901262150019');
       expect(env.carts.active.lines.single.name, 'Amul Butter 500g');
       expect(find.text('Amul Butter 500g added.'), findsOneWidget);
       // the wallet bar: this cart, and a tap opens cart management
@@ -668,21 +663,115 @@ void main() {
       expect(find.byType(CartsScreen), findsOneWidget);
     });
 
-    testWidgets('a code no product has is left in the search box', (t) async {
-      final realScan = scanForSale, realLookup = systemCodeForBarcode;
-      addTearDown(() {
-        scanForSale = realScan;
-        systemCodeForBarcode = realLookup;
-      });
-      scanForSale = (_) async => '0000000000';
-      systemCodeForBarcode = (_) async => null;
-      final env = Till().env();
+    testWidgets('a code no item has: the Bill offers to link it to one of the store\'s items, then adds that item', (t) async {
+      final realScan = scanForSale;
+      addTearDown(() => scanForSale = realScan);
+      scanForSale = (_) async => '8901000000001';
+      final till = Till();
+      final env = till.env();
+      await tall(t, SellScreen(env: env));
+      await t.tap(find.byKey(const ValueKey('sell-scan')));
+      await t.pump();
+      expect(env.carts.active.isEmpty, isTrue);
+      expect(find.text('No item has the code 8901000000001.'), findsOneWidget);
+      await t.pump(const Duration(seconds: 1)); // the toast has risen
+      await t.tap(find.text('Link it'));
+      await t.pumpAndSettle();
+      expect(find.text('No item found for this code'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('link-item-m1')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('link-confirm')));
+      await t.pumpAndSettle();
+      final sent = jsonDecode(till.where('POST', '/rpc/bc_link').single.body) as Map<String, dynamic>;
+      expect([sent['menu_item_id'], sent['code']], ['m1', '8901000000001']);
+      expect(env.carts.active.lines.single.name, 'Coca-Cola 500ml');
+    });
+
+    testWidgets('a weigh label adds that pack at its weight; the bill sends the grams and prices it per kg', (t) async {
+      final realScan = scanForSale;
+      addTearDown(() => scanForSale = realScan);
+      scanForSale = (_) async => '2100003012507';
+      final till = Till();
+      final env = till.env();
       await tall(t, SellScreen(env: env));
       await t.tap(find.byKey(const ValueKey('sell-scan')));
       await t.pumpAndSettle();
-      expect(env.carts.active.isEmpty, isTrue);
-      expect(find.text('No product has the code 0000000000.'), findsOneWidget);
+      final line = env.carts.active.lines.single;
+      expect([line.name, line.qty, line.weightG], ['Basmati Rice Loose · 1.250 kg', 1, 1250]);
+      expect(env.carts.active.lineEstimate(line), 112.5);
+      expect((jsonDecode(till.where('POST', '/pos-orders/quote').last.body)['lines'] as List).single, {'menu_item_id': 'm9', 'qty': 1, 'weight_g': 1250});
     });
+
+    testWidgets('tapping a loose item weighs it: type the kg (or tap 500 g), see the amount, add the pack', (t) async {
+      final till = Till();
+      till.override = (r) => r.url.path.endsWith('/rpc/pos_sell_catalog') ? ok({'items': [...sellItems, looseRice], 'categories': ['Grocery']}) : null;
+      final env = till.env();
+      await tall(t, SellScreen(env: env));
+      expect(find.text('${rupees(90)}/kg'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('product-m9')));
+      await t.pumpAndSettle();
+      expect(find.text('Weigh Basmati Rice Loose'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('weigh-add')));
+      await t.pumpAndSettle();
+      expect(find.text('Enter the weight in kg, from 0.001 to 99.999.'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('weigh-0.5')));
+      await t.pump();
+      expect(find.text(rupees(45)), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('weigh-kg')), '1.25');
+      await t.pump();
+      expect(find.text(rupees(112.5)), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('weigh-add')));
+      await t.pumpAndSettle();
+      expect(env.carts.active.lines.single.weightG, 1250);
+      // a second pack is its own line
+      await t.tap(find.byKey(const ValueKey('product-m9')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('weigh-1')));
+      await t.tap(find.byKey(const ValueKey('weigh-add')));
+      await t.pumpAndSettle();
+      expect(env.carts.active.lines.map((l) => l.weightG), [1250, 1000]);
+    });
+
+    testWidgets('long-press a product: its Barcode Details make a store code, and printing is optional', (t) async {
+      final realPrint = printLabelPdf;
+      addTearDown(() => printLabelPdf = realPrint);
+      final printed = <String>[];
+      printLabelPdf = (pdf, name) async => printed.add(name);
+      final till = Till();
+      final env = till.env();
+      await tall(t, SellScreen(env: env));
+      await t.longPress(find.byKey(const ValueKey('product-m2')));
+      await t.pumpAndSettle();
+      expect(find.text('No barcode yet'), findsOneWidget);
+      expect(env.carts.active.isEmpty, isTrue); // a long-press never sells
+      await t.tap(find.byKey(const ValueKey('details-make')));
+      await t.pumpAndSettle();
+      expect(jsonDecode(till.where('POST', '/rpc/bc_make').single.body)['menu_item_id'], 'm2');
+      expect(find.text('2000000000022'), findsWidgets);
+      await t.tap(find.byKey(const ValueKey('details-print')));
+      await t.pumpAndSettle();
+      expect(printed, ['Barcode labels']);
+      await t.tap(find.byKey(const ValueKey('app-header-back')));
+      await t.pumpAndSettle();
+      expect(find.text('Barcode Details'), findsNothing);
+    });
+  });
+
+  test('a weighed pack: its own line, one pack, priced per kg; it travels with its grams', () {
+    final c = SellCart(id: 'c', number: 1);
+    final rice = SellItem.fromJson(looseRice);
+    c.addWeighed(rice, 750);
+    c.addWeighed(rice, 2000);
+    c.add(SellItem.fromJson(sellItems[0]));
+    expect(c.lines.length, 3);
+    expect(c.lineEstimate(c.lines[0]), 67.5);
+    expect(c.estimate, 67.5 + 180 + 40);
+    c.setQty(c.lines[0], 3);
+    expect(c.lines[0].qty, 1);
+    expect(c.lines[0].toJson(), {'menu_item_id': 'm9', 'qty': 1, 'weight_g': 750});
+    expect(c.lines[2].toJson(), {'menu_item_id': 'm1', 'qty': 1});
+    expect(weightText(500), '500 g');
+    expect(weightText(1250), '1.250 kg');
   });
 
   group('Carts', () {
@@ -725,6 +814,22 @@ void main() {
       await t.pumpAndSettle();
       expect(env.carts.active, parked);
       expect(find.byKey(const ValueKey('wallet-active')), findsOneWidget);
+    });
+
+    testWidgets('PAY is on the active cart card: off while the cart is empty, opens the bill once it has items', (t) async {
+      final till = Till();
+      final env = till.env();
+      await tall(t, CartsScreen(env: env));
+      expect(find.byKey(const ValueKey('cart-pay')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('cart-pay')));
+      await t.pumpAndSettle();
+      expect(find.byType(PayScreen), findsNothing);
+      cartWith(env.carts);
+      env.carts.changed();
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cart-pay')));
+      await t.pumpAndSettle();
+      expect(find.byType(PayScreen), findsOneWidget);
     });
 
     testWidgets('the customer on any card is edited from the card: the active cart here, a held bill on the server', (t) async {

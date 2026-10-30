@@ -5,11 +5,16 @@ import '../orders/orders_api.dart';
 
 /// One sellable item as the search route describes it (`GET /api/partner/sell/catalog`).
 class SellItem {
-  const SellItem({required this.id, required this.name, required this.sku, required this.price, required this.category, required this.available, this.imageUrl});
+  const SellItem({required this.id, required this.name, required this.sku, required this.price, required this.category, required this.available, this.imageUrl, this.loose = false, this.plu, this.barcode});
   final String id, name, sku, category;
   final num price;
   final bool available;
   final String? imageUrl;
+
+  /// Sold loose, by weight (30 Oct 2026): [price] is per kg and each pack is weighed; [plu] is its number on weigh labels.
+  final bool loose;
+  final int? plu;
+  final String? barcode;
 
   factory SellItem.fromJson(Map<String, dynamic> j) => SellItem(
         id: j['id'] as String,
@@ -19,6 +24,9 @@ class SellItem {
         category: (j['category'] ?? '') as String,
         available: j['available'] != false,
         imageUrl: j['image_url'] as String?,
+        loose: j['loose'] == true,
+        plu: (j['plu'] as num?)?.toInt(),
+        barcode: j['barcode'] as String?,
       );
 }
 

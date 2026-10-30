@@ -59,7 +59,12 @@ function lines(v: unknown) {
   return v.map(l => {
     const id = uuid((l as Row)?.menu_item_id), qty = Number((l as Row)?.qty);
     if (!id || !Number.isInteger(qty) || qty < 1 || qty > 99) throw new HttpError(400, 'Each item needs a quantity from 1 to 99.', undefined, 'bad_quantity');
-    return { menu_item_id: id, qty };
+    // a weighed pack of a loose item (30 Oct 2026): its weight in grams; the database prices it per kg
+    const w = (l as Row)?.weight_g;
+    if (w === undefined || w === null) return { menu_item_id: id, qty };
+    const g = Number(w);
+    if (!Number.isInteger(g) || g < 1 || g > 99999) throw new HttpError(400, 'A weight is 1 g to 99.999 kg.', undefined, 'bad_quantity');
+    return { menu_item_id: id, qty, weight_g: g };
   });
 }
 function requiredKey(request: Request) {

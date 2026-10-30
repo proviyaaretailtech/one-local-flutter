@@ -66,12 +66,16 @@ import 'stock/closing_stock_screen.dart';
 import 'tables/manage_tables_screen.dart';
 import 'tables/table_widgets.dart';
 import 'team/team_screens.dart';
+import 'barcodes/barcodes_screen.dart';
+import 'media/product_photos_screen.dart';
 import 'team/team_widgets.dart';
 
 /// Connects the sections to each other. Each section only knows its own screens; this file plugs
 /// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J), money (K), the team (L), the storefront (M), notices (N) and settings and support (P) into the [HomeNav] hooks.
 /// workspace setup (C), the control centre (D), orders (E), the catalogue and GRN (G), low stock (J) and the restaurant menu into the [HomeNav] hooks.
 void installRoutes() {
+  HomeNav.productPhotos = (c) => Navigator.of(c).push(ProductPhotosScreen.route());
+  HomeNav.barcodes = (c) => Navigator.of(c).push(BarcodesScreen.route(store: HomeNav.storeName ?? ''));
   // Home: inside the app shell, its Home tab; otherwise (after setup, first entry) the shell replaces everything.
   HomeNav.home = (c) {
     if (_inShell('Home')) return;

@@ -39,6 +39,9 @@ Future<void> showStoreSideNav(
     SideNavEntry(LucideIcons.qrCode, 'All Orders', hook(HomeNav.orderHistory ?? HomeNav.orders)),
     SideNavEntry(LucideIcons.indianRupee, 'Money', hook(HomeNav.money)),
     SideNavEntry(LucideIcons.circleUser, 'Customer', hook(HomeNav.customers)),
+    // barcodes for the store's own and loose items (founder, 30 Oct 2026)
+    SideNavEntry(LucideIcons.scanBarcode, 'Barcodes', hook(HomeNav.barcodes)),
+    SideNavEntry(LucideIcons.images, 'Product photos', hook(HomeNav.productPhotos)),
     // how the shop looks to customers (founder, 27 Oct 2026): next to the customers it is for
     // Page Manager (founder, 28 Oct 2026; was Business profile): the shop's OneLocal page, ads and offers from one dashboard
     SideNavEntry(LucideIcons.layoutDashboard, 'Page Manager', hook(HomeNav.businessProfile ?? HomeNav.storefront)),
