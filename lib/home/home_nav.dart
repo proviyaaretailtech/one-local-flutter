@@ -95,6 +95,10 @@ class HomeNav {
   static HomeRoute? kitchen;
   // Side nav: customers, the One Local Wallet and Manage account (plugged by lib/account/routes.dart).
   static HomeRoute? customers;
+  // Side menu → Barcodes (30 Oct 2026): store codes, loose items, custom barcodes.
+  static HomeRoute? barcodes;
+  // Side menu → Product photos (30 Oct 2026): the store's photos, the Standard pool, OneLocal's review.
+  static HomeRoute? productPhotos;
   static HomeRoute? wallet;
 
   /// Side menu → Subscription plans (founder, 28 Oct 2026).

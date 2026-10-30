@@ -10,6 +10,8 @@ const reason = z.string({ message: 'Say why the bill is on hold.' }).trim().max(
 const lines = z.array(z.object({
   menu_item_id: id,
   qty: z.number({ message: 'Each item needs a quantity from 1 to 99.' }).int('Each item needs a quantity from 1 to 99.').min(1, 'Each item needs a quantity from 1 to 99.').max(99, 'Each item needs a quantity from 1 to 99.'),
+  // kept so the database can refuse changing a bill with weighed packs (instead of the weight being dropped here)
+  weight_g: z.number().int().min(1).max(99999).optional(),
 }), { message: 'Add between 1 and 50 items.' }).min(1, 'Add between 1 and 50 items.').max(50, 'Add between 1 and 50 items.');
 
 export const Board = z.object({

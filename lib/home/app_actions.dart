@@ -82,6 +82,8 @@ List<AppAction> appActions(BuildContext context, {VoidCallback? onReports}) {
   add(LucideIcons.chartColumn, 'Money reports', 'Money', 'reports gst tax sales report finance', money('reports'));
 
   // the rest of the side menu
+  add(LucideIcons.scanBarcode, 'Barcodes', 'Side menu', 'barcode make generate create custom code sticker loose weigh weight plu kg label print', route(HomeNav.barcodes));
+  add(LucideIcons.images, 'Product photos', 'Side menu', 'photos images pictures media pool standard share offer approve product photo', route(HomeNav.productPhotos));
   add(LucideIcons.circleUser, 'Customers', 'Side menu', 'customers grahak contacts credit khata', route(HomeNav.customers));
   add(LucideIcons.fileText, 'Reports', 'Side menu', 'reports sales analytics best sellers', onReports);
   add(LucideIcons.users, 'Team', 'Side menu', 'team staff users roles invite cashier manager employee', route(HomeNav.team));

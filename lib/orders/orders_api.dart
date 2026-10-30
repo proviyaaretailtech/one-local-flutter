@@ -204,10 +204,13 @@ class CatalogItem {
 
 /// A line the person is building (not placed). Only the item and the quantity go to the server; it sets the price.
 class CartLine {
-  CartLine({required this.menuItemId, required this.name, this.qty = 1});
+  CartLine({required this.menuItemId, required this.name, this.qty = 1, this.weightG});
   final String menuItemId, name;
   int qty;
-  Map<String, dynamic> toJson() => {'menu_item_id': menuItemId, 'qty': qty};
+
+  /// A weighed pack of a loose item (30 Oct 2026): its weight in grams. Such a line is one pack (qty 1), priced per kg by the database.
+  final int? weightG;
+  Map<String, dynamic> toJson() => {'menu_item_id': menuItemId, 'qty': qty, 'weight_g': ?weightG};
 }
 
 /// Calls One Local's server (`/api/partner/pos-orders/*`). The Supabase session token is the only credential; the server and the

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:vinii_pos/barcodes/barcodes_api.dart';
 import 'package:vinii_pos/orders/orders_api.dart';
 import 'package:vinii_pos/sell/sell_api.dart';
 import 'package:vinii_pos/sell/sell_carts.dart';
@@ -23,6 +24,12 @@ const sellItems = [
   {'id': 'm2', 'name': 'Amul Butter 500g', 'sku': 'AB500', 'price': 280, 'category': 'Dairy', 'available': true, 'image_url': null},
   {'id': 'm3', 'name': 'Cadbury Dairy Milk', 'sku': 'CDM50', 'price': 10, 'category': 'Snacks', 'available': false, 'image_url': null},
 ];
+
+/// A loose item (sold by weight, ₹90 per kg) and the barcode functions' view of an item.
+const looseRice = {'id': 'm9', 'name': 'Basmati Rice Loose', 'sku': 'RICE', 'price': 90, 'category': 'Grocery', 'available': true, 'image_url': null, 'loose': true, 'plu': 3};
+Map<String, dynamic> bcItem(Map<String, dynamic> i, {String? barcode, String? source}) => {
+      'menu_item_id': i['id'], 'name': i['name'], 'sku': i['sku'], 'price': i['price'], 'image_url': null, 'category': i['category'],
+      'barcode': barcode ?? i['barcode'], 'barcode_source': source, 'plu': i['plu'], 'loose': i['loose'] == true, 'selling_unit': i['loose'] == true ? 'kg' : 'pc'};
 
 Map<String, dynamic> receipt(String id, String no, String name, num total, {String status = 'paid', String label = 'Paid · UPI', num paid = -1, num refunded = 0, List<Map<String, dynamic>>? items, String? coupon, num discount = 0}) => {
       // a row of pos_receipt_list as the database returns it
@@ -135,6 +142,29 @@ class Till {
       return ok(intentRow(status: st == 'cancelled' ? 'cancelled' : 'failed', attempt: {'status': st, 'code': '', 'message': 'Not received'}));
     }
     if (p.endsWith('/rpc/pos_refund_check')) return ok({'allowed': true, 'purpose': body()['purpose'] ?? 'refund', 'reasons': [], 'display_no': 'P-00087', 'total': 630, 'taken': 630, 'refunded': 0, 'refundable_left': 630, 'return_days': 7, 'days_since_paid': 0});
+    // store barcodes and loose items (30 Oct 2026)
+    if (p.endsWith('/rpc/bc_resolve')) {
+      final code = '${body()['code']}';
+      if (code == '8901262150019') return ok({'kind': 'item', 'code': code, 'item': bcItem(sellItems[1], barcode: code)});
+      if (code == '2100003012507') return ok({'kind': 'weight', 'code': code, 'weight_g': 1250, 'weight_text': '1.250 kg', 'amount': 112.5, 'item': bcItem(looseRice)});
+      return err(404, 'No item has the code $code.', 'not_found');
+    }
+    if (p.endsWith('/rpc/bc_list')) {
+      final tab = body()['tab'] ?? 'missing';
+      final all = [bcItem(sellItems[0], barcode: '2000000000015', source: 'generated'), bcItem(sellItems[1]), bcItem(looseRice)];
+      return ok({'items': tab == 'missing' ? all.where((i) => i['barcode'] == null).toList() : tab == 'loose' ? [all[2]] : all, 'counts': {'all': 3, 'missing': 2, 'loose': 1}});
+    }
+    if (p.endsWith('/rpc/bc_make')) return ok(bcItem(sellItems.firstWhere((i) => i['id'] == body()['menu_item_id'], orElse: () => looseRice), barcode: '2000000000022', source: 'generated'));
+    if (p.endsWith('/rpc/bc_make_all')) return ok({'made': 2});
+    if (p.endsWith('/rpc/bc_link')) {
+      final b = body();
+      return ok(bcItem(sellItems.firstWhere((i) => i['id'] == b['menu_item_id']), barcode: '${b['code']}', source: 'linked'));
+    }
+    if (p.endsWith('/rpc/bc_custom')) return ok({'code': body()['code'] ?? '2000000000039', 'used_by': null});
+    if (p.endsWith('/rpc/bc_weigh_label')) {
+      final g = body()['weight_g'] as int;
+      return ok({'code': '21000030${g.toString().padLeft(5, '0')}0', 'weight_g': g, 'weight_text': weightText(g), 'plu': 3, 'price_per_kg': 90, 'amount': 90 * g / 1000, 'item': bcItem(looseRice)});
+    }
     if (p.endsWith('/rpc/pos_hold_update')) return ok({'order_id': orderId, 'updated_at': '2026-10-27T10:00:00Z', 'changed': false, 'replayed': false});
     if (p.contains('/pos-orders/') && m == 'GET') return ok(view('checkout'));
     return err(404, 'unexpected ${r.method} $p');
@@ -146,6 +176,7 @@ class Till {
         sell: SellApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
         orders: OrdersApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
         shift: ShiftApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
+        barcodes: BarcodesApi(baseUrl: 'http://pos.test', accessToken: () => 'tok', client: client),
         carts: carts ?? (SellCarts()..active.customerPhone = walkInPhone), // a cart starts with its customer's number
         onTab: onTab,
         branchName: 'Latur Main Branch',

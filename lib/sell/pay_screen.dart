@@ -243,7 +243,7 @@ class _PayScreenState extends State<PayScreen> {
     final order = _order, cart = widget.cart;
     if (order != null) return [for (final i in order.items) (i['name'].toString(), (i['qty'] as num).toInt(), (i['amount'] as num))];
     final priced = {for (final l in _quote?.lines ?? const <Map<String, dynamic>>[]) l['menu_item_id']: l};
-    return [for (final l in cart!.lines) (l.name, l.qty, num.tryParse('${priced[l.menuItemId]?['amount'] ?? 0}') ?? 0)];
+    return [for (final l in cart!.lines) (l.name, l.qty, l.weightG != null ? cart.lineEstimate(l) : num.tryParse('${priced[l.menuItemId]?['amount'] ?? 0}') ?? 0)];
   }
 
   /// The bill as a WhatsApp message (founder, 29 Oct 2026): the store, the date and day, every item, the totals and how it is paid.

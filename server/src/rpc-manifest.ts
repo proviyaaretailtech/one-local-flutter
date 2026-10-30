@@ -20,6 +20,8 @@ import * as su from './schemas/setup.ts';
 import * as inv from './schemas/inventory.ts';
 import * as kit from './schemas/kitchen.ts';
 import * as cat from './schemas/catalogue.ts';
+import * as bc from './schemas/barcodes.ts';
+import * as media from './schemas/media.ts';
 import * as grn from './schemas/grn.ts';
 import * as tbl from './schemas/tables.ts';
 import * as bo from './schemas/backoffice.ts';
@@ -161,6 +163,23 @@ export const MANIFEST: Entry[] = [
   db('cat_item_list', { args: cat.List, map: P, rate: 'read', roles: STAFF }),
   db('cat_item_view', { args: cat.View, map: P, rate: 'read', roles: STAFF }),
   db('cat_item_lookup', { args: cat.Lookup, map: P, rate: 'read', roles: STAFF }),
+  // ---- store barcodes and loose (weighed) items (30 Oct 2026): store-level codes only, never the master library's GTINs
+  db('bc_list', { args: bc.List, map: P, rate: 'read', roles: STAFF }),
+  db('bc_resolve', { args: bc.Resolve, map: P, rate: 'read', roles: STAFF }),
+  db('bc_custom', { args: bc.Custom, map: P, rate: 'write', roles: 'staff; saving onto an item needs menu:update' }),
+  db('bc_weigh_label', { args: bc.WeighLabel, map: P, rate: 'write', roles: STAFF }),
+  db('bc_make', { args: bc.Make, map: P, rate: 'write', roles: 'staff with menu:update' }),
+  db('bc_make_all', { args: bc.MakeAll, map: P, rate: 'write', roles: 'staff with menu:update' }),
+  db('bc_link', { args: bc.Link, map: P, rate: 'write', roles: 'staff with menu:update' }),
+  db('bc_set_loose', { args: bc.SetLoose, map: P, rate: 'write', roles: 'staff with menu:update' }),
+  // ---- product media pool (30 Oct 2026): Store Media Pool -> offered to the Master Media Pool -> approved into the Standard Data pool
+  db('media_store_pool', { args: media.StorePool, map: P, rate: 'read', roles: STAFF }),
+  db('media_standard_search', { args: media.Search, map: P, rate: 'read', roles: STAFF }),
+  db('media_offer', { args: media.Offer, map: P, rate: 'write', roles: 'staff with menu:update' }),
+  db('media_withdraw', { args: media.Withdraw, map: P, rate: 'write', roles: 'staff with menu:update' }),
+  db('media_use', { args: media.Use, map: P, rate: 'write', roles: 'staff with menu:update' }),
+  db('media_admin_queue', { args: media.Queue, map: P, rate: 'read', roles: 'OneLocal platform admins (the function checks)' }),
+  db('media_admin_decide', { args: media.Decide, map: P, rate: 'write', roles: 'OneLocal platform admins (the function checks)' }),
   db('cat_item_save', { args: cat.Save, map: P, rate: 'write', idem: true, roles: 'staff with menu:create (new) or menu:update (change)' }),
   // Item form "Remove background (AI)": remove.bg with REMOVE_BG_API_KEY (server only); a photo up to 5 MB, nothing saved.
   sec('cat_image_remove_bg', { args: cat.RemoveBg, rate: 'secure', roles: 'active staff of a business (checked on the server)', maxBytes: 7 * 1024 * 1024 + 64 * 1024 }),
