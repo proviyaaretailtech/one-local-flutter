@@ -46,6 +46,7 @@ import * as sh from './schemas/shift.ts';
 import * as ord from './schemas/orders.ts';
 import * as gst from './schemas/guest.ts';
 import * as mp from './schemas/maps.ts';
+import * as rep from './schemas/reports.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -551,6 +552,14 @@ export const MANIFEST: Entry[] = [
   db('rst_home_insights', { args: rst.DashboardScope, map: P, rate: 'read', roles: STAFF }),
   db('rst_kot_orders', { args: rst.KotOrders, map: P, rate: 'read', roles: STAFF }),
   db('rst_activity_log', { args: rst.ActivityLog, map: P, rate: 'read', roles: STAFF }),
+  // 0636: restaurant reports V1 (read-only; the business and outlets of the caller only)
+  db('rst_report_sales', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_items', { args: rep.Items, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_categories', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_payments', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_cashiers', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_discounts', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
+  db('rst_report_audit', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers with the audit (money:read, pos_audit_log:read)' }),
 ];
 
 const byAlias = new Map<string, Entry>(MANIFEST.map(e => [e.alias, e]));

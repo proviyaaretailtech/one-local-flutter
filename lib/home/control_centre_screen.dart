@@ -19,6 +19,7 @@ import '../restaurant/restaurant_dashboard.dart';
 import '../restaurant/restaurant_more_screen.dart';
 import '../ui/i18n.dart';
 import '../ui/motion.dart';
+import '../reports/rst_reports_screen.dart';
 
 /// Figma section D "Seller Admin Dashboard / POS control center". Every figure comes from
 /// `GET /api/partner/home`; a tile without a data source says so instead of showing a number.
@@ -126,7 +127,9 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
     }
     // A restaurant gets the same side bar with its own links (founder, 29 Oct 2026).
     if (_kind == 'restaurant') {
-      RestaurantMoreScreen.open(c, name: _personName ?? 'Partner', email: (widget.auth ?? AuthRepository()).currentEmail, outletName: _outletName ?? 'My outlet', onLogout: _signOut, onReports: () => _openHub(c));
+      // Reports opens the restaurant reports (0636); the sales feed stays one tap away there
+      RestaurantMoreScreen.open(c, name: _personName ?? 'Partner', email: (widget.auth ?? AuthRepository()).currentEmail, outletName: _outletName ?? 'My outlet', onLogout: _signOut,
+          onReports: () => Navigator.of(c).push(RstReportsScreen.route(openFeed: () => _openHub(c))));
       return;
     }
     showModalBottomSheet<void>(
