@@ -753,9 +753,14 @@ void main() {
       await show(t, FloorScreen(env: TablesEnv(api: s.api)));
       await openTable(t, 'T4');
       expect(find.descendant(of: find.byType(BottomSheet), matching: find.text('Table T4')), findsOneWidget);
-      expect(find.text('4 Pax • Available'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('sheet-seats')), matching: find.text('4 Pax')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('sheet-status')), matching: find.text('Available')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('sheet-table-tile')), matching: find.text('T4')), findsOneWidget);
       expect(find.text('Start New Order'), findsOneWidget);
       expect(find.text('Reserve Table'), findsOneWidget);
+      // the three actions on one line (founder, 30 Oct 2026)
+      final tops = [for (final k in ['sheet-start-order', 'sheet-hand-to-guest', 'sheet-reserve']) t.getRect(find.byKey(ValueKey(k))).top];
+      expect(tops.toSet().length, 1, reason: 'one row');
       expect(find.text('View History'), findsOneWidget);
       await tapKey(t, 'sheet-close');
       expect(find.byType(BottomSheet), findsNothing);

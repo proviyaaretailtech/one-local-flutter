@@ -796,7 +796,8 @@ class _DishSquare extends StatelessWidget {
   }
 }
 
-/// The bottom sheet of a table that is not occupied: "Table T4 / 4 Pax • Available", Start New Order, Reserve Table, View History.
+/// The bottom sheet of a table that is not occupied: the table tile, "Table T4" with its seats and status chips, Start New Order, Hand to
+/// guest and Reserve Table side by side, View History.
 Future<void> showTableSheet(BuildContext context, TablesEnv env, Facts t, {DateTime Function()? storeNow}) {
   return showModalBottomSheet<void>(
     context: context,
@@ -859,7 +860,7 @@ class _TableSheetState extends State<_TableSheet> {
     final v = _v;
     final t = v?.m('table');
     final status = v?.s('status') ?? widget.table.s('status');
-    final (word, _, _, color) = tableLook(status);
+    final (word, border, tint, color) = tableLook(status);
     final allowed = v?.ls('allowed') ?? const <String>[];
     final label = t?.s('label') ?? widget.table.s('label');
     final seats = t?.n('seats') ?? widget.table.n('seats');
@@ -870,15 +871,39 @@ class _TableSheetState extends State<_TableSheet> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFD1D5DB), borderRadius: BorderRadius.circular(4)))),
           const SizedBox(height: 18),
-          Row(children: [
+          // the table as a tile in its status colour, then its name with two chips: seats and status (founder, 30 Oct 2026)
+          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Container(
+              key: const ValueKey('sheet-table-tile'),
+              width: 56,
+              height: 56,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(16), border: Border.all(color: border, width: 1.5)),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Text(label, style: inter(20, 800, color: color))),
+              ),
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Table $label', style: inter(26, 700)),
-                const SizedBox(height: 6),
-                Row(children: [
-                  Container(width: 18, height: 18, decoration: BoxDecoration(color: status == 'available' ? kTableDot : color, shape: BoxShape.circle)),
-                  const SizedBox(width: 10),
-                  Text('${pax(seats)} • ${word[0]}${word.substring(1).toLowerCase()}', style: inter(18, 500, color: color)),
+                Text('Table $label', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(21, 800, height: 1.15)),
+                const SizedBox(height: 7),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  _SheetChip(
+                    key: const ValueKey('sheet-seats'),
+                    icon: LucideIcons.users,
+                    text: pax(seats),
+                    bg: kGreyBg,
+                    ink: kInk,
+                  ),
+                  _SheetChip(
+                    key: const ValueKey('sheet-status'),
+                    dot: status == 'available' ? kTableDot : color,
+                    text: '${word[0]}${word.substring(1).toLowerCase()}',
+                    bg: tint,
+                    ink: color,
+                  ),
                 ]),
               ]),
             ),
@@ -903,33 +928,39 @@ class _TableSheetState extends State<_TableSheet> {
                 textAlign: TextAlign.center, style: inter(13, 400, color: kMuted, height: 1.35)),
             const SizedBox(height: 12),
           ],
-          if (allowed.contains('start_order')) ...[
-            LimeButton('Start New Order', icon: LucideIcons.shoppingCart, height: 56, onPressed: () {
-              nav.pop();
-              final start = widget.env.onStartOrder;
-              final t = v!.m('table');
-              if (start == null) {
-                // founder-approved flow (2026-10-20): Start New Order opens Add dishes for this table
-                nav.push(MaterialPageRoute(builder: (_) => AddDishesScreen(env: widget.env, tableId: t.s('id'), tableLabel: 'Table ${t.s('label')}')));
-              } else {
-                start(context, t);
-              }
-            }),
-            const SizedBox(height: 12),
-          ],
-          if (allowed.contains('start_order')) ...[
-            OutlineButtonT('Hand to guest', key: const ValueKey('sheet-hand-to-guest'), icon: LucideIcons.smartphone, dark: true, height: 56, onPressed: () {
-              nav.pop();
-              nav.push(GuestHostScreen.route(widget.env, widget.table.s('id')));
-            }),
-            const SizedBox(height: 12),
-          ],
-          if (allowed.contains('reserve')) ...[
-            OutlineButtonT('Reserve Table', icon: LucideIcons.calendar, dark: true, height: 56, onPressed: () async {
-              nav.pop();
-              await nav.push(MaterialPageRoute(builder: (_) => ReserveScreen(env: widget.env, table: v!.m('table'), now: widget.storeNow)));
-            }),
-          ],
+          // the three actions side by side (founder, 30 Oct 2026): icon over label, Start New Order lime, the other two outlined
+          if (allowed.contains('start_order') || allowed.contains('reserve'))
+            IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                for (final (i, a) in [
+                  if (allowed.contains('start_order'))
+                    (const ValueKey('sheet-start-order'), 'Start New Order', LucideIcons.shoppingCart, true, () {
+                      nav.pop();
+                      final start = widget.env.onStartOrder;
+                      final t = v!.m('table');
+                      if (start == null) {
+                        // founder-approved flow (2026-10-20): Start New Order opens Add dishes for this table
+                        nav.push(MaterialPageRoute(builder: (_) => AddDishesScreen(env: widget.env, tableId: t.s('id'), tableLabel: 'Table ${t.s('label')}')));
+                      } else {
+                        start(context, t);
+                      }
+                    }),
+                  if (allowed.contains('start_order'))
+                    (const ValueKey('sheet-hand-to-guest'), 'Hand to guest', LucideIcons.smartphone, false, () {
+                      nav.pop();
+                      nav.push(GuestHostScreen.route(widget.env, widget.table.s('id')));
+                    }),
+                  if (allowed.contains('reserve'))
+                    (const ValueKey('sheet-reserve'), 'Reserve Table', LucideIcons.calendar, false, () async {
+                      nav.pop();
+                      await nav.push(MaterialPageRoute(builder: (_) => ReserveScreen(env: widget.env, table: v!.m('table'), now: widget.storeNow)));
+                    }),
+                ].indexed) ...[
+                  if (i > 0) const SizedBox(width: 10),
+                  Expanded(child: _SheetAction(key: a.$1, label: a.$2, icon: a.$3, primary: a.$4, onTap: a.$5)),
+                ],
+              ]),
+            ),
           if (allowed.contains('history'))
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -946,6 +977,59 @@ class _TableSheetState extends State<_TableSheet> {
       ),
     );
   }
+}
+
+/// A small chip of the table sheet's header: seats (with an icon) or the status (with a dot).
+class _SheetChip extends StatelessWidget {
+  const _SheetChip({super.key, required this.text, required this.bg, required this.ink, this.icon, this.dot});
+  final String text;
+  final Color bg, ink;
+  final IconData? icon;
+  final Color? dot;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(40)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null) ...[Icon(icon, size: 14, color: ink), const SizedBox(width: 5)],
+          if (dot != null) ...[Container(width: 8, height: 8, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)), const SizedBox(width: 6)],
+          Text(text, style: inter(13, 700, color: ink)),
+        ]),
+      );
+}
+
+/// One of the table sheet's three side-by-side actions: an icon over a short label; the main one lime, the others outlined.
+class _SheetAction extends StatelessWidget {
+  const _SheetAction({super.key, required this.label, required this.icon, required this.primary, required this.onTap});
+  final String label;
+  final IconData icon;
+  final bool primary;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: label,
+        excludeSemantics: true,
+        child: Material(
+          color: primary ? kLimeBtn : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: primary ? BorderSide.none : const BorderSide(color: kInk, width: 1.2),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(6, 14, 6, 12),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(icon, size: 22, color: kInk),
+                const SizedBox(height: 8),
+                Text(label, textAlign: TextAlign.center, maxLines: 2, style: inter(13, 700, height: 1.2)),
+              ]),
+            ),
+          ),
+        ),
+      );
 }
 
 /// "View History": orders and reservations of one table, newest first.
