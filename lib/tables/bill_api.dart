@@ -50,6 +50,13 @@ class BillApi {
 
   /// [channel] print | whatsapp | sms | email. The database keeps only a masked [to].
   Future<Facts> logReceipt(String orderId, String channel, {String? to}) => _call('rst_receipt_log', {'order_id': orderId, 'channel': channel, 'to': to});
+
+  /// Who the bill is for, before or after it is paid: the customer with this mobile number (added when new, `cust_save` answers the one on
+  /// file when the number is known) is put on the bill (`cust_attach_order`). Changing a customer already on the bill needs a manager.
+  Future<void> setCustomer(String orderId, {required String name, required String phone}) async {
+    final saved = await _call('cust_save', {'first_name': name.trim(), 'phone': phone});
+    await _call('cust_attach_order', {'order_id': orderId, 'customer_id': saved.s('customer_id')});
+  }
 }
 
 const _methodNames = {'cash': 'Cash', 'card': 'Card', 'upi': 'UPI', 'split': 'Split', 'wallet': 'Wallet', 'other': 'Other'};
@@ -94,6 +101,7 @@ String billText(Facts bill, {String? business, String? table, bool receipt = fal
   final out = <String>[
     if (business != null && business.isNotEmpty) business,
     '${receipt ? 'Receipt' : 'Bill'} ${bill.s('display_no')}${table == null ? '' : ' · Table $table'}',
+    if ((bill.so('customer_name') ?? '').isNotEmpty) 'Customer: ${bill.s('customer_name')}',
     '',
   ];
   for (final i in billItems(bill).where((i) => !i.b('takeaway'))) {

@@ -8,6 +8,7 @@ import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import '../ui/whatsapp_icon.dart';
 import 'bill_api.dart';
+import 'bill_customer.dart';
 import 'bill_paid_screen.dart';
 import 'bill_receipt_popup.dart';
 import 'bill_split_screen.dart';
@@ -237,6 +238,8 @@ class _BillPayScreenState extends State<BillPayScreen> {
         if (_error != null) TablesError(_error!, onRetry: _load),
         if (v != null && o == null) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text('No open bill on this table.', style: inter(15, 400, color: kMuted)))),
         if (v != null && o != null) ...[
+          // who the bill is for (founder, 30 Oct 2026): name and number, before the bill is paid
+          BillCustomerButton(api: _api, order: o, onSaved: _load),
           BillCard(title: 'CURRENT ITEMS (TABLE ${t!.s('label').toUpperCase()})', children: [
             // eaten here first, then the dishes packed to take away on the same bill (0606)
             for (final i in billItems(o).where((i) => !i.b('takeaway'))) ...[

@@ -7,6 +7,7 @@ import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import '../ui/whatsapp.dart';
 import 'bill_api.dart';
+import 'bill_customer.dart';
 import 'bill_widgets.dart';
 import 'table_widgets.dart';
 import '../ui/motion.dart';
@@ -128,6 +129,8 @@ class _BillReceiptScreenState extends State<BillReceiptScreen> {
         if (r == null && _error == null) tablesLoading(),
         if (_error != null) TablesError(_error!, onRetry: _load),
         if (r != null) ...[
+          // the customer can still be added once the bill is paid; the number then fills in WhatsApp and SMS
+          BillCustomerButton(api: _api, order: r, onSaved: _load),
           Container(
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: kLine)),
             child: Column(children: [

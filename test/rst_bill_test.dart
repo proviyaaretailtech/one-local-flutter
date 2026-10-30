@@ -157,6 +157,38 @@ void main() {
       expect(find.text('Print Bill'), findsNothing);
     });
 
+    testWidgets('the customer icon takes a name and number before the bill is paid and puts that customer on the bill', (t) async {
+      final s = Fake();
+      ((s.view1['orders'] as List).first as Map)['customer_phone'] = null; // a walk-in bill
+      s.on['cust_save'] = (r) => ok({'customer_id': 'c-77', 'created': true, 'duplicate': false, 'customer': {'id': 'c-77'}});
+      s.on['cust_attach_order'] = (r) {
+        final o = (s.view1['orders'] as List).first as Map;
+        o['customer_name'] = 'Ravi Kumar';
+        o['customer_phone'] = '+919812345678';
+        return ok({'order_id': o1, 'customer_id': 'c-77', 'walk_in': false});
+      };
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill, openUrl: s.open));
+      final views = s.calls('rst_bill_view').length;
+      expect(find.text('Add customer'), findsOneWidget);
+      expect(find.text('Name and mobile number'), findsOneWidget);
+      expect(t.getRect(find.byKey(const ValueKey('bill-customer'))).top, lessThan(t.getRect(find.text('CURRENT ITEMS (TABLE T1)')).top), reason: 'first on the Checkout');
+      await tapKey(t, 'bill-customer');
+      await t.enterText(find.byKey(const ValueKey('bill-customer-name-field')), 'Ravi Kumar');
+      await t.enterText(find.byKey(const ValueKey('bill-customer-phone-field')), '98123');
+      await tapKey(t, 'bill-customer-save');
+      expect(find.text('Enter a 10-digit mobile number.'), findsOneWidget);
+      expect(s.calls('cust_save'), isEmpty, reason: 'a short number is stopped on the phone');
+      await t.enterText(find.byKey(const ValueKey('bill-customer-phone-field')), '9812345678');
+      await tapKey(t, 'bill-customer-save');
+      expect(argsOf(s.calls('cust_save').single), {'first_name': 'Ravi Kumar', 'phone': '9812345678'});
+      expect(argsOf(s.calls('cust_attach_order').single), {'order_id': o1, 'customer_id': 'c-77'});
+      expect(s.calls('rst_bill_view').length, views + 1, reason: 'the bill is read again');
+      expect(t.widget<Text>(find.byKey(const ValueKey('bill-customer-name'))).data, 'Ravi Kumar');
+      expect(t.widget<Text>(find.byKey(const ValueKey('bill-customer-phone'))).data, contains('98123'));
+      await sendBill(t, 'bill-whatsapp', '9812345678');
+      expect(Uri.decodeComponent(s.opened.single.toString()), contains('Customer: Ravi Kumar'), reason: 'the bill sent names the customer');
+    });
+
     testWidgets('cash below the amount due is stopped on the phone and nothing is sent', (t) async {
       final s = Fake();
       await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
@@ -462,6 +494,21 @@ void main() {
       expect(s.opened.single.host, 'api.whatsapp.com');
       expect(s.opened.single.queryParameters['phone'], '919876543210');
       expect(s.opened.single.queryParameters['text'], contains('Receipt R5501'));
+    });
+
+    testWidgets('after the bill: the customer icon shows the number on the receipt; changing the customer is refused for a cashier and says why', (t) async {
+      final s = Fake();
+      s.on['cust_save'] = (r) => ok({'customer_id': 'c-78', 'created': true});
+      s.on['cust_attach_order'] = (r) => err(403, 'Only a manager can change the customer on this bill.', 'forbidden');
+      await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
+      expect(t.widget<Text>(find.byKey(const ValueKey('bill-customer-phone'))).data, contains('98765'));
+      expect(find.byKey(const ValueKey('bill-customer')), findsOneWidget);
+      await tapKey(t, 'bill-customer');
+      await t.enterText(find.byKey(const ValueKey('bill-customer-name-field')), 'Asha');
+      await t.enterText(find.byKey(const ValueKey('bill-customer-phone-field')), '9000000001');
+      await tapKey(t, 'bill-customer-save');
+      expect(find.text('Only a manager can change the customer on this bill.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('bill-customer-save')), findsOneWidget, reason: 'the sheet stays open');
     });
 
     testWidgets('Email asks for the address and opens the mail app; Print is logged with the printer', (t) async {
