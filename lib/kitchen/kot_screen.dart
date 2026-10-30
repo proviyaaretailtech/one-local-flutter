@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
@@ -30,6 +31,9 @@ class KotScreen extends StatefulWidget {
 }
 
 class _KotScreenState extends State<KotScreen> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
   Facts? _d;
   String? _error;
   String _status = 'all';
@@ -42,6 +46,9 @@ class _KotScreenState extends State<KotScreen> {
   @override
   void initState() {
     super.initState();
+    _live = LiveSync.watch({'kitchen', 'orders'}, () {
+      if (mounted) _load();
+    });
     _load();
     final every = widget.env.refreshEvery;
     if (every != null) _poll = Timer.periodic(every, (_) => _load());
@@ -50,6 +57,7 @@ class _KotScreenState extends State<KotScreen> {
   @override
   void dispose() {
     _poll?.cancel();
+    _live();
     super.dispose();
   }
 

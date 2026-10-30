@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../catalogue/item_photo.dart';
@@ -37,6 +38,9 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
   late final MenuApi _api = widget.api ?? MenuApi();
   late final MenuBuildApi _build = widget.buildApi ?? MenuBuildApi();
   late final ItemPhotoService _photos = widget.photos ?? const DeviceItemPhotos();
@@ -46,6 +50,9 @@ class _MenuScreenState extends State<MenuScreen> {
   @override
   void initState() {
     super.initState();
+    _live = LiveSync.watch({'stock'}, () {
+      if (mounted) _reload();
+    });
     OutletScope.selected.addListener(_followScope);
     final asked = MenuScreen.requestedFilter.value;
     if (asked != null) {
@@ -117,6 +124,7 @@ class _MenuScreenState extends State<MenuScreen> {
     OutletScope.selected.removeListener(_followScope);
     MenuScreen.requestedFilter.removeListener(_followRequest);
     _debounce?.cancel();
+    _live();
     super.dispose();
   }
 

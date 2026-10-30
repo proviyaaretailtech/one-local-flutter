@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -60,6 +61,9 @@ class OrdersBoardScreen extends StatefulWidget {
 }
 
 class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
   late final OrdersApi _api = widget.api ?? OrdersApi();
   late String _tab = widget.initialTab;
   String _channel = 'all', _status = 'new', _holdChannel = 'all';
@@ -82,6 +86,9 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
   @override
   void initState() {
     super.initState();
+    _live = LiveSync.watch({'orders', 'kitchen'}, () {
+      if (mounted) _tab == 'live' ? _loadLive() : _loadHolds();
+    });
     OrdersBoardScreen.requestedDelivery.addListener(_applyDeliveryRequest);
     _loadLive();
     if (_tab == 'hold') _loadHolds();
@@ -102,6 +109,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
     _sourcePoll?.cancel();
     _liveQ.dispose();
     _holdQ.dispose();
+    _live();
     super.dispose();
   }
 

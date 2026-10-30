@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
@@ -36,6 +37,9 @@ class KdsBoardScreen extends StatefulWidget {
 }
 
 class _KdsBoardScreenState extends State<KdsBoardScreen> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
   KitchenEnv get env => widget.env;
   Facts? _d;
   Map<String, ({String? image, String category})> _dishes = const {};
@@ -55,6 +59,9 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
   @override
   void initState() {
     super.initState();
+    _live = LiveSync.watch({'kitchen', 'orders'}, () {
+      if (mounted) _load();
+    });
     _load();
     env.api.dishes().then((d) => mounted ? setState(() => _dishes = d) : null).catchError((_) => null);
     if (env.refreshEvery != null) {
@@ -72,6 +79,7 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
     _poll?.cancel();
     _tick?.cancel();
     _rev.dispose();
+    _live();
     super.dispose();
   }
 

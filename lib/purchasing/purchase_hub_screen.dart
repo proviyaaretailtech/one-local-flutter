@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../auth/partner_api.dart';
@@ -36,6 +37,15 @@ class PurchaseHubScreen extends StatefulWidget {
 }
 
 class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
+  @override
+  void dispose() {
+    _live();
+    super.dispose();
+  }
+
   PurEnv get env => widget.env;
   late final CatalogueApi _grn = widget._catalogue ?? widget.stock.catalogue;
 
@@ -56,6 +66,9 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
   @override
   void initState() {
     super.initState();
+    _live = LiveSync.watch({'stock'}, () {
+      if (mounted) _load();
+    });
     _load();
   }
 

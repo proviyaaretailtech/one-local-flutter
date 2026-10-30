@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_api.dart';
@@ -36,6 +37,9 @@ class ClosingStockScreen extends StatefulWidget {
 }
 
 class _ClosingStockScreenState extends State<ClosingStockScreen> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
   StockEnv get env => widget.env;
   List<Facts>? _items;
   InvDocument? _doc; // the count in progress, if any
@@ -48,6 +52,9 @@ class _ClosingStockScreenState extends State<ClosingStockScreen> {
   @override
   void initState() {
     super.initState();
+    _live = LiveSync.watch({'stock'}, () {
+      if (mounted) _load();
+    });
     _load();
   }
 
@@ -57,6 +64,7 @@ class _ClosingStockScreenState extends State<ClosingStockScreen> {
       c.dispose();
     }
     _search.dispose();
+    _live();
     super.dispose();
   }
 

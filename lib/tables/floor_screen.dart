@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_api.dart';
@@ -33,6 +34,15 @@ class FloorScreen extends StatefulWidget {
 }
 
 class _FloorScreenState extends State<FloorScreen> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
+  @override
+  void dispose() {
+    _live();
+    super.dispose();
+  }
+
   TablesEnv get env => widget.env;
   Facts? _d;
   String? _error;
@@ -84,6 +94,9 @@ class _FloorScreenState extends State<FloorScreen> {
   @override
   void initState() {
     super.initState();
+    _live = LiveSync.watch({'orders', 'kitchen'}, () {
+      if (mounted) _load();
+    });
     _load();
     if (widget.pickFor == null) _loadMenu();
   }

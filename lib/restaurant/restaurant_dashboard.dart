@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../home/home_nav.dart';
@@ -34,6 +35,9 @@ class RestaurantHomeBody extends StatefulWidget {
 }
 
 class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
   // the outlet chosen in the header's switcher; null = all outlets (summed by rst_dashboard_scope)
   String? _location = OutletScope.selected.value;
   late Future<RestaurantDashboardData> _f = widget.api.dashboard(locationId: _location);
@@ -44,12 +48,16 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
   @override
   void initState() {
     super.initState();
+    _live = LiveSync.watch({'orders', 'kitchen', 'stock'}, () {
+      if (mounted) _reload();
+    });
     OutletScope.selected.addListener(_followScope);
   }
 
   @override
   void dispose() {
     OutletScope.selected.removeListener(_followScope);
+    _live();
     super.dispose();
   }
 

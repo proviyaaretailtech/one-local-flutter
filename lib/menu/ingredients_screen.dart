@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../home/home_nav.dart';
@@ -21,6 +22,17 @@ class IngredientsView extends StatefulWidget {
 }
 
 class _IngredientsViewState extends State<IngredientsView> {
+  // KOT, KDS, orders and stock in step: re-read when the business's live channel says so (lib/api/live_sync.dart)
+  late final VoidCallback _live;
+
+  @override
+  void initState() {
+    super.initState();
+    _live = LiveSync.watch({'stock'}, () {
+      if (mounted) _reload();
+    });
+  }
+
   late Future<IngredientList> _f = widget.api.ingredients();
   IngredientList? _last;
   String _q = '';
@@ -30,6 +42,7 @@ class _IngredientsViewState extends State<IngredientsView> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _live();
     super.dispose();
   }
 
