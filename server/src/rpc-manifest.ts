@@ -292,6 +292,7 @@ export const MANIFEST: Entry[] = [
   db('rst_bill_split', { args: rst.BillSplit, map: P, rate: 'write', idem: true, roles: 'staff allowed to take payment' }),
   db('rst_bill_pay', { args: rst.BillPay, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
   db('rst_bill_coupon', { args: rst.BillCoupon, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
+  db('rst_bill_discount', { args: rst.BillDiscount, map: P, rate: 'write', roles: 'staff allowed to take payment (above the limit: managers)' }),
   db('rst_bill_note', { args: rst.BillNote, map: P, rate: 'write', roles: 'staff with order:place or order:update_status' }),
   db('rst_receipt_view', { args: rst.BillOrder, map: P, rate: 'read', roles: 'floor staff or staff allowed to take payment' }),
   db('rst_receipt_log', { args: rst.ReceiptLog, map: P, rate: 'write', roles: 'floor staff or staff allowed to take payment' }),

@@ -262,6 +262,62 @@ void main() {
       expect(find.text('A discount code is already on this bill.'), findsOneWidget);
     });
 
+    testWidgets('a manual discount: % with a reason, sent to the database; the bill is read again and says who and why (0637)', (t) async {
+      final s = Fake();
+      var given = false;
+      s.on['rst_bill_discount'] = (r) {
+        given = true;
+        return ok({'id': o1});
+      };
+      s.on['rst_bill_view'] = (r) {
+        final v = copy('view1');
+        if (given) {
+          final o = (v['orders'] as List).first as Map;
+          o['discount'] = 50;
+          o['manual_discount'] = {'reason': 'Regular guest', 'by': 'Ravi Cashier', 'approved_by': null};
+        }
+        return ok(v);
+      };
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      expect(find.byKey(const ValueKey('bill-manual-note')), findsNothing);
+      await tapKey(t, 'bill-manual-discount');
+      expect(find.textContaining('Up to 10% for cashiers'), findsOneWidget);
+      await tapKey(t, 'disc-quick-20');
+      expect(t.widget<Text>(find.byKey(const ValueKey('disc-preview'))).data, contains('needs a manager'), reason: '20 % is over the cashier limit');
+      await tapKey(t, 'disc-quick-5');
+      expect(t.widget<Text>(find.byKey(const ValueKey('disc-preview'))).data, isNot(contains('needs a manager')));
+      await tapKey(t, 'disc-save');
+      expect(find.text('Say why (3 characters or more).'), findsOneWidget);
+      expect(s.calls('rst_bill_discount'), isEmpty);
+      await tapKey(t, 'disc-reason-Regular guest');
+      await tapKey(t, 'disc-save');
+      expect(argsOf(s.calls('rst_bill_discount').single), {'order_id': o1, 'kind': 'percent', 'value': 5, 'reason': 'Regular guest'});
+      expect(find.text('Discount (Regular guest)'), findsOneWidget, reason: 'the bill read again');
+      expect(t.widget<Text>(find.byKey(const ValueKey('bill-manual-note'))).data, 'Manual: Regular guest · by Ravi Cashier');
+      expect(find.text('Change manual discount'), findsOneWidget);
+    });
+
+    testWidgets('a refused manual discount says why and the sheet stays; ₹ off sends the amount', (t) async {
+      final s = Fake();
+      s.on['rst_bill_discount'] = (r) => err(403, 'More than 10 % needs a manager; ask a manager to give this discount.', 'forbidden');
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      await tapKey(t, 'bill-manual-discount');
+      await tapKey(t, 'disc-kind-amount');
+      await t.enterText(find.byKey(const ValueKey('disc-value')), '300');
+      await t.enterText(find.byKey(const ValueKey('disc-reason')), 'Big group');
+      await tapKey(t, 'disc-save');
+      expect(argsOf(s.calls('rst_bill_discount').single), {'order_id': o1, 'kind': 'amount', 'value': 300, 'reason': 'Big group'});
+      expect(find.text('More than 10 % needs a manager; ask a manager to give this discount.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('disc-save')), findsOneWidget, reason: 'the sheet stays open');
+    });
+
+    testWidgets('a bill with a discount code offers no manual discount', (t) async {
+      final s = Fake();
+      s.view1 = {...copy('view1'), 'orders': [copy('coupon')]};
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      expect(find.byKey(const ValueKey('bill-manual-discount')), findsNothing);
+    });
+
     testWidgets('a bill not generated yet cannot be paid and says why', (t) async {
       final s = Fake();
       await show(t, BillPayScreen(env: s.env, tableId: t3, bill: s.bill));

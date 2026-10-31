@@ -275,9 +275,10 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
              d.no('counted_minor') == null ? '' : d.n('counted_minor') / 100, d.no('difference_minor') == null ? '' : d.n('difference_minor') / 100, d.s('closed_by')],
         ],
       'discounts' => [
-          ['Bill', 'At', 'Gross (Rs)', 'Coupon', 'Discount (Rs)', 'Applied by', 'Service charge waived (Rs)', 'Reason', 'Waived by'],
+          ['Bill', 'At', 'Gross (Rs)', 'Kind', 'Coupon', 'Discount (Rs)', 'Reason', 'Given / applied by', 'Approved by', 'Service charge waived (Rs)', 'Waive reason', 'Waived by'],
           for (final b in r.l('bills'))
-            [b.s('bill'), b.s('at'), b.n('gross_minor') / 100, b.s('coupon'), b.n('discount_minor') / 100, b.s('coupon_by'), b.n('waived_minor') / 100, b.s('waive_reason'), b.s('waived_by')],
+            [b.s('bill'), b.s('at'), b.n('gross_minor') / 100, b.s('kind'), b.s('coupon'), b.n('discount_minor') / 100, b.s('reason'),
+             b.s('kind') == 'manual' ? b.s('given_by') : b.s('coupon_by'), b.s('approved_by'), b.n('waived_minor') / 100, b.s('waive_reason'), b.s('waived_by')],
         ],
       _ => [
           ['What', 'Bill', 'At', 'Amount (Rs)', 'By', 'Reason / detail'],
@@ -560,7 +561,11 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
         ('free', 'Free dishes', '${t.n('free_dishes')}', null),
       ]),
       const SizedBox(height: 12),
-      _note('The POS records coupon discounts and service charge waivers. Manual discounts and approvals are not recorded yet.'),
+      if (t.n('manual_minor') > 0 || t.n('coupon_minor') > 0)
+        _card('BY KIND', [
+          _line('Manual discounts', rs(t.n('manual_minor')), key: 'rep-manual', sub: 'Given at checkout, with a reason'),
+          _line('Coupons', rs(t.n('coupon_minor')), key: 'rep-coupon'),
+        ]),
       if (r.l('coupons').isNotEmpty) _card('BY COUPON', [for (final c in r.l('coupons')) _line(c.s('code'), rs(c.n('amount_minor')), sub: '${c.n('bills')} bills')]),
       _card('BILLS', [
         if (r.l('bills').isEmpty) _empty('No discounts in this period.'),
@@ -569,6 +574,8 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
               sub: [
                 _time(b.s('at')),
                 if (b.s('coupon').isNotEmpty) 'Coupon ${b.s('coupon')}${b.s('coupon_by').isEmpty ? '' : ' by ${b.s('coupon_by')}'}',
+                if (b.s('kind') == 'manual')
+                  'Manual: ${b.s('reason')}${b.s('given_by').isEmpty ? '' : ' by ${b.s('given_by')}'}${b.s('approved_by').isEmpty ? '' : ' · approved by ${b.s('approved_by')}'}',
                 if (b.n('waived_minor') > 0 || b.s('waive_reason').isNotEmpty)
                   'Service charge ${rs(b.n('waived_minor'))} waived${b.s('waived_by').isEmpty ? '' : ' by ${b.s('waived_by')}'}${b.s('waive_reason').isEmpty ? '' : ': ${b.s('waive_reason')}'}',
               ].join(' · '),

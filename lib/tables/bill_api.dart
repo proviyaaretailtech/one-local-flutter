@@ -43,6 +43,11 @@ class BillApi {
 
   Future<Facts> coupon(String orderId, String code) => _call('rst_bill_coupon', {'order_id': orderId, 'code': code.trim()});
 
+  /// A manual discount (0637): [kind] 'amount' (₹) or 'percent', with a reason; 0 takes it off. Over the business's limit only a manager
+  /// may give it (the database says so).
+  Future<Facts> discount(String orderId, {required String kind, required num value, String reason = ''}) =>
+      _call('rst_bill_discount', {'order_id': orderId, 'kind': kind, 'value': value, 'reason': reason.trim()});
+
   Future<Facts> note(String orderId, String note) => _call('rst_bill_note', {'order_id': orderId, 'note': note.trim()});
 
   /// A paid bill for the Success and Send-receipt screens.

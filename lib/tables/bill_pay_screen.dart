@@ -8,6 +8,7 @@ import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import '../ui/whatsapp_icon.dart';
 import 'bill_api.dart';
+import 'bill_discount_sheet.dart';
 import 'bill_customer.dart';
 import 'bill_paid_screen.dart';
 import 'bill_receipt_popup.dart';
@@ -114,6 +115,17 @@ class _BillPayScreenState extends State<BillPayScreen> {
       if (mounted) showToast(context, sayError(e));
     }
     if (mounted) setState(() => _busy = false);
+  }
+
+  /// A manual discount: the sheet gives it (or takes it off); the bill is read again for the new total.
+  Future<void> _manualDiscount() async {
+    final o = _order;
+    if (o == null) return;
+    if (await showManualDiscountSheet(context, api: _api, order: o) && mounted) {
+      _received.clear();
+      await _load();
+      if (mounted) showToast(context, 'Discount updated.');
+    }
   }
 
   Future<void> _openSplit() async {
@@ -260,7 +272,11 @@ class _BillPayScreenState extends State<BillPayScreen> {
           ]),
           BillCard(title: 'BILL SUMMARY', children: [
             BillLine('Subtotal', money(o.n('subtotal')), muted: true),
-            if (o.n('discount') != 0) BillLine('Discount${o.so('coupon_code') == null ? '' : ' (${o.s('coupon_code')})'}', '-${money(o.n('discount'))}', muted: true),
+            if (o.n('discount') != 0)
+              BillLine(
+                  'Discount${o.so('coupon_code') != null ? ' (${o.s('coupon_code')})' : o.mo('manual_discount') != null ? ' (${o.m('manual_discount').s('reason')})' : ''}',
+                  '-${money(o.n('discount'))}',
+                  muted: true),
             if (o.n('gst_amount') != 0) BillLine('GST (${_pct(o.n('gst_pct'))}%)', money(o.n('gst_amount')), muted: true),
             if (o.n('service_charge') != 0) BillLine('Service charge', money(o.n('service_charge')), muted: true),
             if (o.n('round_off') != 0) BillLine('Round off', money(o.n('round_off')), muted: true),
@@ -291,6 +307,27 @@ class _BillPayScreenState extends State<BillPayScreen> {
               ]),
               if (!v.m('can').b('coupon') && v.m('unavailable').so('coupon') != null)
                 Padding(padding: const EdgeInsets.only(top: 6), child: Text(v.m('unavailable').s('coupon'), style: inter(13, 400, color: kMuted))),
+              // a manual discount (0637): ₹ or %, with a reason; not on a bill that has a discount code, not once a payment is taken
+              if (o.so('coupon_code') == null && o.n('paid') == 0)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const ValueKey('bill-manual-discount'),
+                    onPressed: _busy ? null : _manualDiscount,
+                    icon: const Icon(LucideIcons.badgePercent, size: 18, color: kInk),
+                    label: Text(o.mo('manual_discount') == null ? 'Manual discount' : 'Change manual discount', style: inter(14.5, 700, color: kInk)),
+                  ),
+                ),
+              if (o.mo('manual_discount') != null)
+                Text(
+                  [
+                    'Manual: ${o.m('manual_discount').s('reason')}',
+                    if (o.m('manual_discount').s('by').isNotEmpty) 'by ${o.m('manual_discount').s('by')}',
+                    if (o.m('manual_discount').s('approved_by').isNotEmpty) 'approved by ${o.m('manual_discount').s('approved_by')}',
+                  ].join(' · '),
+                  key: const ValueKey('bill-manual-note'),
+                  style: inter(13, 500, color: kMuted),
+                ),
             ]),
           BillCard(title: 'PAYMENT METHOD', children: [
             Row(children: [

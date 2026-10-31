@@ -55,6 +55,11 @@ export const BillPay = obj({
   reference: z.string().trim().max(80, 'The reference can be up to 80 characters.').nullish(), expected_updated_at: z.string().max(40).nullish(), ...key,
 });
 export const BillCoupon = obj({ order_id: id, code: z.string({ message: 'Enter a discount code.' }).trim().regex(/^[A-Za-z0-9_-]{3,20}$/, 'This coupon code is not valid.') });
+// 0637: a manual discount at checkout: ₹ or %, with a reason (0 takes it off); the limit and the approval are the database's
+export const BillDiscount = obj({ order_id: id, kind: z.enum(['amount', 'percent'], { message: 'Choose ₹ or %.' }),
+  value: z.number({ message: 'Enter the discount.' }).min(0, 'Enter the discount.').max(1_000_000, 'That discount is too large.'),
+  reason: z.string().trim().max(120, 'Keep the reason under 120 characters.').optional() })
+  .refine(b => b.kind !== 'percent' || b.value <= 100, { message: 'A percentage is at most 100.', path: ['value'] });
 export const BillNote = obj({ order_id: id, note: z.string().max(300, 'A note can be up to 300 characters.').nullish() });
 export const ReceiptLog = obj({
   order_id: id, channel: z.enum(['print', 'whatsapp', 'sms', 'email'], { message: 'Print, WhatsApp, SMS or email.' }),
