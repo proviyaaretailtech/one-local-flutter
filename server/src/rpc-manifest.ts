@@ -174,6 +174,7 @@ export const MANIFEST: Entry[] = [
   db('cat_item_list', { args: cat.List, map: P, rate: 'read', roles: STAFF }),
   db('cat_item_view', { args: cat.View, map: P, rate: 'read', roles: STAFF }),
   db('cat_item_lookup', { args: cat.Lookup, map: P, rate: 'read', roles: STAFF }),
+  db('cat_store_categories', { args: cat.StoreCategories, map: P, rate: 'read', roles: STAFF }),
   // ---- store barcodes and loose (weighed) items (30 Oct 2026): store-level codes only, never the master library's GTINs
   db('bc_list', { args: bc.List, map: P, rate: 'read', roles: STAFF }),
   db('bc_resolve', { args: bc.Resolve, map: P, rate: 'read', roles: STAFF }),
@@ -192,6 +193,11 @@ export const MANIFEST: Entry[] = [
   db('media_admin_queue', { args: media.Queue, map: P, rate: 'read', roles: 'OneLocal platform admins (the function checks)' }),
   db('media_admin_decide', { args: media.Decide, map: P, rate: 'write', roles: 'OneLocal platform admins (the function checks)' }),
   db('cat_item_save', { args: cat.Save, map: P, rate: 'write', idem: true, roles: 'staff with menu:create (new) or menu:update (change)' }),
+  // standard SKUs (hosted_sku_standard_2026-10-31.sql): the lists, barcode first, the variants, a new brand code for Master review
+  db('sku_options', { args: cat.SkuOptions, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('sku_lookup', { args: cat.SkuLookup, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('sku_variants', { args: cat.SkuVariants, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('sku_brand_propose', { args: cat.SkuBrandPropose, map: P, rate: 'write', roles: 'staff with menu:create' }),
   // Item form "Remove background (AI)": remove.bg with REMOVE_BG_API_KEY (server only); a photo up to 5 MB, nothing saved.
   sec('cat_image_remove_bg', { args: cat.RemoveBg, rate: 'secure', roles: 'active staff of a business (checked on the server)', maxBytes: 7 * 1024 * 1024 + 64 * 1024 }),
   // The item's saved photo (item-images bucket): signed upload slot, confirm, remove. The server checks menu:create / menu:update on the
@@ -353,6 +359,8 @@ export const MANIFEST: Entry[] = [
   db('smoney_register', { args: mo.StoreRegister, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('smoney_close_day', { args: mo.StoreClose, map: P, rate: 'money', roles: 'staff with money:record' }),
   db('smoney_dues', { args: mo.Options, map: P, rate: 'read', roles: 'staff with money:read' }),
+  // Money ↔ Stock (hosted_money_stock_2026-10-31.sql): stock worth at cost and stock lost, for the Money page
+  db('smoney_stock', { args: mo.StockRange, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('smoney_contacts', { args: mo.StoreContacts, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('smoney_contact_save', { args: mo.StoreContactSave, map: P, rate: 'money', roles: 'staff with money:record' }),
   sec('smoney_proof_slot', { args: mo.ProofAsk, rate: 'secure', roles: 'staff with money:record' }),
@@ -511,6 +519,9 @@ export const MANIFEST: Entry[] = [
   db('acct_save_name', { args: cu.SaveName, map: P, rate: 'write', roles: ANY }),
   db('acct_sync_contact', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
   db('acct_signed_out_everywhere', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
+  db('acct_delete_preview', { ...empty, map: () => ({}), roles: ANY }),
+  db('acct_delete_request', { args: cu.DeleteRequest, map: P, rate: 'write', roles: ANY }),
+  db('acct_delete_cancel', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
   // ---- store cash shift, payment pending, refund check (0500-0502). Body = the function's `p` object; the database checks organisation,
   //      store, role and every amount. Writes carry the Idempotency-Key header; approving a cash difference is manager-only (403 otherwise).
   db('pos_shift_current', { args: sh.Current, map: P, rate: 'read', roles: STAFF }),
@@ -519,6 +530,15 @@ export const MANIFEST: Entry[] = [
   db('pos_shift_cash_move', { args: sh.CashMove, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
   db('pos_shift_close', { args: sh.Close, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
   db('pos_shift_approve', { args: sh.Approve, map: P, rate: 'money', roles: 'manager roles only, not the person who counted' }),
+  // the business day (31 Oct 2026): auto start, opening / closing cash with audited changes, day closing, reports
+  db('pos_day_today', { args: sh.DayToday, map: P, rate: 'write', roles: STAFF }),
+  db('pos_day_opening_set', { args: sh.DayOpening, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment (a manager change applies at once)' }),
+  db('pos_day_adjustment_decide', { args: sh.DayDecide, map: P, rate: 'money', roles: 'manager roles only' }),
+  db('pos_day_cash_count', { args: sh.DayCount, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
+  db('pos_day_close', { args: sh.DayClose, map: P, rate: 'money', idem: true, roles: 'manager roles only' }),
+  db('pos_day_list', { args: sh.DayList, map: P, rate: 'read', roles: STAFF }),
+  db('pos_day_get', { args: sh.DayGet, map: P, rate: 'read', roles: STAFF }),
+  db('pos_day_stock', { args: sh.DayStock, map: P, rate: 'read', roles: STAFF }),
   db('pos_till_policy_set', { args: sh.Policy, map: P, rate: 'write', roles: 'manager roles only' }),
   db('pos_payment_start', { args: sh.PayStart, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
   db('pos_payment_confirm', { args: sh.PayConfirm, map: P, rate: 'money', roles: 'staff allowed to take payment' }),

@@ -56,6 +56,9 @@ class StoreMoneyApi {
   Future<Map<String, dynamic>> closeDay(int countedMinor, {String? day}) => _call('smoney_close_day', {'counted_minor': countedMinor, 'day': day});
   Future<Map<String, dynamic>> dues() => _call('smoney_dues', {});
 
+  /// Money ↔ Stock: what the stock is worth at cost, and what was lost (damaged, expired, missing at a count) between [from] and [to].
+  Future<Map<String, dynamic>> stock({String? from, String? to}) => _call('smoney_stock', {'from': from, 'to': to});
+
   /// Saved contacts (name, phone, UPI ID) and people money was recorded with who are not saved yet.
   Future<Map<String, dynamic>> contacts({String q = ''}) => _call('smoney_contacts', {'q': q.trim().isEmpty ? null : q.trim()});
   Future<Map<String, dynamic>> saveContact({String? id, required String name, String phone = '', String upiId = ''}) =>
@@ -169,6 +172,7 @@ class _StoreMoneyScreenState extends State<StoreMoneyScreen> {
   num? _onelocalWallet; // what OneLocal owes the store (rupees), on the POS + OneLocal plan
   int? _adCoins; // the shop's ad coins (1 coin = ₹10), on the same plan
   String _part = 'register';
+  Map<String, dynamic>? _stock; // stock worth and losses this month (null until loaded, or for a role without stock)
   int _reload = 0; // bumps the section below after a change
 
   bool get _sellsOnline => _plan == 'pos_and_onelocal';
@@ -201,7 +205,15 @@ class _StoreMoneyScreenState extends State<StoreMoneyScreen> {
     } catch (_) {} // the card shows a dash; Ads says why
   }
 
+  Future<void> _loadStock() async {
+    try {
+      final st = await _api.stock();
+      if (mounted) setState(() => _stock = st);
+    } catch (_) {} // no card: the money still shows
+  }
+
   Future<void> _load() async {
+    _loadStock();
     try {
       final h = await _api.home();
       if (mounted) {
@@ -268,6 +280,44 @@ class _StoreMoneyScreenState extends State<StoreMoneyScreen> {
           ),
         ),
       );
+
+  /// Money ↔ Stock: the stock's worth at cost and what was lost this month; a tap shows the detail.
+  Widget _stockCard(Map<String, dynamic> st) {
+    final lost = (st['losses_minor'] as num?) ?? 0;
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        key: const ValueKey('money-stock'),
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StockWorthScreen(api: _api))),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(color: const Color(0xFFEFF7E6), borderRadius: BorderRadius.circular(12)),
+              child: const Icon(LucideIcons.package, color: Color(0xFF2F8A0B), size: 21),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(tr('Stock worth (at cost)'), style: inter(12.5, 600, color: kMuted)),
+                Text(rs(st['stock_value_minor'] as num?), key: const ValueKey('money-stock-value'), style: inter(19, 800)),
+                Text(
+                  lost > 0 ? '${tr('Lost this month')} ${rs(lost)}' : tr('No stock lost this month'),
+                  key: const ValueKey('money-stock-lost'),
+                  style: inter(12.5, 700, color: lost > 0 ? const Color(0xFFC62828) : kMuted),
+                ),
+              ]),
+            ),
+            const Icon(LucideIcons.chevronRight, size: 18, color: kMuted),
+          ]),
+        ),
+      ),
+    );
+  }
 
   Widget _wallet(Map<String, dynamic> h) {
     final accounts = (h['accounts'] as List? ?? const []).cast<Map>();
@@ -444,6 +494,7 @@ class _StoreMoneyScreenState extends State<StoreMoneyScreen> {
                       onRefresh: _load,
                       child: ListView(key: const ValueKey('store-money'), padding: const EdgeInsets.fromLTRB(14, 12, 14, 28), children: staggered([
                         _wallet(h),
+                        if (_stock != null) ...[const SizedBox(height: 12), _stockCard(_stock!)],
                         if (_sellsOnline) ...[const SizedBox(height: 12), _onelocalCards()],
                         const SizedBox(height: 18),
                         _parts(),
@@ -698,5 +749,95 @@ class _DuesPartState extends State<_DuesPart> {
             ValueKey('due-bill-${s['receipt_document_id']}'),
           ),
     ]);
+  }
+}
+
+/// Stock in Money (31 Oct 2026): what the stock is worth at cost (the items worth the most), and what was lost this month by reason
+/// (damaged, expired, missing at a count) — the same numbers Stock keeps, as money.
+class StockWorthScreen extends StatefulWidget {
+  const StockWorthScreen({super.key, required this.api});
+  final StoreMoneyApi api;
+  @override
+  State<StockWorthScreen> createState() => _StockWorthScreenState();
+}
+
+class _StockWorthScreenState extends State<StockWorthScreen> {
+  Map<String, dynamic>? _d;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final d = await widget.api.stock();
+      if (mounted) setState(() => _d = d);
+    } catch (e) {
+      if (mounted) setState(() => _error = e is PartnerApiException ? e.message : tr('Could not load the stock. Check your connection.'));
+    }
+  }
+
+  Widget _row(String left, String sub, String right, {Color? color, Key? key}) => Padding(
+        key: key,
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(left, style: inter(14, 700)),
+              if (sub.isNotEmpty) Text(sub, style: inter(12, 500, color: kMuted)),
+            ]),
+          ),
+          Text(right, style: inter(14.5, 800, color: color ?? kInk)),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final d = _d;
+    String qtyText(num? q) => q == null ? '' : (q == q.roundToDouble() ? q.round().toString() : q.toStringAsFixed(2));
+    return Scaffold(
+      backgroundColor: kBg,
+      body: Column(children: [
+        AppHeader(title: tr('Stock in money'), onBack: () => Navigator.of(context).maybePop()),
+        Expanded(
+          child: d == null
+              ? Center(child: _error != null ? Text(_error!, style: inter(14, 500, color: kMuted)) : const CircularProgressIndicator())
+              : ListView(key: const ValueKey('stock-worth'), padding: const EdgeInsets.fromLTRB(14, 12, 14, 24), children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(tr('Stock worth (at cost)'), style: inter(13, 600, color: kMuted)),
+                      Text(rs(d['stock_value_minor'] as num?), style: inter(26, 800)),
+                      Text(
+                        '${d['items']} ${tr('items in stock')}${(d['no_cost'] as num? ?? 0) > 0 ? ' · ${d['no_cost']} ${tr('without a cost price (not counted)')}' : ''}',
+                        style: inter(12.5, 500, color: kMuted),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(tr('Worth the most'), style: inter(15, 800)),
+                  for (final t in (d['top'] as List? ?? const []).cast<Map>())
+                    _row('${t['name']}', '${qtyText(t['qty'] as num?)} ${t['unit'] ?? ''}', rs(t['value_minor'] as num?)),
+                  const SizedBox(height: 14),
+                  Text(tr('Lost this month'), style: inter(15, 800)),
+                  if ((d['losses'] as List? ?? const []).isEmpty)
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(tr('Nothing damaged, expired or missing this month.'), style: inter(13, 500, color: kMuted)))
+                  else ...[
+                    for (final l in (d['losses'] as List).cast<Map>())
+                      _row(tr('${l['reason']}'), '${l['lines']} ${tr(l['lines'] == 1 ? 'entry' : 'entries')}', rs(l['value_minor'] as num?), color: const Color(0xFFC62828), key: ValueKey('loss-${l['reason']}')),
+                    const Divider(),
+                    _row(tr('Total lost'), '', rs(d['losses_minor'] as num?), color: const Color(0xFFC62828)),
+                  ],
+                  const SizedBox(height: 8),
+                  Text(tr('From Stock: damaged, expired and count shortfalls, at the item\'s cost price. Opening stock and corrections are not losses.'),
+                      style: inter(12, 500, color: kMuted, height: 1.4)),
+                ]),
+        ),
+      ]),
+    );
   }
 }

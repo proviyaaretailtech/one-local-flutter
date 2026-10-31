@@ -72,7 +72,10 @@ class FakeOnb extends OnboardingApi {
         'states': ['Karnataka', 'Goa'],
         'banks': ['HDFC Bank', 'Other'],
         'restaurant': {'categories': ['Bakery', 'Cafe']},
-        'store': [{'family': 'Food', 'name': 'Grocery & essentials', 'subcategories': ['General store', 'Kirana']}],
+        'store': [
+          {'family': 'Food', 'name': 'Grocery & essentials', 'subcategories': ['General store', 'Kirana']},
+          {'family': 'Food', 'name': 'Dairy', 'subcategories': ['Milk', 'Paneer', 'Ghee / butter']},
+        ],
         'service': {'categories': [{'name': 'Cleaning', 'subcategories': []}]},
       });
   @override
@@ -144,24 +147,37 @@ void main() {
       expect(api.calls, isNot(contains('profile')));
     });
 
-    testWidgets('store: owner from sign-up; a full form saves the profile and the plan in one tap, then opens the next section', (t) async {
+    testWidgets('store: owner from sign-up; one category and several subcategories; a full form saves the profile and the plan in one tap', (t) async {
       final api = FakeOnb(initial: sample(done: 2, plan: null));
       await show(t, MerchantProfileScreen(api: api, type: 'store', phone: '+919876543210', name: 'Riya Sharma'));
       await t.pumpAndSettle();
       expect(find.text('Riya Sharma'), findsOneWidget); // the owner, from sign-up: not typed again
       await t.enterText(find.byType(TextField).at(0), 'Sharma General Store');
+      // one category, then as many of its subcategories as fit the shop
       await tapText(t, 'Choose'); // category
-      await tapText(t, 'Grocery & essentials');
-      await tapText(t, 'Choose'); // subcategory
-      await tapText(t, 'General store');
+      await tapText(t, 'Dairy');
       await tapText(t, 'Online or both');
-      await tapText(t, 'Save & continue');
-      expect(toast('Choose your OneLocal plan.'), findsOneWidget); // the plan is on this screen now
       await tapText(t, 'Purchase POS');
+      await tapText(t, 'Save & continue');
+      expect(toast('Choose your subcategories.'), findsOneWidget);
+      expect(api.calls, isNot(contains('profile')));
+      await t.pump(const Duration(seconds: 6)); // the toast has gone
+      await tapText(t, 'Milk');
+      await tapText(t, 'Paneer');
+      // another category: its own subcategories, the old ones go
+      await tapText(t, 'Dairy');
+      await tapText(t, 'Grocery & essentials');
+      expect(find.text('Milk'), findsNothing);
+      await tapText(t, 'General store');
+      await tapText(t, 'Kirana');
+      await tapText(t, 'Online or both');
       await tapText(t, 'Save & continue');
       expect(api.bodies['profile'], {
         'partner_type': 'store', 'business_name': 'Sharma General Store', 'owner_name': 'Riya Sharma', 'phone': '9876543210',
-        'selling_mode': 'online_or_both', 'category': 'Grocery & essentials', 'subcategory': 'General store',
+        'selling_mode': 'online_or_both', 'category': 'Grocery & essentials',
+        'store_picks': [
+          {'category': 'Grocery & essentials', 'subcategories': ['General store', 'Kirana']},
+        ],
       });
       expect(api.calls, contains('plan pos_only'));
       expect(find.text('How do you want to sell?'), findsNothing); // no separate plan screen

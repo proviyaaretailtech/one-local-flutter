@@ -12,8 +12,8 @@ import 'package:vinii_pos/ui/theme.dart';
 import 'helpers.dart';
 import 'sell_fixtures.dart';
 
-// Side menu → Barcodes (founder's mock-ups, 30 Oct 2026): home, bulk generate (choose → review → generating → done), all codes, details,
-// weigh & print, custom barcode, link an unknown code.
+// Side menu → Barcodes (founder's mock-ups, 30 Oct 2026): home, create (single or bulk), bulk (tick → review → ring → results → print),
+// all codes, details, print label options, weigh & print, custom (save on item / preview → print), link an unknown code, empty states.
 
 Future<void> open(WidgetTester t, Till till) async {
   ignoreOverflow();
@@ -31,6 +31,8 @@ Future<void> tapKey(WidgetTester t, String key) async {
   await t.pumpAndSettle();
 }
 
+List<Map<String, dynamic>> sent(Till till, String fn) => till.where('POST', '/rpc/$fn').map((r) => jsonDecode(r.body) as Map<String, dynamic>).toList();
+
 void main() {
   tearDown(HomeNav.reset);
   late List<String> printed;
@@ -39,94 +41,109 @@ void main() {
     printLabelPdf = (pdf, name) async => printed.add(name);
   });
 
-  testWidgets('home: four ways in', (t) async {
+  testWidgets('home: Create Barcode, All Codes, Loose Items, Custom Barcode', (t) async {
     await open(t, Till());
-    expect(find.text('Manage product barcodes'), findsOneWidget);
-    for (final k in ['bc-home-create', 'bc-home-bulk', 'bc-home-all', 'bc-home-loose']) {
+    expect(find.text('Barcodes'), findsWidgets);
+    for (final k in ['bc-home-create', 'bc-home-all', 'bc-home-loose', 'bc-home-custom']) {
       expect(find.byKey(ValueKey(k)), findsOneWidget);
     }
   });
 
-  testWidgets('bulk generate: all items without a barcode → review → each one made in turn → done, labels print', (t) async {
+  testWidgets('single item: choose the product, its code is made, then its details and the print options', (t) async {
     final till = Till();
     await open(t, till);
-    await tapKey(t, 'bc-home-bulk');
-    expect(find.textContaining('2 items'), findsOneWidget); // the two without a barcode
-    await tapKey(t, 'bulk-continue');
-    expect(find.text('Review & Generate'), findsOneWidget);
-    expect(find.text('You are about to generate barcodes for 2 products.'), findsOneWidget);
-    await tapKey(t, 'bulk-generate');
-    expect(till.where('POST', '/rpc/bc_make').map((r) => jsonDecode(r.body)['menu_item_id']), ['m2', 'm9']);
-    expect(find.byKey(const ValueKey('bulk-done')), findsOneWidget);
-    expect(find.text('2 products have been updated with new barcodes.'), findsOneWidget);
-    await tapKey(t, 'bulk-print');
+    await tapKey(t, 'bc-home-create');
+    expect(find.text('How would you like to create the barcode?'), findsOneWidget);
+    await tapKey(t, 'create-single');
+    await tapKey(t, 'select-m2');
+    await tapKey(t, 'select-confirm');
+    expect(sent(till, 'bc_make').single['menu_item_id'], 'm2');
+    expect(find.text('Barcode Details'), findsOneWidget);
+    expect(find.text('2000000000022'), findsWidgets);
+    await tapKey(t, 'details-print-label');
+    expect(find.text('Print Label'), findsOneWidget);
+    await tapKey(t, 'print-type-large');
+    await tapKey(t, 'copies-more');
+    expect(t.widget<Text>(find.byKey(const ValueKey('copies-value'))).data, '2');
+    await tapKey(t, 'print-label-go');
     expect(printed, ['Barcode labels']);
   });
 
-  testWidgets('bulk generate: only the items you tick', (t) async {
+  testWidgets('bulk: tick by category, review, the ring counts each one, results, print labels with copies per item', (t) async {
     final till = Till();
     await open(t, till);
-    await tapKey(t, 'bc-home-bulk');
-    await tapKey(t, 'bulk-some');
-    await tapKey(t, 'bulk-pick-m9');
+    await tapKey(t, 'bc-home-create');
+    await tapKey(t, 'create-bulk');
+    expect(find.text('All (2)'), findsOneWidget);
+    await tapKey(t, 'bulk-cat-Grocery');
+    expect(find.byKey(const ValueKey('bulk-pick-m2')), findsNothing);
+    await tapKey(t, 'bulk-select-all');
+    expect(t.widget<Text>(find.byKey(const ValueKey('bulk-count'))).data, '1 item selected');
+    await tapKey(t, 'bulk-cat-all');
+    await tapKey(t, 'bulk-pick-m2');
     await tapKey(t, 'bulk-continue');
-    expect(find.text('You are about to generate barcodes for 1 product.'), findsOneWidget);
+    expect(find.text('You are about to generate barcodes for 2 items.'), findsOneWidget);
     await tapKey(t, 'bulk-generate');
-    expect(till.where('POST', '/rpc/bc_make').map((r) => jsonDecode(r.body)['menu_item_id']), ['m9']);
+    expect(sent(till, 'bc_make').map((b) => b['menu_item_id']), ['m2', 'm9']);
+    expect(t.widget<Text>(find.byKey(const ValueKey('bulk-progress'))).data, '2/2');
+    await tapKey(t, 'bulk-view-results');
+    expect(find.text('Barcode Results'), findsOneWidget);
+    await tapKey(t, 'bulk-print');
+    expect(find.text('2 items selected'), findsOneWidget);
+    await tapKey(t, 'bulk-copies-more');
+    await tapKey(t, 'bulk-print-go');
+    expect(printed, ['Barcode labels']);
   });
 
-  testWidgets('all codes: filter by source; details show the code, make one, print, turn sold loose on', (t) async {
+  testWidgets('all codes: filters, and a search that finds nothing says so', (t) async {
     final till = Till();
     await open(t, till);
     await tapKey(t, 'bc-home-all');
     expect(find.text('2000000000015'), findsOneWidget);
-    await tapKey(t, 'codes-filter-generated');
-    expect(find.byKey(const ValueKey('code-m2')), findsNothing);
+    await tapKey(t, 'codes-filter-linked');
+    expect(find.byKey(const ValueKey('bc-empty')), findsOneWidget);
+    expect(find.text('No results found'), findsOneWidget);
     await tapKey(t, 'codes-filter-none');
     await tapKey(t, 'code-m2');
-    expect(find.text('Barcode Details'), findsOneWidget);
     expect(find.text('No barcode yet'), findsOneWidget);
-    await tapKey(t, 'details-make');
-    expect(find.text('2000000000022'), findsWidgets);
-    await tapKey(t, 'details-print');
-    expect(printed, ['Barcode labels']);
     await tapKey(t, 'details-loose');
-    expect(jsonDecode(till.where('POST', '/rpc/bc_set_loose').single.body), {'menu_item_id': 'm2', 'loose': true});
+    expect(sent(till, 'bc_set_loose').single, {'menu_item_id': 'm2', 'loose': true});
   });
 
-  testWidgets('loose items: weigh & print, the weight chips set the amount and the real weigh-label code', (t) async {
+  testWidgets('loose items: weigh & print, the chips set the amount and the real weigh-label code', (t) async {
     final till = Till();
     await open(t, till);
     await tapKey(t, 'bc-home-loose');
     expect(find.textContaining('PLU 00003'), findsOneWidget);
     await tapKey(t, 'code-m9');
-    expect(find.text('Weigh & Print Label'), findsOneWidget);
     await tapKey(t, 'weigh-chip-0.500');
     await t.pump(const Duration(milliseconds: 400));
     await t.pumpAndSettle();
     expect(t.widget<Text>(find.byKey(const ValueKey('weigh-total'))).data, rupees(45));
-    expect(jsonDecode(till.where('POST', '/rpc/bc_weigh_label').last.body), {'menu_item_id': 'm9', 'weight_g': 500});
+    expect(sent(till, 'bc_weigh_label').last, {'menu_item_id': 'm9', 'weight_g': 500});
     await tapKey(t, 'weigh-print-label');
     expect(printed, ['Barcode labels']);
   });
 
-  testWidgets('custom barcode: make one for me, set copies, print; save puts it on a product', (t) async {
+  testWidgets('custom: make one for me, preview then print; save on item → select product → code linked', (t) async {
     final till = Till();
     await open(t, till);
-    await tapKey(t, 'bc-home-create');
+    await tapKey(t, 'bc-home-custom');
     await tapKey(t, 'custom-print');
     expect(find.text('Type a code first.'), findsOneWidget);
     await tapKey(t, 'custom-mode-make');
     expect(find.text('2000000000039'), findsWidgets);
     await tapKey(t, 'custom-more');
-    expect(t.widget<Text>(find.byKey(const ValueKey('custom-copies'))).data, '2');
     await tapKey(t, 'custom-print');
+    expect(t.widget<Text>(find.byKey(const ValueKey('preview-copies'))).data, '2');
+    await tapKey(t, 'preview-print');
     expect(printed, ['Barcode labels']);
+    await t.pump(const Duration(seconds: 6)); // the toast has gone
+    await tapKey(t, 'preview-edit');
     await tapKey(t, 'custom-save');
-    expect(find.text('Which product gets this code?'), findsOneWidget);
-    await tapKey(t, 'link-item-m2');
-    await tapKey(t, 'link-confirm');
-    final sent = till.where('POST', '/rpc/bc_custom').map((r) => jsonDecode(r.body) as Map<String, dynamic>).last;
-    expect([sent['code'], sent['menu_item_id']], ['2000000000039', 'm2']);
+    await tapKey(t, 'select-m2');
+    await tapKey(t, 'select-confirm');
+    expect([sent(till, 'bc_custom').last['code'], sent(till, 'bc_custom').last['menu_item_id']], ['2000000000039', 'm2']);
+    expect(find.text('Code linked!'), findsOneWidget);
   });
 }

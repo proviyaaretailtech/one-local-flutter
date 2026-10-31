@@ -408,13 +408,13 @@ void main() {
       await show(t, CatalogueScreen(api: api, state: api.state));
       expect(find.text('No items added yet'), findsOneWidget);
       await tap(t, 'Add Items');
-      await type(t, 'Item name', 'Tata Salt 1kg');
+      await type(t, 'Item name (capitals)', 'tata salt');
       await type(t, 'Selling price (₹)', '0');
       await tap(t, 'Add item');
       expect(toast('Enter a selling price above zero.'), findsOneWidget);
       await type(t, 'Selling price (₹)', '28.50');
       await tap(t, 'Add item');
-      expect(api.bodies['item'], {'name': 'Tata Salt 1kg', 'category': 'Staples', 'price': '28.50'});
+      expect(api.bodies['item'], {'name': 'Tata Salt', 'category': 'Staples', 'price': '28.50'}); // typed in capitals, saved in Title Case
       expect(find.text('2 items added'), findsOneWidget);
       expect(find.text('Continue'), findsOneWidget);
     });

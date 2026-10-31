@@ -60,6 +60,8 @@ class HomeNav {
   static HomeRoute? quickAdd;
   // Reads the store's language when the app opens (the app sets it; tests leave it unset).
   static Future<void> Function()? loadLanguage;
+  // After a sign-in: a pending account deletion is cancelled (the app sets it; tests leave it unset).
+  static Future<void> Function(BuildContext context)? afterSignIn;
   // Section H kitchen: stations setup and the Kitchen Display System.
   static HomeRoute? kitchenSetup;
   static HomeRoute? kitchenDisplay;
@@ -134,6 +136,7 @@ class HomeNav {
     billPage = null;
     quickAdd = null;
     loadLanguage = null;
+    afterSignIn = null;
     moneyScreen = null;
     kitchenSetup = kitchenDisplay = deliverySettings = null;
     home = orders = orderHistory = setup = items = stock = tables = bill = service = money = notifications = complaints = reviews = support = partnerType = lowStock = grn = receipt = kitchen = kotView = team = storefront = businessProfile = settings = customers = wallet = account = menu = plans = null;

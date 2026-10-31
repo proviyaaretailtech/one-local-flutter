@@ -119,6 +119,18 @@ class ShiftApi {
     }
   }
 
+  /// Any function through the same door (the business day, day_api.dart).
+  Future<Map<String, dynamic>> call(String fn, Map<String, dynamic> args, [String? key]) => _call(fn, args, key);
+
+  Future<List<Object?>> callList(String fn, Map<String, dynamic> args) async {
+    try {
+      final r = await _rpc.call(fn, args);
+      return r is List ? r : const [];
+    } on RpcException catch (e) {
+      throw OrdersApiException(e.status, e.message, e.code);
+    }
+  }
+
   Future<ShiftState> current({String? locationId}) async => ShiftState(await _call('pos_shift_current', {'location_id': ?locationId}));
 
   Future<List<TillShift>> history({String? locationId, int limit = 10}) async {

@@ -19,6 +19,7 @@ class BcItem {
   num get price => (raw['price'] ?? 0) as num;
   String? get imageUrl => raw['image_url'] as String?;
   String? get barcode => (raw['barcode'] as String?)?.isEmpty == true ? null : raw['barcode'] as String?;
+  String get category => _s('category');
 
   /// generated (made by the app), linked (a pack's code saved at the counter), custom (typed), or null (entered on the product).
   String? get barcodeSource => raw['barcode_source'] as String?;

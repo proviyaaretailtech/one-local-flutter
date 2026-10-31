@@ -69,6 +69,22 @@ test('profile arguments are checked against the lists', () => {
   assert.throws(() => ob.profileArgs(ob.Profile.parse({ ...base, categories: [] })), (e: HttpError) => e.status === 400);
 });
 
+test('a store picks one category and several of its subcategories', () => {
+  const base = { partner_type: 'store' as const, business_name: 'Sharma Store', owner_name: 'Riya Sharma', phone: '9876543210', selling_mode: 'physical' as const };
+  const one = ob.profileArgs(ob.Profile.parse({ ...base, store_picks: [{ category: 'Grocery', subcategories: ['Kirana / general store', 'FMCG', 'Organic store'] }] }));
+  assert.equal(one.category, 'Grocery');
+  assert.deepEqual(one.categories, ['Grocery']);
+  assert.deepEqual(one.subcategories, ['Kirana / general store', 'FMCG', 'Organic store']);
+  // an older app: one category, one subcategory
+  const old = ob.profileArgs(ob.Profile.parse({ ...base, category: 'Dairy', subcategory: 'Milk' }));
+  assert.deepEqual([old.category, old.categories, old.subcategories], ['Dairy', ['Dairy'], ['Milk']]);
+  // two categories are refused; so is a category with no subcategory, or one not in it
+  assert.throws(() => ob.Profile.parse({ ...base, store_picks: [{ category: 'Grocery', subcategories: ['FMCG'] }, { category: 'Dairy', subcategories: ['Milk'] }] }));
+  for (const picks of [[{ category: 'Dairy', subcategories: [] }], [{ category: 'Dairy', subcategories: ['FMCG'] }], [{ category: 'Not a category', subcategories: ['Milk'] }]]) {
+    assert.throws(() => ob.profileArgs(ob.Profile.parse({ ...base, store_picks: picks })), (e: HttpError) => e.status === 400);
+  }
+});
+
 test('inventory (section H): every function is listed, reads are "read", writes carry the Idempotency-Key, shapes are checked', async () => {
   const reads = ['inv_options', 'inv_dashboard', 'inv_stock_list', 'inv_stock_detail', 'inv_movement_list', 'inv_movement_detail', 'inv_document_list', 'inv_document_view', 'inv_forecast'];
   const writes = ['inv_document_save', 'inv_document_act', 'inv_audit_to_adjustment'];
@@ -189,4 +205,19 @@ test('take an order at a table (0485): four functions listed, adds and sends car
   assert.equal(parse('tbl_kot_send', { table_id: id }).success, true);
   assert.equal(parse('tbl_mark_served', { item_ids: [] }).success, false);
   assert.equal(parse('tbl_mark_served', { item_ids: ['nope'] }).success, false);
+});
+
+test('business day (31 Oct 2026): every function listed; writes that move money carry the Idempotency-Key; shapes are checked', async () => {
+  const sh = await import('../../src/schemas/shift.ts');
+  for (const fn of ['pos_day_today', 'pos_day_opening_set', 'pos_day_adjustment_decide', 'pos_day_cash_count', 'pos_day_close', 'pos_day_list', 'pos_day_get', 'pos_day_stock']) {
+    assert.ok(lookup(fn), `${fn} is listed`);
+  }
+  for (const fn of ['pos_day_opening_set', 'pos_day_cash_count', 'pos_day_close']) assert.equal((lookup(fn) as { idem?: boolean }).idem, true, `${fn} takes a key`);
+  const day = '6f1b8f0e-8a4c-4d55-9d43-3a2b9f8e1c11';
+  assert.ok(sh.DayOpening.safeParse({ day_id: day, amount: 1240, reason: 'Recounted' }).success);
+  assert.equal(sh.DayOpening.safeParse({ day_id: day, amount: 1240 }).success, false, 'a change needs a reason');
+  assert.equal(sh.DayOpening.safeParse({ day_id: day, amount: -1, reason: 'Recounted' }).success, false, 'no negative cash');
+  assert.ok(sh.DayCount.safeParse({ day_id: day, counted_cash: 1490, reason: 'Change given twice' }).success);
+  assert.equal(sh.DayDecide.safeParse({ adjustment_id: day, decision: 'maybe' }).success, false);
+  assert.equal(sh.DayStock.safeParse({ day_id: day, kind: 'middle' }).success, false);
 });

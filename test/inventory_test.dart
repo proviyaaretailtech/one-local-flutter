@@ -259,7 +259,7 @@ void main() {
 
     testWidgets('+ New item: a product the shop does not have joins the note, flagged as not on the order; damaged units are flagged', (t) async {
       final real = newItemForReceiving;
-      newItemForReceiving = (_) async => Facts({'id': 'new1', 'name': 'Kurkure Masala', 'sku': 'KURKUR-482'});
+      newItemForReceiving = (_, {name, barcode}) async => Facts({'id': 'new1', 'name': 'Kurkure Masala', 'sku': 'KURKUR-482'});
       addTearDown(() => newItemForReceiving = real);
       final s = Fake((r) {
         if (isWrite(r)) return ok(doc('receipt_draft', version: 3));

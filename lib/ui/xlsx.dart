@@ -83,3 +83,113 @@ Uint8List buildXlsx(String sheetName, List<List<Object?>> rows, {int headerRows 
   }
   return ZipEncoder().encodeBytes(archive);
 }
+
+/// The first sheet of an Excel workbook (.xlsx) as rows of text (31 Oct 2026: the catalogue import). Shared strings, inline strings and
+/// numbers are read; a whole number comes back without ".0"; empty cells are ''. Throws [FormatException] when it is not a workbook.
+List<List<String>> readXlsx(Uint8List bytes) {
+  final Archive zip;
+  try {
+    zip = ZipDecoder().decodeBytes(bytes);
+  } catch (_) {
+    throw const FormatException('This is not an Excel (.xlsx) file.');
+  }
+  String? text(String name) {
+    final f = zip.findFile(name);
+    return f == null ? null : utf8.decode(f.content as List<int>, allowMalformed: true);
+  }
+
+  String unesc(String s) => s
+      .replaceAllMapped(RegExp(r'&#(x?)([0-9a-fA-F]+);'), (m) => String.fromCharCode(int.parse(m[2]!, radix: m[1] == 'x' ? 16 : 10)))
+      .replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&apos;', "'").replaceAll('&amp;', '&');
+  String joinT(String xml) => RegExp(r'<t[^>]*>([\s\S]*?)</t>').allMatches(xml).map((m) => unesc(m[1]!)).join();
+
+  final shared = [for (final m in RegExp(r'<si>([\s\S]*?)</si>').allMatches(text('xl/sharedStrings.xml') ?? '')) joinT(m[1]!)];
+  // the first sheet the workbook lists (sheet1.xml when there is no workbook map)
+  var sheetPath = 'xl/worksheets/sheet1.xml';
+  final wb = text('xl/workbook.xml'), rels = text('xl/_rels/workbook.xml.rels');
+  final rid = wb == null ? null : RegExp(r'<sheet\b[^>]*\br:id="([^"]+)"').firstMatch(wb)?[1];
+  if (rid != null && rels != null) {
+    final target = RegExp('<Relationship\b[^>]*Id="$rid"[^>]*Target="([^"]+)"').firstMatch(rels)?[1] ??
+        RegExp('<Relationship\b[^>]*Target="([^"]+)"[^>]*Id="$rid"').firstMatch(rels)?[1];
+    if (target != null) sheetPath = target.startsWith('/') ? target.substring(1) : 'xl/$target';
+  }
+  final sheet = text(sheetPath);
+  if (sheet == null) throw const FormatException('This workbook has no sheet to read.');
+
+  int colIndex(String ref) {
+    var n = 0;
+    for (final c in ref.replaceAll(RegExp(r'[0-9]'), '').codeUnits) {
+      n = n * 26 + (c - 64);
+    }
+    return n - 1;
+  }
+
+  final rows = <List<String>>[];
+  for (final r in RegExp(r'<row\b[^>]*>([\s\S]*?)</row>').allMatches(sheet)) {
+    final row = <String>[];
+    for (final c in RegExp(r'<c\b([^>]*?)(?:/>|>([\s\S]*?)</c>)').allMatches(r[1]!)) {
+      final attrs = c[1]!, body = c[2] ?? '';
+      final ref = RegExp(r'\br="([A-Z]+)[0-9]+"').firstMatch(attrs)?[1];
+      final type = RegExp(r'\bt="([^"]+)"').firstMatch(attrs)?[1];
+      final v = RegExp(r'<v>([\s\S]*?)</v>').firstMatch(body)?[1];
+      var value = switch (type) {
+        's' => v == null ? '' : (int.tryParse(v) != null && int.parse(v) < shared.length ? shared[int.parse(v)] : ''),
+        'inlineStr' => joinT(body),
+        _ => v == null ? '' : unesc(v),
+      };
+      if (type == null || type == 'n') {
+        final d = double.tryParse(value);
+        if (d != null && d == d.roundToDouble() && d.abs() < 1e15) value = d.toInt().toString();
+      }
+      final at = ref == null ? row.length : colIndex(ref);
+      while (row.length < at) {
+        row.add('');
+      }
+      if (at < row.length) {
+        row[at] = value;
+      } else {
+        row.add(value);
+      }
+    }
+    rows.add(row);
+  }
+  return rows;
+}
+
+/// A CSV file as rows (quotes, commas and line breaks inside quotes, a UTF-8 byte-order mark).
+List<List<String>> readCsv(String text) {
+  final rows = <List<String>>[];
+  var row = <String>[], cell = StringBuffer(), quoted = false;
+  final s = text.startsWith('﻿') ? text.substring(1) : text;
+  for (var i = 0; i < s.length; i++) {
+    final ch = s[i];
+    if (quoted) {
+      if (ch == '"' && i + 1 < s.length && s[i + 1] == '"') {
+        cell.write('"');
+        i++;
+      } else if (ch == '"') {
+        quoted = false;
+      } else {
+        cell.write(ch);
+      }
+    } else if (ch == '"') {
+      quoted = true;
+    } else if (ch == ',') {
+      row.add(cell.toString());
+      cell = StringBuffer();
+    } else if (ch == '\n' || ch == '\r') {
+      if (ch == '\r' && i + 1 < s.length && s[i + 1] == '\n') i++;
+      row.add(cell.toString());
+      rows.add(row);
+      row = <String>[];
+      cell = StringBuffer();
+    } else {
+      cell.write(ch);
+    }
+  }
+  if (cell.isNotEmpty || row.isNotEmpty) {
+    row.add(cell.toString());
+    rows.add(row);
+  }
+  return rows;
+}

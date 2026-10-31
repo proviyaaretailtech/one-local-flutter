@@ -159,10 +159,11 @@ Future<String?> showSellMenu(BuildContext context) => showOrderSheet<String>(
         for (final (id, label, icon) in const [
           ('sell', 'New sale', LucideIcons.shoppingCart),
           ('carts', 'Open carts', LucideIcons.layers),
-          ('history', 'Transaction history', LucideIcons.history),
+          ('history', 'Order history', LucideIcons.history),
           ('returns', 'Returns & refunds', LucideIcons.undo2),
           ('receipts', 'Invoices & receipts', LucideIcons.receiptText),
           ('shift', 'Cash shift', LucideIcons.wallet),
+          ('daily', 'Daily operations', LucideIcons.calendarClock),
         ])
           ListTile(contentPadding: EdgeInsets.zero, leading: Icon(icon, color: kInk), title: Text(label, style: inter(15, 600)), onTap: () => Navigator.pop(ctx, id)),
       ]),

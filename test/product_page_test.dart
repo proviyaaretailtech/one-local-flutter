@@ -155,7 +155,7 @@ void main() {
     expect(find.text('Below 5%'), findsOneWidget);
     await tap(t, find.byKey(const ValueKey('product-save-prices')));
     final b = f.body(f.calls('cat_item_save').single);
-    expect(b, {'mode': 'quick', 'version': 3, 'price_minor': 2500, 'cost_minor': 2400, 'id': 'm1'});
+    expect(b, {'mode': 'quick', 'version': 3, 'price_basis': 'mrp', 'price_minor': 2500, 'cost_minor': 2400, 'id': 'm1'}); // the price type is recorded on its first save
     expect(toast('Prices saved.'), findsOneWidget);
   });
 

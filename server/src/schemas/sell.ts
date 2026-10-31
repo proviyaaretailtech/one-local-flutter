@@ -30,6 +30,7 @@ export const OnlineCheckout = obj({ order_id: id });
 export const Receipts = obj({
   q: text(60).optional(), status: z.enum(['all', 'paid', 'part_paid', 'unpaid', 'refunded', 'cancelled'], { message: 'Unknown status.' }).optional(),
   from: day.optional(), to: day.optional(), before: z.string().max(40).optional(), limit: z.number().int().min(1).max(100).optional(),
+  source: z.enum(['all', 'offline', 'online'], { message: 'Unknown source.' }).optional(), // counter bills or online orders (31 Oct 2026)
 });
 export const ReturnList = obj({ status: z.enum(['all', 'requested', 'approved', 'rejected', 'refunded'], { message: 'Unknown status.' }).optional(), q: text(60).optional() });
 export const ReturnCreate = obj({

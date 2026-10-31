@@ -93,7 +93,7 @@ void main() {
   testWidgets('Transaction Success', (t) => frame(t, 'Transaction Success', SuccessScreen(env: till.env(), view: OrderView(view('pending')))), skip: !on);
   testWidgets('Transaction Failed', (t) => frame(t, 'Transaction Failed', FailedScreen(env: till.env(), failure: PaymentFailure({'order_id': orderId, 'display_no': 'ORD-2026-9912', 'method': 'card', 'status': 'declined', 'code': 'S1', 'message': 'Insufficient funds', 'headline': 'Card payment declined', 'detail': 'This payment was declined. Your cart is still saved.', 'amount_due': 1302, 'charged': false}))), skip: !on);
   testWidgets('Razorpay checkout', (t) => frame(t, 'Razorpay checkout', RazorpayScreen(env: till.env(), order: OrderView(view('checkout'))), height: 1000), skip: !on);
-  testWidgets('Transaction History', (t) => frame(t, 'Transaction History', HistoryScreen(env: till.env()), then: () async {
+  testWidgets('Order History', (t) => frame(t, 'Order History', HistoryScreen(env: till.env()), then: () async {
         await t.tap(find.text('View card').first);
       }), skip: !on);
   testWidgets('Invoices & Receipts', (t) => frame(t, 'Invoices & Receipts', ReceiptsScreen(env: till.env())), skip: !on);

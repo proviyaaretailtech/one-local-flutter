@@ -14,6 +14,9 @@ class CatalogueApi {
       : _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken);
 
   final RpcClient _rpc;
+
+  /// The same door for the SKU lists (SkuApi), so a screen built with this API reaches the same server.
+  RpcClient get rpc => _rpc;
   static final _rand = Random.secure();
 
   /// One key per intent (one tap); send it again when retrying that same tap.
@@ -41,6 +44,10 @@ class CatalogueApi {
 
   Future<CatItem> lookup(String code) async => CatItem(await _call('cat_item_lookup', {'code': code.trim()}));
   Future<CatItem> get(String id) async => CatItem(await _call('cat_item_view', {'id': id}));
+
+  /// The categories (and subcategories) the store registered with at onboarding: Quick add lists them first.
+  Future<List<String>> storeCategories() async =>
+      (((await _call('cat_store_categories', {}))['categories'] as List?) ?? const []).map((e) => e.toString()).toList();
 
   /// [fields] holds only what the person typed (names as the database expects them); `version` is required when [id] is set.
   Future<CatItem> save(Map<String, dynamic> fields, {String? id, String? key}) async => CatItem(id == null

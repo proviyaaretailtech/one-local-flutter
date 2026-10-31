@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInputFormatter;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../home/home_nav.dart';
 import '../orders/order_widgets.dart';
+import '../ui/invoice_input.dart';
 import '../ui/theme.dart';
 import 'catalogue_api.dart';
 import 'catalogue_format.dart';
@@ -340,7 +342,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
           for (final l in lines) {
             total += (num.tryParse(l.qty.text) ?? 0) * (parsePriceMinor(l.rate.text) ?? 0);
           }
-          Widget box(TextEditingController c, String hint, {Key? key, bool number = false, double? width}) => SizedBox(
+          Widget box(TextEditingController c, String hint, {Key? key, bool number = false, double? width, List<TextInputFormatter>? formatters}) => SizedBox(
                 width: width,
                 height: 42,
                 child: TextField(
@@ -348,6 +350,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
                   controller: c,
                   keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
                   textAlign: number ? TextAlign.right : TextAlign.start,
+                  inputFormatters: formatters,
                   onChanged: (_) => set(() {}),
                   style: inter(14, 600),
                   decoration: InputDecoration(
@@ -370,7 +373,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
                 box(supplier, tr('Supplier'), key: const ValueKey('bill-supplier')),
                 const SizedBox(height: 8),
                 Row(children: [
-                  Expanded(child: box(number, tr('Bill no.'), key: const ValueKey('bill-number'))),
+                  Expanded(child: box(number, tr('Bill no.'), key: const ValueKey('bill-number'), formatters: invoiceNoFormatters)),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
                     key: const ValueKey('bill-date'),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../ui/item_name.dart';
 import '../ui/theme.dart';
 import 'setup_api.dart';
 import 'setup_flow.dart';
@@ -350,7 +351,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
     if (price == null || price <= 0) return showToast(context, 'Enter a selling price above zero.');
     setState(() => _busy = true);
     final s = await setupGuarded(context, () => widget.api.addItem({
-          'name': _name.text,
+          // a store's product name: typed in capitals, saved in Title Case
+          'name': widget.state.isRestaurant ? _name.text : titleCase(_name.text),
           'category': _category.text,
           'price': _price.text.trim(),
           if (widget.state.isRestaurant) 'food_type': _food,
@@ -366,7 +368,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Add an item', style: inter(18, 700)),
           const SizedBox(height: 14),
-          SetupField(label: 'Item name', controller: _name, hint: widget.state.isRestaurant ? 'e.g. Masala Dosa' : 'e.g. Tata Salt 1kg', maxLength: 120),
+          widget.state.isRestaurant
+              ? SetupField(label: 'Item name', controller: _name, hint: 'e.g. Masala Dosa', maxLength: 120)
+              : SetupField(label: 'Item name (capitals)', controller: _name, hint: 'e.g. TATA SALT', maxLength: kItemNameMax, inputFormatters: itemNameFormatters),
           const SizedBox(height: 12),
           SetupField(label: 'Category', controller: _category, hint: widget.state.isRestaurant ? 'e.g. South Indian' : 'e.g. Staples', maxLength: 60),
           const SizedBox(height: 12),

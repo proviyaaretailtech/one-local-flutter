@@ -31,11 +31,37 @@ class Fake {
   final http.Response Function(http.Request r) handler;
   final requests = <http.Request>[];
   late final api = CatalogueApi(baseUrl: 'http://pos.test', accessToken: () => 'token-123', client: MockClient((r) async {
+    // the SKU picker's lists (not counted as the screen's own requests)
+    final sku = skuFixture(r.url.path.split('/').last);
+    if (sku != null) return ok(sku);
     requests.add(r);
     return handler(r);
   }));
   Iterable<http.Request> where(String method, String pathEnd) => requests.where((r) => r.method == method && r.url.path.endsWith(pathEnd));
   Map<String, dynamic> body(http.Request r) => jsonDecode(r.body) as Map<String, dynamic>;
+}
+
+/// The SKU picker's lists: a subcategory, LSE (fits both price types) and the units.
+Map<String, dynamic>? skuFixture(String fn) => switch (fn) {
+      'sku_options' => {
+          'subcategories': [{'code': 'SNK', 'name': 'Snacks & Namkeen', 'category': 'Groceries', 'examples': 'Chips, namkeen'}],
+          'units': [for (final u in ['G', 'KG', 'PC', 'PK']) {'code': u}],
+          'brands': [{'code': 'LSE', 'name': 'Loose / Unbranded', 'kind': 'reserved', 'status': 'approved'}],
+          'store_initials': 'SGS', 'lot': '3110',
+        },
+      'sku_variants' => {'variants': []},
+      'sku_lookup' => {'found': false},
+      _ => null,
+    };
+
+/// Subcategory, brand and unit: the SKU's parts.
+Future<void> pickSku(WidgetTester t) async {
+  for (final k in ['sku-sub', 'sku-sub-SNK', 'sku-brand', 'sku-brand-LSE', 'sku-unit-PK']) {
+    await t.ensureVisible(find.byKey(ValueKey(k)));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(ValueKey(k)));
+    await t.pumpAndSettle();
+  }
 }
 
 /// A 405 pt wide phone window with the real Inter and Lucide fonts, so a layout overflow here is a real overflow (no ignoreOverflow).
@@ -259,7 +285,8 @@ void main() {
       expect(find.byType(QuickAddScreen), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('quick-name')), 'Oat Crunch');
       await t.pump();
-      expect(find.textContaining('System Code OATCRU-'), findsOneWidget);
+      expect(find.textContaining('System Code'), findsNothing); // the SKU is never made from the name
+      await pickSku(t);
       await t.ensureVisible(find.byKey(const ValueKey('quick-save')));
       await t.tap(find.byKey(const ValueKey('quick-save')));
       await t.pump();
@@ -271,7 +298,7 @@ void main() {
       final post = s.where('POST', '/cat_item_save').single;
       final b = s.body(post);
       expect(b, allOf(containsPair('mode', 'quick'), containsPair('name', 'Oat Crunch'), containsPair('price_minor', 4500), containsPair('selling_unit', 'pc')));
-      expect(b['sku'], startsWith('OATCRU-'));
+      expect(b['sku_parts'], {'sub': 'SNK', 'slot3': 'LSE', 'size': 'PK'});
       expect(post.headers['Idempotency-Key'], startsWith('cat-'));
       expect(toast('Oat added.'), findsOneWidget);
     });
@@ -303,6 +330,7 @@ void main() {
       expect(find.text('Category: Personal care'), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('quick-name')), 'Shampoo');
       await t.enterText(find.byKey(const ValueKey('quick-price')), '99');
+      await pickSku(t);
       await t.ensureVisible(find.byKey(const ValueKey('quick-save')));
       await t.tap(find.byKey(const ValueKey('quick-save')));
       await t.pumpAndSettle();
@@ -319,6 +347,7 @@ void main() {
       expect(find.text('Category: Snacks'), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('quick-name')), 'Chips');
       await t.enterText(find.byKey(const ValueKey('quick-price')), '20');
+      await pickSku(t);
       await t.ensureVisible(find.byKey(const ValueKey('quick-save')));
       await t.tap(find.byKey(const ValueKey('quick-save')));
       await t.pumpAndSettle();
@@ -339,6 +368,7 @@ void main() {
       expect(find.byKey(const ValueKey('quick-photo-replace')), findsOneWidget); // tap the photo to change it
       await t.enterText(find.byKey(const ValueKey('quick-name')), 'Oat');
       await t.enterText(find.byKey(const ValueKey('quick-price')), '45');
+      await pickSku(t);
       await t.ensureVisible(find.byKey(const ValueKey('quick-save')));
       await t.tap(find.byKey(const ValueKey('quick-save')));
       await t.pumpAndSettle();
@@ -353,6 +383,7 @@ void main() {
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const ValueKey('quick-name')), 'Oat');
       await t.enterText(find.byKey(const ValueKey('quick-price')), '45');
+      await pickSku(t);
       await t.ensureVisible(find.byKey(const ValueKey('quick-save')));
       await t.tap(find.byKey(const ValueKey('quick-save')));
       await t.pumpAndSettle();
@@ -457,7 +488,7 @@ void main() {
       }
       final fields = find.byType(TextField);
       await t.enterText(fields.at(0), 'Oat Crunch Cookies 200g');
-      await t.enterText(fields.at(1), 'OC-200-PK');
+      await pickSku(t);
       await t.enterText(find.widgetWithText(TextField, '').at(0), 'Oat Crunch Cookies 200g');
       // price field is the one with the ₹40.00 hint
       await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == '₹40.00'), '40');
@@ -468,7 +499,7 @@ void main() {
       expect(sent['mode'], 'full');
       expect(sent['draft'], false);
       expect(sent['price_minor'], 4000);
-      expect(sent['sku'], 'OC-200-PK');
+      expect(sent['sku_parts'], allOf(containsPair('sub', 'SNK'), containsPair('slot3', 'LSE'))); // the database makes the SKU
       expect(sent.containsKey('version'), false);
       expect(find.text('Complete tax details to save item'), findsOneWidget);
       expect(find.text('Complete the HSN and GST rate to save the item, or save it as a draft.'), findsOneWidget);
@@ -493,7 +524,7 @@ void main() {
       await t.pumpAndSettle();
       final fields = find.byType(TextField);
       await t.enterText(fields.at(0), 'Oat');
-      await t.enterText(fields.at(1), 'OAT1');
+      await pickSku(t);
       await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == '₹40.00'), '40');
       await t.ensureVisible(find.text('Save draft only'));
       await t.tap(find.text('Save draft only'));
@@ -515,7 +546,7 @@ void main() {
       expect(find.text('Background removed'), findsOneWidget);
       final fields = find.byType(TextField);
       await t.enterText(fields.at(0), 'Oat');
-      await t.enterText(fields.at(1), 'OAT1');
+      await pickSku(t);
       await t.enterText(find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == '₹40.00'), '40');
       await t.tap(find.text('Save draft only'));
       await t.pumpAndSettle();
@@ -598,7 +629,7 @@ void main() {
       final s = Fake((_) => err(409, 'This item was changed on another device.', 'version_conflict'));
       await phone(t, ItemFormScreen(api: s.api, item: it), height: 6400);
       expect(find.text('Edit Item'), findsOneWidget);
-      expect(find.text('Coca-Cola 500ml'), findsWidgets);
+      expect(find.text('COCA-COLA 500ML'), findsWidgets); // the name box is in capitals
       await t.ensureVisible(find.text('Save item'));
       await t.tap(find.text('Save item'));
       await t.pumpAndSettle();

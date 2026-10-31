@@ -37,3 +37,5 @@ export const WalletSettlement = z.object({ id }).loose();
 
 // ---- Manage account (0512)
 export const SaveName = z.object({ name: z.string().trim().min(2, 'Enter your full name.').max(120, 'Name is too long.') }).loose();
+// Delete account (hosted_account_deletion_2026-10-31.sql): the person types DELETE; the database checks it again and keeps a 30-day grace.
+export const DeleteRequest = z.object({ confirm: z.literal('DELETE', { message: 'Type DELETE to confirm.' }), reason: z.string().trim().max(300).optional() }).strict();

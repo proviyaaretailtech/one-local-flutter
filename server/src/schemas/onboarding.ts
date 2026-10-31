@@ -46,12 +46,18 @@ export const Profile = z.object({
   category: text(80, 'Choose your category.').optional(),
   categories: z.array(text(80, 'Choose your cuisines.')).max(30, 'Too many cuisines.').optional(), // restaurant: every cuisine it serves
   subcategory: text(80, 'Choose your subcategory.').optional(),
+  // store (founder, 31 Oct 2026): one category and several of its subcategories (the list keeps room for more categories later).
+  // An older app sends one `category` and one `subcategory`.
+  store_picks: z.array(z.object({
+    category: text(80, 'Choose your category.'),
+    subcategories: z.array(text(80, 'Choose your subcategory.')).max(30, 'Too many subcategories.'),
+  })).max(1, 'Choose one category.').optional(),
   specialty: text(80, 'Subcategory is too long.').optional().or(z.literal('')),
 });
 
 /** The profile the database stores: the picked category checked against the lists and split into family, category, subcategories. */
 export function profileArgs(b: z.infer<typeof Profile>) {
-  let family: string | null = null, category: string | null = null, subs: string[] = [];
+  let family: string | null = null, category: string | null = null, subs: string[] = [], cats: string[] | undefined;
   const bad = (m: string) => new HttpError(400, m, undefined, 'validation');
   if (b.partner_type === 'restaurant') {
     // A restaurant can serve several cuisines; the first one picked is its main category. An older app sends just `category`.
@@ -60,19 +66,30 @@ export function profileArgs(b: z.infer<typeof Profile>) {
     if (picked.some(c => !restaurantTypes.includes(c))) throw bad('Choose your cuisines from the list.');
     category = picked[0]; subs = picked;
   } else if (b.partner_type === 'store') {
-    const found = families.flatMap(f => f.categories.map(c => ({ f, c }))).find(x => x.c.name === b.category);
-    if (!b.category) throw bad('Choose your category.');
-    if (!found) throw bad('Choose your category from the list.');
-    if (!b.subcategory) throw bad('Choose your subcategory.');
-    if (!found.c.subcategories.includes(b.subcategory)) throw bad('Choose your subcategory from the list.');
-    family = found.f.name; category = found.c.name; subs = [b.subcategory];
+    const picks = b.store_picks?.length ? b.store_picks : b.category ? [{ category: b.category, subcategories: b.subcategory ? [b.subcategory] : [] }] : [];
+    if (picks.length === 0) throw bad('Choose your category.');
+    const seen = new Set<string>();
+    const all = families.flatMap(f => f.categories.map(c => ({ f, c })));
+    for (const pick of picks) {
+      const found = all.find(x => x.c.name === pick.category);
+      if (!found) throw bad('Choose your category from the list.');
+      if (seen.has(found.c.name)) continue;
+      seen.add(found.c.name);
+      const picked = [...new Set(pick.subcategories)];
+      if (picked.length === 0) throw bad(`Choose a subcategory for ${found.c.name}.`);
+      if (picked.some(sc => !found.c.subcategories.includes(sc))) throw bad(`Choose the ${found.c.name} subcategories from the list.`);
+      if (!family) { family = found.f.name; category = found.c.name; }
+      for (const sc of picked) if (!subs.includes(sc)) subs.push(sc);
+    }
+    if (subs.length > 30) throw bad('Too many subcategories. Pick up to 30.');
+    cats = [...seen];
   } else {
     if (!b.category) throw bad('Choose your service.');
     if (!serviceCategories.some(c => c.name === b.category)) throw bad('Choose your service from the list.');
     category = b.category;
   }
   return { partner_type: b.partner_type, business_name: b.business_name, owner_name: b.owner_name, phone: b.phone, email: b.email || '',
-    selling_mode: b.selling_mode, category_family: family, category, subcategories: subs, specialty: b.specialty || '' };
+    selling_mode: b.selling_mode, category_family: family, category, subcategories: subs, specialty: b.specialty || '', ...(cats ? { categories: cats } : {}) };
 }
 
 export const Plan = z.object({ plan: z.enum(['pos_and_onelocal', 'onelocal_app', 'pos_only'], { message: 'Choose how you want to sell.' }) });

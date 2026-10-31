@@ -5,6 +5,7 @@ import '../auth/partner_api.dart';
 import '../catalogue/catalogue_api.dart';
 import '../catalogue/item_form_screen.dart';
 import '../catalogue/item_sheets.dart' show parsePriceMinor;
+import '../catalogue/price_basis.dart';
 import '../inventory/inventory_api.dart';
 import '../ui/theme.dart';
 import 'stock_env.dart';
@@ -37,6 +38,23 @@ class _ProductPageState extends State<ProductPage> {
   String? _key; // one save of prices, kept for a retry
   final _price = TextEditingController(), _mrp = TextEditingController(), _cost = TextEditingController();
 
+  /// MRP-based (printed MRP) or store-based (own price; cost + markup % sets it).
+  PriceBasis _basis = PriceBasis.mrp;
+  final _markup = TextEditingController();
+  PriceBasis get _savedBasis => priceBasisOf(_cat?.raw['price_basis'], unit: _cat?.sellingUnit ?? 'pc');
+
+  void _syncMarkup() {
+    final m = markupPct(num.tryParse(_cost.text.trim()), num.tryParse(_price.text.trim()));
+    _markup.text = m == null ? '' : pctText(m);
+  }
+
+  void _markupChanged() {
+    final cost = num.tryParse(_cost.text.trim()), pct = num.tryParse(_markup.text.trim());
+    if (cost == null || cost <= 0 || pct == null) return;
+    final v = priceFromMarkup(cost, pct);
+    _price.text = v == v.roundToDouble() ? v.round().toString() : v.toStringAsFixed(2);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +69,7 @@ class _ProductPageState extends State<ProductPage> {
     _price.dispose();
     _mrp.dispose();
     _cost.dispose();
+    _markup.dispose();
     super.dispose();
   }
 
@@ -66,6 +85,8 @@ class _ProductPageState extends State<ProductPage> {
     _price.text = c == null ? '' : _rs(c.priceMinor);
     _mrp.text = _rs(c?.mrpMinor);
     _cost.text = _rs(c?.costMinor);
+    _basis = _savedBasis;
+    _syncMarkup();
   }
 
   String _problem(Object e, String fallback) => e is PartnerApiException ? e.message : fallback;
@@ -161,7 +182,7 @@ class _ProductPageState extends State<ProductPage> {
   bool get _pricesChanged {
     final c = _cat;
     if (c == null) return false;
-    return _minor(_price) != c.priceMinor || _minor(_mrp) != c.mrpMinor || _minor(_cost) != c.costMinor;
+    return _basis != _savedBasis || _minor(_price) != c.priceMinor || (_basis == PriceBasis.mrp && _minor(_mrp) != c.mrpMinor) || _minor(_cost) != c.costMinor;
   }
 
   Future<void> _savePrices() async {
@@ -171,7 +192,7 @@ class _ProductPageState extends State<ProductPage> {
     for (final t in [_mrp, _cost]) {
       if (t.text.trim().isNotEmpty && parsePriceMinor(t.text) == null) return showToast(context, 'Check the amounts.');
     }
-    if (mrp != null && price > mrp) return showToast(context, 'The price is above the MRP. Lower the price or raise the MRP.');
+    if (_basis == PriceBasis.mrp && mrp != null && price > mrp) return showToast(context, 'The price is above the MRP. Lower the price or raise the MRP.');
     setState(() => _savingPrices = true);
     _key ??= CatalogueApi.newKey();
     try {
@@ -179,7 +200,9 @@ class _ProductPageState extends State<ProductPage> {
         'mode': 'quick',
         'version': c.version,
         if (price != c.priceMinor) 'price_minor': price,
-        if (mrp != c.mrpMinor) 'mrp_minor': mrp,
+        if (_basis != _savedBasis || c.raw['price_basis'] == null) 'price_basis': _basis.name,
+        // store-based: no printed MRP; the database keeps the selling price as the MRP
+        if (_basis == PriceBasis.mrp && mrp != c.mrpMinor) 'mrp_minor': mrp,
         if (cost != c.costMinor) 'cost_minor': cost,
       }, id: c.id, key: _key);
       _key = null;
@@ -311,7 +334,8 @@ class _ProductPageState extends State<ProductPage> {
 
   Widget _priceCard(CatItem c) {
     final price = _minor(_price), mrp = _minor(_mrp), cost = _minor(_cost);
-    final tone = UpdateStockScreenTones.tone(price, mrp);
+    final store = _basis == PriceBasis.store;
+    final tone = store ? null : UpdateStockScreenTones.tone(price, mrp);
     final m = UpdateStockScreenTones.margin(price, cost);
     final low = m != null && m.pct < 5;
     String rupees(int minor) => (minor < 0 ? '−₹' : '₹') + _rs(minor.abs());
@@ -319,15 +343,20 @@ class _ProductPageState extends State<ProductPage> {
       margin: const EdgeInsets.only(top: 12, bottom: 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text(tr('Price'), style: inter(15.5, 700)),
+        const SizedBox(height: 8),
+        PriceBasisPicker(key: const ValueKey('product-basis'), keyPrefix: 'product-basis', value: _basis, onChanged: (b) => setState(() => _basis = b)),
         const SizedBox(height: 4),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _money('MRP ₹', _mrp, 'product-mrp'),
+          if (store)
+            _money('Markup %', _markup, 'product-markup', onChanged: _markupChanged)
+          else
+            _money('MRP ₹', _mrp, 'product-mrp'),
           const SizedBox(width: 10),
-          _money('Price ₹', _price, 'product-price', tone: tone),
+          _money(store ? 'Selling price ₹ (as MRP)' : 'Price ₹', _price, 'product-price', tone: tone, onChanged: _syncMarkup),
         ]),
         const SizedBox(height: 6),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _money('Cost ₹', _cost, 'product-cost'),
+          _money('Cost ₹', _cost, 'product-cost', onChanged: () => store && _markup.text.trim().isNotEmpty ? _markupChanged() : _syncMarkup()),
           const SizedBox(width: 10),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -359,7 +388,7 @@ class _ProductPageState extends State<ProductPage> {
     );
   }
 
-  Widget _money(String label, TextEditingController c, String key, {(Color, Color, String)? tone}) => Expanded(
+  Widget _money(String label, TextEditingController c, String key, {(Color, Color, String)? tone, VoidCallback? onChanged}) => Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           InvLabel(label),
           SizedBox(
@@ -367,7 +396,7 @@ class _ProductPageState extends State<ProductPage> {
             child: TextField(
               key: ValueKey(key),
               controller: c,
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) => setState(() => onChanged?.call()),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               style: inter(15, tone == null ? 400 : 700, color: tone?.$2 ?? kInk),
               decoration: InputDecoration(

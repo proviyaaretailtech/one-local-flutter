@@ -50,7 +50,7 @@ void main() {
     expect(HomeNav.shell, isNotNull);
   });
 
-  testWidgets('tabs swap under the bar and keep their own back stack; tapping the current tab goes to its first screen', (t) async {
+  testWidgets('tabs swap under the bar; a tab always opens on its own first screen, never on a page left open in it', (t) async {
     await _show(t);
     await _tab(t, 'Item');
     expect(find.text('root store Item'), findsOneWidget);
@@ -62,9 +62,20 @@ void main() {
     await _tab(t, 'Bill');
     expect(find.text('root store Bill'), findsOneWidget);
     await _tab(t, 'Item');
-    expect(find.text('detail store Item'), findsOneWidget, reason: 'Item kept its place');
+    expect(find.text('root store Item'), findsOneWidget, reason: 'Item opens on Item, not on the page left open (31 Oct 2026)');
+    expect(find.text('detail store Item'), findsNothing);
+
+    // the same from Home: a page opened there is gone when Home is tapped again from another tab
+    await _tab(t, 'Home');
+    await t.tap(find.text('open store Home'));
+    await t.pumpAndSettle();
     await _tab(t, 'Item');
-    expect(find.text('root store Item'), findsOneWidget);
+    await _tab(t, 'Home');
+    expect(find.text('root store Home'), findsOneWidget);
+    await t.tap(find.text('open store Home'));
+    await t.pumpAndSettle();
+    await _tab(t, 'Home');
+    expect(find.text('root store Home'), findsOneWidget, reason: 'tapping the current tab goes to its first screen');
   });
 
   testWidgets('a tab with no screen yet says so and stays put', (t) async {

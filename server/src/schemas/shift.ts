@@ -25,3 +25,16 @@ export const PayFail = obj({ intent_id: id, status: z.enum(['declined', 'failed'
 export const PayStatus = obj({ intent_id: id.optional(), order_id: id.optional() }).refine(a => a.intent_id || a.order_id, { message: 'Send the payment or the bill.' });
 
 export const RefundCheck = obj({ order_id: id, purpose: z.enum(['refund', 'return'], { message: 'Refund or return.' }).optional(), amount: money.optional() });
+
+// The business day (database: hosted_pos_business_day_2026-10-31.sql): Day start, opening cash, closing cash, day closing, reports.
+const bigCash = z.number({ message: 'Enter an amount.' }).min(0, 'Enter 0 or more.').max(9_999_999.99, 'That amount is too large.');
+const reason = z.string().trim().min(3, 'Give a reason (3 to 200 characters).').max(200, 'Give a reason (3 to 200 characters).');
+const version = { expected_version: z.number().int().min(1).optional() };
+export const DayToday = obj({ ...store, start: z.boolean().optional(), trigger: z.enum(['first_activity', 'manual']).optional() });
+export const DayOpening = obj({ day_id: id, amount: bigCash, reason, ...version, ...key });
+export const DayDecide = obj({ adjustment_id: id, decision: z.enum(['approve', 'reject'], { message: 'Approve or reject.' }), note: z.string().max(300).optional() });
+export const DayCount = obj({ day_id: id, counted_cash: bigCash, reason: z.string().max(200).optional(), ...key });
+export const DayClose = obj({ day_id: id, note: z.string().max(300).optional(), ...version, ...key });
+export const DayList = obj({ ...store, limit: z.number().int().min(1).max(100).optional(), before: z.string().max(10).optional() });
+export const DayGet = obj({ day_id: id });
+export const DayStock = obj({ day_id: id, kind: z.enum(['opening', 'closing']).optional(), q: z.string().max(60).optional() });

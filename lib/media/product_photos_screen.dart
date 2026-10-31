@@ -491,6 +491,37 @@ class _ReviewState extends State<_Review> {
 
   Future<void> _decide(PoolPhoto p, bool approve) async {
     String? note;
+    bool? mapProduct;
+    // a new OneLocal product waits with this photo: approve it as the standard product too (barcode, brand, unit, SKU)?
+    if (approve && p.raw['master_status'] == 'pending') {
+      var on = true;
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (d) => StatefulBuilder(
+          builder: (d, set) => AlertDialog(
+            title: Text(tr('Approve this photo')),
+            content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text([p.raw['sku'], if (p.raw['barcode'] != null) '${tr('Barcode')} ${p.raw['barcode']}', if (p.raw['brand_status'] == 'pending') '${tr('new brand')} ${p.raw['brand_code']}'].join(' · '),
+                  style: inter(13, 600)),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                key: const ValueKey('approve-map'),
+                contentPadding: EdgeInsets.zero,
+                value: on,
+                onChanged: (v) => set(() => on = v ?? false),
+                title: Text(tr('Also approve it as the standard product: its barcode, brand, unit and SKU join the Master library for every partner.'), style: inter(13, 500)),
+              ),
+            ]),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(d), child: Text(tr('Cancel'))),
+              FilledButton(key: const ValueKey('approve-confirm'), onPressed: () => Navigator.pop(d, true), child: Text(tr('Approve'))),
+            ],
+          ),
+        ),
+      );
+      if (go != true || !mounted) return;
+      mapProduct = on;
+    }
     if (!approve) {
       final c = TextEditingController();
       note = await showDialog<String>(
@@ -508,7 +539,7 @@ class _ReviewState extends State<_Review> {
     }
     setState(() => _busy = p.id);
     try {
-      await widget.api.decide(p.id, approve: approve, note: note);
+      await widget.api.decide(p.id, approve: approve, note: note, mapProduct: mapProduct);
       if (mounted) showToast(context, approve ? '${p.name} is in the Standard pool now.' : '${p.name} was not approved.');
       await _load();
     } catch (e) {
@@ -566,6 +597,12 @@ class _ReviewState extends State<_Review> {
                                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                     Text(p.name, style: inter(14.5, 700)),
                                     Text([p.storeName, p.productCategory].whereType<String>().join(' · '), style: inter(12, 500, color: kMuted)),
+                                    if (p.raw['sku'] != null)
+                                      Text(
+                                        [p.raw['sku'], if (p.raw['master_status'] == 'approved') tr('standard') else tr('product waiting')].join(' · '),
+                                        key: ValueKey('review-sku-${p.id}'),
+                                        style: inter(11.5, 700, color: p.raw['master_status'] == 'approved' ? kGreenText : const Color(0xFFB45309)),
+                                      ),
                                     if (p.status == 'rejected' && p.note != null) Text(p.note!, style: inter(12, 500, color: const Color(0xFFC62828))),
                                   ]),
                                 ),
