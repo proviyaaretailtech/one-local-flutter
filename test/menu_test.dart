@@ -14,6 +14,9 @@ import 'package:vinii_pos/menu/dish_screen.dart';
 import 'package:vinii_pos/menu/menu_api.dart';
 import 'package:vinii_pos/menu/menu_build_api.dart';
 import 'package:vinii_pos/menu/menu_screen.dart';
+import 'package:vinii_pos/menu/ai_picture_sheet.dart' show fitPhotoAsync;
+import 'package:vinii_pos/menu/photo_fit.dart';
+import 'package:image/image.dart' as img;
 
 import 'home_test.dart' show FakeHome, summaryJson, showTall;
 import 'restaurant_dashboard_test.dart' show FakeRst, dash, ok;
@@ -497,7 +500,7 @@ void main() {
     });
   });
 
-  group('AI picture (with / without background)', () {
+  group('AI enhancer (enhance, background, 4:5 or square)', () {
     // a real 1×1 PNG, so the previews draw
     final png = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
     Map<String, dynamic> withPhoto() {
@@ -506,77 +509,187 @@ void main() {
       return m;
     }
 
-    testWidgets('⋮ → AI picture: With background sends the cream backdrop, Use this picture saves it on the dish and reloads', (t) async {
+    final before = fitPhotoAsync;
+    setUp(() => fitPhotoAsync = (b, s, bd, e) async => fitPhoto(b, size: s, backdrop: bd, enhance: e)); // in place, not an isolate
+    tearDown(() => fitPhotoAsync = before);
+
+    Future<void> openFor(WidgetTester t, String dish) async {
+      await t.tap(find.byKey(ValueKey('more-$dish')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(ValueKey('ai-photo-$dish')));
+      await t.pumpAndSettle();
+    }
+
+    Future<void> tapKey(WidgetTester t, String key) async {
+      await t.ensureVisible(find.byKey(ValueKey(key)));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(ValueKey(key)));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('⋮ → AI enhancer: Studio, 4:5 and Enhance by default; Make picture cuts the dish out and fits it to 1080 × 1350; Use saves it',
+        (t) async {
       final photos = _FakeAiPhotos(png);
       final g = FakeGateway((fn, b) => json(withPhoto()));
       await showScreen(t, MenuScreen(api: g.api, buildApi: g.build, photos: photos));
       await t.tap(find.byKey(const ValueKey('more-d1')));
       await t.pumpAndSettle();
-      expect(find.text('With or without background'), findsOneWidget);
+      expect(find.text('AI enhancer'), findsOneWidget);
+      expect(find.text('Enhance, background, 4:5 or square'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('ai-photo-d1')));
       await t.pumpAndSettle();
-      expect(find.text('AI picture · Americano ( Large )'), findsOneWidget);
-      expect(find.text('With background'), findsOneWidget);
-      expect(find.text('Without background'), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('ai-with-bg')));
-      await t.pumpAndSettle();
+      expect(find.text('AI enhancer · Americano ( Large )'), findsOneWidget);
+      expect(t.widget<SwitchListTile>(find.byKey(const ValueKey('ai-enhance'))).value, isTrue);
+      await tapKey(t, 'ai-make');
       expect(photos.loaded, ['http://img.test/americano.jpg'], reason: 'works on the dish\'s own photo');
-      expect(photos.bg, ['f6efe2']);
+      expect(photos.bg, [null], reason: 'the dish is cut out; the backdrop is added on the phone');
       expect(find.byKey(const ValueKey('ai-result')), findsOneWidget);
-      final before = g.calls.where((c) => c.$1 == 'rst_menu').length;
-      await t.tap(find.byKey(const ValueKey('ai-use')));
-      await t.pumpAndSettle();
-      expect(photos.attached.single.$1, 'd1');
-      expect(photos.attached.single.$2.contentType, 'image/jpeg');
+      expect(find.textContaining('4:5 · 1080 × 1350 · enhanced'), findsOneWidget);
+      final menus = g.calls.where((c) => c.$1 == 'rst_menu').length;
+      await tapKey(t, 'ai-use');
+      final saved = photos.attached.single;
+      expect(saved.$1, 'd1');
+      expect(saved.$2.contentType, 'image/jpeg');
+      final pic = img.decodeImage(saved.$2.bytes)!;
+      expect((pic.width, pic.height), (1080, 1350));
       expect(find.byKey(const ValueKey('ai-result')), findsNothing, reason: 'the sheet closes');
-      expect(g.calls.where((c) => c.$1 == 'rst_menu').length, greaterThan(before), reason: 'the menu reloads with the new photo');
+      expect(g.calls.where((c) => c.$1 == 'rst_menu').length, greaterThan(menus), reason: 'the menu reloads with the new photo');
     });
 
-    testWidgets('Without background asks for a transparent cut-out; nothing is saved until Use this picture', (t) async {
+    testWidgets('Remove + Square: a transparent PNG of 1080 × 1080; nothing is saved until Use this picture', (t) async {
       final photos = _FakeAiPhotos(png);
       final g = FakeGateway((fn, b) => json(withPhoto()));
       await showScreen(t, MenuScreen(api: g.api, buildApi: g.build, photos: photos));
-      await t.tap(find.byKey(const ValueKey('more-d1')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('ai-photo-d1')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('ai-without-bg')));
-      await t.pumpAndSettle();
-      expect(photos.bg, [null]);
-      expect(find.textContaining('Background removed'), findsOneWidget);
+      await openFor(t, 'd1');
+      await tapKey(t, 'ai-bg-none');
+      await tapKey(t, 'ai-size-square');
+      await tapKey(t, 'ai-make');
       expect(photos.attached, isEmpty);
+      await tapKey(t, 'ai-use');
+      final saved = photos.attached.single.$2;
+      expect(saved.contentType, 'image/png');
+      final pic = img.decodeImage(saved.bytes)!;
+      expect((pic.width, pic.height), (1080, 1080));
+      expect(pic.getPixel(2, 2).a, 0, reason: 'the corner is see-through');
+    });
+
+    testWidgets('Keep: no background removal at all; the photo is cropped to fill the frame', (t) async {
+      final photos = _FakeAiPhotos(png);
+      final g = FakeGateway((fn, b) => json(withPhoto()));
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build, photos: photos));
+      await openFor(t, 'd1');
+      await tapKey(t, 'ai-bg-keep');
+      await tapKey(t, 'ai-enhance');
+      await tapKey(t, 'ai-make');
+      expect(photos.bg, isEmpty);
+      expect(find.textContaining('enhanced'), findsNothing, reason: 'Enhance was switched off');
+      await tapKey(t, 'ai-use');
+      final pic = img.decodeImage(photos.attached.single.$2.bytes)!;
+      expect((pic.width, pic.height), (1080, 1350));
+    });
+
+    testWidgets('a new choice after a result clears it; the dish is cut out once and reused', (t) async {
+      final photos = _FakeAiPhotos(png);
+      final g = FakeGateway((fn, b) => json(withPhoto()));
+      await showScreen(t, MenuScreen(api: g.api, buildApi: g.build, photos: photos));
+      await openFor(t, 'd1');
+      await tapKey(t, 'ai-make');
+      expect(find.byKey(const ValueKey('ai-use')), findsOneWidget);
+      await tapKey(t, 'ai-bg-none');
+      expect(find.byKey(const ValueKey('ai-use')), findsNothing);
+      expect(find.byKey(const ValueKey('ai-make')), findsOneWidget);
+      await tapKey(t, 'ai-make');
+      expect(photos.bg, [null], reason: 'Studio and Remove share one cut-out');
     });
 
     testWidgets('the server\'s sentence is shown when background removal is not set up', (t) async {
       final photos = _FakeAiPhotos(png, refuse: 'Background removal is not set up yet. Your photo is kept as it is.');
       final g = FakeGateway((fn, b) => json(withPhoto()));
       await showScreen(t, MenuScreen(api: g.api, buildApi: g.build, photos: photos));
-      await t.tap(find.byKey(const ValueKey('more-d1')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('ai-photo-d1')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('ai-with-bg')));
-      await t.pumpAndSettle();
+      await openFor(t, 'd1');
+      await tapKey(t, 'ai-make');
       expect(find.text('Background removal is not set up yet. Your photo is kept as it is.'), findsOneWidget);
       expect(find.byKey(const ValueKey('ai-use')), findsNothing);
     });
 
-    testWidgets('a dish with no photo asks for one first; a chosen photo is what the AI works on', (t) async {
+    testWidgets('a dish with no photo asks for one first; a chosen photo is what it works on', (t) async {
       final photos = _FakeAiPhotos(png);
       final g = FakeGateway((fn, b) => json(menuJson()));
       await showScreen(t, MenuScreen(api: g.api, buildApi: g.build, photos: photos));
-      await t.tap(find.byKey(const ValueKey('more-d2')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('ai-photo-d2')));
-      await t.pumpAndSettle();
+      await openFor(t, 'd2');
       expect(find.text('Choose a photo'), findsOneWidget);
-      expect(t.widget<OutlinedButton>(find.byKey(const ValueKey('ai-with-bg'))).onPressed, isNull);
-      await t.tap(find.byKey(const ValueKey('ai-pick')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('ai-without-bg')));
-      await t.pumpAndSettle();
+      expect(t.widget<FilledButton>(find.byKey(const ValueKey('ai-make'))).onPressed, isNull);
+      await tapKey(t, 'ai-pick');
+      await tapKey(t, 'ai-make');
       expect(photos.loaded, isEmpty);
       expect(photos.bg, [null]);
+    });
+  });
+
+  group('fitting a photo', () {
+    // a 300 × 200 picture: a red dish in the middle on transparency, as a cut-out comes back
+    Uint8List cutOut() {
+      final p = img.Image(width: 300, height: 200, numChannels: 4);
+      img.fillRect(p, x1: 100, y1: 50, x2: 199, y2: 149, color: img.ColorRgba8(200, 40, 30, 255));
+      return Uint8List.fromList(img.encodePng(p));
+    }
+
+    test('Studio: the dish centred on cream at 1080 × 1350, never cut off', () {
+      final out = fitPhoto(cutOut(), size: PhotoSize.portrait, backdrop: Backdrop.studio, enhance: false);
+      expect(out.contentType, 'image/jpeg');
+      final p = img.decodeImage(out.bytes)!;
+      expect((p.width, p.height), (1080, 1350));
+      final corner = p.getPixel(5, 5), centre = p.getPixel(540, 675);
+      expect((corner.r.toInt() - 0xF6).abs() < 6 && (corner.g.toInt() - 0xEF).abs() < 6, isTrue, reason: 'cream at the corner');
+      expect(centre.r > 150 && centre.g < 90, isTrue, reason: 'the dish in the middle');
+      expect(p.getPixel(540, 20).r > 230, isTrue, reason: 'a margin above the dish (88 % of the frame)');
+    });
+
+    test('Remove: transparent PNG; Square: 1080 × 1080', () {
+      final p = img.decodeImage(fitPhoto(cutOut(), size: PhotoSize.square, backdrop: Backdrop.none, enhance: false).bytes)!;
+      expect((p.width, p.height), (1080, 1080));
+      expect(p.getPixel(3, 3).a, 0);
+      expect(p.getPixel(540, 540).a, 255);
+    });
+
+    test('Keep: a wide photo is cropped from the middle to fill 4:5, with no empty edges', () {
+      final wide = img.Image(width: 400, height: 200);
+      img.fill(wide, color: img.ColorRgb8(20, 120, 40));
+      final p = img.decodeImage(fitPhoto(Uint8List.fromList(img.encodePng(wide)), size: PhotoSize.portrait, backdrop: Backdrop.keep, enhance: false).bytes)!;
+      expect((p.width, p.height), (1080, 1350));
+      expect(p.getPixel(2, 2).g > 100, isTrue, reason: 'the photo reaches the corner');
+    });
+
+    test('Enhance opens up a dull photo without changing its colours', () {
+      final dull = img.Image(width: 40, height: 40);
+      for (final px in dull) {
+        final v = 90 + (px.x + px.y); // 90 … 168: no blacks, no whites
+        px
+          ..r = v
+          ..g = v
+          ..b = v;
+      }
+      final out = enhancePhoto(dull);
+      var lo = 255, hi = 0, tinted = 0;
+      for (final px in out) {
+        lo = px.r.toInt() < lo ? px.r.toInt() : lo;
+        hi = px.r.toInt() > hi ? px.r.toInt() : hi;
+        if ((px.r - px.g).abs() > 2 || (px.g - px.b).abs() > 2) tinted++;
+      }
+      expect(hi - lo, greaterThan((168 - 90) * 1.4), reason: 'the levels open up');
+      expect(tinted, 0, reason: 'a grey stays grey: no colour cast');
+    });
+
+    test('Enhance keeps a food colour\'s balance (brown stays brown)', () {
+      final brown = img.Image(width: 20, height: 20);
+      img.fill(brown, color: img.ColorRgb8(140, 100, 70));
+      img.fillRect(brown, x1: 0, y1: 0, x2: 9, y2: 19, color: img.ColorRgb8(110, 80, 55));
+      final p = enhancePhoto(brown).getPixel(15, 10);
+      expect(p.r > p.g && p.g > p.b, isTrue, reason: 'red > green > blue, as before');
+    });
+
+    test('a file that is not a photo says so', () {
+      expect(() => fitPhoto(Uint8List.fromList([1, 2, 3]), size: PhotoSize.square, backdrop: Backdrop.keep), throwsFormatException);
     });
   });
 }

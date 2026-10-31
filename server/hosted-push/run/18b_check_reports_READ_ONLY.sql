@@ -1,14 +1,14 @@
 -- ==========================================================================================================================
 -- HOSTED CHECK (read only): the seven restaurant reports (0636) against plain sums of the same bills. Run after piece 18 and after making
 -- the test bills. It runs the reports as the owner of the business named below, compares, and ROLLS BACK: nothing is written.
--- The result is one table of PASS / FAIL rows. Business: Demo Spice; period: today (India time). Change the name below to check another.
+-- The result is one table of PASS / FAIL rows. Business: Niks Cafe; period: today (India time). Change the name below to check another.
 -- ==========================================================================================================================
 begin;
 create temp table chk_args as
 select o.id org, (select ou.user_id from public.org_users ou join public.roles r on r.id = ou.role_id
                    where ou.organization_id = o.id and r.slug = 'org_owner' and ou.status = 'active' limit 1) owner,
        (now() at time zone 'Asia/Kolkata')::date d
-  from public.organizations o where o.name = 'Demo Spice' limit 1;
+  from public.organizations o where o.name = 'Niks Cafe' limit 1;
 create temp table chk (n serial, result text, what text, report numeric, bills numeric);
 grant all on chk_args, chk to authenticated; grant all on sequence chk_n_seq to authenticated;
 

@@ -567,8 +567,8 @@ class _DishRow extends StatelessWidget {
               ListTile(
                 key: ValueKey('ai-photo-${d.id}'),
                 leading: const Icon(LucideIcons.sparkles, color: kInk),
-                title: Text('AI picture', style: inter(15, 600)),
-                subtitle: Text('With or without background', style: inter(12.5, 400, color: kMuted)),
+                title: Text('AI enhancer', style: inter(15, 600)),
+                subtitle: Text('Enhance, background, 4:5 or square', style: inter(12.5, 400, color: kMuted)),
                 onTap: () => Navigator.pop(c, 'ai'),
               ),
               ListTile(

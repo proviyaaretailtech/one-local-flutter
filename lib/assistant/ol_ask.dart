@@ -15,7 +15,7 @@ import 'ol_tour.dart';
 /// Each tab's tip, said the first time that tab is ever opened on this device.
 const _tips = {
   'Home': "Today's sales, bills and kitchen are here. Tap me any time to find something or to be shown how.",
-  'Menu': 'Quick add a dish here. Tap ⋮ on a dish for its photo, description and timings, or to mark it out of stock.',
+  'Menu': 'Quick add a dish here. Tap ⋮ on a dish for the AI enhancer, description and timings, or to mark it out of stock.',
   'Bill': 'Choose a table, then tap dishes to add them. Takeaway and Delivery need no table.',
   'Orders': 'Every order is here, newest first. Tap one to see its dishes and where it is.',
 };
@@ -67,7 +67,7 @@ const _topics = <_Topic>[
   )),
   _Topic(['photo', 'picture', 'image', 'ai', 'background', 'enhance'], OlAnswer(
     'For a dish photo:',
-    steps: ['Open Menu', 'Tap ⋮ on the dish, then AI picture', 'Choose With or Without background', 'Tap Use this picture'],
+    steps: ['Open Menu', 'Tap ⋮ on the dish, then AI enhancer', 'Choose the background (Keep, Studio or Remove) and the size (4:5 or square)', 'Tap Make picture, then Use this picture'],
     tab: 'Menu',
   )),
   _Topic(['description', 'describe', 'timing', 'time', 'hour', 'available', 'breakfast', 'lunch', 'dinner'], OlAnswer(
