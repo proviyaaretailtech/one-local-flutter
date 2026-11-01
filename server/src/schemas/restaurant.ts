@@ -71,3 +71,12 @@ export const ActivityLog = z.object({
   before: z.string().datetime({ offset: true, message: 'Not a valid time.' }).nullish(),
   limit: z.number().int().min(1).max(100).optional(),
 }).loose();
+
+// 0638: Devices (printers) for the restaurant; every rule (who, IP address, defaults) is checked again in the database
+export const DevicesList = obj({});
+export const PrinterSave = obj({ id: id.nullish(), location_id: id.nullish(), name: z.string().trim().min(1, 'Give the printer a name.').max(40, 'The name can be up to 40 letters.'),
+  type: z.enum(['receipt', 'kot', 'label'], { message: 'Choose what it prints.' }), connection: z.enum(['lan', 'usb', 'bluetooth', 'system'], { message: 'Choose how it connects.' }),
+  address: z.string().trim().max(60).nullish(), model: z.string().trim().max(40).nullish(), paper_mm: z.union([z.literal(58), z.literal(80)]).optional(),
+  label_size: z.enum(['38x25', '50x25', '50x30', '75x50', '100x50']).nullish(), copies: z.number().int().min(1).max(5).optional(),
+  auto_cut: z.boolean().optional(), is_default: z.boolean().optional() });
+export const PrinterId = obj({ id });
