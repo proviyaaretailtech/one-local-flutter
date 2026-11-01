@@ -437,9 +437,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             actions: go,
           ),
         ]),
-      // Devices (founder, 31 Oct 2026): printers for receipts, barcode labels and the kitchen, with a test print each
-      _Part('devices', 'Devices', LucideIcons.printer, 'Receipt, barcode label and kitchen printers', const [],
-          open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeviceManagerScreen(store: HomeNav.storeName ?? '')))),
+      // Devices (founder, 31 Oct 2026): a store's printers for receipts and barcode labels, with a test print each; a restaurant has its own
+      // Devices page above (0638), so only one shows
+      if (HomeNav.shell?.kind != 'restaurant')
+        _Part('devices', 'Devices', LucideIcons.printer, 'Receipt and barcode label printers', const [],
+            open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeviceManagerScreen(store: HomeNav.storeName ?? '')))),
       // every order's timeline (0614): one tap opens its own page
       _Part('activity', 'Activity log', LucideIcons.history, 'Every order’s timeline: placed, KOTs, ready, billed, paid', const [],
           open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ActivityLogScreen(env: widget.env)))),
