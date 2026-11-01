@@ -8,6 +8,7 @@ import '../states/state_kit.dart' show StateTone, StatusCard;
 import '../ui/i18n.dart';
 import '../ui/theme.dart';
 import 'activity_log_screen.dart';
+import 'rst_devices_screen.dart';
 import 'returns_screens.dart';
 import 'settings_api.dart';
 import '../devices/device_manager_screen.dart';
@@ -404,6 +405,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
+      // the restaurant's printers (0638): receipts, kitchen tickets and labels; one tap opens its own page
+      if (HomeNav.shell?.kind == 'restaurant')
+        _Part('devices', 'Devices', LucideIcons.printer, 'Receipt, kitchen (KOT) and barcode label printers', const [],
+            open: () => Navigator.of(context).push(RstDevicesScreen.route())),
       // a restaurant's three pages that left the side bar (founder, 29 Oct 2026: "put them in Settings")
       if (HomeNav.shell?.kind == 'restaurant')
         _Part('restaurant', 'Purchases, menu link & delivery', LucideIcons.utensils, 'Purchase orders · public menu link · delivery settings', [
