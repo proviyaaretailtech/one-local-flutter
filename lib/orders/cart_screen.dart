@@ -437,7 +437,7 @@ class _CartScreenState extends State<CartScreen> {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
               style: inter(20, 800),
-              decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: '0', hintStyle: inter(20, 800, color: kKicker)),
+              decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: '0', hintStyle: inter(20, 800, color: kHint)),
               onChanged: (_) => setState(() => _key = null),
             ),
           ),

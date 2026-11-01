@@ -10,6 +10,7 @@ import 'package:printing/printing.dart';
 import '../auth/partner_api.dart';
 import '../home/home_nav.dart';
 import '../inventory/inventory_api.dart';
+import '../devices/print_service.dart';
 import '../ui/theme.dart';
 import 'label_pdf.dart';
 import 'stock_env.dart';
@@ -148,8 +149,14 @@ class _LabelsPageState extends State<_LabelsPage> {
     if (_entries.isEmpty) return showToast(context, 'Add a product first.');
     setState(() => _busy = true);
     try {
+      // printing: the default label printer first (a network one prints straight away), at its roll's size
+      if (send == printLabelPdf && await printLabelsDirect(_batch)) {
+        if (mounted) showToast(context, 'Labels sent to the label printer.');
+        return;
+      }
+      final size = send == printLabelPdf ? labelSizeFor(await defaultPrinterFor('label'), widget.size) : widget.size;
       final (font, bold) = await _fonts();
-      final pdf = await buildLabelsPdf(_batch, size: widget.size, font: font, bold: bold);
+      final pdf = await buildLabelsPdf(_batch, size: size, font: font, bold: bold);
       await send(pdf, _shelf ? 'shelf-labels.pdf' : 'product-labels.pdf');
     } catch (_) {
       if (mounted) showToast(context, 'The labels could not be made. Try again.');

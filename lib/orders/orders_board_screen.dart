@@ -529,7 +529,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
               controller: c,
               style: inter(14.5, 400),
               textInputAction: TextInputAction.search,
-              decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: hint, hintStyle: inter(14.5, 400, color: kMuted)),
+              decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: hint, hintStyle: inter(14.5, 400, color: kHint)),
               onChanged: (_) => _searchChanged(),
               onSubmitted: (_) => _tab == 'live' ? _loadLive() : _loadHolds(),
             ),

@@ -118,7 +118,7 @@ class _SfFieldState extends State<SfField> {
       style: inter(16, 400),
       decoration: InputDecoration(
         hintText: widget.hint,
-        hintStyle: inter(16, 400, color: kMuted),
+        hintStyle: inter(16, 400, color: kHint),
         prefixText: widget.prefix,
         prefixStyle: inter(16, 500),
         semanticCounterText: widget.label,

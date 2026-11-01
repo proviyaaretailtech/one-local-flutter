@@ -355,7 +355,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
                   style: inter(14, 600),
                   decoration: InputDecoration(
                     hintText: hint,
-                    hintStyle: inter(13, 400, color: kMuted),
+                    hintStyle: inter(13, 400, color: kHint),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFDADCD5))),
@@ -486,7 +486,7 @@ class _GrnDashboardState extends State<GrnDashboardScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFDADCD5))),
-        child: TextField(controller: c, enabled: enabled, style: inter(16, 400), decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(16, 400, color: kMuted))),
+        child: TextField(controller: c, enabled: enabled, style: inter(16, 400), decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(16, 400, color: kHint))),
       );
 
   Widget _label(String t) => Padding(padding: const EdgeInsets.only(top: 12, bottom: 8), child: Text(t, style: inter(14, 700, color: kMuted)));

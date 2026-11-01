@@ -31,7 +31,7 @@ class CashField extends StatelessWidget {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
               style: inter(22, 800),
-              decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: '0', hintStyle: inter(22, 800, color: kKicker)),
+              decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: '0', hintStyle: inter(22, 800, color: kHint)),
               onChanged: onChanged,
             ),
           ),

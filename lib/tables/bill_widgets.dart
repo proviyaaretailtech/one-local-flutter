@@ -75,7 +75,7 @@ class BillField extends StatelessWidget {
         style: inter(17, 600),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: inter(17, 500, color: kMuted),
+          hintStyle: inter(17, 500, color: kHint),
           counterText: '',
           filled: true,
           fillColor: const Color(0xFFF3F4F2),

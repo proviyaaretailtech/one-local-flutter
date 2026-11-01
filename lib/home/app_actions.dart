@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../ui/i18n.dart';
 import 'home_nav.dart';
+import '../devices/device_manager_screen.dart';
 
 /// One place or action of the store app that the side menu's search can open: what it is called, where it lives, the words people
 /// might type for it, and how to open it.
@@ -83,11 +84,12 @@ List<AppAction> appActions(BuildContext context, {VoidCallback? onReports}) {
 
   // the rest of the side menu
   add(LucideIcons.scanBarcode, 'Barcodes', 'Side menu', 'barcode make generate create custom code sticker loose weigh weight plu kg label print', route(HomeNav.barcodes));
-  add(LucideIcons.images, 'Product photos', 'Side menu', 'photos images pictures media pool standard share offer approve product photo', route(HomeNav.productPhotos));
+  add(LucideIcons.images, 'Media manager', 'Side menu', 'media manager photos images pictures gallery product photos master media my photos brand subcategory standard share offer approve', route(HomeNav.productPhotos));
   add(LucideIcons.circleUser, 'Customers', 'Side menu', 'customers grahak contacts credit khata', route(HomeNav.customers));
   add(LucideIcons.fileText, 'Reports', 'Side menu', 'reports sales analytics best sellers', onReports);
   add(LucideIcons.users, 'Team', 'Side menu', 'team staff users roles invite cashier manager employee', route(HomeNav.team));
   add(LucideIcons.settings, 'Settings', 'Side menu', 'settings preferences store timings language', route(HomeNav.settings ?? HomeNav.setup));
+  add(LucideIcons.printer, 'Devices', 'Settings', 'devices printer printers receipt label barcode kot kitchen thermal bluetooth test print', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeviceManagerScreen(store: HomeNav.storeName ?? ''))));
   add(LucideIcons.mapPinned, 'Delivery area & charges', 'Settings → Orders & delivery', 'delivery distance radius km fee minimum order free delivery', route(HomeNav.deliverySettings));
   add(LucideIcons.layoutDashboard, 'Page Manager', 'Side menu', 'page manager business profile shop page online store storefront onelocal page how customers see banner theme colours publish details logo hours delivery offers ads promote', route(HomeNav.businessProfile ?? HomeNav.storefront));
   add(LucideIcons.megaphone, 'Ads', 'Page Manager', 'ads advertise promote boost visibility customers nearby', route(HomeNav.businessProfile ?? HomeNav.storefront));

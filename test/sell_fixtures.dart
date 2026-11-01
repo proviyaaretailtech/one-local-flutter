@@ -150,9 +150,11 @@ class Till {
       return err(404, 'No item has the code $code.', 'not_found');
     }
     if (p.endsWith('/rpc/bc_list')) {
-      final tab = body()['tab'] ?? 'missing';
+      final tab = body()['tab'] ?? 'missing', q = '${body()['q'] ?? ''}'.toLowerCase();
       final all = [bcItem(sellItems[0], barcode: '2000000000015', source: 'generated'), bcItem(sellItems[1]), bcItem(looseRice)];
-      return ok({'items': tab == 'missing' ? all.where((i) => i['barcode'] == null).toList() : tab == 'loose' ? [all[2]] : all, 'counts': {'all': 3, 'missing': 2, 'loose': 1}});
+      final onTab = tab == 'missing' ? all.where((i) => i['barcode'] == null).toList() : tab == 'loose' ? [all[2]] : all;
+      final found = onTab.where((i) => q.isEmpty || '${i['name']} ${i['sku']} ${i['barcode'] ?? ''}'.toLowerCase().contains(q)).toList();
+      return ok({'items': found, 'counts': {'all': 3, 'missing': 2, 'loose': 1}});
     }
     if (p.endsWith('/rpc/bc_make')) return ok(bcItem(sellItems.firstWhere((i) => i['id'] == body()['menu_item_id'], orElse: () => looseRice), barcode: '2000000000022', source: 'generated'));
     if (p.endsWith('/rpc/bc_make_all')) return ok({'made': 2});

@@ -56,7 +56,7 @@ class SellSearchField extends StatelessWidget {
               onSubmitted: onSubmitted,
               textInputAction: TextInputAction.search,
               style: inter(14, 400),
-              decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: hint, hintStyle: inter(14, 400, color: kMuted)),
+              decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: hint, hintStyle: inter(14, 400, color: kHint)),
             ),
           ),
           if (onClear != null)

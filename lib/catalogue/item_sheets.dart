@@ -350,7 +350,7 @@ class _ScanSheetState extends State<_ScanSheet> {
                   onChanged: (_) => setState(() => _error = null),
                   onSubmitted: (_) => ready && !_busy ? _find() : null,
                   style: inter(14, 400),
-                  decoration: plainInput.copyWith(hintText: 'e.g. 8901058851298', hintStyle: inter(14, 400, color: kMuted)),
+                  decoration: plainInput.copyWith(hintText: 'e.g. 8901058851298', hintStyle: inter(14, 400, color: kHint)),
                 ),
               ),
             ]),

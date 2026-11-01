@@ -13,6 +13,7 @@ import '../stock/stock_kit.dart';
 import '../ui/theme.dart';
 import 'po_create_screen.dart';
 import 'po_grn_screen.dart';
+import 'po_whatsapp.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
 import 'simple_purchase.dart';
@@ -319,7 +320,13 @@ class _PurchaseHubScreenState extends State<PurchaseHubScreen> {
   }
 
   // ---------------------------------------------------------------- orders
-  Widget _orderRow(PurchaseOrder po) => OpenOrderCard(po: po, onOpen: () => _openOrder(po), onReceived: () => _receiveOrder(po), onCancel: () => _cancelOrder(po));
+  Widget _orderRow(PurchaseOrder po) => OpenOrderCard(
+        po: po,
+        onOpen: () => _openOrder(po),
+        onReceived: () => _receiveOrder(po),
+        onCancel: () => _cancelOrder(po),
+        onSend: () => sendPoOnWhatsApp(context, env.api, po),
+      );
 
   List<Widget> _ordersList() {
     final orders = _orders;

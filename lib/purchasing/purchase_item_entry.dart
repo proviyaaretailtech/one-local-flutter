@@ -230,7 +230,7 @@ class _PurchaseItemSearchState extends State<PurchaseItemSearch> {
         decoration: InputDecoration(
           isDense: true,
           hintText: tr('Search or scan an item'),
-          hintStyle: inter(14.5, 500, color: kMuted),
+          hintStyle: inter(14.5, 500, color: kHint),
           prefixIcon: const Icon(LucideIcons.search, size: 19),
           suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
             if (q.isNotEmpty) IconButton(key: const ValueKey('recv-find-clear'), onPressed: _clear, icon: const Icon(LucideIcons.x, size: 18, color: kMuted)),
@@ -503,7 +503,7 @@ class _LineSheetState extends State<_LineSheet> {
           Row(children: [
             _field(_qty, widget.already > 0 ? 'Add quantity' : 'Quantity', key: const ValueKey('line-qty'), suffix: buyUnitWord(unit), autofocus: true, decimals: i.byMeasure),
             const SizedBox(width: 8),
-            _field(_rate, 'Rate per ${buyUnitWord(unit, 1)}', key: const ValueKey('line-rate'), prefix: '₹ '),
+            _field(_rate, 'Buy rate per ${buyUnitWord(unit, 1)}', key: const ValueKey('line-rate'), prefix: '₹ '),
           ]),
           const SizedBox(height: 8),
           Row(children: [

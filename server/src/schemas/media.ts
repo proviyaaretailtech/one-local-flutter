@@ -10,7 +10,13 @@ const q = z.string().max(80, 'Search is up to 80 characters.').optional();
 export const StorePool = z.object({ q }).strict();
 export const Offer = z.object({ menu_item_id: item }).strict();
 export const Withdraw = z.object({ pool_id: pool }).strict();
-export const Search = z.object({ q, menu_item_id: item.optional() }).strict();
+// Media manager (1 Nov 2026): Master media narrowed by brand or by OL subcategory (a 3-letter code such as ATT).
+export const Search = z.object({
+  q,
+  menu_item_id: item.optional(),
+  brand: z.string().max(60, 'Brand is up to 60 characters.').optional(),
+  sub: z.string().regex(/^[A-Za-z]{3}$/, 'Choose a subcategory.').optional(),
+}).strict();
 export const Use = z.object({ pool_id: pool, menu_item_id: item }).strict();
 export const Queue = z.object({
   status: z.enum(['submitted', 'approved', 'rejected'], { message: 'Unknown status.' }).optional(),

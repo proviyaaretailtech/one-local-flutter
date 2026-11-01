@@ -178,7 +178,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             style: inter(15, 400),
             decoration: InputDecoration(
               hintText: tr('Transaction ID or description'),
-              hintStyle: inter(15, 400, color: kMuted),
+              hintStyle: inter(15, 400, color: kHint),
               prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
               filled: true,
               fillColor: Colors.white,
@@ -254,7 +254,7 @@ class InvoicesScreen extends StatelessWidget {
             style: inter(15, 400),
             decoration: InputDecoration(
               hintText: tr('Invoice number, customer or supplier'),
-              hintStyle: inter(15, 400, color: kMuted),
+              hintStyle: inter(15, 400, color: kHint),
               prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
               filled: true,
               fillColor: Colors.white,

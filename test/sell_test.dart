@@ -586,7 +586,20 @@ void main() {
       expect(jsonDecode(till.where('POST', '/cancel').single.body)['reason'], 'Payment not collected');
     });
 
+    testWidgets('a held bill keeps its customer\'s number: WhatsApp sends to it without asking again', (t) async {
+      final till = Till();
+      final opened = <Uri>[];
+      final env = till.env(opened: opened);
+      await tall(t, PayScreen(env: env, held: OrderView({...view('checkout'), 'customer': 'Asha Rao', 'customer_phone': '9876543210'})));
+      expect(t.widget<Text>(find.byKey(const ValueKey('pay-customer-phone'))).data, '+91 98765 43210');
+      await t.tap(find.text('Send by WhatsApp'));
+      await t.pumpAndSettle();
+      expect(find.text("Add the customer's mobile number first."), findsNothing);
+      expect(opened.single.queryParameters['phone'], '919876543210');
+    });
+
     testWidgets('the bill shows the customer big; WhatsApp asks for the number if missing, then sends the whole bill to it', (t) async {
+      HomeNav.storeName = 'Sharma General Store'; // the signed-in store: its name heads the bill
       final till = Till();
       final opened = <Uri>[];
       final env = till.env(opened: opened);
@@ -606,13 +619,20 @@ void main() {
       expect(opened.single.host, 'api.whatsapp.com');
       expect(opened.single.queryParameters['phone'], '919876543210');
       final text = opened.single.queryParameters['text']!;
-      expect(text, contains('*OneLocal*'));
+      expect(text, startsWith('🧾 *Sharma General Store*'));
       expect(text, contains('Latur Main Branch'));
       expect(text, contains('Hello *Asha Rao*'));
       expect(text, contains('📅 '));
-      expect(text, contains('1. '));
-      expect(text, contains('*Total: '));
-      expect(text, contains('Payment: '));
+      // the items and totals as a table in fixed-width text: every amount line is 30 wide, so the amounts line up on the right
+      final table = text.split('```')[1].trim().split('\n');
+      expect(table.first, startsWith('1. '));
+      expect(table[1], matches(RegExp(r'^   \d+ × ₹[\d,.]+ +₹[\d,.]+$')));
+      expect(table, contains(startsWith('Subtotal ')));
+      expect(table.last, startsWith('TOTAL '));
+      for (final line in table.where((l) => !RegExp(r'^\d+\. ').hasMatch(l))) {
+        expect(line.length, 30, reason: line);
+      }
+      expect(text, contains('Payment: *'));
       expect(text, contains('Thank you'));
     });
 
@@ -677,13 +697,10 @@ void main() {
       await t.pump(const Duration(seconds: 1)); // the toast has risen
       await t.tap(find.text('Link it'));
       await t.pumpAndSettle();
-      expect(find.text('Link Unknown Barcode'), findsOneWidget);
+      expect(find.text('Link Barcode'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('link-item-m1')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('link-confirm')));
-      await t.pumpAndSettle();
-      expect(find.text('Code linked!'), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('link-done')));
       await t.pumpAndSettle();
       final sent = jsonDecode(till.where('POST', '/rpc/bc_link').single.body) as Map<String, dynamic>;
       expect([sent['menu_item_id'], sent['code']], ['m1', '8901000000001']);
@@ -705,7 +722,7 @@ void main() {
       expect((jsonDecode(till.where('POST', '/pos-orders/quote').last.body)['lines'] as List).single, {'menu_item_id': 'm9', 'qty': 1, 'weight_g': 1250});
     });
 
-    testWidgets('tapping a loose item weighs it: type the kg (or tap 500 g), see the amount, add the pack', (t) async {
+    testWidgets('tapping a loose item weighs it: type grams or kg (or tap 500 g), see the amount, add the pack', (t) async {
       final till = Till();
       till.override = (r) => r.url.path.endsWith('/rpc/pos_sell_catalog') ? ok({'items': [...sellItems, looseRice], 'categories': ['Grocery']}) : null;
       final env = till.env();
@@ -720,6 +737,15 @@ void main() {
       await t.tap(find.byKey(const ValueKey('weigh-0.5')));
       await t.pump();
       expect(find.text(rupees(45)), findsOneWidget);
+      expect(t.widget<TextField>(find.byKey(const ValueKey('weigh-kg'))).controller!.text, '500'); // 500 g, in grams
+      // grams: 300 g of rice at ₹90/kg is ₹27; switching to kg keeps the weight
+      await t.enterText(find.byKey(const ValueKey('weigh-kg')), '300');
+      await t.pump();
+      expect(find.text(rupees(27)), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('weigh-unit-kg')));
+      await t.pump();
+      expect(t.widget<TextField>(find.byKey(const ValueKey('weigh-kg'))).controller!.text, '0.3');
+      expect(find.text(rupees(27)), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('weigh-kg')), '1.25');
       await t.pump();
       expect(find.text(rupees(112.5)), findsOneWidget);

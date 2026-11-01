@@ -347,7 +347,7 @@ class _AllItems extends StatelessWidget {
                 decoration: InputDecoration(
                   prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
                   hintText: 'Search items',
-                  hintStyle: inter(15, 400, color: kMuted),
+                  hintStyle: inter(15, 400, color: kHint),
                   filled: true,
                   fillColor: Colors.white,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),

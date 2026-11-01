@@ -21,9 +21,9 @@ import 'advertiser_screens.dart' show AdvertiserApi, BrandProfileScreen;
 import '../ui/motion.dart';
 
 // The Ads section (founder's sketch and the "Advertising & Partner Growth System" spec, 29 Oct 2026): a dashboard (coins available,
-// held, spent and disputed; campaigns by stage; views, clicks and valid clicks), a new campaign (what it is for, where it shows, a 9:16
-// photo or video, dates; a price only when OneLocal has approved and switched one on, otherwise OneLocal sends one), the campaign page
-// (ads_campaign.dart), the coins wallet (1 coin = ₹10) and topping it up.
+// held, spent and disputed; campaigns by stage; views, clicks and valid clicks), a new campaign (what it is for, where it shows, a photo
+// or video in its shape: wide 16:9 for a banner, tall 9:16 for the rest; dates; a price only when OneLocal has approved and switched one
+// on, otherwise OneLocal sends one), the campaign page (ads_campaign.dart), the coins wallet (1 coin = ₹10) and topping it up.
 
 /// Where an ad can show, with its icon (the names and what each supports come from the server's `formats`).
 const formatIcons = <String, IconData>{
@@ -44,6 +44,10 @@ const _formatNames = <String, String>{
   'brand_awareness': 'Brand awareness', 'lead_gen': 'Lead generation',
 };
 String formatName(Object? id) => tr(_formatNames['$id'] ?? _formatNames['home_banner']!);
+
+/// Banners are wide, as the customer app shows them (founder, 1 Nov 2026): 16:9, 1920 × 1080. Reels, pop-ups and the rest stay tall, 9:16.
+bool isWideFormat(Object? id) => '$id' == 'home_banner' || '$id' == 'category_banner';
+double adRatio(Object? id) => isWideFormat(id) ? 16 / 9 : 9 / 16;
 IconData formatIcon(Object? id) => formatIcons['$id'] ?? LucideIcons.megaphone;
 
 /// "per day", "per click"… for a pricing model.
@@ -515,10 +519,10 @@ class _AdsHomeScreenState extends State<AdsHomeScreen> {
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(children: [
-              // a 9:16 thumbnail frame
+              // a thumbnail in the ad's shape: wide for a banner, tall for the rest
               Container(
-                width: 46,
-                height: 82,
+                width: isWideFormat(format) ? 82 : 46,
+                height: isWideFormat(format) ? 46 : 82,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
                   gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF2A2E35), kMoneyDeep]),
@@ -771,7 +775,7 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
   Future<void> _send({bool draft = false}) async {
     if (_busy) return;
     if (!draft) {
-      if (!_hasMedia) return showToast(context, tr('Add a 9:16 photo or video first.'));
+      if (!_hasMedia) return showToast(context, tr(isWideFormat(_format) ? 'Add a wide 16:9 photo or video first.' : 'Add a 9:16 photo or video first.'));
       if (_title.text.trim().isEmpty) return showToast(context, tr('Give the ad a title.'));
       if (_days > 90) return showToast(context, tr('An ad runs for at most 90 days.'));
       if (isBudgetModel(_model) && _rule != null && _budgetCoins <= 0) return showToast(context, tr('Set the most this campaign can spend.'));
@@ -939,7 +943,7 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
 
   InputDecoration _deco(String hint) => InputDecoration(
         hintText: tr(hint),
-        hintStyle: inter(14.5, 500, color: kMuted),
+        hintStyle: inter(14.5, 500, color: kHint),
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kCardLine)),
@@ -1023,17 +1027,19 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
     );
   }
 
-  /// The 9:16 frame: + and Photo / Video until something is picked, then the photo itself or the video's name.
+  /// The frame in the ad's shape (16:9 for a banner, 9:16 for the rest): + and Photo / Video until something is picked, then the photo
+  /// itself or the video's name.
   Widget _mediaBox() {
     final d = _media;
-    final offShape = !_video && _ratio != null && (_ratio! - 9 / 16).abs() > 0.06;
+    final wide = isWideFormat(_format), ratio = adRatio(_format);
+    final offShape = !_video && _ratio != null && (_ratio! - ratio).abs() > (wide ? 0.2 : 0.06);
     final kept = d == null && _uploadedPath != null; // the campaign's photo or video, from before
     return Column(children: [
       Center(
         child: SizedBox(
-          width: 200,
+          width: wide ? 340 : 200,
           child: AspectRatio(
-            aspectRatio: 9 / 16,
+            aspectRatio: ratio,
             child: Container(
               key: const ValueKey('ad-media-box'),
               clipBehavior: Clip.antiAlias,
@@ -1052,7 +1058,7 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(tr('Add photo or video'), style: inter(14, 800)),
-                      Text('9 : 16', style: inter(12.5, 700, color: kMuted)),
+                      Text(wide ? '16 : 9' : '9 : 16', key: const ValueKey('ad-media-shape'), style: inter(12.5, 700, color: kMuted)),
                     ])
                   : _video || kept
                       ? Stack(children: [
@@ -1088,12 +1094,17 @@ class _AdCreateScreenState extends State<AdCreateScreen> {
       if (offShape)
         Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text(tr('This photo is not 9:16 (tall). It will be cropped to fit.'), key: const ValueKey('ad-ratio-warning'), style: inter(12.5, 600, color: const Color(0xFFB45309))),
+          child: Text(tr(wide ? 'This photo is not 16:9 (wide). It will be cropped to fit.' : 'This photo is not 9:16 (tall). It will be cropped to fit.'), key: const ValueKey('ad-ratio-warning'), style: inter(12.5, 600, color: const Color(0xFFB45309))),
         )
       else
         Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text(tr('Tall, like a phone screen: 1080 × 1920. Photo up to 5 MB, video up to 50 MB.'), textAlign: TextAlign.center, style: inter(12, 500, color: kMuted)),
+          child: Text(
+            tr(wide ? 'Wide, like a banner in the customer app: 1920 × 1080. Photo up to 5 MB, video up to 50 MB.' : 'Tall, like a phone screen: 1080 × 1920. Photo up to 5 MB, video up to 50 MB.'),
+            key: const ValueKey('ad-media-hint'),
+            textAlign: TextAlign.center,
+            style: inter(12, 500, color: kMuted),
+          ),
         ),
     ]);
   }

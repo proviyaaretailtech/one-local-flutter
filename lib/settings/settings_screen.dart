@@ -10,6 +10,7 @@ import '../ui/theme.dart';
 import 'activity_log_screen.dart';
 import 'returns_screens.dart';
 import 'settings_api.dart';
+import '../devices/device_manager_screen.dart';
 import 'settings_sheets.dart';
 import 'settings_widgets.dart';
 import 'support_screens.dart';
@@ -431,6 +432,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             actions: go,
           ),
         ]),
+      // Devices (founder, 31 Oct 2026): printers for receipts, barcode labels and the kitchen, with a test print each
+      _Part('devices', 'Devices', LucideIcons.printer, 'Receipt, barcode label and kitchen printers', const [],
+          open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeviceManagerScreen(store: HomeNav.storeName ?? '')))),
       // every order's timeline (0614): one tap opens its own page
       _Part('activity', 'Activity log', LucideIcons.history, 'Every order’s timeline: placed, KOTs, ready, billed, paid', const [],
           open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ActivityLogScreen(env: widget.env)))),

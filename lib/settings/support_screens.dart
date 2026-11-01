@@ -97,7 +97,7 @@ class _SupportScreenState extends State<SupportScreen> {
                       child: Row(children: [
                         const Icon(LucideIcons.search, size: 18, color: kMuted),
                         const SizedBox(width: 10),
-                        Expanded(child: TextField(onChanged: (v) => setState(() => _q = v), style: inter(14, 400), decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: tr('Search help articles…'), hintStyle: inter(14, 400, color: kMuted)))),
+                        Expanded(child: TextField(onChanged: (v) => setState(() => _q = v), style: inter(14, 400), decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: tr('Search help articles…'), hintStyle: inter(14, 400, color: kHint)))),
                       ]),
                     ),
                     if (faq.isNotEmpty) ...[

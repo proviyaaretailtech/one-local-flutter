@@ -256,7 +256,7 @@ class _UsersState extends State<UsersScreen>
           style: inter(15, 400),
           decoration: InputDecoration(
             hintText: tr('Search name, email or number'),
-            hintStyle: inter(15, 400, color: kKicker),
+            hintStyle: inter(15, 400, color: kHint),
             prefixIcon: const Icon(LucideIcons.search, size: 20, color: kMuted),
             filled: true,
             fillColor: Colors.white,

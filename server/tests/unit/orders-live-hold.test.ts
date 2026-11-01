@@ -39,3 +39,14 @@ test('resume: needs the order, the version it resumed, 1-50 lines of 1-99, a sho
   refused(ord.HoldUpdate, { order_id: ID, expected_updated_at: '2026-10-20T10:00:00Z', reason: 'x'.repeat(201) }, /under 200/);
   refused(ord.HoldUpdate, { order_id: 'x', expected_updated_at: '2026-10-20T10:00:00Z' }, /valid id/);
 });
+
+// A held bill reopened on the pay screen (1 Nov 2026): the order carries the customer's number, so WhatsApp can send the bill to it.
+test('the order view carries the customer number saved on the bill', async () => {
+  const { shapeView } = await import('../../src/modules/orders.ts');
+  const order = { id: 'o1', display_no: 'P-1', status: 'open', channel: 'pickup', customer_name: 'Asha', customer_phone: '9876543210', created_at: '2026-11-01T07:00:00Z',
+    updated_at: '2026-11-01T07:00:00Z', subtotal: 930, gst_pct: 0, gst_amount: 0, service_charge: 0, discount: 0, round_off: 0, total: 930 };
+  const v = shapeView({ order, items: [], payments: [], paid: 0 });
+  assert.equal(v.customer, 'Asha');
+  assert.equal(v.customer_phone, '9876543210');
+  assert.equal(shapeView({ order: { ...order, customer_phone: null }, items: [], payments: [], paid: 0 }).customer_phone, null);
+});

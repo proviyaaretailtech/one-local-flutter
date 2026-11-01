@@ -65,7 +65,7 @@ class _NewCategoryState extends State<_NewCategory> {
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _ready ? Navigator.of(context).pop(_value) : null,
               style: inter(14, 400),
-              decoration: plainInput.copyWith(counterText: '', hintText: tr('For example Snacks'), hintStyle: inter(14, 400, color: kMuted)),
+              decoration: plainInput.copyWith(counterText: '', hintText: tr('For example Snacks'), hintStyle: inter(14, 400, color: kHint)),
             ),
           ),
           if (ideas.isNotEmpty) ...[

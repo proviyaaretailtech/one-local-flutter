@@ -348,7 +348,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     if (_photo != null && _basis == PriceBasis.mrp && _matched == null && _barcode.text.trim().isNotEmpty && !missed.any((m) => m.contains('photo'))) {
       try {
         await widget.media.offer(item.id);
-      } catch (_) {} // it can be offered again from Product photos
+      } catch (_) {} // it can be offered again from Media manager
     }
     if (!widget.receiving && (_stock ?? 0) > 0 && inv != null) {
       try {

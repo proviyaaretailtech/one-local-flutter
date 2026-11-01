@@ -198,7 +198,7 @@ class SvcSearch extends StatelessWidget {
               key: fieldKey,
               onChanged: onChanged,
               style: inter(15, 400),
-              decoration: InputDecoration(isDense: true, border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, filled: false, hintText: hint, hintStyle: inter(15, 400, color: kMuted)),
+              decoration: InputDecoration(isDense: true, border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, filled: false, hintText: hint, hintStyle: inter(15, 400, color: kHint)),
             ),
           ),
         ]),

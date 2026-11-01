@@ -689,7 +689,7 @@ class TeamField extends StatelessWidget {
           style: inter(17, 400),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: inter(17, 400, color: kKicker),
+            hintStyle: inter(17, 400, color: kHint),
             prefixIcon: prefix == null
                 ? null
                 : Padding(

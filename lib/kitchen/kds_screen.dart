@@ -112,7 +112,7 @@ class _KdsScreenState extends State<KdsScreen> {
           style: inter(15, 400),
           decoration: InputDecoration(
             hintText: 'Search orders or items...',
-            hintStyle: inter(15, 400, color: kMuted),
+            hintStyle: inter(15, 400, color: kHint),
             prefixIcon: const Icon(LucideIcons.search, size: 17, color: kMuted),
             filled: true,
             fillColor: Colors.white,

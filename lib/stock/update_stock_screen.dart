@@ -457,7 +457,7 @@ class _UpdateStockScreenState extends State<UpdateStockScreen> {
               controller: _search,
               textInputAction: TextInputAction.search,
               style: inter(14, 400),
-              decoration: InputDecoration.collapsed(hintText: tr('Search items'), hintStyle: inter(14, 400, color: kMuted)),
+              decoration: InputDecoration.collapsed(hintText: tr('Search items'), hintStyle: inter(14, 400, color: kHint)),
               onChanged: _searchChanged,
             ),
           ),

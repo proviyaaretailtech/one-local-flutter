@@ -7,19 +7,19 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../auth/partner_api.dart';
 import '../orders/orders_api.dart' show rupees;
 import '../stock/label_pdf.dart';
+import '../ui/barcode_scanner.dart' show scanBarcodeOrType;
 import '../ui/i18n.dart';
 import '../ui/theme.dart';
 import 'barcode_sheets.dart';
 import 'barcode_ui.dart';
 import 'barcodes_api.dart';
 
-// Side menu → Barcodes (founder's mock-ups, 30 Oct 2026, both sets):
-//   home → Create (single item or bulk) · All codes · Loose items · Custom barcode
-//   single: select product → its code is made → details
-//   bulk:   tick items (search, category) → review → generating (ring) → results → print labels (copies per item)
-//   details → print label (Standard / Large, copies, preview); loose items → weigh & print
-//   custom: type or make a code → save on an item, or preview → print
-//   link an unknown code: pick the product → "Code linked!"
+// Side menu → Barcodes (founder's mock-ups, 30 Oct 2026; one page since 1 Nov 2026):
+//   one page: a search bar that lists items as you type (name, code, SKU, PLU) or a scan, All / No barcode / Loose, tick several →
+//     make their codes (the ring, then print) or print their labels; tap one → details (make, re-make, sold loose, print) or weigh & print
+//   print: one item or many, Standard / Large, copies of each, a preview
+//   custom code: type or make a code → save on an item, or print it
+//   link a scanned code no item has: pick the product
 // Every code is this store's own (Master Architecture §2): never a GTIN, never added to the master library.
 
 String _err(Object e, String fallback) => e is PartnerApiException ? e.message : fallback;
@@ -37,9 +37,6 @@ InputDecoration _field(String hint, {Widget? prefixIcon, Widget? suffix, String?
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kBcBorder)),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
     );
-
-Widget _search(TextEditingController c, String hint, VoidCallback onChanged, {Key? key}) =>
-    TextField(key: key, controller: c, decoration: _field(tr(hint), prefixIcon: const Icon(LucideIcons.search, size: 18)), onChanged: (_) => onChanged());
 
 /// 18 · No results: a search that found nothing.
 class BcEmpty extends StatelessWidget {
@@ -91,388 +88,298 @@ class _Stepper extends StatelessWidget {
       );
 }
 
-// ---------------------------------------------------------------- 1. home
 
-class BarcodesScreen extends StatelessWidget {
-  const BarcodesScreen({super.key, this.api, this.store = ''});
-  final BarcodesApi? api;
-  final String store;
-  static Route<void> route({BarcodesApi? api, String store = ''}) => MaterialPageRoute(builder: (_) => BarcodesScreen(api: api, store: store));
+/// The camera (or typing the code) for the search bar's scan button; tests replace it.
+Future<String?> Function(BuildContext context) scanForBarcodes = scanBarcodeOrType;
 
-  @override
-  Widget build(BuildContext context) {
-    final a = api ?? BarcodesApi();
-    Widget tile(String key, IconData icon, String title, String line, Widget Function() page) => BcCard(
-          key: ValueKey(key),
-          onTap: () => _push<void>(context, page()),
-          child: SizedBox(
-            height: 92,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Icon(icon, size: 22, color: kInk),
-              const Spacer(),
-              Text(tr(title), style: inter(14, 800)),
-              Text(tr(line), maxLines: 2, style: inter(11.5, 500, color: kMuted, height: 1.3)),
-            ]),
-          ),
-        );
-    return BcPage(
-      title: 'Barcodes',
-      subtitle: 'Create, manage and print product barcodes for your store.',
-      children: [
-        BcCard(
-          key: const ValueKey('bc-home-create'),
-          color: kBcMint,
-          border: const Color(0xFFD6EBC4),
-          onTap: () => _push<void>(context, CreateTypeScreen(api: a, store: store)),
-          padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 16),
-          child: Column(children: [
-            Stack(clipBehavior: Clip.none, children: [
-              Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: kBcBorder)),
-                child: const Icon(LucideIcons.scanBarcode, size: 40, color: kInk),
-              ),
-              Positioned(
-                right: -8,
-                bottom: -8,
-                child: Container(width: 28, height: 28, decoration: const BoxDecoration(color: kBcDeep, shape: BoxShape.circle), child: const Icon(LucideIcons.plus, size: 16, color: Colors.white)),
-              ),
-            ]),
-            const SizedBox(height: 18),
-            Text(tr('Create Barcode'), style: inter(18, 800)),
-            const SizedBox(height: 4),
-            Text(tr('Single or bulk generation and printing.'), textAlign: TextAlign.center, style: inter(12.5, 500, color: kMuted)),
-          ]),
-        ),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: tile('bc-home-all', LucideIcons.box, 'All Codes', 'View & manage existing codes', () => AllCodesScreen(api: a, store: store))),
-          const SizedBox(width: 12),
-          Expanded(child: tile('bc-home-loose', LucideIcons.scale, 'Loose Items', 'Weigh & print labels', () => AllCodesScreen(api: a, store: store, looseOnly: true))),
-        ]),
-        const SizedBox(height: 12),
-        tile('bc-home-custom', LucideIcons.tag, 'Custom Barcode', 'Create or link a code', () => CustomBarcodeScreen(api: a, store: store)),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------- 2. create: choose type
-
-class CreateTypeScreen extends StatelessWidget {
-  const CreateTypeScreen({super.key, required this.api, this.store = ''});
-  final BarcodesApi api;
-  final String store;
-
-  Future<void> _single(BuildContext context) async {
-    final item = await _push<BcItem>(context, SelectProductScreen(api: api, title: 'Select Product', tab: 'missing', cta: 'Generate barcode'));
-    if (item == null || !context.mounted) return;
-    try {
-      final made = item.barcode == null ? await api.make(item.id) : item;
-      if (context.mounted) await _push<void>(context, BarcodeDetailsScreen(api: api, item: made, store: store));
-    } catch (e) {
-      if (context.mounted) showToast(context, _err(e, 'Could not make the barcode. Try again.'));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Widget choice(String key, IconData icon, String title, String line, VoidCallback onTap, {bool lead = false}) => BcCard(
-          key: ValueKey(key),
-          color: lead ? kBcMint : Colors.white,
-          border: lead ? const Color(0xFFD6EBC4) : null,
-          onTap: onTap,
-          padding: const EdgeInsets.all(16),
-          child: Row(children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: kBcBorder)),
-              child: Icon(icon, size: 26, color: kInk),
-            ),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(tr(title), style: inter(14.5, 800)), const SizedBox(height: 2), Text(tr(line), style: inter(12, 500, color: kMuted, height: 1.35))])),
-            const Icon(LucideIcons.chevronRight, size: 18, color: kMuted),
-          ]),
-        );
-    return BcPage(
-      title: 'Create Barcode',
-      subtitle: 'How would you like to create the barcode?',
-      children: [
-        choice('create-single', LucideIcons.scanBarcode, 'Generate for a Single Item', 'Create a barcode for one product at a time.', () => _single(context)),
-        const SizedBox(height: 12),
-        choice('create-bulk', LucideIcons.boxes, 'Bulk Generate', 'Create barcodes for multiple items at once.', () => _push<void>(context, BulkSelectScreen(api: api, store: store)), lead: true),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------- 13. select product (single item, saving a code, linking)
-
-/// Pick one of the store's items. [tab]: 'missing' lists the items without a code first, 'all' every item. Answers the item.
-class SelectProductScreen extends StatefulWidget {
-  const SelectProductScreen({super.key, required this.api, this.title = 'Select Product', this.tab = 'all', this.cta = 'Confirm', this.subtitle});
-  final BarcodesApi api;
-  final String title, tab, cta;
-  final String? subtitle;
-  @override
-  State<SelectProductScreen> createState() => _SelectProductScreenState();
-}
-
-class _SelectProductScreenState extends State<SelectProductScreen> {
-  final _q = TextEditingController();
+/// A search bar that lists the store's items as you type (name, code, SKU or PLU), from the database. [tab]: all, missing, loose.
+mixin _LiveSearch<T extends StatefulWidget> on State<T> {
+  final q = TextEditingController();
   Timer? _wait;
-  List<BcItem>? _items;
-  BcItem? _picked;
+  List<BcItem>? items;
+  Map<String, int> counts = const {};
+  String? loadError;
+
+  BarcodesApi get api;
+  String get tab => 'all';
 
   @override
   void initState() {
     super.initState();
-    _load();
+    load();
   }
 
   @override
   void dispose() {
     _wait?.cancel();
+    q.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> load() async {
+    final asked = q.text, onTab = tab;
     try {
-      final r = await widget.api.list(tab: widget.tab, q: _q.text);
-      if (mounted) setState(() => _items = r.items);
+      final r = await api.list(tab: onTab, q: asked);
+      if (!mounted || q.text != asked || tab != onTab) return; // a newer search is on its way
+      setState(() {
+        items = r.items;
+        counts = r.counts;
+        loadError = null;
+      });
     } catch (e) {
       if (mounted) {
-        setState(() => _items = const []);
-        showToast(context, _err(e, 'Could not load your items.'));
+        setState(() {
+          items ??= const [];
+          loadError = _err(e, 'Could not load your items.');
+        });
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final list = _items;
-    return BcPage(
-      title: widget.title,
-      subtitle: widget.subtitle,
-      bottom: BcCta(key: const ValueKey('select-confirm'), label: widget.cta, onPressed: _picked == null ? null : () => Navigator.pop(context, _picked)),
-      children: [
-        _search(_q, 'Search product...', () {
-          _wait?.cancel();
-          _wait = Timer(const Duration(milliseconds: 300), _load);
-        }, key: const ValueKey('select-search')),
-        const SizedBox(height: 12),
-        if (list == null) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator(strokeWidth: 2.5))),
-        if (list != null && list.isEmpty)
-          BcEmpty(line: widget.tab == 'missing' && _q.text.trim().isEmpty ? 'Every item already has a barcode.' : 'Try a different search or check if the item has a barcode.'),
-        if (list != null && list.isNotEmpty)
-          BcCard(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            child: Column(children: [
-              for (final (n, i) in list.indexed) ...[
-                if (n > 0) const Divider(height: 1, color: kBcBorder),
-                InkWell(
-                  key: ValueKey('select-${i.id}'),
-                  onTap: () => setState(() => _picked = i),
-                  child: Container(
-                    color: _picked?.id == i.id ? kBcMint : null,
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                    child: Row(children: [
-                      BcThumb(i.imageUrl, size: 42),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(i.name, style: inter(14, 700)),
-                          Text(tr(i.loose ? 'Sold loose' : 'Piece'), style: inter(12, 500, color: kMuted)),
-                        ]),
-                      ),
-                      if (_picked?.id == i.id) const Icon(Icons.check_circle, size: 20, color: kBcDeep),
-                    ]),
-                  ),
-                ),
-              ],
-            ]),
-          ),
-      ],
-    );
+  void _typed() {
+    setState(() {});
+    _wait?.cancel();
+    _wait = Timer(const Duration(milliseconds: 250), load);
   }
+
+  Widget searchBar(String hint, {required String key, VoidCallback? onScan}) => TextField(
+        key: ValueKey(key),
+        controller: q,
+        textInputAction: TextInputAction.search,
+        decoration: _field(
+          tr(hint),
+          prefixIcon: const Icon(LucideIcons.search, size: 18),
+          suffix: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (q.text.isNotEmpty)
+              IconButton(key: ValueKey('$key-clear'), tooltip: tr('Clear'), icon: const Icon(LucideIcons.x, size: 18), onPressed: () {
+                q.clear();
+                _typed();
+              }),
+            if (onScan != null) IconButton(key: ValueKey('$key-scan'), tooltip: tr('Scan a barcode'), icon: const Icon(LucideIcons.scanLine, size: 20, color: kInk), onPressed: onScan),
+          ]),
+        ),
+        onChanged: (_) => _typed(),
+      );
 }
 
-// ---------------------------------------------------------------- 3–6. bulk generate
-
-class BulkSelectScreen extends StatefulWidget {
-  const BulkSelectScreen({super.key, required this.api, this.store = ''});
-  final BarcodesApi api;
-  final String store;
+/// One item in a list: photo, name, its code (or "No barcode yet"), price or PLU, and its source tag.
+class _ItemRow extends StatelessWidget {
+  const _ItemRow(this.i, {super.key, this.onTap, this.leading, this.trailing, this.selected = false});
+  final BcItem i;
+  final VoidCallback? onTap;
+  final Widget? leading, trailing;
+  final bool selected;
   @override
-  State<BulkSelectScreen> createState() => _BulkSelectScreenState();
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: Container(
+          color: selected ? kBcMint : null,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          child: Row(children: [
+            ?leading,
+            BcThumb(i.imageUrl, size: 42),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(i.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(14, 700)),
+                Text(i.barcode ?? tr('No barcode yet'), style: inter(12, 500, color: i.barcode == null ? const Color(0xFFB45309) : kMuted)),
+                Text(i.loose ? 'PLU ${(i.plu ?? 0).toString().padLeft(5, '0')} · ${rupees(i.price)}/kg' : priceLine(i, rupees), style: inter(11.5, 500, color: kMuted)),
+              ]),
+            ),
+            trailing ?? Row(mainAxisSize: MainAxisSize.min, children: [sourceTag(i), const SizedBox(width: 4), const Icon(LucideIcons.chevronRight, size: 18, color: kMuted)]),
+          ]),
+        ),
+      );
 }
 
-class _BulkSelectScreenState extends State<BulkSelectScreen> {
-  final _q = TextEditingController();
-  List<BcItem>? _items;
-  String _cat = '';
-  final _picked = <String>{};
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.api.list(tab: 'missing').then((r) {
-      if (mounted) setState(() => _items = r.items);
-    }, onError: (Object e) {
-      if (mounted) setState(() => _error = _err(e, 'Could not load your items.'));
-    });
-  }
-
-  List<BcItem> get _shown {
-    final q = _q.text.trim().toLowerCase();
-    return (_items ?? const <BcItem>[]).where((i) => (_cat.isEmpty || i.category == _cat) && (q.isEmpty || i.name.toLowerCase().contains(q) || i.sku.toLowerCase().contains(q))).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final all = _items ?? const <BcItem>[];
-    final cats = <String, int>{};
-    for (final i in all) {
-      if (i.category.isNotEmpty) cats[i.category] = (cats[i.category] ?? 0) + 1;
-    }
-    final shown = _shown, n = _picked.length;
-    return BcPage(
-      title: 'Bulk Generate',
-      subtitle: 'Choose the items for which you want to generate barcodes.',
-      bottom: Row(children: [
-        Expanded(
-          child: Container(
-            height: 52,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: kBcMint, borderRadius: BorderRadius.circular(16)),
-            child: Text('$n ${n == 1 ? 'item' : 'items'} selected', key: const ValueKey('bulk-count'), style: inter(13.5, 700, color: kBcDeep)),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: BcCta(
-            key: const ValueKey('bulk-continue'),
-            label: 'Generate ($n)',
-            onPressed: n == 0 ? null : () => _push<void>(context, BulkReviewScreen(api: widget.api, items: all.where((i) => _picked.contains(i.id)).toList(), store: widget.store)),
-          ),
-        ),
+/// Rows in one card, with a line between them.
+Widget _rows(List<Widget> rows) => BcCard(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      child: Column(children: [
+        for (final (n, r) in rows.indexed) ...[if (n > 0) const Divider(height: 1, color: kBcBorder), r],
       ]),
+    );
+
+// ---------------------------------------------------------------- the one Barcodes page
+
+/// Side menu → Barcodes: search (or scan) any item, filter All / No barcode / Loose, tap one for its details, or tick several to make
+/// their codes or print their labels.
+class BarcodesScreen extends StatefulWidget {
+  const BarcodesScreen({super.key, this.api, this.store = ''});
+  final BarcodesApi? api;
+  final String store;
+  static Route<void> route({BarcodesApi? api, String store = ''}) => MaterialPageRoute(builder: (_) => BarcodesScreen(api: api, store: store));
+  @override
+  State<BarcodesScreen> createState() => _BarcodesScreenState();
+}
+
+class _BarcodesScreenState extends State<BarcodesScreen> with _LiveSearch {
+  @override
+  late final BarcodesApi api = widget.api ?? BarcodesApi();
+  String _filter = 'all'; // all · missing · loose (the database's tabs)
+  final _ticked = <String, BcItem>{};
+
+  @override
+  String get tab => _filter;
+
+  void _setFilter(String id) {
+    setState(() => _filter = id);
+    load();
+  }
+
+  Future<void> _open(Widget page) async {
+    await _push<void>(context, page);
+    if (mounted) load(); // it may have a new code, or be sold loose now
+  }
+
+  void _openItem(BcItem i) =>
+      _open(_filter == 'loose' ? WeighPrintScreen(api: api, item: i, store: widget.store) : BarcodeDetailsScreen(api: api, item: i, store: widget.store));
+
+  Future<void> _ticks(Widget page) async {
+    await _push<void>(context, page);
+    if (!mounted) return;
+    setState(_ticked.clear);
+    load();
+  }
+
+  /// Scan a code: its item's details; a code no item has: link it to one.
+  Future<void> _scan() async {
+    final code = (await scanForBarcodes(context))?.trim() ?? '';
+    if (code.isEmpty || !mounted) return;
+    try {
+      final r = await api.resolve(code);
+      if (mounted) _openItem(r.item);
+    } on PartnerApiException catch (e) {
+      if (!mounted) return;
+      if (e.status == 404) {
+        await _open(LinkCodeScreen(api: api, code: code));
+      } else {
+        showToast(context, e.message);
+      }
+    } catch (_) {
+      if (mounted) showToast(context, 'Could not look up that code. Try again.');
+    }
+  }
+
+  Widget _empty() {
+    final searching = q.text.trim().isNotEmpty;
+    if (searching && _filter != 'all') {
+      return Column(children: [
+        const BcEmpty(line: 'Nothing found under this filter.'),
+        TextButton(key: const ValueKey('bc-search-all'), onPressed: () => _setFilter('all'), child: Text(tr('Search all items'), style: inter(13.5, 700, color: kBcDeep))),
+      ]);
+    }
+    if (!searching && _filter == 'missing') return const BcEmpty(title: 'All set', line: 'Every item already has a barcode.');
+    if (!searching && _filter == 'loose') return const BcEmpty(title: 'No loose items yet', line: 'Open an item and turn on Sold loose.');
+    if (!searching) return const BcEmpty(title: 'No items yet', line: 'Add items to your catalogue first.');
+    return const BcEmpty();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final list = items;
+    final ticked = _ticked.values.toList();
+    final toMake = ticked.where((i) => i.barcode == null).toList(), toPrint = ticked.where((i) => i.barcode != null).toList();
+    final allTicked = list != null && list.isNotEmpty && list.every((i) => _ticked.containsKey(i.id));
+    String n(int k, String one, String many) => '$k ${k == 1 ? one : many}';
+    return BcPage(
+      title: 'Barcodes',
+      subtitle: 'Search any item to make, link or print its barcode.',
+      trailing: TextButton.icon(
+        key: const ValueKey('bc-custom'),
+        onPressed: () => _open(CustomBarcodeScreen(api: api, store: widget.store)),
+        icon: const Icon(LucideIcons.tag, size: 16, color: kBcDeep),
+        label: Text(tr('Custom code'), style: inter(13, 700, color: kBcDeep)),
+      ),
+      bottom: ticked.isEmpty
+          ? null
+          : Column(mainAxisSize: MainAxisSize.min, children: [
+              Row(children: [
+                Text(n(ticked.length, 'item selected', 'items selected'), key: const ValueKey('bc-count'), style: inter(13, 700, color: kBcDeep)),
+                const Spacer(),
+                TextButton(key: const ValueKey('bc-clear'), onPressed: () => setState(_ticked.clear), child: Text(tr('Clear'), style: inter(13, 700, color: kMuted))),
+              ]),
+              Row(children: [
+                if (toMake.isNotEmpty)
+                  Expanded(
+                    child: BcCta(
+                      key: const ValueKey('bc-make'),
+                      label: 'Make ${n(toMake.length, 'code', 'codes')}',
+                      onPressed: () => _ticks(BulkProgressScreen(api: api, items: toMake, store: widget.store)),
+                    ),
+                  ),
+                if (toMake.isNotEmpty && toPrint.isNotEmpty) const SizedBox(width: 10),
+                if (toPrint.isNotEmpty)
+                  Expanded(
+                    child: toMake.isEmpty
+                        ? BcCta(key: const ValueKey('bc-print'), label: 'Print ${n(toPrint.length, 'label', 'labels')}', icon: LucideIcons.printer, onPressed: () => _ticks(PrintLabelsScreen(items: toPrint, store: widget.store)))
+                        : BcOutline(key: const ValueKey('bc-print'), label: 'Print ${toPrint.length}', icon: LucideIcons.printer, onPressed: () => _ticks(PrintLabelsScreen(items: toPrint, store: widget.store))),
+                  ),
+              ]),
+            ]),
       children: [
-        _search(_q, 'Search products...', () => setState(() {}), key: const ValueKey('bulk-search')),
+        searchBar('Search name, code, SKU or PLU', key: 'bc-search', onScan: _scan),
         const SizedBox(height: 12),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(children: [
-            for (final (id, label) in [('', 'All (${all.length})'), for (final c in cats.entries) (c.key, '${c.key} (${c.value})')])
+            for (final (id, label) in const [('all', 'All'), ('missing', 'No barcode'), ('loose', 'Loose')])
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
-                  key: ValueKey('bulk-cat-${id.isEmpty ? 'all' : id}'),
-                  selected: _cat == id,
+                  key: ValueKey('bc-filter-$id'),
+                  selected: _filter == id,
                   showCheckmark: false,
                   selectedColor: kBcDeep,
                   backgroundColor: Colors.white,
-                  side: BorderSide(color: _cat == id ? kBcDeep : kBcBorder),
-                  labelStyle: inter(12.5, 700, color: _cat == id ? Colors.white : kInk),
-                  label: Text(label),
-                  onSelected: (_) => setState(() => _cat = id),
+                  side: BorderSide(color: _filter == id ? kBcDeep : kBcBorder),
+                  labelStyle: inter(12.5, 700, color: _filter == id ? Colors.white : kInk),
+                  label: Text('${tr(label)} (${counts[id] ?? 0})'),
+                  onSelected: (_) => _setFilter(id),
                 ),
               ),
           ]),
         ),
-        const SizedBox(height: 10),
-        if (_error != null) Text(_error!, style: inter(13, 500, color: kError)),
-        if (_items == null && _error == null) const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator(strokeWidth: 2.5))),
-        if (_items != null && shown.isEmpty)
-          BcEmpty(title: all.isEmpty ? 'All set' : 'No results found', line: all.isEmpty ? 'Every item already has a barcode.' : 'Try a different search or category.'),
-        if (shown.isNotEmpty) ...[
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              key: const ValueKey('bulk-select-all'),
-              onPressed: () => setState(() => shown.every((i) => _picked.contains(i.id)) ? _picked.removeAll(shown.map((i) => i.id)) : _picked.addAll(shown.map((i) => i.id))),
-              child: Text(tr(shown.every((i) => _picked.contains(i.id)) ? 'Clear all' : 'Select all'), style: inter(13, 700, color: kBcDeep)),
+        const SizedBox(height: 6),
+        if (loadError != null) Padding(padding: const EdgeInsets.all(12), child: Text(loadError!, textAlign: TextAlign.center, style: inter(13, 500, color: kError))),
+        if (list == null) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator(strokeWidth: 2.5))),
+        if (list != null && list.isEmpty && loadError == null) _empty(),
+        if (list != null && list.isNotEmpty) ...[
+          Row(children: [
+            Text(q.text.trim().isEmpty ? n(list.length, 'item', 'items') : n(list.length, 'match', 'matches'), key: const ValueKey('bc-shown'), style: inter(12.5, 600, color: kMuted)),
+            const Spacer(),
+            TextButton(
+              key: const ValueKey('bc-select-all'),
+              onPressed: () => setState(() => allTicked ? _ticked.removeWhere((id, _) => list.any((i) => i.id == id)) : _ticked.addAll({for (final i in list) i.id: i})),
+              child: Text(tr(allTicked ? 'Clear all' : 'Select all'), style: inter(13, 700, color: kBcDeep)),
             ),
-          ),
-          BcCard(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: Column(children: [
-              for (final (k, i) in shown.indexed) ...[
-                if (k > 0) const Divider(height: 1, color: kBcBorder),
-                CheckboxListTile(
-                  key: ValueKey('bulk-pick-${i.id}'),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-                  value: _picked.contains(i.id),
-                  activeColor: kBcDeep,
-                  onChanged: (v) => setState(() => v == true ? _picked.add(i.id) : _picked.remove(i.id)),
-                  title: Text(i.name, style: inter(14, 700)),
-                  subtitle: Text(priceLine(i, rupees), style: inter(12, 500, color: kMuted)),
-                  secondary: BcThumb(i.imageUrl, size: 40),
+          ]),
+          _rows([
+            for (final i in list)
+              _ItemRow(
+                i,
+                key: ValueKey('bc-item-${i.id}'),
+                selected: _ticked.containsKey(i.id),
+                onTap: () => _openItem(i),
+                leading: SizedBox(
+                  width: 36,
+                  child: Checkbox(
+                    key: ValueKey('bc-tick-${i.id}'),
+                    value: _ticked.containsKey(i.id),
+                    activeColor: kBcDeep,
+                    visualDensity: VisualDensity.compact,
+                    onChanged: (v) => setState(() => v == true ? _ticked[i.id] = i : _ticked.remove(i.id)),
+                  ),
                 ),
-              ],
-            ]),
-          ),
+              ),
+          ]),
         ],
       ],
     );
   }
 }
 
-class BulkReviewScreen extends StatelessWidget {
-  const BulkReviewScreen({super.key, required this.api, required this.items, this.store = ''});
-  final BarcodesApi api;
-  final List<BcItem> items;
-  final String store;
-
-  @override
-  Widget build(BuildContext context) {
-    final n = items.length;
-    return BcPage(
-      title: 'Review & Generate',
-      subtitle: 'You are about to generate barcodes for $n ${n == 1 ? 'item' : 'items'}.',
-      bottom: BcCta(key: const ValueKey('bulk-generate'), label: 'Generate', onPressed: () => _swap<void>(context, BulkProgressScreen(api: api, items: items, store: store))),
-      children: [
-        BcCard(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          child: Column(children: [
-            for (final (k, i) in items.indexed) ...[
-              if (k > 0) const Divider(height: 1, color: kBcBorder),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(children: [
-                  BcThumb(i.imageUrl, size: 48),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(i.name, style: inter(14, 700)), Text(priceLine(i, rupees), style: inter(12, 500, color: kMuted))])),
-                  unitTag(i),
-                ]),
-              ),
-            ],
-          ]),
-        ),
-        const SizedBox(height: 14),
-        BcCard(
-          color: kBcMint,
-          border: kBcMint,
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Icon(LucideIcons.shieldCheck, size: 20, color: kBcDeep),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(tr("Barcodes will be created using your store's code range (20-29)."), style: inter(13, 600, height: 1.35)),
-                const SizedBox(height: 4),
-                Text(tr('Each item will get a unique code.'), style: inter(12, 500, color: kMuted)),
-              ]),
-            ),
-          ]),
-        ),
-      ],
-    );
-  }
-}
+// ---------------------------------------------------------------- making several codes (the ring)
 
 class BulkProgressScreen extends StatefulWidget {
   const BulkProgressScreen({super.key, required this.api, required this.items, this.store = ''});
@@ -515,12 +422,21 @@ class _BulkProgressScreenState extends State<BulkProgressScreen> {
     final failed = _state.values.where((s) => s == 'failed').length;
     return BcPage(
       title: _finished ? 'Barcodes generated' : 'Generating barcodes...',
-      subtitle: _finished ? (failed == 0 ? 'Every item has its new code.' : '$failed could not be made; try them again from Bulk Generate.') : 'This may take a moment.',
-      bottom: BcCta(
-        key: const ValueKey('bulk-view-results'),
-        label: 'View Results',
-        onPressed: _finished ? () => _swap<void>(context, BulkResultsScreen(api: widget.api, made: _made, store: widget.store)) : null,
-      ),
+      subtitle: _finished ? (failed == 0 ? 'Every item has its new code.' : '$failed could not be made; tick them again to retry.') : 'This may take a moment.',
+      bottom: Row(children: [
+        Expanded(child: BcOutline(key: const ValueKey('bulk-done'), label: 'Done', onPressed: _finished ? () => Navigator.pop(context) : null)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: BcCta(
+            key: const ValueKey('bulk-print'),
+            label: 'Print labels',
+            icon: LucideIcons.printer,
+            onPressed: _finished && _made.isNotEmpty
+                ? () => _swap<void>(context, PrintLabelsScreen(items: _made, store: widget.store, subtitle: '${_made.length} ${_made.length == 1 ? 'item has' : 'items have'} new barcodes.'))
+                : null,
+          ),
+        ),
+      ]),
       children: [
         Center(
           child: SizedBox(
@@ -565,175 +481,7 @@ class _BulkProgressScreenState extends State<BulkProgressScreen> {
   }
 }
 
-/// 6 · The codes just made, with their source; from here, print them all.
-class BulkResultsScreen extends StatelessWidget {
-  const BulkResultsScreen({super.key, required this.api, required this.made, this.store = ''});
-  final BarcodesApi api;
-  final List<BcItem> made;
-  final String store;
-
-  @override
-  Widget build(BuildContext context) => BcPage(
-        title: 'Barcode Results',
-        subtitle: '${made.length} ${made.length == 1 ? 'item has' : 'items have'} new barcodes.',
-        bottom: BcCta(
-          key: const ValueKey('bulk-print'),
-          label: 'Print Labels',
-          icon: LucideIcons.printer,
-          onPressed: made.isEmpty ? null : () => _push<void>(context, BulkPrintScreen(items: made, store: store)),
-        ),
-        children: [
-          if (made.isEmpty) const BcEmpty(title: 'No codes made', line: 'Nothing was generated. Try again from Bulk Generate.'),
-          if (made.isNotEmpty) _CodeList(items: made, onTap: (i) => _push<void>(context, BarcodeDetailsScreen(api: api, item: i, store: store))),
-        ],
-      );
-}
-
-/// Rows of items with their code, source and unit.
-class _CodeList extends StatelessWidget {
-  const _CodeList({required this.items, required this.onTap, this.loose = false});
-  final List<BcItem> items;
-  final ValueChanged<BcItem> onTap;
-  final bool loose;
-  @override
-  Widget build(BuildContext context) => BcCard(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        child: Column(children: [
-          for (final (n, i) in items.indexed) ...[
-            if (n > 0) const Divider(height: 1, color: kBcBorder),
-            InkWell(
-              key: ValueKey('code-${i.id}'),
-              onTap: () => onTap(i),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Row(children: [
-                  BcThumb(i.imageUrl, size: 46),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(i.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(14, 700)),
-                      const SizedBox(height: 2),
-                      Text(
-                        loose ? 'PLU ${(i.plu ?? 0).toString().padLeft(5, '0')} · ${rupees(i.price)}/kg' : (i.barcode ?? tr('No barcode yet')),
-                        style: inter(12, 500, color: i.barcode == null && !loose ? const Color(0xFFB45309) : kMuted),
-                      ),
-                      if (!loose) Text(i.loose ? '${rupees(i.price)}/kg · ${tr('loose')}' : tr('Piece'), style: inter(11.5, 500, color: kMuted)),
-                    ]),
-                  ),
-                  if (loose) const BcTag('Weigh') else sourceTag(i),
-                  const SizedBox(width: 6),
-                  const Icon(LucideIcons.chevronRight, size: 18, color: kMuted),
-                ]),
-              ),
-            ),
-          ],
-        ]),
-      );
-}
-
-// ---------------------------------------------------------------- 7. all codes (and loose items)
-
-class AllCodesScreen extends StatefulWidget {
-  const AllCodesScreen({super.key, required this.api, this.store = '', this.looseOnly = false});
-  final BarcodesApi api;
-  final String store;
-  final bool looseOnly;
-  @override
-  State<AllCodesScreen> createState() => _AllCodesScreenState();
-}
-
-class _AllCodesScreenState extends State<AllCodesScreen> {
-  final _q = TextEditingController();
-  Timer? _wait;
-  List<BcItem> _items = const [];
-  String _filter = 'all';
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  void dispose() {
-    _wait?.cancel();
-    _q.dispose();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    setState(() => _error = null);
-    try {
-      final r = await widget.api.list(tab: widget.looseOnly ? 'loose' : 'all', q: _q.text);
-      if (mounted) setState(() => _items = r.items);
-    } catch (e) {
-      if (mounted) setState(() => _error = _err(e, 'Could not load the codes.'));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  List<BcItem> get _shown => switch (_filter) {
-        'generated' || 'linked' || 'custom' => _items.where((i) => i.barcode != null && i.barcodeSource == _filter).toList(),
-        'none' => _items.where((i) => i.barcode == null).toList(),
-        _ => _items,
-      };
-
-  Future<void> _open(BcItem i) async {
-    await _push<void>(context, widget.looseOnly ? WeighPrintScreen(api: widget.api, item: i, store: widget.store) : BarcodeDetailsScreen(api: widget.api, item: i, store: widget.store));
-    if (mounted) _load();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final shown = _shown;
-    return BcPage(
-      title: widget.looseOnly ? 'Loose Items' : 'All Codes',
-      subtitle: widget.looseOnly ? 'Sold by weight. Tap one to weigh a pack and print its label.' : null,
-      children: [
-        _search(_q, 'Search by name, code or PLU', () {
-          _wait?.cancel();
-          _wait = Timer(const Duration(milliseconds: 300), _load);
-        }, key: const ValueKey('codes-search')),
-        if (!widget.looseOnly) ...[
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              for (final (id, label) in const [('all', 'All'), ('generated', 'Generated'), ('linked', 'Linked'), ('custom', 'Custom'), ('none', 'No barcode')])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    key: ValueKey('codes-filter-$id'),
-                    selected: _filter == id,
-                    showCheckmark: false,
-                    selectedColor: kBcDeep,
-                    backgroundColor: Colors.white,
-                    side: BorderSide(color: _filter == id ? kBcDeep : kBcBorder),
-                    labelStyle: inter(12.5, 700, color: _filter == id ? Colors.white : kInk),
-                    label: Text(tr(label)),
-                    onSelected: (_) => setState(() => _filter = id),
-                  ),
-                ),
-            ]),
-          ),
-        ],
-        const SizedBox(height: 12),
-        if (_loading) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator(strokeWidth: 2.5))),
-        if (_error != null) Padding(padding: const EdgeInsets.all(20), child: Text(_error!, textAlign: TextAlign.center, style: inter(14, 500, color: kMuted))),
-        if (!_loading && _error == null && shown.isEmpty)
-          widget.looseOnly && _q.text.trim().isEmpty
-              ? const BcEmpty(title: 'No loose items yet', line: 'Open an item in All Codes and turn on Sold loose.')
-              : const BcEmpty(),
-        if (shown.isNotEmpty) _CodeList(items: shown, loose: widget.looseOnly, onTap: _open),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------- 7/9. barcode details
+// ---------------------------------------------------------------- barcode details
 
 class BarcodeDetailsScreen extends StatefulWidget {
   const BarcodeDetailsScreen({super.key, required this.api, required this.item, this.store = ''});
@@ -793,7 +541,7 @@ class _BarcodeDetailsScreenState extends State<BarcodeDetailsScreen> {
       title: 'Barcode Details',
       bottom: i.barcode == null
           ? BcCta(key: const ValueKey('details-make'), label: 'Make barcode', busy: _busy, onPressed: () => _run(() => widget.api.make(i.id), 'Barcode made. Scans now find ${i.name}.'))
-          : BcCta(key: const ValueKey('details-print-label'), label: 'Print label', icon: LucideIcons.printer, onPressed: () => _push<void>(context, PrintLabelScreen(item: i, store: widget.store))),
+          : BcCta(key: const ValueKey('details-print-label'), label: 'Print label', icon: LucideIcons.printer, onPressed: () => _push<void>(context, PrintLabelsScreen(items: [i], store: widget.store))),
       children: [
         _itemHead(i),
         const SizedBox(height: 12),
@@ -825,7 +573,7 @@ class _BarcodeDetailsScreenState extends State<BarcodeDetailsScreen> {
         const SizedBox(height: 12),
         Row(children: [
           if (i.barcode != null) ...[
-            _action('details-print', LucideIcons.printer, 'Print', () => _push<void>(context, PrintLabelScreen(item: i, store: widget.store))),
+            _action('details-print', LucideIcons.printer, 'Print', () => _push<void>(context, PrintLabelsScreen(items: [i], store: widget.store))),
             const SizedBox(width: 8),
             _action('details-remake', LucideIcons.refreshCw, 'Re-make', _remake),
             const SizedBox(width: 8),
@@ -852,27 +600,31 @@ class _BarcodeDetailsScreenState extends State<BarcodeDetailsScreen> {
   }
 }
 
-// ---------------------------------------------------------------- 16. print label (options) · 17. bulk print
+// ---------------------------------------------------------------- print labels (one item or many)
 
-/// One item's label: Standard (50 × 30 mm) or Large (3 × 2 in), how many copies, a preview, print.
-class PrintLabelScreen extends StatefulWidget {
-  const PrintLabelScreen({super.key, required this.item, this.store = ''});
-  final BcItem item;
+/// Labels for one item or several: Standard (50 × 30 mm) or Large (3 × 2 in), copies of each, a preview, print.
+class PrintLabelsScreen extends StatefulWidget {
+  const PrintLabelsScreen({super.key, required this.items, this.store = '', this.subtitle});
+  final List<BcItem> items;
   final String store;
+  final String? subtitle;
   @override
-  State<PrintLabelScreen> createState() => _PrintLabelScreenState();
+  State<PrintLabelsScreen> createState() => _PrintLabelsScreenState();
 }
 
-class _PrintLabelScreenState extends State<PrintLabelScreen> {
+class _PrintLabelsScreenState extends State<PrintLabelsScreen> {
   bool _large = false;
   int _copies = 1;
   bool _busy = false;
 
+  List<BcItem> get _coded => widget.items.where((i) => i.barcode != null).toList();
+
   Future<void> _print() async {
     setState(() => _busy = true);
     try {
-      await printBarcodeLabels([(itemLabel(widget.item, store: widget.store), _copies)], size: _large ? LabelSize.medium : LabelSize.product);
-      if (mounted) showToast(context, '$_copies ${_copies == 1 ? 'label' : 'labels'} sent to print.');
+      await printBarcodeLabels([for (final i in _coded) (itemLabel(i, store: widget.store), _copies)], size: _large ? LabelSize.medium : LabelSize.product);
+      final n = _coded.length * _copies;
+      if (mounted) showToast(context, '$n ${n == 1 ? 'label' : 'labels'} sent to print.');
     } catch (_) {
       if (mounted) showToast(context, 'Could not open printing. Try again.');
     } finally {
@@ -882,12 +634,13 @@ class _PrintLabelScreenState extends State<PrintLabelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final i = widget.item;
+    final items = _coded, one = items.length == 1, first = items.firstOrNull;
     return BcPage(
-      title: 'Print Label',
-      bottom: BcCta(key: const ValueKey('print-label-go'), label: 'Print', icon: LucideIcons.printer, busy: _busy, onPressed: _print),
+      title: one ? 'Print Label' : 'Print Labels',
+      subtitle: widget.subtitle ?? (one ? null : '${items.length} items'),
+      bottom: BcCta(key: const ValueKey('print-label-go'), label: 'Print', icon: LucideIcons.printer, busy: _busy, onPressed: items.isEmpty ? null : _print),
       children: [
-        _itemHead(i),
+        if (one) _itemHead(first!) else _rows([for (final i in items) _ItemRow(i, trailing: const SizedBox.shrink())]),
         const SizedBox(height: 16),
         Text(tr('Label type'), style: inter(13, 700)),
         const SizedBox(height: 6),
@@ -917,82 +670,26 @@ class _PrintLabelScreenState extends State<PrintLabelScreen> {
           ]),
         ),
         const SizedBox(height: 14),
-        Text(tr('Copies'), style: inter(13, 700)),
+        Text(tr(one ? 'Copies' : 'Copies of each'), style: inter(13, 700)),
         const SizedBox(height: 6),
         _Stepper(value: _copies, onChanged: (v) => setState(() => _copies = v)),
-        const SizedBox(height: 16),
-        Text(tr('Label preview'), style: inter(13, 700)),
-        const SizedBox(height: 6),
-        BcCard(child: Column(children: [
-          if (i.barcode != null) BarcodeView(i.barcode!, height: _large ? 70 : 50),
+        if (first != null) ...[
+          const SizedBox(height: 16),
+          Text(tr('Label preview'), style: inter(13, 700)),
           const SizedBox(height: 6),
-          Text(i.name, style: inter(12.5, 600, color: kMuted)),
-          Text(i.loose ? '${rupees(i.price)}/kg' : rupees(i.price), style: inter(16, 800)),
-        ])),
+          BcCard(child: Column(children: [
+            BarcodeView(first.barcode!, height: _large ? 70 : 50),
+            const SizedBox(height: 6),
+            Text(first.name, style: inter(12.5, 600, color: kMuted)),
+            Text(first.loose ? '${rupees(first.price)}/kg' : rupees(first.price), style: inter(16, 800)),
+          ])),
+        ],
       ],
     );
   }
 }
 
-/// 17 · Labels for several items at once, the same number of copies each.
-class BulkPrintScreen extends StatefulWidget {
-  const BulkPrintScreen({super.key, required this.items, this.store = ''});
-  final List<BcItem> items;
-  final String store;
-  @override
-  State<BulkPrintScreen> createState() => _BulkPrintScreenState();
-}
-
-class _BulkPrintScreenState extends State<BulkPrintScreen> {
-  int _copies = 1;
-  bool _busy = false;
-
-  Future<void> _print() async {
-    setState(() => _busy = true);
-    try {
-      await printBarcodeLabels([for (final i in widget.items) (itemLabel(i, store: widget.store), _copies)]);
-      if (mounted) showToast(context, '${widget.items.length * _copies} labels sent to print.');
-    } catch (_) {
-      if (mounted) showToast(context, 'Could not open printing. Try again.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final n = widget.items.length;
-    return BcPage(
-      title: 'Print Labels',
-      subtitle: '$n ${n == 1 ? 'item' : 'items'} selected',
-      bottom: BcCta(key: const ValueKey('bulk-print-go'), label: 'Print Labels', icon: LucideIcons.printer, busy: _busy, onPressed: _print),
-      children: [
-        BcCard(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          child: Column(children: [
-            for (final (k, i) in widget.items.indexed) ...[
-              if (k > 0) const Divider(height: 1, color: kBcBorder),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(children: [
-                  BcThumb(i.imageUrl, size: 42),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(i.name, style: inter(14, 700)), Text(i.barcode ?? '', style: inter(12, 500, color: kMuted))])),
-                ]),
-              ),
-            ],
-          ]),
-        ),
-        const SizedBox(height: 16),
-        Text(tr('Copies per item'), style: inter(13, 700)),
-        const SizedBox(height: 6),
-        _Stepper(value: _copies, onChanged: (v) => setState(() => _copies = v), keyPrefix: 'bulk-copies'),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------- 8/9. weigh & print (loose items)
+// ---------------------------------------------------------------- weigh & print (loose items)
 
 class WeighPrintScreen extends StatefulWidget {
   const WeighPrintScreen({super.key, required this.api, required this.item, this.store = ''});
@@ -1004,7 +701,8 @@ class WeighPrintScreen extends StatefulWidget {
 }
 
 class _WeighPrintScreenState extends State<WeighPrintScreen> {
-  final _kg = TextEditingController(text: '1.000');
+  final _kg = TextEditingController(text: '1');
+  String _unit = 'kg'; // g or kg: the switch beside the custom weight
   bool _busy = false;
   WeighLabel? _label; // the code for the weight shown, from the database
   Timer? _wait;
@@ -1021,17 +719,23 @@ class _WeighPrintScreenState extends State<WeighPrintScreen> {
     super.dispose();
   }
 
-  int? get _grams {
-    final v = double.tryParse(_kg.text.trim());
-    if (v == null || v <= 0) return null;
-    final g = (v * 1000).round();
-    return g < 1 || g > 99999 ? null : g;
-  }
+  int? get _grams => gramsOf(_kg.text, _unit);
 
   num get _amount => ((widget.item.price * (_grams ?? 0) / 1000) * 100).round() / 100;
 
-  void _set(String kg) {
-    _kg.text = kg;
+  /// A quick weight: 250 g and 500 g in grams, whole kilos in kg.
+  void _set(int grams) {
+    _unit = grams < 1000 ? 'g' : 'kg';
+    _kg.text = weightFor(grams, _unit);
+    _changed();
+  }
+
+  /// g ↔ kg: the weight typed stays the same weight.
+  void _setUnit(String u) {
+    if (u == _unit) return;
+    final g = _grams;
+    _unit = u;
+    _kg.text = g == null ? '' : weightFor(g, u);
     _changed();
   }
 
@@ -1055,7 +759,7 @@ class _WeighPrintScreenState extends State<WeighPrintScreen> {
 
   Future<void> _print() async {
     final g = _grams;
-    if (g == null) return showToast(context, 'Enter the weight in kg, from 0.001 to 99.999.');
+    if (g == null) return showToast(context, _unit == 'g' ? 'Enter the weight in grams, from 1 to 99999.' : 'Enter the weight in kg, from 0.001 to 99.999.');
     setState(() => _busy = true);
     try {
       final l = _label ?? await widget.api.weighLabel(widget.item.id, g);
@@ -1092,16 +796,16 @@ class _WeighPrintScreenState extends State<WeighPrintScreen> {
         const SizedBox(height: 8),
         // one row of five, sharing the width (as in the mock-up)
         Row(children: [
-          for (final (n, (label, kg)) in const [('250 g', '0.250'), ('500 g', '0.500'), ('1 kg', '1.000'), ('2 kg', '2.000'), ('5 kg', '5.000')].indexed) ...[
+          for (final (n, (label, key, grams)) in const [('250 g', '0.250', 250), ('500 g', '0.500', 500), ('1 kg', '1.000', 1000), ('2 kg', '2.000', 2000), ('5 kg', '5.000', 5000)].indexed) ...[
             if (n > 0) const SizedBox(width: 6),
             Expanded(
               child: Material(
-                color: _kg.text == kg ? kBcLime : Colors.white,
-                shape: StadiumBorder(side: BorderSide(color: _kg.text == kg ? kBcLime : kBcBorder)),
+                color: _grams == grams ? kBcLime : Colors.white,
+                shape: StadiumBorder(side: BorderSide(color: _grams == grams ? kBcLime : kBcBorder)),
                 child: InkWell(
-                  key: ValueKey('weigh-chip-$kg'),
+                  key: ValueKey('weigh-chip-$key'),
                   customBorder: const StadiumBorder(),
-                  onTap: () => _set(kg),
+                  onTap: () => _set(grams),
                   child: Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Center(child: Text(label, maxLines: 1, style: inter(12.5, 700)))),
                 ),
               ),
@@ -1114,10 +818,11 @@ class _WeighPrintScreenState extends State<WeighPrintScreen> {
         TextField(
           key: const ValueKey('weigh-custom'),
           controller: _kg,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d{0,2}(\.\d{0,3})?'))],
+          keyboardType: TextInputType.numberWithOptions(decimal: _unit == 'kg'),
+          inputFormatters: weightFormatters(_unit),
           style: inter(16, 700),
-          decoration: _field('1.250').copyWith(suffixText: 'kg'),
+          decoration: _field(_unit == 'g' ? '300' : '1.250', suffix: WeightUnitSwitch(unit: _unit, onChanged: _setUnit, keyPrefix: 'weigh-custom-unit'))
+              .copyWith(suffixIconConstraints: const BoxConstraints(minHeight: 40)),
           onChanged: (_) => _changed(),
         ),
         const SizedBox(height: 12),
@@ -1147,7 +852,7 @@ class _WeighPrintScreenState extends State<WeighPrintScreen> {
   }
 }
 
-// ---------------------------------------------------------------- 10–11. custom barcode
+// ---------------------------------------------------------------- custom barcode
 
 class CustomBarcodeScreen extends StatefulWidget {
   const CustomBarcodeScreen({super.key, required this.api, this.store = ''});
@@ -1161,7 +866,7 @@ class _CustomBarcodeScreenState extends State<CustomBarcodeScreen> {
   String _mode = 'type';
   final _code = TextEditingController(), _name = TextEditingController(), _price = TextEditingController();
   int _copies = 1;
-  bool _busy = false;
+  bool _busy = false, _printing = false;
   String? _error;
 
   String get _text => _code.text.trim();
@@ -1203,26 +908,39 @@ class _CustomBarcodeScreenState extends State<CustomBarcodeScreen> {
   LabelData get _labelData =>
       LabelData(name: _name.text.trim().isEmpty ? _text : _name.text.trim(), priceMinor: ((num.tryParse(_price.text.trim()) ?? 0) * 100).round(), code: _text, systemCode: _text, store: widget.store);
 
-  Future<void> _preview() async {
+  Future<void> _print() async {
     if (!await _check() || !mounted) return;
-    await _push<void>(context, CustomPreviewScreen(label: _labelData, price: num.tryParse(_price.text.trim()), copies: _copies));
+    setState(() => _printing = true);
+    try {
+      await printBarcodeLabels([(_labelData, _copies)]);
+      if (mounted) showToast(context, '$_copies ${_copies == 1 ? 'label' : 'labels'} sent to print.');
+    } catch (_) {
+      if (mounted) showToast(context, 'Could not open printing. Try again.');
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  void _saved(BcItem item) {
+    showToast(context, '$_text saved on ${item.name}.');
+    Navigator.pop(context);
   }
 
   /// Save on item: pick the product, the code is saved on it (as "custom"), then the linked screen.
   Future<void> _save() async {
     if (!await _check() || !mounted) return;
-    final item = await _push<BcItem>(context, SelectProductScreen(api: widget.api, title: 'Select Product', subtitle: 'Which product gets $_text?', cta: 'Confirm'));
+    final item = await _push<BcItem>(context, PickProductScreen(api: widget.api, subtitle: 'Which product gets $_text?'));
     if (item == null || !mounted) return;
     try {
       final saved = (await widget.api.custom(code: _text, itemId: item.id)).item ?? item;
-      if (mounted) await _push<void>(context, LinkDoneScreen(code: _text, item: saved));
+      if (mounted) _saved(saved);
     } on PartnerApiException catch (e) {
       if (!mounted) return;
       if (e.status == 409 && e.message.contains('already has the barcode')) {
         final ok = await _confirmReplace(context, item, _text);
         if (ok && mounted) {
           final saved = (await widget.api.custom(code: _text, itemId: item.id, replace: true)).item ?? item;
-          if (mounted) await _push<void>(context, LinkDoneScreen(code: _text, item: saved));
+          if (mounted) _saved(saved);
         }
       } else {
         showToast(context, e.message);
@@ -1236,7 +954,7 @@ class _CustomBarcodeScreenState extends State<CustomBarcodeScreen> {
         bottom: Column(mainAxisSize: MainAxisSize.min, children: [
           BcCta(key: const ValueKey('custom-save'), label: 'Save on item', onPressed: _save),
           const SizedBox(height: 8),
-          BcOutline(key: const ValueKey('custom-print'), label: 'Print label', onPressed: _preview),
+          BcOutline(key: const ValueKey('custom-print'), label: _printing ? 'Printing...' : 'Print label', icon: LucideIcons.printer, onPressed: _printing ? null : _print),
         ]),
         children: [
           Container(
@@ -1319,53 +1037,6 @@ class _CustomBarcodeScreenState extends State<CustomBarcodeScreen> {
       );
 }
 
-/// 11 · The label as it will print, with Edit (back) and Print.
-class CustomPreviewScreen extends StatefulWidget {
-  const CustomPreviewScreen({super.key, required this.label, required this.copies, this.price});
-  final LabelData label;
-  final int copies;
-  final num? price;
-  @override
-  State<CustomPreviewScreen> createState() => _CustomPreviewScreenState();
-}
-
-class _CustomPreviewScreenState extends State<CustomPreviewScreen> {
-  bool _busy = false;
-
-  Future<void> _print() async {
-    setState(() => _busy = true);
-    try {
-      await printBarcodeLabels([(widget.label, widget.copies)]);
-      if (mounted) showToast(context, '${widget.copies} ${widget.copies == 1 ? 'label' : 'labels'} sent to print.');
-    } catch (_) {
-      if (mounted) showToast(context, 'Could not open printing. Try again.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => BcPage(
-        title: 'Custom Barcode',
-        bottom: Row(children: [
-          Expanded(child: BcOutline(key: const ValueKey('preview-edit'), label: 'Edit', icon: LucideIcons.pencil, onPressed: () => Navigator.pop(context))),
-          const SizedBox(width: 10),
-          Expanded(child: BcCta(key: const ValueKey('preview-print'), label: 'Print', icon: LucideIcons.printer, busy: _busy, onPressed: _print)),
-        ]),
-        children: [
-          BcCard(child: BarcodeView(widget.label.code, height: 80)),
-          const SizedBox(height: 14),
-          BcCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              _fact('Product name', Text(widget.label.name, style: inter(14, 700))),
-              if (widget.price != null) _fact('Price', Text(rupees(widget.price!), style: inter(14, 700))),
-              _fact('Copies', Text('${widget.copies}', key: const ValueKey('preview-copies'), style: inter(14, 700))),
-            ]),
-          ),
-        ],
-      );
-}
-
 Future<bool> _confirmReplace(BuildContext context, BcItem i, String code) async =>
     await showDialog<bool>(
       context: context,
@@ -1377,9 +1048,53 @@ Future<bool> _confirmReplace(BuildContext context, BcItem i, String code) async 
     ) ==
     true;
 
-// ---------------------------------------------------------------- 12–14. link an unknown barcode
+// ---------------------------------------------------------------- pick a product (saving a custom code, linking a scanned one)
 
-/// 12 · A scanned code no item has: pick the product (13), it is saved for this store only, then "Code linked!" (14). Answers the item.
+/// The live search list to pick one item from; the picked row is tinted and ticked.
+Widget _pickList(List<BcItem>? list, BcItem? picked, ValueChanged<BcItem> onPick, {required String keyPrefix}) {
+  if (list == null) return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)));
+  if (list.isEmpty) return const BcEmpty(line: 'Try a different name, code or SKU.');
+  return _rows([
+    for (final i in list)
+      _ItemRow(
+        i,
+        key: ValueKey('$keyPrefix-${i.id}'),
+        selected: picked?.id == i.id,
+        onTap: () => onPick(i),
+        trailing: picked?.id == i.id ? const Icon(Icons.check_circle, size: 20, color: kBcDeep) : const Icon(LucideIcons.circle, size: 18, color: Color(0xFFC4C8BF)),
+      ),
+  ]);
+}
+
+/// Pick one of the store's items. Answers the item.
+class PickProductScreen extends StatefulWidget {
+  const PickProductScreen({super.key, required this.api, this.title = 'Select Product', this.subtitle, this.cta = 'Confirm'});
+  final BarcodesApi api;
+  final String title, cta;
+  final String? subtitle;
+  @override
+  State<PickProductScreen> createState() => _PickProductScreenState();
+}
+
+class _PickProductScreenState extends State<PickProductScreen> with _LiveSearch {
+  @override
+  BarcodesApi get api => widget.api;
+  BcItem? _picked;
+
+  @override
+  Widget build(BuildContext context) => BcPage(
+        title: widget.title,
+        subtitle: widget.subtitle,
+        bottom: BcCta(key: const ValueKey('pick-confirm'), label: widget.cta, onPressed: _picked == null ? null : () => Navigator.pop(context, _picked)),
+        children: [
+          searchBar('Search name, code or SKU', key: 'pick-search'),
+          const SizedBox(height: 12),
+          _pickList(items, _picked, (i) => setState(() => _picked = i), keyPrefix: 'pick'),
+        ],
+      );
+}
+
+/// A scanned code no item has: pick the product and it is saved on it, for this store only. Answers the item.
 class LinkCodeScreen extends StatefulWidget {
   const LinkCodeScreen({super.key, required this.api, required this.code});
   final BarcodesApi api;
@@ -1388,53 +1103,25 @@ class LinkCodeScreen extends StatefulWidget {
   State<LinkCodeScreen> createState() => _LinkCodeScreenState();
 }
 
-class _LinkCodeScreenState extends State<LinkCodeScreen> {
-  final _q = TextEditingController();
-  Timer? _wait;
-  List<BcItem>? _items;
+class _LinkCodeScreenState extends State<LinkCodeScreen> with _LiveSearch {
+  @override
+  BarcodesApi get api => widget.api;
   BcItem? _picked;
   bool _busy = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  void dispose() {
-    _wait?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    try {
-      final r = await widget.api.list(tab: 'all', q: _q.text);
-      if (mounted) setState(() => _items = r.items);
-    } catch (e) {
-      if (mounted) {
-        setState(() => _items = const []);
-        showToast(context, _err(e, 'Could not load your items.'));
-      }
-    }
-  }
-
   Future<void> _link() async {
-    var i = _picked;
-    i ??= await _push<BcItem>(context, SelectProductScreen(api: widget.api, title: 'Select Product', cta: 'Confirm'));
-    if (i == null || !mounted) return;
+    final i = _picked;
+    if (i == null) return showToast(context, 'Pick the product first.');
     setState(() => _busy = true);
     try {
       BcItem saved;
       try {
-        saved = await widget.api.link(i.id, widget.code);
+        saved = await api.link(i.id, widget.code);
       } on PartnerApiException catch (e) {
         if (!(e.status == 409 && e.message.contains('already has the barcode')) || !mounted) rethrow;
         if (!await _confirmReplace(context, i, widget.code)) return;
-        saved = await widget.api.link(i.id, widget.code, replace: true);
+        saved = await api.link(i.id, widget.code, replace: true);
       }
-      if (!mounted) return;
-      await _push<void>(context, LinkDoneScreen(code: widget.code, item: saved));
       if (mounted) Navigator.pop(context, saved);
     } catch (e) {
       if (mounted) showToast(context, _err(e, 'Could not save the code. Try again.'));
@@ -1444,95 +1131,28 @@ class _LinkCodeScreenState extends State<LinkCodeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final list = _items;
-    return BcPage(
-      title: 'Link Unknown Barcode',
-      bottom: BcCta(key: const ValueKey('link-confirm'), label: 'Link to product', busy: _busy, onPressed: _link),
-      children: [
-        BcCard(
-          color: const Color(0xFFF7F9F3),
-          child: Row(children: [
-            const Icon(LucideIcons.scanBarcode, size: 30, color: kInk),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(tr('Scanned code'), style: inter(12, 600, color: kMuted)),
-                Text(widget.code, key: const ValueKey('link-code'), style: inter(16, 800).copyWith(letterSpacing: 0.6)),
-              ]),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: const Color(0xFFFFF1F0), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFFBD5D2))),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Icon(LucideIcons.circleAlert, size: 18, color: kError),
-            const SizedBox(width: 10),
-            Expanded(child: Text(tr('No item found for this code. Link it to an existing product in your store.'), style: inter(12.5, 600, color: kError, height: 1.35))),
-          ]),
-        ),
-        const SizedBox(height: 14),
-        _search(_q, 'Search product name or code', () {
-          _wait?.cancel();
-          _wait = Timer(const Duration(milliseconds: 300), _load);
-        }, key: const ValueKey('link-search')),
-        const SizedBox(height: 10),
-        if (list == null) const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator(strokeWidth: 2.5))),
-        if (list != null && list.isEmpty) const BcEmpty(),
-        if (list != null && list.isNotEmpty)
+  Widget build(BuildContext context) => BcPage(
+        title: 'Link Barcode',
+        subtitle: 'No item has this code yet. Pick the product it belongs to.',
+        bottom: BcCta(key: const ValueKey('link-confirm'), label: 'Link to product', busy: _busy, onPressed: _picked == null ? null : _link),
+        children: [
           BcCard(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            child: Column(children: [
-              for (final (n, i) in list.indexed) ...[
-                if (n > 0) const Divider(height: 1, color: kBcBorder),
-                InkWell(
-                  key: ValueKey('link-item-${i.id}'),
-                  onTap: () => setState(() => _picked = i),
-                  child: Container(
-                    color: _picked?.id == i.id ? kBcMint : null,
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-                    child: Row(children: [
-                      BcThumb(i.imageUrl, size: 40),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(i.name, style: inter(14, 700)), Text(tr(i.loose ? 'Sold loose' : 'Piece'), style: inter(12, 500, color: kMuted))])),
-                      Icon(_picked?.id == i.id ? Icons.check_circle : LucideIcons.chevronRight, size: 18, color: _picked?.id == i.id ? kBcDeep : kMuted),
-                    ]),
-                  ),
-                ),
-              ],
+            color: const Color(0xFFF7F9F3),
+            child: Row(children: [
+              const Icon(LucideIcons.scanBarcode, size: 30, color: kInk),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(tr('Scanned code'), style: inter(12, 600, color: kMuted)),
+                  Text(widget.code, key: const ValueKey('link-code'), style: inter(16, 800).copyWith(letterSpacing: 0.6)),
+                ]),
+              ),
             ]),
           ),
-      ],
-    );
-  }
-}
-
-/// 14 · "Code linked!": the code and the product it is on now.
-class LinkDoneScreen extends StatelessWidget {
-  const LinkDoneScreen({super.key, required this.code, required this.item});
-  final String code;
-  final BcItem item;
-  @override
-  Widget build(BuildContext context) => BcPage(
-        title: '',
-        bottom: BcCta(key: const ValueKey('link-done'), label: 'Done', onPressed: () => Navigator.pop(context)),
-        children: [
-          const SizedBox(height: 20),
-          Center(
-            child: Container(width: 84, height: 84, decoration: const BoxDecoration(color: kBcDeep, shape: BoxShape.circle), child: const Icon(LucideIcons.check, size: 42, color: Colors.white)),
-          ),
-          const SizedBox(height: 18),
-          Text(tr('Code linked!'), key: const ValueKey('link-success'), textAlign: TextAlign.center, style: inter(20, 800)),
-          const SizedBox(height: 6),
-          Text('$code has been linked to ${item.name}${item.loose ? ' (Sold loose)' : ''}.', textAlign: TextAlign.center, style: inter(13, 500, color: kMuted, height: 1.4)),
-          const SizedBox(height: 20),
-          BcCard(child: Row(children: [
-            BcThumb(item.imageUrl, size: 48),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(item.name, style: inter(14, 700)), Text(tr(item.loose ? 'Sold loose' : 'Piece'), style: inter(12, 500, color: kMuted))])),
-          ])),
+          const SizedBox(height: 12),
+          searchBar('Search name, code or SKU', key: 'link-search'),
+          const SizedBox(height: 12),
+          _pickList(items, _picked, (i) => setState(() => _picked = i), keyPrefix: 'link-item'),
         ],
       );
 }

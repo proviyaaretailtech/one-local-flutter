@@ -21,6 +21,7 @@ import * as inv from './schemas/inventory.ts';
 import * as kit from './schemas/kitchen.ts';
 import * as cat from './schemas/catalogue.ts';
 import * as bc from './schemas/barcodes.ts';
+import * as dev from './schemas/devices.ts';
 import * as media from './schemas/media.ts';
 import * as grn from './schemas/grn.ts';
 import * as tbl from './schemas/tables.ts';
@@ -183,6 +184,11 @@ export const MANIFEST: Entry[] = [
   db('bc_make', { args: bc.Make, map: P, rate: 'write', roles: 'staff with menu:update' }),
   db('bc_make_all', { args: bc.MakeAll, map: P, rate: 'write', roles: 'staff with menu:update' }),
   db('bc_link', { args: bc.Link, map: P, rate: 'write', roles: 'staff with menu:update' }),
+  // the store's Device manager (hosted_store_devices_2026-10-31.sql): printers for receipts, barcode labels and the kitchen
+  db('dev_printers', { args: dev.List, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('dev_printer_save', { args: dev.Save, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('dev_printer_remove', { args: dev.Remove, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('dev_printer_tested', { args: dev.Tested, map: P, rate: 'write', roles: 'staff of the business' }),
   db('bc_set_loose', { args: bc.SetLoose, map: P, rate: 'write', roles: 'staff with menu:update' }),
   // ---- product media pool (30 Oct 2026): Store Media Pool -> offered to the Master Media Pool -> approved into the Standard Data pool
   db('media_store_pool', { args: media.StorePool, map: P, rate: 'read', roles: STAFF }),

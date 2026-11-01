@@ -4,6 +4,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
+import '../devices/bill_receipt.dart';
+import '../devices/print_service.dart';
+import '../home/home_nav.dart';
 import '../ui/theme.dart';
 import '../shift/refund_blocked_screen.dart';
 import 'sell_api.dart';
@@ -303,12 +306,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
           const Divider(height: 18, color: kLine),
           Row(children: [Text(tr('Total Amount'), style: inter(17, 800)), const Spacer(), Text(rupees(r.total), style: inter(22, 800, color: const Color(0xFF3DB800)))]),
           const SizedBox(height: 8),
-          Row(children: [
+          // the buttons wrap on a narrow phone (Copy, Print, Open order, Refund)
+          Wrap(alignment: WrapAlignment.spaceBetween, children: [
             TextButton(onPressed: () {
               Clipboard.setData(ClipboardData(text: r.receiptText));
               showToast(context, 'Receipt text copied.');
             }, child: Text(tr('Copy receipt'))),
-            const Spacer(),
+            TextButton(key: ValueKey('hist-print-${r.id}'), onPressed: () => printBill(context, BillReceipt.fromRecord(r, store: HomeNav.storeName ?? 'OneLocal')), child: Text(tr('Print'))),
             if (widget.onOpen != null) TextButton(key: ValueKey('hist-open-${r.id}'), onPressed: () => widget.onOpen!(r.id), child: Text(tr('Open order'))),
             if (!_online && r.paid > r.refunded) TextButton(onPressed: () => _refund(r), child: Text(tr('Refund this bill'))),
           ]),

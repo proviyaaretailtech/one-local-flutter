@@ -41,7 +41,7 @@ Future<void> showStoreSideNav(
     SideNavEntry(LucideIcons.circleUser, 'Customer', hook(HomeNav.customers)),
     // barcodes for the store's own and loose items (founder, 30 Oct 2026)
     SideNavEntry(LucideIcons.scanBarcode, 'Barcodes', hook(HomeNav.barcodes)),
-    SideNavEntry(LucideIcons.images, 'Product photos', hook(HomeNav.productPhotos)),
+    SideNavEntry(LucideIcons.images, 'Media manager', hook(HomeNav.productPhotos)),
     // how the shop looks to customers (founder, 27 Oct 2026): next to the customers it is for
     // Page Manager (founder, 28 Oct 2026; was Business profile): the shop's OneLocal page, ads and offers from one dashboard
     SideNavEntry(LucideIcons.layoutDashboard, 'Page Manager', hook(HomeNav.businessProfile ?? HomeNav.storefront)),
@@ -150,7 +150,7 @@ class _StoreSideNavState extends State<_StoreSideNav> {
               controller: _search,
               textInputAction: TextInputAction.search,
               style: inter(14, 400),
-              decoration: InputDecoration.collapsed(hintText: tr('Search the app'), hintStyle: inter(14, 400, color: kMuted)),
+              decoration: InputDecoration.collapsed(hintText: tr('Search the app'), hintStyle: inter(14, 400, color: kHint)),
               onChanged: (_) => setState(() {}),
               onSubmitted: (q) {
                 final hits = searchActions(widget.actions, q);

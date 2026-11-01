@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
+import '../devices/bill_receipt.dart';
+import '../devices/print_service.dart';
 import '../ui/theme.dart';
 import 'pay_screen.dart';
 import 'sell_api.dart';
@@ -15,9 +16,10 @@ void _backToTill(BuildContext context) => Navigator.of(context).popUntil((r) => 
 
 /// Figma "448 Transaction Success". Every figure is read from the paid bill the server returned.
 class SuccessScreen extends StatelessWidget {
-  const SuccessScreen({super.key, required this.env, required this.view});
+  const SuccessScreen({super.key, required this.env, required this.view, this.customerName, this.customerPhone});
   final SellEnv env;
   final OrderView view;
+  final String? customerName, customerPhone; // from the cart: the receipt names the customer
 
   @override
   Widget build(BuildContext context) {
@@ -38,10 +40,11 @@ class SuccessScreen extends StatelessWidget {
               branch: env.branchName,
               when: view.placedAt,
               onNewOrder: () => _backToTill(context),
-              onPrintReceipt: () {
-                Clipboard.setData(ClipboardData(text: view.receiptText));
-                showToast(context, 'Receipt text copied. Printers connect in a later release.');
-              },
+              // the default receipt printer from Settings → Devices (the print dialog when there is none)
+              onPrintReceipt: () => printBill(
+                context,
+                BillReceipt.fromOrder(view, store: env.storeName, branch: env.branchName, customer: customerName, phone: customerPhone),
+              ),
               footnote: 'Use New Order to start the next sale.',
             ),
           ]),

@@ -114,7 +114,7 @@ class _QuickAddSheetState extends State<QuickAddSheet> {
   static const _line = Color(0xFFDADDD5);
   static InputDecoration _deco(String hint, {String? prefix}) => InputDecoration(
         hintText: hint,
-        hintStyle: inter(14.5, 400, color: const Color(0xFF9AA095)),
+        hintStyle: inter(14.5, 400, color: kHint),
         prefixText: prefix,
         prefixStyle: inter(15, 600),
         counterText: '',
