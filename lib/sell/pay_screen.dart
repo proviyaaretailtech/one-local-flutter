@@ -5,7 +5,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
-import '../ui/whatsapp.dart';
 import '../shift/shift_screens.dart';
 import 'cart_customer.dart';
 import 'payment_pending_screen.dart';
@@ -252,60 +251,6 @@ class _PayScreenState extends State<PayScreen> {
     return [for (final l in cart!.lines) (l.name, l.qty, l.weightG != null ? cart.lineEstimate(l) : num.tryParse('${priced[l.menuItemId]?['amount'] ?? 0}') ?? 0)];
   }
 
-  /// The bill as a WhatsApp message (founder, 29 Oct 2026): the store, the date and day, every item, the totals and how it is paid.
-  String billMessage(DateTime now) {
-    final q = _quote, b = _order?.bill;
-    final subtotal = q?.subtotal ?? (b?['subtotal'] as num?) ?? 0;
-    final gstPct = q?.gstPct ?? (b?['gst_pct'] as num?) ?? 0;
-    final gst = q?.gst ?? (b?['gst'] as num?) ?? 0;
-    final sc = q?.serviceCharge ?? (b?['service_charge'] as num?) ?? 0;
-    final disc = q?.discount ?? (b?['discount'] as num?) ?? 0;
-    final round = q?.roundOff ?? (b?['round_off'] as num?) ?? 0;
-    final code = widget.cart?.couponCode;
-    final rows = _rows;
-    final units = rows.fold<int>(0, (n, r) => n + r.$2);
-    final method = _methods.firstWhere((m) => m.$1 == _method).$2;
-    return [
-      '🧾 *${env.storeName}*',
-      if (env.branchName != null) env.branchName!,
-      '',
-      _name.isEmpty ? 'Hello! Here is your bill.' : 'Hello *$_name*, here is your bill.',
-      '📅 ${billDate(now)}',
-      if (_order != null) 'Bill no: ${_order!.displayNo}',
-      '',
-      '*Items (${rows.length} · $units ${units == 1 ? 'unit' : 'units'})*',
-      // a table in WhatsApp's fixed-width text (founder, 1 Nov 2026): each item, then qty × price and its amount; the totals under it
-      '```',
-      for (final (i, (name, qty, amount)) in rows.indexed) ...[
-        '${i + 1}. $name',
-        waPair('   ${waQty(qty)} × ${rupees(qty == 0 ? amount : amount / qty)}', rupees(amount)),
-      ],
-      waRule,
-      waPair('Subtotal', rupees(subtotal)),
-      if (gst > 0) waPair('GST (${gstPct == gstPct.roundToDouble() ? gstPct.toInt() : gstPct}%)', rupees(gst)),
-      if (sc > 0) waPair('Service charge', rupees(sc)),
-      if (disc > 0) waPair('Discount${code == null ? '' : ' ($code)'}', '−${rupees(disc)}'),
-      if (round != 0) waPair('Round off', '${round < 0 ? '−' : '+'}${rupees(round.abs())}'),
-      waRule,
-      waPair('TOTAL', rupees(_total)),
-      '```',
-      'Payment: *$method*',
-      '',
-      'Thank you for shopping with us! 🙏',
-      'Please visit again.',
-      '',
-      '_${env.storeName} · a OneLocal partner store_',
-    ].join('\n');
-  }
-
-  Future<void> _whatsapp() async {
-    if (_phone.length < 10) {
-      showToast(context, 'Add the customer\'s mobile number first.');
-      if (widget.cart != null) await _customer();
-      if (_phone.length < 10 || !mounted) return;
-    }
-    await env.openUrl(whatsAppLink(_phone, billMessage(DateTime.now())));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -326,18 +271,15 @@ class _PayScreenState extends State<PayScreen> {
             const SizedBox(height: 18),
             DarkCta(label: 'Pay ${rupees(_total)}', busy: _busy, onPressed: (order == null && q == null && _method != 'split') ? null : _pay),
             const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: LightCta(label: tr('Send by WhatsApp'), onPressed: _whatsapp)),
-              const SizedBox(width: 10),
-              Expanded(child: LightCta(label: tr('Save & Hold'), onPressed: _busy ? null : _hold)),
-            ]),
+            // Send by WhatsApp is on the receipt, once the bill is paid (founder, 2 Nov 2026)
+            LightCta(label: tr('Save & Hold'), onPressed: _busy ? null : _hold),
             if (_method == 'card' || _method == 'upi') ...[
               const SizedBox(height: 4),
               UnderLink('Payment did not go through', onTap: _busy ? null : () => _failed(_method)),
             ],
             if (_phone.length < 10) ...[
               const SizedBox(height: 8),
-              Text(tr('Walk-in sale · Add the customer\'s number to send the bill on WhatsApp.'), style: inter(13, 400, color: kMuted)),
+              Text(tr('Walk-in sale · Add the customer\'s number to send the bill on WhatsApp after payment.'), style: inter(13, 400, color: kMuted)),
             ],
           ]),
         ),

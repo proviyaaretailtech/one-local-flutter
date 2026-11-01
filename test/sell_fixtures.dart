@@ -114,6 +114,7 @@ class Till {
     }
     if (p.endsWith('/pos-orders/checkout')) return ok(view('pending'));
     if (p.endsWith('/pos-orders/hold')) return ok(view('checkout'));
+    if (p.endsWith('/rpc/pos_bill_link')) return ok({'code': 'Ab3dEf7hJk9m'});
     if (p.endsWith('/rpc/pos_split_pay')) return ok({'order_id': orderId, 'replayed': false, 'parts': 2});
     if (p.endsWith('/pos-orders/' + orderId + '/pay')) return ok(view('pending'));
     if (p.endsWith('/cancel')) return ok(view('cancelled'));

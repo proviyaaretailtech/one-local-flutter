@@ -586,54 +586,44 @@ void main() {
       expect(jsonDecode(till.where('POST', '/cancel').single.body)['reason'], 'Payment not collected');
     });
 
-    testWidgets('a held bill keeps its customer\'s number: WhatsApp sends to it without asking again', (t) async {
+    testWidgets('no WhatsApp before payment: the pay screen has Save & Hold only', (t) async {
       final till = Till();
-      final opened = <Uri>[];
-      final env = till.env(opened: opened);
-      await tall(t, PayScreen(env: env, held: OrderView({...view('checkout'), 'customer': 'Asha Rao', 'customer_phone': '9876543210'})));
-      expect(t.widget<Text>(find.byKey(const ValueKey('pay-customer-phone'))).data, '+91 98765 43210');
-      await t.tap(find.text('Send by WhatsApp'));
-      await t.pumpAndSettle();
-      expect(find.text("Add the customer's mobile number first."), findsNothing);
-      expect(opened.single.queryParameters['phone'], '919876543210');
+      await tall(t, PayScreen(env: till.env(), cart: cartWith(till.env().carts)));
+      expect(find.text('Send by WhatsApp'), findsNothing);
+      expect(find.text('Save & Hold'), findsOneWidget);
     });
 
-    testWidgets('the bill shows the customer big; WhatsApp asks for the number if missing, then sends the whole bill to it', (t) async {
-      HomeNav.storeName = 'Sharma General Store'; // the signed-in store: its name heads the bill
+    testWidgets('after payment, Send by WhatsApp sits beside Print Receipt and sends a short note with the bill\'s public link', (t) async {
+      HomeNav.storeName = 'Sharma General Store'; // the signed-in store: its name is in the note
       final till = Till();
       final opened = <Uri>[];
       final env = till.env(opened: opened);
-      final cart = cartWith(env.carts)..customerPhone = ''; // a walk-in who skipped the number
-      await tall(t, PayScreen(env: env, cart: cart));
-      expect(find.text('Walk-in customer'), findsOneWidget);
-      expect(find.textContaining('Razorpay'), findsNothing);
-      await t.tap(find.text('Send by WhatsApp'));
+      await tall(t, SuccessScreen(env: env, view: OrderView(view('pending')), customerName: 'Asha Rao', customerPhone: '9876543210'));
+      expect(find.text('Print Receipt'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('receipt-whatsapp')));
+      await t.pumpAndSettle();
+      expect(jsonDecode(till.where('POST', '/rpc/pos_bill_link').single.body), {'order_id': orderId});
+      expect(opened.single.host, 'api.whatsapp.com');
+      expect(opened.single.queryParameters['phone'], '919876543210');
+      expect(opened.single.queryParameters['text'],
+          'Dear Asha Rao,\n\nThank you for shopping at Sharma General Store! 🛍️\nYour bill is ready to view, print or save here:\n'
+          'https://one-local-flutter.vercel.app/b/Ab3dEf7hJk9m\n\nSee you again soon.');
+      expect(opened.single.queryParameters['text'], isNot(contains('localhost'))); // a link the customer's phone can open
+    });
+
+    testWidgets('after payment, a walk-in with no number is asked for one, then gets the bill', (t) async {
+      final till = Till();
+      final opened = <Uri>[];
+      final env = till.env(opened: opened);
+      await tall(t, SuccessScreen(env: env, view: OrderView(view('pending'))));
+      await t.tap(find.byKey(const ValueKey('receipt-whatsapp')));
       await t.pumpAndSettle();
       expect(opened, isEmpty);
       await t.enterText(find.byKey(const ValueKey('cart-customer-phone')), '9876543210');
-      await t.enterText(find.byKey(const ValueKey('cart-customer-name')), 'Asha Rao');
       await t.tap(find.byKey(const ValueKey('cart-customer-save')));
       await t.pumpAndSettle();
-      expect(t.widget<Text>(find.byKey(const ValueKey('pay-customer-name'))).data, 'Asha Rao');
-      expect(t.widget<Text>(find.byKey(const ValueKey('pay-customer-phone'))).data, '+91 98765 43210');
-      expect(opened.single.host, 'api.whatsapp.com');
       expect(opened.single.queryParameters['phone'], '919876543210');
-      final text = opened.single.queryParameters['text']!;
-      expect(text, startsWith('🧾 *Sharma General Store*'));
-      expect(text, contains('Latur Main Branch'));
-      expect(text, contains('Hello *Asha Rao*'));
-      expect(text, contains('📅 '));
-      // the items and totals as a table in fixed-width text: every amount line is 30 wide, so the amounts line up on the right
-      final table = text.split('```')[1].trim().split('\n');
-      expect(table.first, startsWith('1. '));
-      expect(table[1], matches(RegExp(r'^   \d+ × ₹[\d,.]+ +₹[\d,.]+$')));
-      expect(table, contains(startsWith('Subtotal ')));
-      expect(table.last, startsWith('TOTAL '));
-      for (final line in table.where((l) => !RegExp(r'^\d+\. ').hasMatch(l))) {
-        expect(line.length, 30, reason: line);
-      }
-      expect(text, contains('Payment: *'));
-      expect(text, contains('Thank you'));
+      expect(opened.single.queryParameters['text'], startsWith('Dear Customer,'));
     });
 
     test('the bill date names the day', () {
