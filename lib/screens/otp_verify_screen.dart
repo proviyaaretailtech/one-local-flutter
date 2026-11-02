@@ -131,11 +131,13 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
               const SizedBox(height: 24),
               Text('6-digit verification code', style: inter(14, 600)),
               const SizedBox(height: 12),
-              OtpBoxes(
-                controller: _code,
-                onChanged: (v) {
-                  if (v.length == 6) _verify();
-                },
+              KeepInViewWhileTyping(
+                child: OtpBoxes(
+                  controller: _code,
+                  onChanged: (v) {
+                    if (v.length == 6) _verify();
+                  },
+                ),
               ),
               const SizedBox(height: 16),
               if (_left > 0)
