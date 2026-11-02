@@ -357,7 +357,37 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Sign out'));
       await t.pumpAndSettle();
+      // asks first: No keeps you signed in with the menu open
+      expect(find.text('Are you sure you want to sign out?'), findsOneWidget);
+      expect(find.byKey(const ValueKey('signout-no')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('signout-no')));
+      await t.pumpAndSettle();
+      expect(auth.calls, isEmpty);
+      expect(find.byKey(const ValueKey('side-nav')), findsOneWidget);
+      await t.tap(find.text('Sign out'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('signout-yes')));
+      await t.pumpAndSettle();
       expect(auth.calls, ['signOut']);
+    });
+
+    testWidgets('Sign out closes the app shell too and lands on the first screen, the sign-in splash', (t) async {
+      final auth = FakeAuth();
+      await showTall(t, const Text('sign-in splash'));
+      // as in the app: the shell is a screen over the sign-in gate, and the dashboard sits in a tab's own navigator inside it
+      t.state<NavigatorState>(find.byType(Navigator)).push(MaterialPageRoute<void>(
+          builder: (_) => Navigator(onGenerateRoute: (_) => MaterialPageRoute<void>(builder: (_) => ControlCentreScreen(api: FakeHome(), auth: auth, now: () => _clock)))));
+      await t.pumpAndSettle();
+      expect(find.text('sign-in splash'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('home-menu')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Sign out'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('signout-yes')));
+      await t.pumpAndSettle();
+      expect(auth.calls, ['signOut']);
+      expect(find.byType(ControlCentreScreen), findsNothing, reason: 'the dashboard is gone');
+      expect(find.text('sign-in splash'), findsOneWidget);
     });
 
     testWidgets('several outlets: the outlet line picks one, and the server is asked for it', (t) async {

@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../api/rpc_client.dart';
 import '../auth/auth_repository.dart';
 import '../auth/partner_api.dart';
+import '../home/side_nav.dart' show confirmSignOut;
 import '../inventory/inventory_widgets.dart' show kCardLine;
 import '../onboarding/onboarding_widgets.dart';
 import '../ui/i18n.dart';
@@ -454,6 +455,7 @@ class AdvertiserHomeScreen extends StatelessWidget {
     if (pick == 'profile') {
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => BrandProfileScreen(api: api)));
     } else {
+      if (!await confirmSignOut(context) || !context.mounted) return;
       final nav = Navigator.of(context);
       await (auth ?? AuthRepository()).signOut();
       nav.popUntil((r) => r.isFirst);
