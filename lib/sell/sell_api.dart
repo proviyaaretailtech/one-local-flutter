@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 
+import '../api/app_env.dart';
 import '../api/rpc_client.dart';
 import '../orders/orders_api.dart';
 
@@ -182,6 +183,12 @@ class SellApi {
 
   final RpcClient _rpc;
   final OrdersApi _orders;
+
+  /// The bill's online page, which the customer opens from the WhatsApp note (2 Nov 2026): made once per bill, the same link after.
+  Future<Uri> billLink(String orderId) async {
+    final code = (await _call('pos_bill_link', {'order_id': orderId}))['code'] as String;
+    return Uri.parse('${AppEnv.publicWebUrl}/b/$code');
+  }
 
   /// The gateway's refusal as the exception the till screens already handle.
   Future<Map<String, dynamic>> _call(String fn, Map<String, dynamic> args, [String? key]) async {

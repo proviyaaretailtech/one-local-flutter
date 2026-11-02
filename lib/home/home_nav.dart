@@ -112,7 +112,7 @@ class HomeNav {
   static HomeRoute? customers;
   // Side menu → Barcodes (30 Oct 2026): store codes, loose items, custom barcodes.
   static HomeRoute? barcodes;
-  // Side menu → Product photos (30 Oct 2026): the store's photos, the Standard pool, OneLocal's review.
+  // Side menu → Media manager (30 Oct 2026, named 1 Nov 2026): My photos, Master media (by brand or subcategory), OneLocal's review.
   static HomeRoute? productPhotos;
   static HomeRoute? wallet;
 

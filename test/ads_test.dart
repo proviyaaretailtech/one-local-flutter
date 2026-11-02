@@ -199,7 +199,7 @@ void main() {
   });
 
   group('Create campaign', () {
-    testWidgets('a 9:16 photo, the format, the dates; the amount is worked out from the active price; the terms must be ticked', (t) async {
+    testWidgets('a photo, the format, the dates; the amount is worked out from the active price; the terms must be ticked', (t) async {
       final f = Fake();
       pickAdMedia = ({required bool video}) async => PickedDocument(name: 'diwali.png', bytes: Uint8List.fromList(_png916), contentType: 'image/png');
       await show(t, AdCreateScreen(api: f.api, home: _home(), today: DateTime(2026, 10, 29)));
@@ -208,15 +208,21 @@ void main() {
       expect(textOf(t, 'ad-left'), '₹50');
       await tapKey(t, 'ad-format-popup');
       expect(textOf(t, 'ad-cost'), '105');
+      expect(textOf(t, 'ad-media-shape'), '9 : 16'); // a reel is tall
       await tapKey(t, 'ad-format-home_banner');
       expect(textOf(t, 'ad-cost'), '35');
+      expect(textOf(t, 'ad-media-shape'), '16 : 9'); // a banner is wide, as the customer app shows it
+      expect(textOf(t, 'ad-media-hint'), contains('1920 × 1080'));
       // nothing picked yet
       await tapKey(t, 'ad-create');
       expect(f.calls('ads_save'), isEmpty);
       await tapKey(t, 'ad-pick-photo');
       await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200))); // the photo is measured
       await t.pumpAndSettle();
-      expect(find.byKey(const ValueKey('ad-ratio-warning')), findsNothing); // it is 9:16
+      expect(find.byKey(const ValueKey('ad-ratio-warning')), findsOneWidget); // a tall photo on a wide banner is cropped
+      await tapKey(t, 'ad-format-reel');
+      expect(find.byKey(const ValueKey('ad-ratio-warning')), findsNothing); // it fits a reel
+      await tapKey(t, 'ad-format-home_banner');
       await t.enterText(find.byKey(const ValueKey('ad-title')), 'Diwali sweets');
       await tapKey(t, 'ad-create');
       expect(f.calls('ads_save'), isEmpty); // the terms are not ticked

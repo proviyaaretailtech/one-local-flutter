@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../catalogue/catalogue_api.dart';
 import '../catalogue/item_sheets.dart' show showQuickAdd;
+import '../home/home_nav.dart';
 import '../orders/orders_api.dart';
 import '../orders/orders_home.dart';
 import '../shift/shift_api.dart';
@@ -21,9 +22,10 @@ import 'sell_widgets.dart';
 /// What every till screen shares: the two API clients, the open carts, and where the other sections' tabs lead.
 /// Tests pass fakes; the app passes nothing and gets the live ones.
 class SellEnv {
-  SellEnv({SellApi? sell, OrdersApi? orders, ShiftApi? shift, SellCarts? carts, BarcodesApi? barcodes, this.onTab, this.storeName = 'OneLocal', this.branchName, this.initials = 'RP', Future<bool> Function(Uri)? openUrl,
+  SellEnv({SellApi? sell, OrdersApi? orders, ShiftApi? shift, SellCarts? carts, BarcodesApi? barcodes, this.onTab, String? storeName, this.branchName, this.initials = 'RP', Future<bool> Function(Uri)? openUrl,
       Future<bool> Function(BuildContext context, String category)? addFirstItem})
-      : addFirstItem = addFirstItem ?? ((context, category) async => await showQuickAdd(context, CatalogueApi(), category: category) != null),
+      : storeName = storeName ?? HomeNav.storeName ?? 'OneLocal', // the signed-in store's name: on the WhatsApp bill and the till
+        addFirstItem = addFirstItem ?? ((context, category) async => await showQuickAdd(context, CatalogueApi(), category: category) != null),
         sell = sell ?? SellApi(),
         barcodes = barcodes ?? BarcodesApi(),
         shift = shift ?? ShiftApi(),

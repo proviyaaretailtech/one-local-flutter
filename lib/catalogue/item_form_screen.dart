@@ -210,7 +210,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
 
   String? _nullIfBlank(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
 
-  Future<void> _save({required bool draft}) async {
+  Future<void> _save({required bool draft, num? restock}) async {
     final price = parsePriceMinor(_price.text);
     if (_name.text.trim().isEmpty) return showToast(context, tr('Enter the product name.'));
     if (!_editing && _parts == null) return showToast(context, tr(skuProblem(_parts)!));
@@ -245,6 +245,8 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
       'purchase_pack_units': pack,
       'storage': _storage.isEmpty ? null : _storage,
       'version': ?(_editing ? widget.item!.version : null),
+      // a new selling unit on an item with stock: what is on hand, counted in the new unit
+      'restock_qty': ?restock,
     };
     setState(() {
       _busy = true;
@@ -269,6 +271,13 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
+      // the selling unit changed on an item with stock (kg to pc, say): ask how much is on hand in the new unit, then save again
+      if (e is CatalogueApiException && e.recount && restock == null) {
+        setState(() => _busy = false);
+        final n = await _askRestock(e.message);
+        if (n != null && mounted) await _save(draft: draft, restock: n);
+        return;
+      }
       setState(() {
         _busy = false;
         _bannerOpen = true;
@@ -281,6 +290,36 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
         }
       });
     }
+  }
+
+  /// The stock on hand counted in the new selling unit (the database says what it had in the old one).
+  Future<num?> _askRestock(String why) async {
+    final c = TextEditingController();
+    final n = await showDialog<num>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('Count the stock in the new unit')),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(why, style: inter(13.5, 500, color: kMuted, height: 1.35)),
+          const SizedBox(height: 12),
+          TextField(
+            key: const ValueKey('item-restock'),
+            controller: c,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}'))],
+            decoration: InputDecoration(labelText: '${tr('In stock now')} ($_unit)', hintText: '0'),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancel'))),
+          FilledButton(key: const ValueKey('item-restock-save'), onPressed: () => Navigator.pop(ctx, num.tryParse(c.text.trim())), child: Text(tr('Save'))),
+        ],
+      ),
+    );
+    // the box is let go once the dialog has finished closing, not while it still animates out
+    WidgetsBinding.instance.addPostFrameCallback((_) => Future.delayed(const Duration(milliseconds: 400), c.dispose));
+    return n;
   }
 
   // ---------------------------------------------------------------- photo
@@ -437,7 +476,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
               keyboardType: type,
               inputFormatters: formatters,
               style: inter(14, 400),
-              decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(14, 400, color: bad ? kError : kMuted)),
+              decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(14, 400, color: bad ? kError : kHint)),
             ),
           ),
           ?trailing,

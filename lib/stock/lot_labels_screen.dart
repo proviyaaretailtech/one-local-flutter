@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../auth/partner_api.dart';
 import '../home/home_nav.dart';
 import '../inventory/inventory_api.dart';
+import '../devices/print_service.dart';
 import '../ui/theme.dart';
 import 'label_pdf.dart';
 import 'labels_screens.dart' show printLabelPdf, shareLabelPdf;
@@ -130,11 +131,15 @@ class _LotLabelsScreenState extends State<LotLabelsScreen> {
     if (batch.isEmpty) return showToast(context, 'Turn on at least one product.');
     setState(() => _busy = true);
     try {
+      if (send == printLabelPdf && await printLabelsDirect(batch)) {
+        if (mounted) showToast(context, '$_total label${_total == 1 ? '' : 's'} sent to the label printer.');
+        return;
+      }
       pw.Font? font;
       try {
         font = pw.Font.ttf(await rootBundle.load('fonts/Inter.ttf'));
       } catch (_) {}
-      final pdf = await buildLabelsPdf(batch, size: _size, font: font, bold: font);
+      final pdf = await buildLabelsPdf(batch, size: send == printLabelPdf ? labelSizeFor(await defaultPrinterFor('label'), _size) : _size, font: font, bold: font);
       await send(pdf, 'lot-labels-${_doc?.number ?? 'receipt'}.pdf');
       if (mounted) showToast(context, '$_total label${_total == 1 ? '' : 's'} sent to the print screen.');
     } catch (_) {

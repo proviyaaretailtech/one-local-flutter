@@ -382,7 +382,7 @@ class _OlSheetState extends State<_OlSheet> {
                 style: inter(15, 500),
                 decoration: InputDecoration(
                   hintText: tr('Ask Ol… e.g. where do I split a bill?'),
-                  hintStyle: inter(14, 400, color: kMuted),
+                  hintStyle: inter(14, 400, color: kHint),
                   filled: true,
                   fillColor: const Color(0xFFF4F5F1),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

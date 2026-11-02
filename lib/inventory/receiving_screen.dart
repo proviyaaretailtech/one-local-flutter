@@ -425,7 +425,7 @@ class _ReceivingScreenState extends State<ReceivingScreen> {
             onSubmitted: (v) => _addItem(query: v),
             decoration: InputDecoration(
               hintText: l.sku,
-              hintStyle: inter(15, 400, color: kMuted),
+              hintStyle: inter(15, 400, color: kHint),
               filled: true,
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

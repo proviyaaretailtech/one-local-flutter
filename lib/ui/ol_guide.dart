@@ -78,7 +78,7 @@ const olTours = [
     OlStep('Tap Ads.', target: OlTarget.key('pm-ads')),
     OlStep('Ads are paid in coins (1 coin = ₹10). Tap Top up to add coins.', target: OlTarget.key('ads-topup'), next: true),
     OlStep('Tap Create campaign.', target: OlTarget.key('ads-create')),
-    OlStep('Pick what the ad is for and where it shows, add a 9:16 photo or video and the dates. Where OneLocal has a price you see the coins it holds; otherwise OneLocal sends you a price. OneLocal checks every ad before it runs.', next: true),
+    OlStep('Pick what the ad is for and where it shows, add a photo or video (wide for a banner, tall for a reel) and the dates. Where OneLocal has a price you see the coins it holds; otherwise OneLocal sends you a price. OneLocal checks every ad before it runs.', next: true),
   ]),
   OlTour('Pay someone', [
     OlStep('Open the menu.', target: OlTarget.key('app-header-menu')),

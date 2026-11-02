@@ -174,7 +174,7 @@ class _LocationPickerState extends State<LocationPicker> {
               onSubmitted: (v) => v.trim().length >= 2 ? _search(v.trim()) : null,
               autocorrect: false,
               style: inter(15, 400),
-              decoration: plainInput.copyWith(hintText: 'Search your shop, street or area', hintStyle: inter(15, 400, color: kMuted)),
+              decoration: plainInput.copyWith(hintText: 'Search your shop, street or area', hintStyle: inter(15, 400, color: kHint)),
             ),
           ),
           if (_searching)

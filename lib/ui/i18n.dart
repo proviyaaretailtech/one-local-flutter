@@ -650,6 +650,13 @@ const _words = <String, (String, String)>{
   '+ New cart': ('+ नया कार्ट', '+ Naya cart'),
   '+ Return': ('+ वापसी', '+ Wapsi'),
   'A draft is not sold and does not change stock. Stock is received in Stock.': ('ड्राफ्ट बिकता नहीं और स्टॉक नहीं बदलता। स्टॉक, स्टॉक में आता है।', 'Draft bikta nahi aur stock nahi badalta. Stock, Stock mein aata hai.'),
+  // Media manager (1 Nov 2026)
+  'Media manager': ('मीडिया मैनेजर', 'Media manager'),
+  'My photos': ('मेरी फ़ोटो', 'Meri photos'),
+  'Master media': ('मास्टर मीडिया', 'Master media'),
+  'By brand': ('ब्रांड से', 'Brand se'),
+  'By subcategory': ('उप-श्रेणी से', 'Subcategory se'),
+  'Use on an item': ('किसी आइटम पर लगाएँ', 'Kisi item par lagayein'),
   'A simpler receipt preview': ('आसान रसीद झलक', 'Aasan receipt preview'),
   'About this product': ('इस प्रोडक्ट के बारे में', 'Is product ke baare mein'),
   'Add customer': ('ग्राहक जोड़ें', 'Grahak jodein'),
@@ -870,6 +877,8 @@ const _words = <String, (String, String)>{
   'checked': ('जाँचे', 'check kiye'),
   'Rcvd': ('आए', 'Aaye'),
   'Rate': ('भाव', 'Rate'),
+  // what the store pays the supplier per unit, not the selling price (founder, 1 Nov 2026)
+  'Buy rate': ('खरीद भाव', 'Kharid rate'),
   'Matches': ('मिलता है', 'Milta hai'),
   'Bill amount (before GST)': ('बिल रकम (GST से पहले)', 'Bill amount (GST se pehle)'),
   'GST': ('GST', 'GST'),

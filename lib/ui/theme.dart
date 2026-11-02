@@ -9,6 +9,9 @@ import 'motion.dart';
 const kBg = Color(0xFFF5F5F0);
 const kInk = Color(0xFF111827);
 const kMuted = Color(0xFF6B7280);
+
+/// Example text inside an empty field (founder, 1 Nov 2026): light grey and regular weight, so it never reads as typed text.
+const kHint = Color(0xFFA3A8B0);
 const kLink = Color(0xFF3DB800);
 const kField = Color(0xFFF7F8F6);
 const kFieldBorder = Color(0xFFE3E8E3);
@@ -55,6 +58,7 @@ ThemeData posTheme() {
     fontFamily: 'Inter',
     colorScheme: ColorScheme.fromSeed(seedColor: kPrimary, primary: kPrimary),
     pageTransitionsTheme: olPageTransitions, // soft fade and rise between pages (lib/ui/motion.dart)
+    inputDecorationTheme: const InputDecorationTheme(hintStyle: TextStyle(color: kHint, fontWeight: FontWeight.w400)),
   );
 }
 
@@ -66,7 +70,8 @@ const kRegistrationGradient = LinearGradient(
   stops: [0.25, 0.75],
 );
 
-/// Page shell: scrolling content, then a pinned action area.
+/// Page shell: scrolling content, then a pinned action area. While the phone's keyboard is open (founder, 1 Nov 2026: the email and
+/// password fields hid behind it) the actions scroll with the content instead, so the field being typed in always has room to show.
 class ScreenShell extends StatelessWidget {
   const ScreenShell({super.key, required this.children, required this.actions, this.gradient});
   final List<Widget> children;
@@ -75,7 +80,17 @@ class ScreenShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final actionArea = Padding(
+      padding: EdgeInsets.fromLTRB(kPadX, 16, kPadX, keyboard ? 16 : 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: actions,
+      ),
+    );
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Container(
         decoration: BoxDecoration(color: kBg, gradient: gradient),
         child: SafeArea(
@@ -84,17 +99,11 @@ class ScreenShell extends StatelessWidget {
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: staggered(children)),
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [...staggered(children), if (keyboard) actionArea]),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(kPadX, 16, kPadX, 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: actions,
-                ),
-              ),
+              if (!keyboard) actionArea,
             ],
           ),
         ),
@@ -365,6 +374,9 @@ class FieldBox extends StatelessWidget {
 
 InputDecoration get plainInput => const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero);
 
+/// How much room a field keeps around it when the keyboard scrolls it into view: its label above, a little space below.
+const kFieldScrollPadding = EdgeInsets.fromLTRB(20, 64, 20, 40);
+
 /// Label above a field. [labelSize]/[labelWeight] differ between screens (13/500 vs 14/600).
 class LabeledField extends StatelessWidget {
   const LabeledField({
@@ -430,6 +442,8 @@ class LabeledField extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: controller,
+                  // when the keyboard opens, its label above stays in view too, and a little room below
+                  scrollPadding: kFieldScrollPadding,
                   keyboardType: keyboardType,
                   obscureText: obscure,
                   maxLength: maxLength,
@@ -442,7 +456,7 @@ class LabeledField extends StatelessWidget {
                   autocorrect: false,
                   enableSuggestions: false,
                   style: inter(15, 400),
-                  decoration: plainInput.copyWith(hintText: hint, counterText: '', hintStyle: inter(15, 400, color: kMuted)),
+                  decoration: plainInput.copyWith(hintText: hint, counterText: '', hintStyle: inter(15, 400, color: kHint)),
                 ),
               ),
               if (trailingSvg != null || trailingIcon != null) ...[

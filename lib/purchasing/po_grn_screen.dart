@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
-import '../ui/whatsapp.dart';
+import 'po_whatsapp.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
 import 'simple_purchase.dart';
@@ -80,23 +79,8 @@ class _PoGrnScreenState extends State<PoGrnScreen> {
     }
   }
 
-  /// Suppliers are not on OneLocal: the order goes to them on WhatsApp, written out, to their saved number when there is one.
-  Future<void> _send(PurchaseOrder po) async {
-    var phone = '';
-    try {
-      final s = (await env.api.suppliers()).where((s) => s.s('id') == po.m('supplier').s('id'));
-      phone = s.isEmpty ? '' : s.first.s('phone').replaceAll(RegExp(r'\D'), '');
-    } catch (_) {}
-    if (phone.length == 10) phone = '91$phone';
-    final expected = po.t('expected_delivery');
-    final text = [
-      'Purchase order ${po.number}',
-      for (final l in po.lines) '• ${l.s('name')} × ${qty1(l.n('ordered_qty'))} ${unitWord(l.s('unit'))}',
-      if (expected != null) 'Please deliver by ${dayMonth(expected)}.',
-    ].join('\n');
-    final uri = whatsAppLink(phone, text);
-    if (!await (widget.openUrl ?? (u) => launchUrl(u, mode: LaunchMode.externalApplication))(uri) && mounted) showToast(context, 'WhatsApp could not be opened.');
-  }
+  /// Suppliers are not on OneLocal: the order goes to them on WhatsApp, from this store, to their saved number when there is one.
+  Future<void> _send(PurchaseOrder po) => sendPoOnWhatsApp(context, env.api, po, openUrl: widget.openUrl);
 
   @override
   Widget build(BuildContext context) => InvScaffold(env: env.inv, onRefresh: _load, children: [

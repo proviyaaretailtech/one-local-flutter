@@ -21,6 +21,7 @@ import * as inv from './schemas/inventory.ts';
 import * as kit from './schemas/kitchen.ts';
 import * as cat from './schemas/catalogue.ts';
 import * as bc from './schemas/barcodes.ts';
+import * as dev from './schemas/devices.ts';
 import * as media from './schemas/media.ts';
 import * as grn from './schemas/grn.ts';
 import * as tbl from './schemas/tables.ts';
@@ -125,6 +126,7 @@ export const MANIFEST: Entry[] = [
   db('pos_sell_catalog', { args: sell.Catalog, map: P, rate: 'read', roles: STAFF }),
   db('pos_basket_suggest', { args: sell.Basket, map: P, rate: 'read', roles: STAFF }), // bought together, for All items
   db('pos_receipt_list', { args: sell.Receipts, map: P, rate: 'read', roles: STAFF }),
+  db('pos_bill_link', { args: sell.BillLink, map: P, rate: 'write', roles: STAFF }),
   db('pos_split_pay', { args: sell.SplitPay, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
   db('pos_payment_attempt_record', { args: sell.Attempt, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
   db('pos_online_checkout', { args: sell.OnlineCheckout, map: P, rate: 'money', roles: 'staff allowed to take payment' }),
@@ -183,6 +185,11 @@ export const MANIFEST: Entry[] = [
   db('bc_make', { args: bc.Make, map: P, rate: 'write', roles: 'staff with menu:update' }),
   db('bc_make_all', { args: bc.MakeAll, map: P, rate: 'write', roles: 'staff with menu:update' }),
   db('bc_link', { args: bc.Link, map: P, rate: 'write', roles: 'staff with menu:update' }),
+  // the store's Device manager (hosted_store_devices_2026-10-31.sql): printers for receipts, barcode labels and the kitchen
+  db('dev_printers', { args: dev.List, map: P, rate: 'read', roles: 'staff of the business' }),
+  db('dev_printer_save', { args: dev.Save, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('dev_printer_remove', { args: dev.Remove, map: P, rate: 'write', roles: 'owner or manager' }),
+  db('dev_printer_tested', { args: dev.Tested, map: P, rate: 'write', roles: 'staff of the business' }),
   db('bc_set_loose', { args: bc.SetLoose, map: P, rate: 'write', roles: 'staff with menu:update' }),
   // ---- product media pool (30 Oct 2026): Store Media Pool -> offered to the Master Media Pool -> approved into the Standard Data pool
   db('media_store_pool', { args: media.StorePool, map: P, rate: 'read', roles: STAFF }),

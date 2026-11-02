@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../home/home_nav.dart';
 import '../orders/order_widgets.dart';
@@ -45,7 +46,8 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   String? _error;
   String? _category;
   bool _grid = false;
-  bool _noteOpen = true;
+  bool _noteOpen = false; // shown until closed once on this phone (founder, 1 Nov 2026)
+  static const _noteClosedKey = 'catalogue.receipt_note_closed';
   int _page = 1;
   int _seq = 0;
   static const _pageSize = 6;
@@ -54,6 +56,23 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   void initState() {
     super.initState();
     _load();
+    _readNote();
+  }
+
+  /// The receipt-preview note shows until it is closed once; then never again on this phone.
+  Future<void> _readNote() async {
+    var closed = false;
+    try {
+      closed = (await SharedPreferences.getInstance()).getBool(_noteClosedKey) == true;
+    } catch (_) {} // no storage here: show it
+    if (!closed && mounted) setState(() => _noteOpen = true);
+  }
+
+  Future<void> _closeNote() async {
+    setState(() => _noteOpen = false);
+    try {
+      await (await SharedPreferences.getInstance()).setBool(_noteClosedKey, true);
+    } catch (_) {}
   }
 
   @override
@@ -253,7 +272,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
               controller: _search,
               textInputAction: TextInputAction.search,
               style: inter(14, 400),
-              decoration: plainInput.copyWith(hintText: tr('Search items'), hintStyle: inter(14, 400, color: kMuted)),
+              decoration: plainInput.copyWith(hintText: tr('Search items'), hintStyle: inter(14, 400, color: kHint)),
               onChanged: (_) {
                 _debounce?.cancel();
                 _debounce = Timer(const Duration(milliseconds: 300), () => _reload(toFirst: true));
@@ -325,7 +344,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
               Text(tr('Item quantities and tax are now easier to review before you print or share.'), style: inter(13, 400, color: kMuted, height: 1.35)),
             ]),
           ),
-          IconButton(tooltip: tr('Dismiss'), onPressed: () => setState(() => _noteOpen = false), icon: const Icon(LucideIcons.x, size: 20, color: kInk)),
+          IconButton(tooltip: tr('Dismiss'), onPressed: _closeNote, icon: const Icon(LucideIcons.x, size: 20, color: kInk)),
         ]),
       );
 

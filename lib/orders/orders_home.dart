@@ -204,7 +204,7 @@ class _OrdersHomeState extends State<OrdersHome> {
               border: InputBorder.none,
               isCollapsed: true,
               hintText: tr('Search by order ID or customer'),
-              hintStyle: inter(14, 400, color: kMuted),
+              hintStyle: inter(14, 400, color: kHint),
             ),
             onChanged: (_) {
               _debounce?.cancel();

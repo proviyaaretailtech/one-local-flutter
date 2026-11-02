@@ -148,7 +148,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
             decoration: InputDecoration(
               prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
               hintText: tr('Search by name or mobile number'),
-              hintStyle: inter(14, 400, color: kMuted),
+              hintStyle: inter(14, 400, color: kHint),
               filled: true,
               fillColor: Colors.white,
               isDense: true,

@@ -104,6 +104,9 @@ class CatalogueApiException extends PartnerApiException {
   final String? code;
   bool get stale => code == 'version_conflict';
   bool get taxRequired => code == 'tax_required';
+
+  /// A new selling unit on an item with stock: the count in the new unit is needed (1 Nov 2026).
+  bool get recount => code == 'recount';
 }
 
 /// One catalogue item as the server describes it. Every label comes from the server's data; nothing is decided here.

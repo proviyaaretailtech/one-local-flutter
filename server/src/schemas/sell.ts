@@ -44,3 +44,6 @@ export const CouponSave = obj({
   code: text(20), label: text(80).optional(), kind: z.enum(['percent', 'flat'], { message: 'Choose percent or flat.' }), value: z.number().positive('Enter a value above zero.'),
   min_order: z.number().min(0).nullish(), max_discount: z.number().positive().nullish(), max_uses: z.number().int().positive().nullish(), max_uses_per_customer: z.number().int().positive().nullish(), active: z.boolean().optional(), starts_at: text(40).nullish(), ends_at: text(40).nullish(),
 });
+
+// the bill's online link (2 Nov 2026): Send by WhatsApp sends a short note with it (hosted_bill_link_2026-11-02.sql)
+export const BillLink = obj({ order_id: z.string().regex(UUID, 'Choose a bill.') });

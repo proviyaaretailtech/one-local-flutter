@@ -11,6 +11,7 @@ import { rpcBatch, rpcOne } from './rpc.ts';
 import { webhookRoutes } from './modules/secure/index.ts';
 import { guestCall } from './guest-door.ts';
 import { guestWeb } from './guest-web.ts';
+import { billPage } from './bill-page.ts';
 
 // Health probe: version and whether the database answers. Uses the public key only; nothing secret is read or shown.
 add('GET', '/health', async () => {
@@ -26,6 +27,9 @@ add('GET', '/health', async () => {
 add('POST', '/rpc/:name', rpcOne);
 add('POST', '/rpc', rpcBatch);
 for (const w of webhookRoutes) add('POST', w.path, w.handler);
+
+// ---- the customer's online bill (2 Nov 2026): the link in the WhatsApp note; no sign-in, see src/bill-page.ts
+add('GET', '/b/:code', billPage);
 
 // ---- the guest door and the guest menu page (table QR codes, 0561): no sign-in; see src/guest-door.ts and src/guest-web.ts
 add('POST', '/guest/:name', guestCall);

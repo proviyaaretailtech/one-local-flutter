@@ -93,7 +93,7 @@ class CwaField extends StatelessWidget {
               hintText: hint,
               prefixText: mobile ? kMobilePrefix : null,
               prefixStyle: inter(15, 600),
-              hintStyle: inter(14, 400, color: kMuted),
+              hintStyle: inter(14, 400, color: kHint),
               filled: true,
               fillColor: kField,
               isDense: true,

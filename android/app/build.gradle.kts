@@ -35,8 +35,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.onelocal.vinii_pos"
+        // Google Play package name, permanent once the first bundle is uploaded: the Play Console app is
+        // com.onelocal.partner. The Kotlin namespace above stays com.onelocal.vinii_pos.
+        applicationId = "com.onelocal.partner"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

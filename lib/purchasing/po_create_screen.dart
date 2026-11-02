@@ -7,6 +7,8 @@ import '../inventory/inv_env.dart';
 import '../inventory/inventory_widgets.dart';
 import '../stock/stock_env.dart' show OrderWant;
 import '../ui/theme.dart';
+import '../ui/motion.dart' show showOlDialog;
+import 'po_whatsapp.dart';
 import 'purchasing_api.dart';
 import 'purchasing_widgets.dart';
 import 'simple_purchase.dart' show chooseSupplier, scanForPurchase;
@@ -235,6 +237,26 @@ class _PoCreateScreenState extends State<PoCreateScreen> {
       _key = PurchasingApi.newKey();
       if (!mounted) return;
       showToast(context, '${po.number} ${tr('generated')}. ${tr('Mark it Received when the goods come.')}');
+      // straight away, the offer to send it to the supplier on WhatsApp (founder, 1 Nov 2026); the button stops spinning first
+      setState(() => _busy = false);
+      final send = await showOlDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text('${tr('Send')} ${po.number} ${tr('to')} ${po.supplierName.isEmpty ? tr('the supplier') : po.supplierName}?'),
+          content: Text(tr('WhatsApp opens with the order written out, from your store.')),
+          actions: [
+            TextButton(key: const ValueKey('po-send-later'), onPressed: () => Navigator.pop(c, false), child: Text(tr('Later'))),
+            FilledButton.icon(
+              key: const ValueKey('po-send-now'),
+              onPressed: () => Navigator.pop(c, true),
+              icon: const Icon(LucideIcons.send, size: 16),
+              label: Text(tr('Send on WhatsApp')),
+            ),
+          ],
+        ),
+      );
+      if (send == true && mounted) await sendPoOnWhatsApp(context, env.api, po);
+      if (!mounted) return;
       Navigator.of(context).maybePop(po);
     } catch (e) {
       if (mounted) showToast(context, errorSentence(e));

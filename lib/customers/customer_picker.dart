@@ -126,7 +126,7 @@ class _CustomerPickerState extends State<CustomerPicker> {
             decoration: InputDecoration(
               prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
               hintText: tr('Mobile number or name'),
-              hintStyle: inter(14, 400, color: kMuted),
+              hintStyle: inter(14, 400, color: kHint),
               filled: true,
               fillColor: Colors.white,
               isDense: true,

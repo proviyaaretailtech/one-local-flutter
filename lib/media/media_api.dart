@@ -24,6 +24,10 @@ class PoolPhoto {
 
   String get statusLabel => const {'submitted': 'Waiting for review', 'approved': 'In the Standard pool', 'rejected': 'Not approved', 'withdrawn': 'Taken back'}[status] ?? status;
 
+  /// The OL subcategory (Atta, Rice…) the product belongs to, when known (Media manager, 1 Nov 2026).
+  String? get subCode => raw['sub_code'] as String?;
+  String? get subName => raw['sub_name'] as String?;
+
   /// "Aashirvaad · Staples"
   String get group => [brand, productCategory].whereType<String>().where((s) => s.isNotEmpty).join(' · ');
 }
@@ -72,6 +76,18 @@ class MediaApi {
   /// The Standard Data pool (approved only). With [itemId], that item's pack barcode, brand and category put the best matches first.
   Future<List<PoolPhoto>> standard({String q = '', String? itemId}) async =>
       _photos(await _rpc.callMap('media_standard_search', {if (q.trim().isNotEmpty) 'q': q.trim(), 'menu_item_id': ?itemId}));
+
+  /// Master media: approved photos, narrowed by [brand] or OL subcategory [sub]; with every brand and subcategory and how many photos each has.
+  Future<({List<PoolPhoto> items, int total, List<({String brand, int count})> brands, List<({String code, String name, String group, int count})> subs})> master({String q = '', String? brand, String? sub}) async {
+    final r = await _rpc.callMap('media_standard_search', {if (q.trim().isNotEmpty) 'q': q.trim(), 'brand': ?brand, 'sub': ?sub});
+    List<Map<String, dynamic>> list(String k) => ((r[k] as List?) ?? const []).map((e) => (e as Map).cast<String, dynamic>()).toList();
+    return (
+      items: _photos(r),
+      total: ((r['total'] ?? 0) as num).toInt(),
+      brands: [for (final b in list('brands')) (brand: '${b['brand']}', count: ((b['count'] ?? 0) as num).toInt())],
+      subs: [for (final c in list('subs')) (code: '${c['code']}', name: '${c['name'] ?? c['code']}', group: '${c['group'] ?? ''}', count: ((c['count'] ?? 0) as num).toInt())],
+    );
+  }
 
   /// Puts an approved photo on one of this store's items; answers its link.
   Future<String> use(String poolId, String itemId) async => (await _rpc.callMap('media_use', {'pool_id': poolId, 'menu_item_id': itemId}))['image_url'] as String;

@@ -214,7 +214,7 @@ class _ShelfLabelsScreenState extends State<ShelfLabelsScreen> {
                   key: const ValueKey('labels-search'),
                   controller: _search,
                   style: inter(14, 400),
-                  decoration: InputDecoration.collapsed(hintText: tr('Search name or System Code'), hintStyle: inter(14, 400, color: kMuted)),
+                  decoration: InputDecoration.collapsed(hintText: tr('Search name or System Code'), hintStyle: inter(14, 400, color: kHint)),
                   onChanged: (_) {
                     _debounce?.cancel();
                     _debounce = Timer(const Duration(milliseconds: 300), _load);

@@ -244,7 +244,7 @@ class _DishScreenState extends State<DishScreen> {
                               style: inter(14, 400),
                               decoration: InputDecoration(
                                 hintText: 'e.g. coffee shot, hot water, served large',
-                                hintStyle: inter(14, 400, color: kMuted),
+                                hintStyle: inter(14, 400, color: kHint),
                                 filled: true,
                                 fillColor: kField,
                                 border: OutlineInputBorder(

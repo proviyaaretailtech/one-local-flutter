@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
+import '../devices/bill_receipt.dart';
+import '../devices/print_service.dart';
 import '../ui/theme.dart';
+import '../ui/whatsapp.dart';
+import 'cart_customer.dart';
 import 'pay_screen.dart';
 import 'sell_api.dart';
 import 'sell_env.dart';
@@ -15,9 +18,10 @@ void _backToTill(BuildContext context) => Navigator.of(context).popUntil((r) => 
 
 /// Figma "448 Transaction Success". Every figure is read from the paid bill the server returned.
 class SuccessScreen extends StatelessWidget {
-  const SuccessScreen({super.key, required this.env, required this.view});
+  const SuccessScreen({super.key, required this.env, required this.view, this.customerName, this.customerPhone});
   final SellEnv env;
   final OrderView view;
+  final String? customerName, customerPhone; // from the cart: the receipt names the customer
 
   @override
   Widget build(BuildContext context) {
@@ -38,10 +42,13 @@ class SuccessScreen extends StatelessWidget {
               branch: env.branchName,
               when: view.placedAt,
               onNewOrder: () => _backToTill(context),
-              onPrintReceipt: () {
-                Clipboard.setData(ClipboardData(text: view.receiptText));
-                showToast(context, 'Receipt text copied. Printers connect in a later release.');
-              },
+              // the default receipt printer from Settings → Devices (the print dialog when there is none)
+              onPrintReceipt: () => printBill(
+                context,
+                BillReceipt.fromOrder(view, store: env.storeName, branch: env.branchName, customer: customerName, phone: customerPhone),
+              ),
+              // beside Print: the paid bill to the customer on WhatsApp, as a short note with its online page (founder, 2 Nov 2026)
+              onWhatsApp: () => _whatsapp(context),
               footnote: 'Use New Order to start the next sale.',
             ),
           ]),
@@ -50,18 +57,59 @@ class SuccessScreen extends StatelessWidget {
       ]),
     );
   }
+
+  /// The customer's number: the cart's, else the one saved on the bill.
+  String get _phone {
+    String digits(Object? v) => (v ?? '').toString().replaceAll(RegExp(r'\D'), '');
+    final fromCart = digits(customerPhone);
+    return fromCart.isNotEmpty ? fromCart : digits(view.raw['customer_phone']);
+  }
+
+  Future<void> _whatsapp(BuildContext context) async {
+    var phone = _phone, name = (customerName ?? view.customer).trim();
+    if (name == 'Guest' || name == 'Walk-in') name = '';
+    if (phone.length < 10) {
+      // a walk-in who gave no number: ask for it here
+      final r = await askCartCustomer(context, name: name, title: tr('Customer\'s WhatsApp number'));
+      if (r == null || !context.mounted) return;
+      name = r.$1.trim();
+      phone = r.$2.replaceAll(RegExp(r'\D'), '');
+      if (phone.length < 10) return showToast(context, 'Add the customer\'s mobile number first.');
+    }
+    try {
+      final link = await env.sell.billLink(view.id);
+      if (context.mounted) await env.openUrl(whatsAppLink(phone, billNote(store: env.storeName, name: name, link: link)));
+    } catch (e) {
+      if (context.mounted) showToast(context, sellErrorText(e));
+    }
+  }
 }
+
+/// The WhatsApp note (founder, 2 Nov 2026): a few friendly lines and the link to the bill's online page, which shows the whole bill
+/// and can be printed or saved; the bill itself is not written out in the message.
+String billNote({required String store, required String name, required Uri link}) => [
+      'Dear ${name.isEmpty ? 'Customer' : name},',
+      '',
+      'Thank you for shopping at $store! 🛍️',
+      'Your bill is ready to view, print or save here:',
+      '$link',
+      '',
+      'See you again soon.',
+    ].join('\n');
 
 /// The body of "448 Transaction Success", shared by the store till ([SuccessScreen]) and the restaurant's table bill. The figures are the
 /// server's; [tendered] (cash only) shows "Amount Tendered" and "Change Returned".
 class TransactionSuccessCard extends StatelessWidget {
   const TransactionSuccessCard({super.key, required this.orderNo, required this.amountPaid, required this.method, this.tendered, this.change = 0, this.branch,
-      required this.when, required this.onNewOrder, required this.onPrintReceipt, this.footnote});
+      required this.when, required this.onNewOrder, required this.onPrintReceipt, this.onWhatsApp, this.footnote});
   final String orderNo, method, when;
   final num amountPaid, change;
   final num? tendered;
   final String? branch, footnote;
   final VoidCallback onNewOrder, onPrintReceipt;
+
+  /// Send by WhatsApp beside Print Receipt (the store till); none for a table bill.
+  final VoidCallback? onWhatsApp;
 
   @override
   Widget build(BuildContext context) => OrderCardBox(
@@ -83,7 +131,14 @@ class TransactionSuccessCard extends StatelessWidget {
           const Divider(height: 28, color: kLine),
           DarkCta(label: tr('New Order'), onPressed: onNewOrder),
           const SizedBox(height: 12),
-          LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt),
+          if (onWhatsApp == null)
+            LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt)
+          else
+            Row(children: [
+              Expanded(child: LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt)),
+              const SizedBox(width: 10),
+              Expanded(child: LightCta(key: const ValueKey('receipt-whatsapp'), label: tr('Send by WhatsApp'), onPressed: onWhatsApp)),
+            ]),
           if (footnote != null) ...[const SizedBox(height: 14), Text(footnote!, style: inter(12.5, 400, color: kKicker))],
         ]),
       );

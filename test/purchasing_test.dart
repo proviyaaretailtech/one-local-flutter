@@ -8,7 +8,9 @@ import 'package:http/testing.dart';
 import 'package:vinii_pos/inventory/inv_env.dart';
 import 'package:vinii_pos/purchasing/po_create_screen.dart';
 import 'package:vinii_pos/purchasing/simple_purchase.dart';
+import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/purchasing/po_grn_screen.dart';
+import 'package:vinii_pos/purchasing/po_whatsapp.dart';
 import 'package:vinii_pos/purchasing/purchasing_api.dart';
 import 'package:vinii_pos/purchasing/purchasing_widgets.dart';
 import 'package:vinii_pos/purchasing/supplier_price_screen.dart';
@@ -332,15 +334,49 @@ void main() {
       await createOne(t, s);
       expect(s.requests.where((r) => fnOf(r) == 'pur_po_act'), isEmpty); // no approve call
       expect(toast('${live['number']} generated. Mark it Received when the goods come.'), findsOneWidget);
+      // then the offer to send it to the supplier on WhatsApp; Later just goes back
+      expect(find.byKey(const ValueKey('po-send-now')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('po-send-later')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('po-send-now')), findsNothing);
+    });
+
+    testWidgets('right after Generate PO, Send on WhatsApp opens the order from this store', (t) async {
+      final live = {...(fx['po_pending'] as Map<String, dynamic>), 'status': 'Approved', 'allowed_actions': ['receive', 'cancel']};
+      final s = Fake((r) => fnOf(r) == 'pur_po_create' ? ok(live) : null);
+      final opened = <Uri>[];
+      final real = openPoWhatsApp;
+      openPoWhatsApp = (u) async {
+        opened.add(u);
+        return true;
+      };
+      addTearDown(() => openPoWhatsApp = real);
+      HomeNav.storeName = 'Sharma General Store';
+      addTearDown(HomeNav.reset);
+      await createOne(t, s);
+      await t.tap(find.byKey(const ValueKey('po-send-now')));
+      await t.pumpAndSettle();
+      expect(opened.single.queryParameters['text'], contains('This is Sharma General Store. We would like to order these items:'));
     });
   });
 
   group('Send to supplier', () {
+    testWidgets('each open order card has a WhatsApp button beside Received', (t) async {
+      final po = PurchaseOrder(fx['po_pending'] as Map<String, dynamic>);
+      var sent = 0;
+      await showTall(t, Scaffold(body: OpenOrderCard(po: po, onReceived: () {}, onCancel: () {}, onSend: () => sent++)));
+      await t.tap(find.byKey(ValueKey('po-whatsapp-${po.id}')));
+      expect(sent, 1);
+      expect(find.byTooltip('Send to supplier on WhatsApp'), findsOneWidget);
+    });
+
     testWidgets('the small send icon opens WhatsApp to the supplier\'s saved number with the order written out', (t) async {
       final po = fx['po_partial'] as Map<String, dynamic>;
       final supplierId = (po['supplier'] as Map)['id'];
       final s = Fake((r) => fnOf(r) == 'pur_supplier_list' ? ok({'suppliers': [{'id': supplierId, 'name': 'ABC Foods', 'phone': '98765 43210'}]}) : null);
       final opened = <Uri>[];
+      HomeNav.storeName = 'Sharma General Store';
+      addTearDown(HomeNav.reset);
       await showTall(t, PoGrnScreen(env: s.env, orderId: po['id'] as String, openUrl: (u) async { opened.add(u); return true; }));
       await t.tap(find.byKey(const ValueKey('po-send')));
       await t.pumpAndSettle();
@@ -348,10 +384,51 @@ void main() {
       expect(u.host, 'api.whatsapp.com');
       expect(u.queryParameters['phone'], '919876543210');
       final text = u.queryParameters['text']!;
-      expect(text, startsWith('Purchase order ${po['number']}'));
-      for (final l in po['lines'] as List) {
-        expect(text, contains((l as Map)['name']));
+      expect(text, startsWith('Hello ${(po['supplier'] as Map)['name']},'));
+      expect(text, contains('This is Sharma General Store. We would like to order these items:'));
+      expect(text, contains('*Purchase order ${po['number']}*'));
+      for (final (i, l) in (po['lines'] as List).indexed) {
+        expect(text, contains('${i + 1}. ${(l as Map)['name']}\n'));
       }
+      expect(text, contains('Kindly confirm the order and the delivery date.'));
+      expect(text, endsWith('Thank you,\nSharma General Store'));
+    });
+
+    test('the message: the items as a fixed-width table, quantities without ".0", amounts lined up, and the total', () {
+      final po = PurchaseOrder({
+        'number': 'SPO-0012',
+        'supplier': {'id': 's1', 'name': 'Vaishnavi'},
+        'expected_delivery': '2026-11-02',
+        'totals': {'ordered_total_minor': 223000},
+        'lines': [
+          {'name': 'Dettol Soap 125g', 'ordered_qty': 17.0, 'unit': 'pc', 'unit_cost_minor': 4500},
+          {'name': 'Fortune Sunflower Oil 1L', 'ordered_qty': 10.0, 'unit': 'pc', 'unit_cost_minor': 14650},
+          {'name': 'Loose Jeera', 'ordered_qty': 2.5, 'unit': 'kg'},
+        ],
+      });
+      expect(poWhatsAppMessage(po, store: 'Sharma General Store - Main'), [
+        'Hello Vaishnavi,',
+        '',
+        'This is Sharma General Store - Main. We would like to order these items:',
+        '',
+        '*Purchase order SPO-0012*',
+        '```',
+        '1. Dettol Soap 125g',
+        '   17 pc × ₹45${' ' * 12}₹765', // 30 wide
+        '2. Fortune Sunflower Oil 1L',
+        '   10 pc × ₹146.50${' ' * 6}₹1,465',
+        '3. Loose Jeera',
+        '   2.5 kg',
+        '------------------------------',
+        'TOTAL${' ' * 19}₹2,230',
+        '```',
+        '',
+        'Please deliver by 02 Nov.',
+        'Kindly confirm the order and the delivery date.',
+        '',
+        'Thank you,',
+        'Sharma General Store - Main',
+      ].join('\n'));
     });
   });
 

@@ -522,7 +522,7 @@ class _FloorScreenState extends State<FloorScreen> {
               style: inter(14.5, 500),
               decoration: InputDecoration(
                 hintText: 'Search menu',
-                hintStyle: inter(14, 400, color: kMuted),
+                hintStyle: inter(14, 400, color: kHint),
                 prefixIcon: const Icon(LucideIcons.search, size: 18, color: kMuted),
                 isDense: true,
                 filled: true,

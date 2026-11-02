@@ -27,6 +27,13 @@ class AppEnv {
   /// Base URL of the POS server without a trailing slash.
   static String get apiBaseUrl => current.apiBase;
 
+  /// Where customers open public pages, such as the online bill in the WhatsApp note (2 Nov 2026). Always the public OneLocal address,
+  /// never this PC's server, whatever the app itself talks to: PUBLIC_WEB_URL when set to a public https address.
+  static String get publicWebUrl {
+    final u = _trim(const String.fromEnvironment('PUBLIC_WEB_URL'));
+    return u.startsWith('https://') ? u : 'https://one-local-flutter.vercel.app';
+  }
+
   static final AppEnv _local = AppEnv._(
     'local',
     const String.fromEnvironment('SUPABASE_URL'),

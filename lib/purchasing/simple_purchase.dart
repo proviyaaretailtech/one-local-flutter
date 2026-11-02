@@ -74,10 +74,13 @@ class PoWaitBar extends StatelessWidget {
 
 /// An open order: supplier, amount, the day counter, and its two outcomes, Received or Cancel.
 class OpenOrderCard extends StatelessWidget {
-  const OpenOrderCard({super.key, required this.po, required this.onReceived, required this.onCancel, this.onOpen});
+  const OpenOrderCard({super.key, required this.po, required this.onReceived, required this.onCancel, this.onOpen, this.onSend});
   final PurchaseOrder po;
   final VoidCallback onReceived, onCancel;
   final VoidCallback? onOpen;
+
+  /// Send the order to the supplier on WhatsApp (founder, 1 Nov 2026).
+  final VoidCallback? onSend;
   @override
   Widget build(BuildContext context) {
     final total = po.totals.no('ordered_total_minor') ?? po.totals.no('estimated_minor');
@@ -106,6 +109,20 @@ class OpenOrderCard extends StatelessWidget {
               style: FilledButton.styleFrom(backgroundColor: kPrimary, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             ),
           ),
+          if (onSend != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              key: ValueKey('po-whatsapp-${po.id}'),
+              onPressed: onSend,
+              tooltip: tr('Send to supplier on WhatsApp'),
+              icon: const Icon(LucideIcons.send, size: 19, color: Color(0xFF1B7F3B)),
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFFE7F6EC),
+                fixedSize: const Size(46, 46),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
           const SizedBox(width: 8),
           // a dustbin, not a word (founder, 29 Oct 2026); it still asks before cancelling
           IconButton(
@@ -409,12 +426,27 @@ class _Line {
   num gst;
   bool get extra => ordered == null;
   GstLine get money => GstLine(qty: _num(qty.text) ?? 0, rate: _num(cost.text) ?? 0, discountPct: _num(disc.text) ?? 0, gstPct: gst);
+
+  /// The taxable value, typed as on the supplier's invoice (founder, 1 Nov 2026); filled from qty × rate − discount while not being typed in.
+  final taxable = TextEditingController();
+  final taxableFocus = FocusNode();
+
+  /// A typed taxable value sets the rate: qty × rate − discount comes to it. Nothing changes without a quantity, or at 100% discount.
+  void setTaxable(String text) {
+    final t = _num(text), q = _num(qty.text) ?? 0, d = _num(disc.text) ?? 0;
+    if (t == null || q <= 0 || d >= 100) return;
+    final rate = t / (q * (1 - d / 100));
+    cost.text = rate == rate.roundToDouble() ? rate.round().toString() : rate.toStringAsFixed(4).replaceFirst(RegExp(r'\.?0+$'), '');
+  }
+
   void dispose() {
     qty.dispose();
     mrp.dispose();
     cost.dispose();
     hsn.dispose();
     disc.dispose();
+    taxable.dispose();
+    taxableFocus.dispose();
   }
 }
 
@@ -790,7 +822,7 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
         ]),
         const SizedBox(height: 8),
         Row(children: [
-          _field(l.cost, l.unit.isEmpty ? 'Rate' : '${tr('Rate')}/${buyUnitWord(l.unit, 1)}', key: ValueKey('recv-cost-$i'), prefix: '₹ '),
+          _field(l.cost, l.unit.isEmpty ? 'Buy rate' : '${tr('Buy rate')}/${buyUnitWord(l.unit, 1)}', key: ValueKey('recv-cost-$i'), prefix: '₹ '),
           const SizedBox(width: 8),
           _field(l.disc, 'Disc %', key: ValueKey('recv-disc-$i')),
           const SizedBox(width: 8),
@@ -807,7 +839,7 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
           ),
         ]),
         const SizedBox(height: 10),
-        _lineMoney(i, l.money),
+        _lineMoney(i, l),
         if (noMrp) Padding(padding: const EdgeInsets.only(top: 6), child: Text(tr('Add the MRP to add this to stock.'), style: inter(12, 600, color: const Color(0xFFC62828)))),
         if (l.ordered != null && q < l.ordered! && q >= 0)
           Padding(padding: const EdgeInsets.only(top: 6), child: Text('${_rupees(l.ordered! - q)} ${tr('fewer than ordered')}', style: inter(12, 600, color: const Color(0xFFB45309)))),
@@ -827,22 +859,50 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: kPostedText, width: 1.5)),
       );
 
-  /// Under each line: its taxable value, GST and total, like the columns of the supplier's invoice.
-  Widget _lineMoney(int i, GstLine m) {
-    Widget cell(String k, String v, {bool bold = false}) => Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(tr(k), style: inter(11, 600, color: kMuted)),
-            Text(v, style: inter(13.5, bold ? 800 : 600)),
-          ]),
-        );
+  /// Under each line: its taxable value (typed in, or worked out), GST and total, like the columns of the supplier's invoice.
+  Widget _lineMoney(int i, _Line l) {
+    final m = l.money;
+    // while not being typed in, the taxable value follows qty × rate − discount
+    if (!l.taxableFocus.hasFocus) {
+      final t = m.taxable == 0 ? '' : _rupees((m.taxable * 100).round() / 100);
+      if (l.taxable.text != t) l.taxable.text = t;
+    }
+    Widget cell(String k, String v, {bool bold = false}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr(k), style: inter(11, 600, color: kMuted)),
+          Text(v, style: inter(13.5, bold ? 800 : 600)),
+        ]);
     return Container(
       key: ValueKey('recv-line-money-$i'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(color: kBg, borderRadius: BorderRadius.circular(10)),
-      child: Row(children: [
-        cell('Taxable', _paise(m.taxable)),
-        cell('GST ${_rupees(m.gstPct)}%', _paise(m.gst)),
-        cell('Total', _paise(m.total), bold: true),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Expanded(
+          flex: 5,
+          child: TextField(
+            key: ValueKey('recv-taxable-$i'),
+            controller: l.taxable,
+            focusNode: l.taxableFocus,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+            onChanged: (v) => setState(() => l.setTaxable(v)),
+            onTapOutside: (_) => l.taxableFocus.unfocus(),
+            style: inter(13.5, 700),
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: tr('Taxable'),
+              prefixText: '₹ ',
+              labelStyle: inter(11.5, 600, color: kMuted),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kCardLine)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kCardLine)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(flex: 4, child: cell('GST ${_rupees(m.gstPct)}%', _paise(m.gst))),
+        Expanded(flex: 4, child: cell('Total', _paise(m.total), bold: true)),
       ]),
     );
   }
@@ -1450,7 +1510,7 @@ class _PurchaseBillScreenState extends State<PurchaseBillScreen> {
                                 const SizedBox(width: 6),
                                 _num2(l.qty, 'Qty', key: ValueKey('bill-qty-$i')),
                                 const SizedBox(width: 6),
-                                _num2(l.rate, 'Rate', prefix: '₹ ', key: ValueKey('bill-rate-$i')),
+                                _num2(l.rate, 'Buy rate', prefix: '₹ ', key: ValueKey('bill-rate-$i')),
                               ]),
                               const SizedBox(height: 6),
                               Row(children: [

@@ -47,6 +47,8 @@ export const Save = z.object({
   price_basis: opt(z.enum(['mrp', 'store'], { message: 'Choose MRP-based or store-based pricing.' })),
   // the SKU's parts (founder's OL SKU sheet, 31 Oct 2026): the database makes the SKU from them; a new item needs them
   sku_parts: SkuParts.optional(),
+  // a new selling unit on an item with stock (1 Nov 2026): how much is on hand, counted in the new unit (hosted_item_unit_change_2026-11-01.sql)
+  restock_qty: z.number({ message: 'Enter the stock count.' }).min(0, 'The stock count cannot be below zero.').max(10_000_000).optional(),
 }).strict().refine(b => !b.id || b.version, { message: 'Refresh the item and try again.', path: ['version'] });
 
 // "Remove background (AI)" on the item form: the photo as base64 (JPG, PNG or WebP, up to 5 MB before encoding). Nothing is saved.

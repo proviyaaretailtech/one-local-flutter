@@ -181,6 +181,8 @@ export function shapeView(v: Row) {
     channel_label: channelLabel(o),
     place_label: v.table_label ?? null,
     customer: o.customer_name || 'Guest',
+    // the number the till saved on the bill: the pay screen sends the bill to it on WhatsApp (founder, 1 Nov 2026)
+    customer_phone: o.customer_phone || null,
     placed_at: time(o.created_at),
     order_status: orderStatus,
     fulfilment,

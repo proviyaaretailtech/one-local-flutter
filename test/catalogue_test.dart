@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vinii_pos/api/rpc_client.dart';
 import 'package:vinii_pos/app_routes.dart';
 import 'package:vinii_pos/catalogue/catalogue_api.dart';
@@ -83,6 +84,8 @@ void main() {
     await _font('Inter', 'fonts/Inter.ttf');
     await _font('packages/lucide_icons_flutter/Lucide', 'packages/lucide_icons_flutter/assets/lucide.ttf');
   });
+  // a fresh phone: nothing remembered (the receipt-preview note shows until it is closed)
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   tearDown(HomeNav.reset);
 
   group('formatting', () {
@@ -194,11 +197,24 @@ void main() {
       expect(find.text('42000 g'), findsOneWidget);
       expect(find.text('₹72/Dz'), findsOneWidget);
       expect(find.text('Available · QR ✓'), findsNWidgets(6));
+      expect(find.text('A simpler receipt preview'), findsOneWidget);
       await t.scrollUntilVisible(find.text('Showing 1–6 of 142 items'), 300, scrollable: find.byType(Scrollable).first); // the pager scrolls with the list
       expect(find.text('Showing 1–6 of 142 items'), findsOneWidget);
       expect(find.text('POS Items'), findsOneWidget);
-      expect(find.text('A simpler receipt preview'), findsOneWidget);
       expect(t.takeException(), isNull);
+    });
+
+    testWidgets('the receipt-preview note, once closed, stays closed on this phone', (t) async {
+      SharedPreferences.setMockInitialValues({});
+      final s = server();
+      await phone(t, CatalogueScreen(api: s.api));
+      expect(find.text('A simpler receipt preview'), findsOneWidget);
+      await t.tap(find.byTooltip('Dismiss'));
+      await t.pumpAndSettle();
+      expect(find.text('A simpler receipt preview'), findsNothing);
+      await t.pumpWidget(const SizedBox());
+      await phone(t, CatalogueScreen(api: s.api));
+      expect(find.text('A simpler receipt preview'), findsNothing);
     });
 
     testWidgets('the grid view is a two column card layout; a category chip filters on the server; search is debounced', (t) async {
@@ -638,6 +654,32 @@ void main() {
       expect(jsonDecode(r.body)['id'], 'i1');
       expect(jsonDecode(r.body)['version'], 3);
       expect(find.text('This item changed on another device'), findsOneWidget);
+    });
+
+    testWidgets('a new selling unit on an item with stock: the stock is counted in the new unit, then it saves', (t) async {
+      final it = CatItem(item('i1', 'Coca-Cola 500ml', 'CC500', 4000, version: 3));
+      var asked = false;
+      final s = Fake((r) {
+        if (jsonDecode(r.body)['restock_qty'] == null) {
+          asked = true;
+          return err(400, 'Coca-Cola 500ml has 51 pc in stock; say how many l that is.', 'recount');
+        }
+        return ok(item('i1', 'Coca-Cola 500ml', 'CC500', 4000, version: 4));
+      });
+      await phone(t, ItemFormScreen(api: s.api, item: it), height: 6400);
+      await t.ensureVisible(find.text('Save item'));
+      await t.tap(find.text('Save item'));
+      await t.pumpAndSettle();
+      expect(asked, isTrue);
+      expect(find.text('Count the stock in the new unit'), findsOneWidget);
+      expect(find.text('Coca-Cola 500ml has 51 pc in stock; say how many l that is.'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('item-restock')), '25.5');
+      await t.tap(find.byKey(const ValueKey('item-restock-save')));
+      await t.pumpAndSettle();
+      final saves = s.requests.where((r) => r.url.path.endsWith('/cat_item_save')).toList();
+      expect(saves, hasLength(2));
+      expect(jsonDecode(saves.last.body)['restock_qty'], 25.5);
+      expect(find.text('Count the stock in the new unit'), findsNothing);
     });
   });
 

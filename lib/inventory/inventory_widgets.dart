@@ -530,7 +530,7 @@ class InvInput extends StatelessWidget {
             prefixStyle: inter(15, 600),
             labelText: null,
             semanticCounterText: label,
-            hintStyle: inter(15, 400, color: kMuted),
+            hintStyle: inter(15, 400, color: kHint),
             prefixIcon: prefixIcon == null ? null : Icon(prefixIcon, size: 18, color: kMuted),
             suffixIcon: suffix,
             filled: true,

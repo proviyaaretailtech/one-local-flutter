@@ -251,6 +251,7 @@ class SetupField extends StatelessWidget {
           decoration: _boxDecoration,
           child: TextField(
             controller: controller,
+            scrollPadding: kFieldScrollPadding, // its label stays in view when the keyboard opens
             keyboardType: keyboardType,
             maxLines: maxLines,
             minLines: 1,
@@ -259,7 +260,7 @@ class SetupField extends StatelessWidget {
             inputFormatters: inputFormatters,
             autocorrect: false,
             style: inter(12.5, 400),
-            decoration: plainInput.copyWith(hintText: hint, counterText: '', hintStyle: inter(12.5, 400, color: kMuted)),
+            decoration: plainInput.copyWith(hintText: hint, counterText: '', hintStyle: inter(12.5, 400, color: kHint)),
           ),
         ),
       ]);

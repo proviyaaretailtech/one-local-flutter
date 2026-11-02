@@ -157,6 +157,25 @@ void main() {
       expect(opened, 'rcv1'); // then the bill
     });
 
+    testWidgets('the taxable value can be typed as on the invoice: the rate follows; changing qty or rate fills it again', (t) async {
+      final f = Fake();
+      await show(t, ReceiveGoodsScreen(api: f.api, po: _po, openBill: (_, _) {}));
+      String text(String key) => t.widget<TextField>(find.byKey(ValueKey(key))).controller!.text;
+      expect(text('recv-taxable-0'), '5400'); // 20 × ₹270
+      // the invoice says ₹5,000 taxable, with 10% discount: the rate before discount is ₹277.78 for 20
+      await t.enterText(find.byKey(const ValueKey('recv-disc-0')), '10');
+      await t.pump();
+      expect(text('recv-taxable-0'), '4860');
+      await t.enterText(find.byKey(const ValueKey('recv-taxable-0')), '5000');
+      await t.pump();
+      expect(text('recv-cost-0'), '277.7778');
+      expect(find.descendant(of: find.byKey(const ValueKey('recv-line-money-0')), matching: find.textContaining('5,000')), findsOneWidget); // total, no GST
+      // a change of quantity works the taxable value out again from the rate
+      await t.enterText(find.byKey(const ValueKey('recv-qty-0')), '10');
+      await t.pump();
+      expect(text('recv-taxable-0'), '2500');
+    });
+
     testWidgets('Add item: the store item found by name, its quantity and rate, then on the purchase with its SKU and maker barcode', (t) async {
       final f = Fake();
       await show(t, ReceiveGoodsScreen(api: f.api, po: _po, openBill: (_, _) {}));
@@ -234,7 +253,7 @@ void main() {
       expect(t.widget<Text>(find.byKey(const ValueKey('line-total'))).data, '₹650');
       await tapKey(t, 'line-add');
       expect(find.text('Qty (kg)'), findsOneWidget);
-      expect(find.text('Rate/kg'), findsOneWidget);
+      expect(find.text('Buy rate/kg'), findsOneWidget);
       expect(t.widget<TextField>(find.byKey(const ValueKey('recv-qty-0'))).controller!.text, '12.5');
       await tapKey(t, 'recv-supplier');
       await tapKey(t, 'supplier-s2');

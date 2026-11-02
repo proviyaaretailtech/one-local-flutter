@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vinii_pos/api/live_sync.dart';
 import 'package:vinii_pos/assistant/ol_bot.dart';
+import 'package:vinii_pos/devices/print_service.dart' show defaultPrinterFor;
 import 'package:vinii_pos/orders/channel_orders.dart';
 
 /// Runs before every test file: Ol (the helper on the restaurant bar) holds still in tests, with no blinking or timed tips
@@ -12,5 +13,6 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   LiveSync.enabled = false; // no live channel in tests: the screens re-read on their own
   ChannelStack.animate = false; // the delivery cards do not pulse in tests
   setUp(OlBot.reset);
+  defaultPrinterFor = (_) async => null; // no printers set up: printing uses the print dialog, nothing tries the network
   await testMain();
 }

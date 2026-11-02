@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
+import '../devices/print_service.dart';
 import '../ui/theme.dart';
 import 'cart_customer.dart';
 import 'pay_screen.dart';
@@ -368,10 +368,7 @@ class _CartsScreenState extends State<CartsScreen> {
         Row(children: [
           Expanded(child: _cardButton('Hold', cart.isEmpty || _busy ? null : _hold, key: const ValueKey('cart-hold'))),
           const SizedBox(width: 8),
-          Expanded(child: _cardButton('Slip', cart.isEmpty ? null : () {
-            Clipboard.setData(ClipboardData(text: [for (final l in cart.lines) '${l.qty} x ${l.name}'].join('\n')));
-            showToast(context, 'Slip copied. Printers connect in a later release.');
-          })),
+          Expanded(child: _cardButton('Slip', cart.isEmpty ? null : () => printSlip(context, ['Slip · ${cart.label}', '', for (final l in cart.lines) '${l.qty} x ${l.name}'].join('\n'), title: 'Slip'))),
           const SizedBox(width: 8),
           Expanded(child: _cardButton(_showItems ? 'Hide items' : 'Show items', () => setState(() => _showItems = !_showItems), solid: true)),
         ]),

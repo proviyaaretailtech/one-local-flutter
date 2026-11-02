@@ -54,6 +54,21 @@ class _PosScreenState extends State<PosScreen> with TourHost {
     if (s != null) popWith(context, s);
   }
 
+  /// Printers later: the POS device is registered without peripherals (when it has a name); printers go in Settings → Devices.
+  Future<void> _later() async {
+    if (_name.text.trim().length < 2) {
+      showToast(context, 'Add printers any time in Settings → Devices.');
+      return popWith(context, widget.state);
+    }
+    setState(() => _busy = true);
+    final s = await setupGuarded(context, () => widget.api.registerPos({'device_name': _name.text, 'peripherals': const <String>[]}));
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (s == null) return;
+    showToast(context, 'Device saved. Add printers any time in Settings → Devices.');
+    popWith(context, s);
+  }
+
   @override
   Widget build(BuildContext context) {
     final registered = widget.state.pos['registered'] == true;
@@ -93,10 +108,13 @@ class _PosScreenState extends State<PosScreen> with TourHost {
           onChanged: (v) => setState(() => _connection = v),
         ),
         const SizedBox(height: 12),
-        const SetupNote('Leave peripherals unchecked to skip them. You can connect them later.'),
+        const SetupNote('Leave peripherals unchecked to skip them. Printers can be added and tested any time in Settings → Devices.'),
       ],
       actions: [
         PillPrimary(label: _busy ? 'Saving…' : 'Set Up Device', onPressed: _busy ? null : _save),
+        const SizedBox(height: 8),
+        // printers later (founder, 31 Oct 2026): the device is saved without them; Settings → Devices adds and tests them
+        PillSecondary(key: const ValueKey('pos-printers-later'), label: 'Set up printers later', onPressed: _busy ? null : _later),
         const SizedBox(height: 8),
         PillSecondary(label: 'Skip for Now', onPressed: _busy ? null : () => popWith(context, widget.state)),
       ],

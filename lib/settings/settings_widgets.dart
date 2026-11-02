@@ -206,7 +206,7 @@ class SheetField extends StatelessWidget {
                   inputFormatters: inputFormatters,
                   autocorrect: false,
                   style: inter(13.5, 400),
-                  decoration: InputDecoration(border: InputBorder.none, isCollapsed: false, contentPadding: const EdgeInsets.symmetric(vertical: 12), hintText: hint, counterText: '', hintStyle: inter(13.5, 400, color: kMuted)),
+                  decoration: InputDecoration(border: InputBorder.none, isCollapsed: false, contentPadding: const EdgeInsets.symmetric(vertical: 12), hintText: hint, counterText: '', hintStyle: inter(13.5, 400, color: kHint)),
                 ),
               ),
             ]),

@@ -11,6 +11,7 @@ import 'activity_log_screen.dart';
 import 'rst_devices_screen.dart';
 import 'returns_screens.dart';
 import 'settings_api.dart';
+import '../devices/device_manager_screen.dart';
 import 'settings_sheets.dart';
 import 'settings_widgets.dart';
 import 'support_screens.dart';
@@ -436,6 +437,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             actions: go,
           ),
         ]),
+      // Devices (founder, 31 Oct 2026): a store's printers for receipts and barcode labels, with a test print each; a restaurant has its own
+      // Devices page above (0638), so only one shows
+      if (HomeNav.shell?.kind != 'restaurant')
+        _Part('devices', 'Devices', LucideIcons.printer, 'Receipt and barcode label printers', const [],
+            open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeviceManagerScreen(store: HomeNav.storeName ?? '')))),
       // every order's timeline (0614): one tap opens its own page
       _Part('activity', 'Activity log', LucideIcons.history, 'Every order’s timeline: placed, KOTs, ready, billed, paid', const [],
           open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ActivityLogScreen(env: widget.env)))),

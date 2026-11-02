@@ -5,7 +5,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
-import '../ui/whatsapp.dart';
 import '../shift/shift_screens.dart';
 import 'cart_customer.dart';
 import 'payment_pending_screen.dart';
@@ -170,8 +169,9 @@ class _PayScreenState extends State<PayScreen> {
 
   void _done(OrderView v) {
     final cart = widget.cart;
+    final name = _name, phone = _phone;
     if (cart != null) env.carts.finish(cart);
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => SuccessScreen(env: env, view: v)));
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => SuccessScreen(env: env, view: v, customerName: name, customerPhone: phone)));
   }
 
   Future<void> _pay() => _guard(() async {
@@ -232,7 +232,12 @@ class _PayScreenState extends State<PayScreen> {
       });
 
   /// Who the bill is for: the cart's customer, or the held bill's.
-  String get _phone => (widget.cart?.customerPhone ?? _order?.raw['customer_phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+  /// The customer's number: the cart's, else the one saved on the bill (a held or reopened bill has no cart number).
+  String get _phone {
+    String digits(Object? v) => (v ?? '').toString().replaceAll(RegExp(r'\D'), '');
+    final fromCart = digits(widget.cart?.customerPhone);
+    return fromCart.isNotEmpty ? fromCart : digits(_order?.raw['customer_phone']);
+  }
   String get _name {
     final n = widget.cart != null ? widget.cart!.customerName : (_order?.customer ?? '');
     return n == 'Guest' || n == 'Walk-in' ? '' : n.trim();
@@ -246,49 +251,6 @@ class _PayScreenState extends State<PayScreen> {
     return [for (final l in cart!.lines) (l.name, l.qty, l.weightG != null ? cart.lineEstimate(l) : num.tryParse('${priced[l.menuItemId]?['amount'] ?? 0}') ?? 0)];
   }
 
-  /// The bill as a WhatsApp message (founder, 29 Oct 2026): the store, the date and day, every item, the totals and how it is paid.
-  String billMessage(DateTime now) {
-    final q = _quote, b = _order?.bill;
-    final subtotal = q?.subtotal ?? (b?['subtotal'] as num?) ?? 0;
-    final gstPct = q?.gstPct ?? (b?['gst_pct'] as num?) ?? 0;
-    final gst = q?.gst ?? (b?['gst'] as num?) ?? 0;
-    final sc = q?.serviceCharge ?? (b?['service_charge'] as num?) ?? 0;
-    final disc = q?.discount ?? (b?['discount'] as num?) ?? 0;
-    final code = widget.cart?.couponCode;
-    final rows = _rows;
-    final units = rows.fold<int>(0, (n, r) => n + r.$2);
-    final method = _methods.firstWhere((m) => m.$1 == _method).$2;
-    return [
-      '🧾 *${env.storeName}*',
-      if (env.branchName != null) env.branchName!,
-      '',
-      _name.isEmpty ? 'Hello! Here is your bill.' : 'Hello *$_name*, here is your bill.',
-      '📅 ${billDate(now)}',
-      if (_order != null) 'Bill no: ${_order!.displayNo}',
-      '',
-      '*Items (${rows.length} · $units ${units == 1 ? 'unit' : 'units'})*',
-      for (final (i, (name, qty, amount)) in rows.indexed) '${i + 1}. $name × $qty = ${rupees(amount)}',
-      '',
-      'Subtotal: ${rupees(subtotal)}',
-      if (gst > 0) 'GST (${gstPct == gstPct.roundToDouble() ? gstPct.toInt() : gstPct}%): ${rupees(gst)}',
-      if (sc > 0) 'Service charge: ${rupees(sc)}',
-      if (disc > 0) 'Discount${code == null ? '' : ' ($code)'}: −${rupees(disc)}',
-      '*Total: ${rupees(_total)}*',
-      'Payment: $method',
-      '',
-      'Thank you for shopping with us! 🙏',
-      'Please visit again.',
-    ].join('\n');
-  }
-
-  Future<void> _whatsapp() async {
-    if (_phone.length < 10) {
-      showToast(context, 'Add the customer\'s mobile number first.');
-      if (widget.cart != null) await _customer();
-      if (_phone.length < 10 || !mounted) return;
-    }
-    await env.openUrl(whatsAppLink(_phone, billMessage(DateTime.now())));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -309,18 +271,15 @@ class _PayScreenState extends State<PayScreen> {
             const SizedBox(height: 18),
             DarkCta(label: 'Pay ${rupees(_total)}', busy: _busy, onPressed: (order == null && q == null && _method != 'split') ? null : _pay),
             const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: LightCta(label: tr('Send by WhatsApp'), onPressed: _whatsapp)),
-              const SizedBox(width: 10),
-              Expanded(child: LightCta(label: tr('Save & Hold'), onPressed: _busy ? null : _hold)),
-            ]),
+            // Send by WhatsApp is on the receipt, once the bill is paid (founder, 2 Nov 2026)
+            LightCta(label: tr('Save & Hold'), onPressed: _busy ? null : _hold),
             if (_method == 'card' || _method == 'upi') ...[
               const SizedBox(height: 4),
               UnderLink('Payment did not go through', onTap: _busy ? null : () => _failed(_method)),
             ],
             if (_phone.length < 10) ...[
               const SizedBox(height: 8),
-              Text(tr('Walk-in sale · Add the customer\'s number to send the bill on WhatsApp.'), style: inter(13, 400, color: kMuted)),
+              Text(tr('Walk-in sale · Add the customer\'s number to send the bill on WhatsApp after payment.'), style: inter(13, 400, color: kMuted)),
             ],
           ]),
         ),
@@ -419,6 +378,7 @@ class _PayScreenState extends State<PayScreen> {
     final gst = q?.gst ?? (b?['gst'] as num?) ?? 0;
     final sc = q?.serviceCharge ?? (b?['service_charge'] as num?) ?? 0;
     final disc = q?.discount ?? (b?['discount'] as num?) ?? 0;
+    final round = q?.roundOff ?? (b?['round_off'] as num?) ?? 0;
     final code = widget.cart?.couponCode;
     final total = _total;
     final t = _tendered;
@@ -446,6 +406,7 @@ class _PayScreenState extends State<PayScreen> {
               Text('−${rupees(disc)}', style: inter(15, 700, color: kGreenText)),
             ]),
           ),
+        if (round != 0) KeyValue('Round off', '${round < 0 ? '−' : '+'}${rupees(round.abs())}', size: 15),
         const Divider(height: 22, color: kLine),
         Row(children: [Text(tr('Total Amount'), style: inter(17, 800)), const Spacer(), Text(rupees(total), style: inter(26, 800, color: kGreenText))]),
         if (_method == 'cash') ...[
@@ -465,7 +426,7 @@ class _PayScreenState extends State<PayScreen> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
                   style: inter(22, 800),
-                  decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: '0', hintStyle: inter(22, 800, color: kKicker)),
+                  decoration: InputDecoration(border: InputBorder.none, isCollapsed: true, hintText: '0', hintStyle: inter(22, 800, color: kHint)),
                   onChanged: (_) => _intentChanged(),
                 ),
               ),

@@ -13,7 +13,8 @@ import 'package:vinii_pos/ui/theme.dart';
 import 'helpers.dart';
 
 // The product media pool (founder, 30 Oct 2026): Store Media Pool → offered to the Master Media Pool → approved into the Standard Data pool,
-// which other stores may use. Nothing is shared unless the store offers it.
+// which other stores may use. Nothing is shared unless the store offers it. Side menu → Media manager (1 Nov 2026): My photos and Master
+// media, browsed by brand or by subcategory.
 
 const _own = 'https://x.test/item-images/org1/items/i1/a.png';
 
@@ -46,7 +47,20 @@ class _Server {
         status = 'withdrawn';
         return ok(pool..['status'] = 'withdrawn');
       case 'media_standard_search':
-        return ok({'items': [pool..['status'] = 'approved']});
+        // Master media: two approved photos; narrowed by brand or subcategory
+        final atta = {...pool, 'status': 'approved', 'sub_code': 'ATT', 'sub_name': 'Atta & Flours'};
+        final salt = {...pool, 'pool_id': 'p2', 'name': 'Tata Salt 1kg', 'brand': 'Tata', 'status': 'approved', 'sub_code': 'SUG', 'sub_name': 'Sugar, Salt & Jaggery'};
+        final all = [atta, salt].where((m) => (b['brand'] == null || m['brand'] == b['brand']) && (b['sub'] == null || m['sub_code'] == b['sub'])).toList();
+        return ok({
+          'items': all,
+          'total': 2,
+          'brands': [{'brand': 'Aashirvaad', 'count': 1}, {'brand': 'Tata', 'count': 1}],
+          'subs': [
+            {'code': 'ATT', 'name': 'Atta & Flours', 'group': 'Groceries', 'count': 1},
+            {'code': 'SUG', 'name': 'Sugar, Salt & Jaggery', 'group': 'Groceries', 'count': 1},
+            {'code': 'OTC', 'name': 'OTC Medicines', 'group': 'Pharmacy', 'count': 0},
+          ],
+        });
       case 'media_use':
         return ok({'menu_item_id': b['menu_item_id'], 'image_url': _own, 'replaced_url': null});
       case 'media_admin_queue':
@@ -99,12 +113,64 @@ void main() {
     expect(s.sent('media_withdraw').single, {'pool_id': 'p1'});
   });
 
-  testWidgets('Standard photos: approved ones only, and Use puts one on a chosen item', (t) async {
+  testWidgets('Media manager: two sections, My photos and Master media', (t) async {
+    final s = _Server();
+    await open(t, s);
+    expect(find.text('Media manager'), findsOneWidget);
+    expect(find.text('My photos'), findsOneWidget);
+    expect(find.text('Master media'), findsOneWidget);
+    expect(find.text('Standard photos'), findsNothing);
+  });
+
+  testWidgets('Master media: browse by brand or by subcategory', (t) async {
     final s = _Server();
     await open(t, s);
     await tapKey(t, 'photos-tab-standard');
-    expect(find.text('Aashirvaad · Staples'), findsOneWidget);
-    expect(find.text('Retail · used by 2'), findsOneWidget);
+    expect(find.text('All (2)'), findsOneWidget);
+    expect(find.text('Aashirvaad (1)'), findsOneWidget);
+    await tapKey(t, 'master-pick-Tata');
+    expect(s.sent('media_standard_search').last, {'brand': 'Tata'});
+    expect(find.byKey(const ValueKey('standard-p2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('standard-p1')), findsNothing);
+    await tapKey(t, 'master-by-sub');
+    expect(s.sent('media_standard_search').last, <String, dynamic>{}); // the brand choice is cleared
+    // the groups first, then the chosen group's subcategories below
+    expect(find.text('Groceries (2)'), findsOneWidget);
+    expect(find.text('Pharmacy (0)'), findsOneWidget);
+    expect(find.text('Atta & Flours (1)'), findsOneWidget);
+    expect(find.text('OTC Medicines (0)'), findsNothing);
+    await tapKey(t, 'master-group-Pharmacy');
+    expect(find.text('OTC Medicines (0)'), findsOneWidget);
+    expect(find.text('Atta & Flours (1)'), findsNothing);
+    await tapKey(t, 'master-group-Groceries');
+    await tapKey(t, 'master-pick-ATT');
+    expect(s.sent('media_standard_search').last, {'sub': 'ATT'});
+    expect(find.text('Aashirvaad · Atta & Flours'), findsOneWidget);
+    expect(find.byKey(const ValueKey('standard-p2')), findsNothing);
+    await tapKey(t, 'master-pick-all');
+    expect(find.byKey(const ValueKey('standard-p2')), findsOneWidget);
+  });
+
+  testWidgets('grid or list: both sections switch between them', (t) async {
+    final s = _Server();
+    await open(t, s);
+    expect(find.byType(GridView), findsOneWidget); // My photos as a grid
+    await tapKey(t, 'media-view-list');
+    expect(find.byType(GridView), findsNothing);
+    expect(find.byKey(const ValueKey('mine-i1')), findsOneWidget);
+    await tapKey(t, 'photos-tab-standard');
+    expect(find.byType(GridView), findsNothing); // Master media keeps the list
+    expect(find.text('Use'), findsNWidgets(2));
+    await tapKey(t, 'media-view-grid');
+    expect(find.byType(GridView), findsOneWidget);
+    expect(find.text('Use on an item'), findsNWidgets(2));
+  });
+
+  testWidgets('Master media: approved ones only, and Use puts one on a chosen item', (t) async {
+    final s = _Server();
+    await open(t, s);
+    await tapKey(t, 'photos-tab-standard');
+    expect(find.text('Aashirvaad · Atta & Flours'), findsOneWidget);
     await tapKey(t, 'use-p1');
     await tapKey(t, 'photo-item-i9');
     expect(s.sent('media_use').single, {'pool_id': 'p1', 'menu_item_id': 'i9'});
