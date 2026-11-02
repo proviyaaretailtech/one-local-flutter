@@ -14,6 +14,7 @@ import 'package:vinii_pos/account/wallet_screen.dart';
 import 'package:vinii_pos/customers/customer_picker.dart';
 import 'package:vinii_pos/customers/customers_api.dart';
 import 'package:vinii_pos/customers/customers_screen.dart';
+import 'package:vinii_pos/customers/customer_widgets.dart' show CwaButton;
 import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/home/side_nav.dart';
 import 'package:vinii_pos/orders/cart_screen.dart';
@@ -86,6 +87,8 @@ class FakeAccountAuth implements AccountAuth {
   Future<void> confirmPhone(String e164, String code) async => calls.add('confirm $e164 $code');
   @override
   Future<void> signOutEverywhere() async => calls.add('signOutEverywhere');
+  @override
+  Future<void> signOutHere() async => calls.add('signOutHere');
 
   /// When true, the first password change is answered "send a code first", like Supabase's secure password change.
   bool wantsCode = false;
@@ -465,17 +468,106 @@ void main() {
       expect(find.text('Password changed.'), findsOneWidget);
     });
 
-    testWidgets('sign out of all devices: confirm, record, revoke, leave', (t) async {
+    Future<void> tapKey(WidgetTester t, String key) async {
+      await t.tap(find.byKey(ValueKey(key)));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('sign out: which devices (each signed-in one listed, this device ticked), then are you sure; No keeps everything', (t) async {
+      final auth = FakeAccountAuth();
+      final s = FakeRpc((fn, b) => fn == 'acct_get' ? ok(acct()) : ok({}));
+      var left = 0;
+      await show(t, ManageAccountScreen(api: s.account, auth: auth, onSignedOut: (_) => left++));
+      await tapKey(t, 'acct-signout');
+      expect(find.text('Which devices do you want to sign out?'), findsOneWidget);
+      final sheet = find.ancestor(of: find.byKey(const ValueKey('acct-dev-go')), matching: find.byType(Column)).first;
+      expect(find.descendant(of: sheet, matching: find.text('VINII Partner Android')), findsOneWidget);
+      expect(find.descendant(of: sheet, matching: find.text('Chrome on Mac')), findsOneWidget);
+      expect(find.descendant(of: sheet, matching: find.text('This device')), findsOneWidget);
+      bool? ticked(String key) => t.widget<CheckboxListTile>(find.byKey(ValueKey(key))).value;
+      expect([ticked('acct-dev-0'), ticked('acct-dev-1'), ticked('acct-dev-all')], [true, false, false]);
+      // nothing ticked: nothing to sign out
+      await tapKey(t, 'acct-dev-0');
+      expect(t.widget<CwaButton>(find.byKey(const ValueKey('acct-dev-go'))).onPressed, isNull);
+      await tapKey(t, 'acct-dev-all');
+      expect([ticked('acct-dev-0'), ticked('acct-dev-1')], [true, true]);
+      await tapKey(t, 'acct-dev-go');
+      expect(find.text('Are you sure you want to sign out?'), findsOneWidget);
+      await tapKey(t, 'signout-no');
+      expect(auth.calls, isEmpty);
+      expect(s.calls.map((c) => c.$1), isNot(contains('acct_sign_out_devices')));
+      expect(left, 0);
+    });
+
+    testWidgets('sign out every device: Yes records it, signs out everywhere and goes to the sign-in page', (t) async {
       final auth = FakeAccountAuth();
       final s = FakeRpc((fn, b) => fn == 'acct_get' ? ok(acct()) : ok({'sessions': 2, 'recorded': true}));
       var left = 0;
       await show(t, ManageAccountScreen(api: s.account, auth: auth, onSignedOut: (_) => left++));
-      await t.tap(find.byKey(const ValueKey('acct-signout-all')));
-      await t.pumpAndSettle();
-      expect(find.text('Sign out of all devices?'), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('acct-signout-all-yes')));
-      await t.pumpAndSettle();
+      await tapKey(t, 'acct-signout');
+      await tapKey(t, 'acct-dev-all');
+      await tapKey(t, 'acct-dev-go');
+      await tapKey(t, 'signout-yes');
       expect(s.calls.map((c) => c.$1), contains('acct_signed_out_everywhere'));
+      expect(auth.calls, ['signOutEverywhere']);
+      expect(left, 1);
+    });
+
+    testWidgets('sign out this device only: the others stay signed in; the sign-in page', (t) async {
+      final auth = FakeAccountAuth();
+      final s = FakeRpc((fn, b) => fn == 'acct_get' ? ok(acct()) : ok({}));
+      var left = 0;
+      await show(t, ManageAccountScreen(api: s.account, auth: auth, onSignedOut: (_) => left++));
+      await tapKey(t, 'acct-signout');
+      await tapKey(t, 'acct-dev-go');
+      await tapKey(t, 'signout-yes');
+      expect(auth.calls, ['signOutHere']);
+      expect(s.calls.map((c) => c.$1), isNot(contains('acct_sign_out_devices')));
+      expect(left, 1);
+    });
+
+    testWidgets('sign out another device only: that session is ended, this one stays on Manage account', (t) async {
+      final auth = FakeAccountAuth();
+      final s = FakeRpc((fn, b) => fn == 'acct_get' ? ok(acct()) : ok({'signed_out': 1}));
+      var left = 0;
+      await show(t, ManageAccountScreen(api: s.account, auth: auth, onSignedOut: (_) => left++));
+      await tapKey(t, 'acct-signout');
+      await tapKey(t, 'acct-dev-0'); // untick this device
+      await tapKey(t, 'acct-dev-1');
+      await tapKey(t, 'acct-dev-go');
+      await tapKey(t, 'signout-yes');
+      expect(s.bodies('acct_sign_out_devices').single, {'session_ids': ['d2']});
+      expect(auth.calls, isEmpty);
+      expect(left, 0);
+      expect(find.text('Signed out of 1 device.'), findsOneWidget);
+    });
+
+    testWidgets('signing this device out from inside the app shell lands on the first screen, the sign-in splash', (t) async {
+      final auth = FakeAccountAuth();
+      final s = FakeRpc((fn, b) => fn == 'acct_get' ? ok(acct()) : ok({}));
+      await show(t, const Text('sign-in splash'));
+      // as in the app: the shell is a screen over the sign-in gate, and Manage account opens in a tab's own navigator inside it
+      t.state<NavigatorState>(find.byType(Navigator)).push(MaterialPageRoute<void>(
+          builder: (_) => Navigator(onGenerateRoute: (_) => MaterialPageRoute<void>(builder: (_) => ManageAccountScreen(api: s.account, auth: auth)))));
+      await t.pumpAndSettle();
+      expect(find.text('sign-in splash'), findsNothing);
+      await tapKey(t, 'acct-signout');
+      await tapKey(t, 'acct-dev-go');
+      await tapKey(t, 'signout-yes');
+      expect(auth.calls, ['signOutHere']);
+      expect(find.byType(ManageAccountScreen), findsNothing);
+      expect(find.text('sign-in splash'), findsOneWidget);
+    });
+
+    testWidgets('this device and the server cannot be told about another: still the sign-in page, never stuck here', (t) async {
+      final auth = FakeAccountAuth();
+      final s = FakeRpc((fn, b) => fn == 'acct_get' ? ok(acct()) : fn == 'acct_signed_out_everywhere' ? http.Response(jsonEncode({'error': 'down'}), 500, headers: _json) : ok({}));
+      var left = 0;
+      await show(t, ManageAccountScreen(api: s.account, auth: auth, onSignedOut: (_) => left++));
+      await tapKey(t, 'acct-signout');
+      await tapKey(t, 'acct-dev-all');
+      await tapKey(t, 'acct-dev-go');
+      await tapKey(t, 'signout-yes');
       expect(auth.calls, ['signOutEverywhere']);
       expect(left, 1);
     });
@@ -497,8 +589,8 @@ void main() {
           });
       var left = 0;
       await show(t, ManageAccountScreen(api: s.account, auth: auth, onSignedOut: (_) => left++));
-      // the last thing on the page, below Sign out of all devices
-      expect(t.getTopLeft(find.byKey(const ValueKey('acct-danger'))).dy, greaterThan(t.getTopLeft(find.byKey(const ValueKey('acct-signout-all'))).dy));
+      // the last thing on the page, below Sign out
+      expect(t.getTopLeft(find.byKey(const ValueKey('acct-danger'))).dy, greaterThan(t.getTopLeft(find.byKey(const ValueKey('acct-signout'))).dy));
       await tapDown(t, 'acct-delete');
       // warning one: what happens, and the business nobody else can run
       expect(find.textContaining('You are the only owner of Satya Stores'), findsOneWidget);

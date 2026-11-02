@@ -21,6 +21,8 @@ class SignInMethod {
 class AccountDevice {
   const AccountDevice(this.raw);
   final Map<String, dynamic> raw;
+  /// The login session's id: what [AccountApi.signOutDevices] ends.
+  String get id => _s(raw['id']);
   String get device => _s(raw['device']);
   DateTime? get lastActive => _d(raw['last_active_at']);
   bool get thisDevice => raw['this_device'] == true;
@@ -70,6 +72,10 @@ class AccountApi {
   Future<void> syncContact() => _call('acct_sync_contact');
   Future<void> recordSignOutEverywhere() => _call('acct_signed_out_everywhere');
 
+  /// Ends the chosen sessions of this login on other phones and browsers (0639); this device signs itself out with [AccountAuth.signOutHere].
+  Future<int> signOutDevices(List<String> sessionIds) async =>
+      ((await _call('acct_sign_out_devices', {'session_ids': sessionIds}))['signed_out'] as num?)?.toInt() ?? 0;
+
   /// Delete account: memberships, businesses the person is the only owner of (sole_owner_of), and a request already waiting (pending).
   Future<Map<String, dynamic>> deletePreview() => _call('acct_delete_preview');
 
@@ -90,6 +96,8 @@ abstract class AccountAuth {
   Future<void> confirmPhone(String e164, String code);
   /// Revokes every session of this login (every device), including this one.
   Future<void> signOutEverywhere();
+  /// Signs out this phone or browser only.
+  Future<void> signOutHere();
 
   /// Sets a password, or changes it (27 Oct 2026). [nonce]: the code from [reauthenticate], when the server asked for one
   /// ([PasswordNeedsCode]). A refusal is an [AccountApiException] with a plain sentence.
@@ -114,6 +122,8 @@ class SupabaseAccountAuth implements AccountAuth {
   Future<void> confirmPhone(String e164, String code) => _auth.verifyOTP(phone: e164, token: code, type: OtpType.phoneChange);
   @override
   Future<void> signOutEverywhere() => _auth.signOut(scope: SignOutScope.global);
+  @override
+  Future<void> signOutHere() => _auth.signOut();
 
   @override
   Future<void> setPassword(String password, {String? nonce}) async {

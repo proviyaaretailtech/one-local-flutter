@@ -531,6 +531,7 @@ export const MANIFEST: Entry[] = [
   db('acct_save_name', { args: cu.SaveName, map: P, rate: 'write', roles: ANY }),
   db('acct_sync_contact', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
   db('acct_signed_out_everywhere', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
+  db('acct_sign_out_devices', { args: cu.SignOutDevices, map: P, rate: 'write', roles: ANY }),
   db('acct_delete_preview', { ...empty, map: () => ({}), roles: ANY }),
   db('acct_delete_request', { args: cu.DeleteRequest, map: P, rate: 'write', roles: ANY }),
   db('acct_delete_cancel', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),

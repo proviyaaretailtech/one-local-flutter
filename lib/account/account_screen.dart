@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../app.dart' show closeScreensOnSignOut;
 import '../customers/customer_widgets.dart';
+import '../home/side_nav.dart' show confirmSignOut;
 import '../home/control_centre_screen.dart' show initials;
 import '../home/home_widgets.dart' show kLime;
 import '../settings/settings_widgets.dart' show GroupCard, GroupTitle, RowAction, SettingRow, StatusPill;
@@ -9,10 +11,9 @@ import '../ui/theme.dart';
 import '../auth/partner_api.dart' show PartnerApiException;
 import 'account_api.dart';
 import 'delete_account_screen.dart';
-import '../ui/motion.dart';
 
 /// Side nav "Manage account": the signed-in person's name, email and mobile, how they can sign in, where they are signed in, and
-/// "Sign out of all devices". Email and mobile change through Supabase's own confirmation; the name is saved on their memberships.
+/// "Sign out" (which devices, then are you sure). Email and mobile change through Supabase's own confirmation; the name is saved on their memberships.
 class ManageAccountScreen extends StatefulWidget {
   const ManageAccountScreen({super.key, this.api, this.auth, this.onSignedOut});
   final AccountApi? api;
@@ -166,36 +167,68 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
     }
   }
 
-  Future<void> _signOutEverywhere() async {
-    final yes = await showOlDialog<bool>(
+  /// Off to the sign-in page: the app's first screen, past the app shell's own navigator (founder, 2 Nov 2026).
+  void _leave(NavigatorState root) {
+    final go = widget.onSignedOut;
+    if (go != null) {
+      if (mounted) go(context);
+    } else {
+      closeScreensOnSignOut(root);
+    }
+  }
+
+  /// Sign out (founder, 2 Nov 2026): first which devices (every phone and browser this login is signed in on, this one ticked), then
+  /// "Are you sure you want to sign out?" Yes / No. This device signed out → the sign-in page; only others → they are ended and listed again.
+  Future<void> _signOut() async {
+    final a = _a;
+    if (a == null) return;
+    final devices = [
+      ...a.devices,
+      // the list always has this phone or browser, even when the login server did not say which session it is
+      if (!a.devices.any((d) => d.thisDevice)) const AccountDevice({'id': '', 'device': 'This phone or browser', 'this_device': true}),
+    ];
+    final chosen = await showModalBottomSheet<Set<AccountDevice>>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Sign out of all devices?', style: inter(17, 700)),
-        content: Text('Every phone and browser signed in with this account, including this one, will need to sign in again.', style: inter(14, 400)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: inter(14, 600, color: kMuted))),
-          TextButton(key: const ValueKey('acct-signout-all-yes'), onPressed: () => Navigator.pop(ctx, true), child: Text('Sign out everywhere', style: inter(14, 700, color: kError))),
-        ],
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _DevicesSheet(devices: devices),
     );
-    if (yes != true || !mounted) return;
+    if (chosen == null || chosen.isEmpty || !mounted) return;
+    if (!await confirmSignOut(context) || !mounted) return;
+    final root = Navigator.of(context, rootNavigator: true);
+    final here = chosen.any((d) => d.thisDevice);
+    final others = [for (final d in chosen) if (!d.thisDevice && d.id.isNotEmpty) d.id];
+    // set once this phone's own sign-out starts: the session is gone from the phone then, even if the login server cannot be reached
+    var gone = false;
     setState(() => _busy = true);
     try {
-      await _api.recordSignOutEverywhere();
-      await _auth.signOutEverywhere();
-      if (!mounted) return;
-      final go = widget.onSignedOut;
-      setState(() => _busy = false);
-      if (go != null) {
-        go(context);
+      if (here && chosen.length == devices.length) {
+        // every device: one call to the login server; the note in the audit is not worth staying signed in for
+        try {
+          await _api.recordSignOutEverywhere();
+        } catch (_) {}
+        gone = true;
+        await _auth.signOutEverywhere();
       } else {
-        Navigator.of(context).popUntil((r) => r.isFirst);
+        if (others.isNotEmpty) await _api.signOutDevices(others);
+        if (here) {
+          gone = true;
+          await _auth.signOutHere();
+        }
       }
+      if (gone) {
+        _leave(root);
+        return;
+      }
+      if (!mounted) return;
+      showToast(context, others.length == 1 ? 'Signed out of 1 device.' : 'Signed out of ${others.length} devices.');
+      await _load();
     } catch (e) {
-      if (mounted) {
-        showToast(context, e.toString());
-        setState(() => _busy = false);
-      }
+      if (mounted) showToast(context, e is PartnerApiException ? e.message : e.toString());
+      if (gone) _leave(root);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -204,12 +237,7 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
     final done = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => DeleteAccountScreen(api: _api, auth: _auth)));
     if (done != true || !mounted) return;
     showToast(context, 'Your account will be deleted in 30 days. Sign in again before then to keep it.');
-    final go = widget.onSignedOut;
-    if (go != null) {
-      go(context);
-    } else {
-      Navigator.of(context).popUntil((r) => r.isFirst);
-    }
+    _leave(Navigator.of(context, rootNavigator: true));
   }
 
   // Laid out like the Settings page (Figma section P, there is no Manage account frame): a profile card, then grouped white
@@ -310,12 +338,12 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
                   ],
                   const SizedBox(height: 22),
                   CwaButton(
-                      key: const ValueKey('acct-signout-all'),
-                      label: 'Sign out of all devices',
+                      key: const ValueKey('acct-signout'),
+                      label: 'Sign out',
                       icon: LucideIcons.logOut,
                       danger: true,
                       busy: _busy,
-                      onPressed: _signOutEverywhere),
+                      onPressed: _signOut),
                   // apart from everything else, at the very end
                   const SizedBox(height: 48),
                   const Divider(color: Color(0xFFE3E5DF)),
@@ -326,6 +354,71 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
       ]),
     );
   }
+}
+
+/// Which devices to sign out: every phone and browser this login is signed in on, with "This device" marked and ticked to start
+/// with, and "Select all". Answers the ticked ones (none: the sheet was closed).
+class _DevicesSheet extends StatefulWidget {
+  const _DevicesSheet({required this.devices});
+  final List<AccountDevice> devices;
+  @override
+  State<_DevicesSheet> createState() => _DevicesSheetState();
+}
+
+class _DevicesSheetState extends State<_DevicesSheet> {
+  late final Set<AccountDevice> _on = {for (final d in widget.devices) if (d.thisDevice) d};
+
+  bool get _all => _on.length == widget.devices.length;
+
+  Widget _row(int i, AccountDevice d) => CheckboxListTile(
+        key: ValueKey('acct-dev-$i'),
+        value: _on.contains(d),
+        onChanged: (v) => setState(() => v == true ? _on.add(d) : _on.remove(d)),
+        controlAffinity: ListTileControlAffinity.leading,
+        contentPadding: EdgeInsets.zero,
+        activeColor: kPrimary,
+        title: Text(d.device, style: inter(14, 600), maxLines: 2, overflow: TextOverflow.ellipsis),
+        subtitle: Row(children: [
+          if (d.lastActive != null) Flexible(child: Text('Last active ${cwaDateTime(d.lastActive)}', style: inter(12, 400, color: kMuted))),
+          if (d.thisDevice) ...[const SizedBox(width: 8), const StatusPill('This device', good: true)],
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('Which devices do you want to sign out?', style: inter(18, 700)),
+              const SizedBox(height: 4),
+              Text('You are signed in on these phones and browsers.', style: inter(13, 400, color: kMuted, height: 1.35)),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                key: const ValueKey('acct-dev-all'),
+                value: _all,
+                onChanged: (_) => setState(() => _all ? _on.clear() : _on.addAll(widget.devices)),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                activeColor: kPrimary,
+                title: Text('Select all', style: inter(14, 700)),
+              ),
+              const Divider(height: 1, color: Color(0xFFE3E5DF)),
+              Flexible(child: ListView(shrinkWrap: true, children: [for (final (i, d) in widget.devices.indexed) _row(i, d)])),
+              const SizedBox(height: 12),
+              CwaButton(
+                key: const ValueKey('acct-dev-go'),
+                label: _on.isEmpty ? 'Choose a device' : (_on.length == 1 ? 'Sign out 1 device' : 'Sign out ${_on.length} devices'),
+                icon: LucideIcons.logOut,
+                danger: true,
+                onPressed: _on.isEmpty ? null : () => Navigator.pop(context, Set.of(_on)),
+              ),
+            ]),
+          ),
+        ),
+      );
 }
 
 /// New password, typed twice; it can be shown. At least 8 characters with a letter and a number (the login server checks again).
