@@ -295,6 +295,9 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
           for (final p in r.m('reprints').l('list')) ['Reprint', p.s('bill'), p.s('at'), '', p.s('by'), p.s('what')],
           for (final a in r.m('after_bill').l('list')) ['After the bill', a.s('bill'), a.s('at'), '', a.s('by'), a.s('what')],
           for (final f in r.m('refunds').l('list')) ['Refund', f.s('bill'), f.s('at'), f.n('amount_minor') / 100, f.s('by'), f.s('reason')],
+          for (final x in r.m('day_end').m('unsettled').l('list'))
+            ['Left unsettled at day end', x.s('bill'), x.s('at'), x.n('due_minor') / 100, x.s('by'), '${x.s('place')}${x.s('note').isEmpty ? '' : ' · ${x.s('note')}'}'],
+          for (final x in r.m('day_end').m('reopened').l('list')) ['Day reopened', x.s('day'), x.s('at'), x.n('counted_minor') / 100, x.s('by'), x.s('reason')],
         ],
     };
     final name = '${widget.kind}-${RstReportsApi.day(_from)}${_from == _to ? '' : '-to-${RstReportsApi.day(_to)}'}.xlsx';
@@ -647,7 +650,9 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
 
   List<Widget> _audit(Facts r) {
     final c = r.m('cancelled'), u = r.m('unpaid'), p = r.m('reprints'), a = r.m('after_bill'), f = r.m('refunds'), o = r.m('overrides');
-    final nothing = c.n('bills') == 0 && u.n('bills') == 0 && p.n('count') == 0 && a.n('count') == 0 && f.n('count') == 0 && o.n('count') == 0;
+    final du = r.m('day_end').m('unsettled'), dr = r.m('day_end').m('reopened');
+    final nothing = c.n('bills') == 0 && u.n('bills') == 0 && p.n('count') == 0 && a.n('count') == 0 && f.n('count') == 0 && o.n('count') == 0 &&
+        du.n('count') == 0 && dr.n('count') == 0;
     Widget event(Facts e) => _line('Bill ${e.s('bill')}', _time(e.s('at')), sub: '${e.s('what')}${e.s('by').isEmpty ? '' : ' · ${e.s('by')}'}', onTap: () => _openBill(e.s('order_id')));
     return [
       // 0645: changes made with an admin PIN (a generated bill changed, an order cancelled after its KOT), first and in red
@@ -672,6 +677,36 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
                     if (x.s('approved_by').isNotEmpty) 'PIN of ${x.s('approved_by')}',
                   ].join(' · '),
                   onTap: () => _openBill(x.s('order_id'))),
+          ]),
+        ),
+      // 0650: bills left open at Day end, and ended days reopened
+      if (du.n('count') > 0 || dr.n('count') > 0)
+        Container(
+          key: const ValueKey('rep-day-end'),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFFCA5A5), width: 1.4)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Icon(LucideIcons.moon, size: 18, color: kError),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                    [
+                      if (du.n('count') > 0) 'LEFT UNSETTLED AT DAY END · ${du.n('count').toInt()} · ${rs(du.n('due_minor'))}',
+                      if (dr.n('count') > 0) 'DAY REOPENED · ${dr.n('count').toInt()}',
+                    ].join('   '),
+                    style: inter(12.5, 800, color: kError).copyWith(letterSpacing: 1)),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            for (final x in du.l('list'))
+              _line('${x.s('place')} · bill ${x.s('bill')}', rs(x.n('due_minor')), color: kError, key: 'rep-unsettled-${x.s('order_id')}-${x.s('at')}',
+                  sub: [_time(x.s('at')), if (x.s('by').isNotEmpty) 'Day end by ${x.s('by')}', if (x.s('note').isNotEmpty) x.s('note')].join(' · '),
+                  onTap: () => _openBill(x.s('order_id'))),
+            for (final x in dr.l('list'))
+              _line('Day ${x.s('day')} reopened', _time(x.s('at')), color: kError, key: 'rep-reopened-${x.s('at')}',
+                  sub: [if (x.s('by').isNotEmpty) 'by ${x.s('by')}', 'counted ${rs(x.n('counted_minor'))}', x.s('reason')].join(' · ')),
           ]),
         ),
       _kpis([

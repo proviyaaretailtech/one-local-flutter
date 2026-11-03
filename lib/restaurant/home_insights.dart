@@ -82,19 +82,33 @@ class _RestaurantInsightsState extends State<RestaurantInsights> {
   // ---- Revenue leakage (0645): bills changed or orders cancelled today with an admin PIN; red when there are any. Opens the Leakage audit.
   Widget _leakage(Map<String, dynamic> l) {
     final n = _n(l['admin_changes']).toInt();
+    // 0650: bills left open at Day end, and ended days reopened, today
+    final unsettled = _n(l['unsettled']).toInt(), reopened = _n(l['reopened']).toInt();
     const red = Color(0xFFB91C1C);
     void open() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RstReportScreen(kind: 'audit')));
     return HomeCard(
       key: const ValueKey('rst-leakage'),
       onTap: open,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _title('Revenue leakage', sub: 'Changed with an admin PIN today', link: 'Leakage audit', onLink: open, linkKey: const ValueKey('rst-leakage-open')),
+        _title('Revenue leakage', sub: 'Admin PIN changes and Day end, today', link: 'Leakage audit', onLink: open, linkKey: const ValueKey('rst-leakage-open')),
         const SizedBox(height: 8),
         Row(children: [
           Icon(n > 0 ? LucideIcons.keyRound : LucideIcons.shieldCheck, size: 18, color: n > 0 ? red : const Color(0xFF15803D)),
           const SizedBox(width: 8),
-          Text(n == 0 ? 'None today' : '$n change${n == 1 ? '' : 's'} with an admin PIN', key: const ValueKey('rst-leakage-count'), style: inter(14, 800, color: n > 0 ? red : kInk)),
+          Text(n == 0 ? (unsettled + reopened == 0 ? 'None today' : 'No admin PIN changes') : '$n change${n == 1 ? '' : 's'} with an admin PIN',
+              key: const ValueKey('rst-leakage-count'), style: inter(14, 800, color: n > 0 ? red : kInk)),
         ]),
+        if (unsettled > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('$unsettled bill${unsettled == 1 ? '' : 's'} left unsettled at Day end · ${rupees(_n(l['unsettled_due_minor']) / 100)}',
+                key: const ValueKey('rst-leakage-unsettled'), style: inter(13, 800, color: red)),
+          ),
+        if (reopened > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('Day reopened $reopened time${reopened == 1 ? '' : 's'}', key: const ValueKey('rst-leakage-reopened'), style: inter(13, 800, color: red)),
+          ),
         for (final x in _l(l['latest']))
           Padding(
             padding: const EdgeInsets.only(top: 6),

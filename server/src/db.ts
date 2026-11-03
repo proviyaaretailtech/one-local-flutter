@@ -52,6 +52,7 @@ const STATUS: Record<string, number> = {
   NO_AUDIENCE: 422,                                         // notices (section N)
   NOT_VERIFIED: 409, NOT_LISTED: 409, INCOMPLETE: 422,                                                                          // outlets (0520-0522)
   SHIFT_OPEN: 409, NO_SHIFT: 409, PAYMENT_PENDING: 409, NOT_ENOUGH_CASH: 422, REASON_REQUIRED: 422, RETURN_WINDOW: 422,       // store shift, payment pending, refunds (0500-0502)
+  OPEN_BILLS: 409,                                                                                                           // Day end with bills still open (0650)
   ADMIN_PIN: 403,                                                                                                            // a generated bill or a cancel after the KOT needs an admin PIN (0645)
 };
 const CODE: Record<string, string> = {
@@ -59,7 +60,7 @@ const CODE: Record<string, string> = {
   STALE: 'version_conflict', GONE: 'offer_withdrawn', BAD_STEP: 'invalid_transition', BAD_QTY: 'bad_quantity', EMPTY: 'empty_cart',
   IDEMPOTENCY: 'idempotency_mismatch', IDEMPOTENCY_MISMATCH: 'idempotency_mismatch', STATUS_AUTHORITY: 'wrong_state', ORDER_FROZEN: 'wrong_state', FROZEN: 'wrong_state',
   ITEM_UNAVAILABLE: 'item_unavailable', SCOPE: 'store_scope', COUPON_MIN: 'coupon_minimum', PROVIDER_OFF: 'provider_not_configured',
-  ADMIN_PIN: 'admin_pin_required',
+  ADMIN_PIN: 'admin_pin_required', OPEN_BILLS: 'open_bills',
 };
 const sentence = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) + (/[.!?]$/.test(s) ? '' : '.') : 'Request refused.');
 

@@ -428,6 +428,7 @@ export const MANIFEST: Entry[] = [
   db('rmoney_contacts_list', { args: mo.RmContacts, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('rmoney_record', { args: mo.RmRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
   db('rmoney_close_day', { args: mo.RmClose, map: P, rate: 'money', roles: 'staff with money:record' }),
+  db('rmoney_reopen_day', { args: mo.RmReopen, map: P, rate: 'money', roles: 'the owner and admins (money:approve; checked in the database)' }),
   db('rmoney_contact_save', { args: mo.RmContactSave, map: P, rate: 'write', roles: 'staff with money:record' }),
   db('rmoney_void', { args: mo.RmVoid, map: P, rate: 'money', roles: 'staff with money:approve' }),
   // ---- team, section L (0440). Body = the function's `p` object; the database checks organisation, place and role (owner/admin invite and change people;

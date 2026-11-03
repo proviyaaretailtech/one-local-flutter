@@ -17,7 +17,7 @@ import 'rst_money_flow.dart';
 
 // Restaurant Money in the store's design (founder, 29 Oct 2026: "keep money built like this for restaurant POS", rebuilt here): the wallet
 // balance (cash drawer + UPI + bank) with Money in, Money out and Transfer; the OneLocal wallet and the ad and discount credits; then the
-// cash register (with Close day) and dues. Data: `rmoney_*` (0622) over what the restaurant already records.
+// cash register (with Day end, 0650) and dues. Data: `rmoney_*` (0622) over what the restaurant already records.
 
 const kRmDeep = Color(0xFF16181D); // the dark cards
 const kRmDeepSoft = Color(0xFF2A2E35); // buttons on a dark card
@@ -454,7 +454,7 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
 }
 
 // ------------------------------------------------------------------------------------------------------------------- cash register
-/// Today's cash drawer: opening, cash sales, other cash in, refunds, paid out, what should be in the drawer, and Close day.
+/// Today's cash drawer: opening, cash sales, other cash in, refunds, paid out, what should be in the drawer, and Day end.
 class RmRegisterPart extends StatefulWidget {
   const RmRegisterPart({super.key, required this.api, required this.canRecord, required this.onChanged});
   final RstMoneyApi api;
@@ -489,52 +489,158 @@ class _RmRegisterPartState extends State<RmRegisterPart> {
     }
   }
 
+  Map<String, dynamic> get _open => ((_r?['open_bills'] as Map?) ?? const {}).cast<String, dynamic>();
+
+  /// Day end (founder, 3 Nov 2026; 0650): count the cash. Bills still open are listed first; ending the day anyway needs a note, and each
+  /// open bill goes to Revenue leakage. A count that is not a valid amount says so in the dialog.
   Future<void> _close() async {
+    // the open bills as they are now, not as they were when the page opened
+    try {
+      final fresh = await widget.api.register();
+      if (mounted) setState(() => _r = fresh);
+    } catch (_) {}
+    if (!mounted) return;
     final r = _r!;
-    final counted = TextEditingController();
-    final paise = await showOlDialog<int>(
+    final open = _open;
+    final n = (open['count'] as num? ?? 0).toInt();
+    final counted = TextEditingController(), note = TextEditingController();
+    String? countError, noteError;
+    final res = await showOlDialog<(int, String?)>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: Text('Close day · count the cash', style: inter(18, 800)),
-        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Should be in the drawer: ${rs(r['expected_minor'] as num?)}', style: inter(13.5, 500, color: kMuted)),
-          const SizedBox(height: 12),
-          TextField(
-            key: const ValueKey('rm-counted'),
-            controller: counted,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: rupeeFormatters,
-            decoration: const InputDecoration(labelText: 'Cash you counted', prefixText: '₹ '),
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) => AlertDialog(
+          title: Text('Day end · count the cash', style: inter(18, 800)),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (n > 0) ...[_openBillsCard(open, inDialog: true), const SizedBox(height: 12)],
+              Text('Should be in the drawer: ${rs(r['expected_minor'] as num?)}', style: inter(13.5, 500, color: kMuted)),
+              const SizedBox(height: 12),
+              TextField(
+                key: const ValueKey('rm-counted'),
+                controller: counted,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: rupeeFormatters,
+                onChanged: (_) => set(() => countError = null),
+                decoration: InputDecoration(labelText: 'Cash you counted', prefixText: '₹ ', errorText: countError),
+              ),
+              if (n > 0) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  key: const ValueKey('rm-dayend-note'),
+                  controller: note,
+                  maxLength: 200,
+                  onChanged: (_) => set(() => noteError = null),
+                  decoration: InputDecoration(labelText: 'Why are these bills still open?', errorText: noteError),
+                ),
+              ],
+            ]),
           ),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: Text('Cancel', style: inter(14, 600))),
-          TextButton(
-            key: const ValueKey('rm-close-save'),
-            onPressed: () {
-              final a = num.tryParse(counted.text.trim());
-              if (a == null || a < 0) return;
-              Navigator.pop(c, (a * 100).round());
-            },
-            child: Text('Close day', style: inter(14, 800, color: kRmGreen)),
-          ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: Text('Cancel', style: inter(14, 600))),
+            TextButton(
+              key: const ValueKey('rm-close-save'),
+              onPressed: () {
+                final a = num.tryParse(counted.text.trim());
+                if (a == null || a < 0) return set(() => countError = 'Enter the cash you counted, like 2500 or 2500.50.');
+                if (n > 0 && note.text.trim().length < 3) return set(() => noteError = 'Write why: these bills go to Revenue leakage.');
+                Navigator.pop(c, ((a * 100).round(), n > 0 ? note.text.trim() : null));
+              },
+              child: Text(n > 0 ? 'End day anyway' : 'End day', style: inter(14, 800, color: n > 0 ? kRmRed : kRmGreen)),
+            ),
+          ],
+        ),
       ),
     );
-    if (paise == null || !mounted) return;
+    if (res == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      final done = await widget.api.closeDay(paise);
+      final done = await widget.api.closeDay(res.$1, confirmOpenBills: res.$2 != null, note: res.$2);
       if (!mounted) return;
       setState(() => _r = done);
       final diff = ((done['closed'] as Map?)?['difference_minor'] as num?) ?? 0;
-      showToast(context, diff == 0 ? 'Day closed. The cash matches.' : diff > 0 ? 'Day closed. ${rs(diff)} extra in the drawer.' : 'Day closed. ${rs(-diff)} short.');
+      final left = n > 0 ? ' $n open bill${n == 1 ? '' : 's'} went to Revenue leakage.' : '';
+      showToast(context, '${diff == 0 ? 'Day ended. The cash matches.' : diff > 0 ? 'Day ended. ${rs(diff)} extra in the drawer.' : 'Day ended. ${rs(-diff)} short.'}$left');
+      widget.onChanged();
+    } catch (e) {
+      if (mounted) showToast(context, errorSentence(e));
+      await _load(); // a bill may have opened or closed meanwhile
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  /// Reopen an ended day (0650; the owner and admins): with a reason; the count is undone and the day is counted again at its next Day end.
+  Future<void> _reopen() async {
+    final reason = TextEditingController();
+    String? problem;
+    final go = await showOlDialog<String>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, set) => AlertDialog(
+          title: Text('Reopen the day?', style: inter(18, 800)),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('The count is undone: cash can be recorded for this day again, and the day is counted at its next Day end. '
+                'The reopen shows in Revenue leakage.', style: inter(13.5, 500, color: kMuted)),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('rm-reopen-reason'),
+              controller: reason,
+              autofocus: true,
+              maxLength: 200,
+              onChanged: (_) => set(() => problem = null),
+              decoration: InputDecoration(labelText: 'Why is the day reopened?', errorText: problem),
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: Text('Cancel', style: inter(14, 600))),
+            TextButton(
+              key: const ValueKey('rm-reopen-save'),
+              onPressed: () => reason.text.trim().length < 3 ? set(() => problem = 'Write why the day is reopened.') : Navigator.pop(c, reason.text.trim()),
+              child: Text('Reopen day', style: inter(14, 800, color: kRmRed)),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (go == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final r = await widget.api.reopenDay(go, day: _r?['day'] as String?);
+      if (!mounted) return;
+      setState(() => _r = r);
+      showToast(context, 'Day reopened. Count the cash again at Day end.');
       widget.onChanged();
     } catch (e) {
       if (mounted) showToast(context, errorSentence(e));
     }
     if (mounted) setState(() => _busy = false);
+  }
+
+  /// The bills still open: how many, what is due, and the first few by place.
+  Widget _openBillsCard(Map<String, dynamic> open, {bool inDialog = false}) {
+    final n = (open['count'] as num? ?? 0).toInt();
+    final list = ((open['list'] as List?) ?? const []).cast<Map>();
+    return Container(
+      key: ValueKey(inDialog ? 'rm-open-bills-dialog' : 'rm-open-bills'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFCA5A5))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(LucideIcons.triangleAlert, size: 16, color: kRmRed),
+          const SizedBox(width: 8),
+          Expanded(child: Text('$n bill${n == 1 ? '' : 's'} still open · ${rs(open['due_minor'] as num?)} due', style: inter(14, 800, color: kRmRed))),
+        ]),
+        const SizedBox(height: 6),
+        for (final b in list.take(5))
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text('${b['place']} · #${b['bill']} · ${rs(b['due_minor'] as num?)}', style: inter(12.5, 600)),
+          ),
+        if (list.length > 5) Text('and ${list.length - 5} more', style: inter(12.5, 500, color: kMuted)),
+        const SizedBox(height: 6),
+        Text('Settle them before Day end. Ending the day anyway sends them to Revenue leakage.', style: inter(12.5, 500, color: kMuted)),
+      ]),
+    );
   }
 
   @override
@@ -573,7 +679,7 @@ class _RmRegisterPartState extends State<RmRegisterPart> {
           Text(rs(r['expected_minor'] as num?), key: const ValueKey('rm-expected'), style: inter(20, 800)),
         ]),
         const SizedBox(height: 14),
-        if (closed != null)
+        if (closed != null) ...[
           Container(
             key: const ValueKey('rm-closed'),
             padding: const EdgeInsets.all(12),
@@ -583,19 +689,48 @@ class _RmRegisterPartState extends State<RmRegisterPart> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Closed · counted ${rs(closed['counted_minor'] as num?)}'
+                  'Day ended · counted ${rs(closed['counted_minor'] as num?)}'
                   '${(closed['difference_minor'] as num? ?? 0) == 0 ? ' · matches' : (closed['difference_minor'] as num) > 0 ? ' · ${rs(closed['difference_minor'] as num)} extra' : ' · ${rs(-(closed['difference_minor'] as num))} short'}',
                   style: inter(13, 600),
                 ),
               ),
             ]),
-          )
-        else if (widget.canRecord)
-          FilledButton(
-            key: const ValueKey('rm-close-day'),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0F1E14), minimumSize: const Size.fromHeight(52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-            onPressed: _busy ? null : _close,
-            child: Text('Close day · count the cash', style: inter(15, 700, color: Colors.white)),
+          ),
+          // 0650: bills left open at Day end (they are in Revenue leakage), and the note
+          if ((closed['open_bills'] as num? ?? 0) > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '${closed['open_bills']} bill${closed['open_bills'] == 1 ? '' : 's'} left open (${rs(closed['open_due_minor'] as num?)}) · in Revenue leakage'
+                '${(closed['note'] ?? '') == '' ? '' : ' · “${closed['note']}”'}',
+                key: const ValueKey('rm-closed-open'),
+                style: inter(12.5, 600, color: kRmRed),
+              ),
+            ),
+          if (r['can_reopen'] == true) ...[
+            const SizedBox(height: 10),
+            OutlinedButton(
+              key: const ValueKey('rm-reopen-day'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              onPressed: _busy ? null : _reopen,
+              child: Text('Reopen day', style: inter(14, 700)),
+            ),
+          ],
+        ] else ...[
+          if ((_open['count'] as num? ?? 0) > 0) ...[_openBillsCard(_open), const SizedBox(height: 12)],
+          if (widget.canRecord)
+            FilledButton(
+              key: const ValueKey('rm-close-day'),
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0F1E14), minimumSize: const Size.fromHeight(52), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              onPressed: _busy ? null : _close,
+              child: Text('Day end · count the cash', style: inter(15, 700, color: Colors.white)),
+            ),
+        ],
+        // 0650: an ended day reopened (who, when, why)
+        for (final x in ((r['reopens'] as List?) ?? const []).cast<Map>())
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('Reopened${(x['by'] ?? '') == '' ? '' : ' by ${x['by']}'} · ${x['reason']}', style: inter(12, 500, color: kMuted)),
           ),
       ]),
     );
