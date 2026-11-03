@@ -382,8 +382,9 @@ class OrdersApi {
   /// Turn auto-accept on or off for the business (owner or manager).
   /// A delivery update (0619): [step] ready | out | delivered; for out, the rider, their number and the minutes it will take.
   /// For delivered, [paymentMethod] (cash | upi | card) is how the money due was collected at the door (0620).
-  Future<String> deliveryUpdate(String orderId, String step, {String? riderName, String? riderPhone, int? etaMinutes, String? paymentMethod}) async =>
-      '${(await _rpc('rst_channel_delivery', {'order_id': orderId, 'step': step, 'rider_name': ?riderName, 'rider_phone': ?riderPhone, 'eta_minutes': ?etaMinutes, 'payment_method': ?paymentMethod}))['message'] ?? ''}';
+  /// [reference] (0648): the card or UPI reference number of money collected at the door.
+  Future<String> deliveryUpdate(String orderId, String step, {String? riderName, String? riderPhone, int? etaMinutes, String? paymentMethod, String? reference}) async =>
+      '${(await _rpc('rst_channel_delivery', {'order_id': orderId, 'step': step, 'rider_name': ?riderName, 'rider_phone': ?riderPhone, 'eta_minutes': ?etaMinutes, 'payment_method': ?paymentMethod, 'reference': ?reference}))['message'] ?? ''}';
 
   Future<bool> setAutoAccept(bool on) async => (await _rpc('rst_auto_accept_set', {'on': on}))['auto_accept'] == true;
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/orders/cart_screen.dart';
 import 'package:vinii_pos/orders/order_screen.dart';
 import 'package:vinii_pos/orders/orders_api.dart';
@@ -235,6 +236,26 @@ void main() {
       expect(jsonDecode(s.where('POST', '/checkout').last.body).containsKey('tendered'), isFalse);
     });
 
+    testWidgets('a restaurant\'s cart by card needs the reference, then sends it (0648)', (t) async {
+      HomeNav.shell = _Shell('restaurant');
+      addTearDown(() => HomeNav.shell = null);
+      final s = FakeServer((r) => r.url.path.endsWith('/quote') ? ok(quote()) : ok(view('pending')));
+      await showTall(t, CartScreen(api: s.api, initialLines: [CartLine(menuItemId: 'm1', name: 'Amul Butter 500g')]));
+      await t.tap(find.textContaining('Proceed to Checkout'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Card'));
+      await t.pumpAndSettle();
+      await t.tap(find.textContaining('Complete Payment'));
+      await t.pumpAndSettle();
+      expect(toast('Enter the card reference: the last 4 digits or the approval code.'), findsOneWidget);
+      expect(s.where('POST', '/checkout'), isEmpty);
+      await t.enterText(find.byKey(const ValueKey('cart-reference')), '4821');
+      await t.tap(find.textContaining('Complete Payment'));
+      await t.pumpAndSettle();
+      final b = jsonDecode(s.where('POST', '/checkout').single.body) as Map;
+      expect([b['method'], b['reference']], ['card', '4821']);
+    });
+
     testWidgets('quantity stepper requotes; coupon refusal is shown as the server says it', (t) async {
       final s = FakeServer((r) {
         final b = jsonDecode(r.body) as Map;
@@ -344,6 +365,37 @@ void main() {
       expect(find.text('Order Confirmation'), findsOneWidget);
     });
 
+    testWidgets('held bill in a restaurant: UPI needs the UTR, which is sent with the payment (0648)', (t) async {
+      HomeNav.shell = _Shell('restaurant');
+      addTearDown(() => HomeNav.shell = null);
+      final s = FakeServer((r) => r.method == 'GET' ? ok(view('checkout')) : ok(view('pending')));
+      await showTall(t, OrderScreen(api: s.api, orderId: orderId));
+      await t.tap(find.text('Complete Payment'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('UPI / QR'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Complete Payment ₹1,840'));
+      await t.pumpAndSettle();
+      expect(find.text('Enter the UTR or transaction id.'), findsOneWidget);
+      expect(s.where('POST', '/pay'), isEmpty);
+      await t.enterText(find.byKey(const ValueKey('pay-reference')), ' 431298765012 ');
+      await t.tap(find.text('Complete Payment ₹1,840'));
+      await t.pumpAndSettle();
+      expect(jsonDecode(s.where('POST', '/pay').single.body), {'method': 'upi', 'reference': '431298765012', 'version': '2026-10-16T12:53:00.000Z'});
+    });
+
+    testWidgets('held bill in a store: UPI without a reference still goes through', (t) async {
+      final s = FakeServer((r) => r.method == 'GET' ? ok(view('checkout')) : ok(view('pending')));
+      await showTall(t, OrderScreen(api: s.api, orderId: orderId));
+      await t.tap(find.text('Complete Payment'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('UPI / QR'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Complete Payment ₹1,840'));
+      await t.pumpAndSettle();
+      expect(jsonDecode(s.where('POST', '/pay').single.body), {'method': 'upi', 'version': '2026-10-16T12:53:00.000Z'});
+    });
+
     testWidgets('print says honestly that no printer is connected', (t) async {
       final s = FakeServer((_) => ok(view('completed')));
       await showTall(t, OrderScreen(api: s.api, orderId: orderId));
@@ -362,4 +414,14 @@ void main() {
       expect((jsonDecode(s.where('POST', '/quote').single.body)['lines'] as List), hasLength(5));
     });
   });
+}
+
+class _Shell implements TabShell {
+  _Shell(this.kind);
+  @override
+  String kind;
+  @override
+  void setKind(String k) => kind = k;
+  @override
+  bool show(String label) => false;
 }

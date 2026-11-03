@@ -240,7 +240,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
 
   /// Moves an online order on: ready, out for delivery (asks the rider, their number and the minutes first) or delivered / picked up.
   Future<void> _deliver(ChannelOrder o, String step) async {
-    String? name, phone, paid;
+    String? name, phone, paid, reference;
     int? eta;
     if (step == 'out') {
       final r = await _askRider(o);
@@ -251,11 +251,16 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
     if (step == 'delivered' && o.collectAtDoor) {
       paid = await _askPaid(o);
       if (paid == null) return;
+      // 0648: card or UPI at the door keeps its reference number
+      if (paid != 'cash') {
+        reference = await _askReference(o, paid);
+        if (reference == null) return;
+      }
     }
     if (!_delivering.add(o.id)) return;
     if (mounted) setState(() {});
     try {
-      final msg = await _api.deliveryUpdate(o.id, step, riderName: name, riderPhone: phone, etaMinutes: eta, paymentMethod: paid);
+      final msg = await _api.deliveryUpdate(o.id, step, riderName: name, riderPhone: phone, etaMinutes: eta, paymentMethod: paid, reference: reference);
       if (mounted) showToast(context, msg.isEmpty ? 'Updated.' : '$msg.');
     } catch (e) {
       if (mounted) showToast(context, errorSentence(e));
@@ -282,6 +287,38 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
           ],
         ),
       );
+
+  /// The card's last 4 digits / approval code, or the UPI UTR, of money collected at the door (0648); null for Cancel.
+  Future<String?> _askReference(ChannelOrder o, String method) {
+    final c = TextEditingController();
+    String? problem;
+    return showOlDialog<String>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, set) => AlertDialog(
+          title: Text(method == 'card' ? 'Card reference' : 'UPI reference', style: inter(18, 700)),
+          content: TextField(
+            key: const ValueKey('paid-reference'),
+            controller: c,
+            autofocus: true,
+            maxLength: 60,
+            decoration: InputDecoration(
+              labelText: method == 'card' ? 'Last 4 digits or approval code' : 'UTR or transaction id',
+              errorText: problem,
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+            FilledButton(
+              key: const ValueKey('paid-reference-go'),
+              onPressed: () => c.text.trim().length < 4 ? set(() => problem = 'Enter at least 4 characters.') : Navigator.pop(d, c.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   /// Out for delivery: who takes it, their number, and about how long (all optional).
   Future<(String?, String?, int?)?> _askRider(ChannelOrder o) {

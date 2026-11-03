@@ -222,6 +222,11 @@ void main() {
       final s = Fake();
       await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
       await tapKey(t, 'method-Card');
+      // 0648: the card's reference is always kept
+      await tapText(t, 'Complete Payment');
+      expect(find.text('Enter the card reference: the last 4 digits or the approval code on the slip.'), findsOneWidget);
+      expect(find.text('Has the card payment gone through?'), findsNothing);
+      await t.enterText(find.byKey(const ValueKey('bill-reference')), ' 4821 ');
       await tapText(t, 'Complete Payment');
       expect(find.text('Has the card payment gone through?'), findsOneWidget);
       await tapKey(t, 'confirm-no');
@@ -229,6 +234,7 @@ void main() {
       await tapText(t, 'Complete Payment');
       await tapKey(t, 'confirm-yes');
       expect(argsOf(s.calls('rst_bill_pay').single)['method'], 'card');
+      expect(argsOf(s.calls('rst_bill_pay').single)['reference'], '4821');
     });
 
     testWidgets('no answer from the server: the retry sends the same key; a refusal starts a new one', (t) async {
@@ -435,7 +441,10 @@ void main() {
       s.on['rst_bill_split'] = (r) => ok(fx['split']);
       await show(t, BillSplitScreen(env: s.env, tableId: t1, orderId: o1, bill: s.bill));
       expect(find.text('Table T1 · ₹1,050'), findsOneWidget);
-      for (final gone in ['guests-plus', 'guests-minus', 'mode-equal', 'mode-item', 'mode-amount']) {
+      // by payment method is the first way; Equally and By dish are offered beside it (rst_split_modes_test.dart)
+      expect(find.byKey(const ValueKey('split-mode-equal')), findsOneWidget);
+      expect(find.byKey(const ValueKey('split-mode-item')), findsOneWidget);
+      for (final gone in ['guests-plus', 'guests-minus']) {
         expect(find.byKey(ValueKey(gone)), findsNothing, reason: gone);
       }
       expect(find.text('PAY BY'), findsOneWidget);
@@ -603,6 +612,7 @@ void main() {
       expect(find.byKey(const ValueKey('bill-receipt')), findsOneWidget, reason: 'the bill is the page');
       await tapKey(t, 'take-payment');
       await tapKey(t, 'method-UPI / QR');
+      await t.enterText(find.byKey(const ValueKey('bill-reference')), 'UTR991');
       await tapText(t, 'Complete Payment');
       await tapKey(t, 'confirm-yes');
       expect(find.text('Transaction Successful'), findsOneWidget);

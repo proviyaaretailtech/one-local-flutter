@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../api/net_guard.dart';
 import '../customers/customer_picker.dart';
 import '../customers/customers_api.dart';
+import '../home/home_nav.dart';
 import '../ui/theme.dart';
 import 'order_screen.dart';
 import 'order_widgets.dart';
@@ -41,6 +42,7 @@ class _CartScreenState extends State<CartScreen> {
   late final OrdersApi _api = widget.api ?? OrdersApi();
   late final List<CartLine> _lines = [for (final l in widget.initialLines) CartLine(menuItemId: l.menuItemId, name: l.name, qty: l.qty)];
   final _tender = TextEditingController();
+  final _reference = TextEditingController(); // 0648: the card's last 4 digits / approval code, or the UPI UTR
   final _placedAt = TimeOfDay.now();
   Quote? _quote;
   String? _quoteError;
@@ -81,6 +83,7 @@ class _CartScreenState extends State<CartScreen> {
   void dispose() {
     _debounce?.cancel();
     _tender.dispose();
+    _reference.dispose();
     super.dispose();
   }
 
@@ -180,6 +183,12 @@ class _CartScreenState extends State<CartScreen> {
       showToast(context, 'Enter the cash received.');
       return;
     }
+    // 0648: a card or UPI payment keeps its reference (a restaurant must enter it; the database checks)
+    final ref = _method == 'card' || _method == 'upi' ? _reference.text.trim() : '';
+    if (ref.length < 4 && (_method == 'card' || _method == 'upi') && HomeNav.shell?.kind == 'restaurant') {
+      showToast(context, _method == 'card' ? 'Enter the card reference: the last 4 digits or the approval code.' : 'Enter the UPI reference: the UTR or transaction id.');
+      return;
+    }
     setState(() => _busy = true);
     _key ??= OrdersApi.newKey();
     try {
@@ -187,9 +196,9 @@ class _CartScreenState extends State<CartScreen> {
       final OrderView view;
       if (r != null) {
         final version = await _syncHeld('${_key!}:lines');
-        view = await _api.pay(r.orderId, method: _method, tendered: _method == 'cash' ? _tendered : null, version: version, key: _key!);
+        view = await _api.pay(r.orderId, method: _method, tendered: _method == 'cash' ? _tendered : null, reference: ref.isEmpty ? null : ref, version: version, key: _key!);
       } else {
-        view = await _api.checkout(lines: _lines, method: _method, tendered: _method == 'cash' ? _tendered : null, key: _key!);
+        view = await _api.checkout(lines: _lines, method: _method, tendered: _method == 'cash' ? _tendered : null, reference: ref.isEmpty ? null : ref, key: _key!);
       }
       await _linkCustomer(view.id);
       if (!mounted) return;
@@ -392,6 +401,18 @@ class _CartScreenState extends State<CartScreen> {
                 ),
             ],
           ),
+          if (_checkout && (_method == 'card' || _method == 'upi')) ...[
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('cart-reference'),
+              controller: _reference,
+              maxLength: 60,
+              onChanged: (_) => _key = null,
+              decoration: InputDecoration(
+                labelText: _method == 'card' ? 'Card reference (last 4 digits or approval code)' : 'UPI reference (UTR or transaction id)',
+              ),
+            ),
+          ],
         ]),
       );
 

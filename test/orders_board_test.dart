@@ -462,6 +462,47 @@ void main() {
       final sent = jsonDecode(s.where('POST', '/rpc/rst_channel_delivery').single.body) as Map<String, dynamic>;
       expect(sent, containsPair('step', 'delivered'));
       expect(sent, containsPair('payment_method', 'cash'));
+      expect(sent, isNot(contains('reference')));
+    });
+
+    testWidgets('Delivered, paid by UPI at the door: the UTR is asked (4 characters at least) and sent with it; Cancel sends nothing', (t) async {
+      final src = sources();
+      final orders = (src['orders'] as List).cast<Map<String, dynamic>>();
+      orders[1]
+        ..['due'] = 200
+        ..['prepaid'] = false;
+      final s = FakeServer((r) {
+        final p = r.url.path;
+        if (p.endsWith('/rpc/rst_channel_delivery')) return ok({'message': 'P-00032 delivered, ₹200.00 collected by UPI'});
+        if (p.endsWith('/rpc/rst_channel_orders')) return ok(src);
+        if (p.endsWith('/rpc/pos_orders_board')) return ok(board());
+        return err(404, 'not in this fake: $p');
+      });
+      await openTab(t, s);
+      await tapChip(t, 'channel-card-onelocal');
+      await t.pumpAndSettle();
+      await tapChip(t, 'deliver-delivered-P-00032');
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('paid-upi')));
+      await t.pumpAndSettle();
+      expect(find.text('UPI reference'), findsOneWidget);
+      await t.tap(find.text('Cancel'));
+      await t.pumpAndSettle();
+      expect(s.where('POST', '/rpc/rst_channel_delivery'), isEmpty);
+      await tapChip(t, 'deliver-delivered-P-00032');
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('paid-upi')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('paid-reference')), '12');
+      await t.tap(find.byKey(const ValueKey('paid-reference-go')));
+      await t.pumpAndSettle();
+      expect(find.text('Enter at least 4 characters.'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('paid-reference')), ' UTR998877 ');
+      await t.tap(find.byKey(const ValueKey('paid-reference-go')));
+      await t.pumpAndSettle();
+      final sent = jsonDecode(s.where('POST', '/rpc/rst_channel_delivery').single.body) as Map<String, dynamic>;
+      expect(sent, containsPair('payment_method', 'upi'));
+      expect(sent, containsPair('reference', 'UTR998877'));
     });
 
     testWidgets('Delivered on an order paid in the app does not ask how it was paid', (t) async {

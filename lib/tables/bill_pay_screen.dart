@@ -52,7 +52,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
   String? _error, _payError;
   bool _busy = false;
   late String _method = widget.part?.s('method') ?? 'cash';
-  final _received = TextEditingController();
+  final _received = TextEditingController(), _reference = TextEditingController();
   final _code = TextEditingController();
   String? _payKey; // the key of the tap in flight; kept only when the server gave no answer, so a retry cannot pay twice
 
@@ -65,6 +65,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
   @override
   void dispose() {
     _received.dispose();
+    _reference.dispose();
     _code.dispose();
     super.dispose();
   }
@@ -169,8 +170,15 @@ class _BillPayScreenState extends State<BillPayScreen> {
     if (_method == 'cash') {
       tendered = typedAmount(_received.text);
       if (tendered == null || tendered < _due) return setState(() => _payError = 'Enter at least ${money(_due)} received.');
-    } else if (!await _confirmed(_method == 'card' ? 'card' : 'UPI')) {
-      return;
+    } else {
+      // 0648: the card's last digits / approval code, or the UPI UTR, is always kept with the payment
+      final ref = _reference.text.trim();
+      if (ref.length < 4) {
+        return setState(() => _payError = _method == 'card'
+            ? 'Enter the card reference: the last 4 digits or the approval code on the slip.'
+            : 'Enter the UPI reference: the UTR or transaction id the guest\'s app shows.');
+      }
+      if (!await _confirmed(_method == 'card' ? 'card' : 'UPI')) return;
     }
     setState(() {
       _busy = true;
@@ -178,7 +186,8 @@ class _BillPayScreenState extends State<BillPayScreen> {
     });
     final key = _payKey ??= BillApi.newKey();
     try {
-      final r = await _api.pay(o.s('id'), partId: widget.part?.s('id'), method: _method, tendered: tendered, key: key);
+      final r = await _api.pay(o.s('id'), partId: widget.part?.s('id'), method: _method, tendered: tendered,
+          reference: _method == 'cash' ? null : _reference.text.trim(), key: key);
       _payKey = null;
       if (!mounted) return;
       if (r.b('order_paid')) {
@@ -365,6 +374,18 @@ class _BillPayScreenState extends State<BillPayScreen> {
             if (_method == 'upi') ...[
               const SizedBox(height: 14),
               const StoreQrCard(key: ValueKey('bill-store-qr'), big: true),
+            ],
+            // 0648: a card or UPI payment always keeps its reference number
+            if (_method == 'card' || _method == 'upi') ...[
+              const SizedBox(height: 14),
+              Text(_method == 'card' ? 'Card reference (last 4 digits or approval code)' : 'UPI reference (UTR or transaction id)', style: inter(15, 500, color: kMuted)),
+              const SizedBox(height: 8),
+              BillField(
+                fieldKey: const ValueKey('bill-reference'),
+                controller: _reference,
+                hint: _method == 'card' ? 'e.g. 4821 or approval 093512' : 'e.g. 412398765432',
+                onChanged: (_) => setState(() => _payError = null),
+              ),
             ],
           ]),
           if (_payError != null)

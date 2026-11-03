@@ -323,6 +323,10 @@ class _OrderScreenState extends State<OrderScreen> {
     final due = num.tryParse('${v.payment['due']}') ?? 0;
     var method = 'cash';
     final tender = TextEditingController(text: due == due.roundToDouble() ? due.toInt().toString() : due.toString());
+    // 0648: a card or UPI payment keeps its reference (required for a restaurant; the database checks)
+    final ref = TextEditingController();
+    final restaurant = HomeNav.shell?.kind == 'restaurant';
+    String? problem;
     final key = OrdersApi.newKey();
     final go = await showOrderSheet<bool>(
       context,
@@ -343,13 +347,34 @@ class _OrderScreenState extends State<OrderScreen> {
               decoration: const InputDecoration(labelText: 'Cash received (₹)'),
             ),
           ],
+          if (method == 'card' || method == 'upi') ...[
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('pay-reference'),
+              controller: ref,
+              maxLength: 60,
+              decoration: InputDecoration(
+                labelText: method == 'card' ? 'Card reference (last 4 digits or approval code)' : 'UPI reference (UTR or transaction id)',
+                errorText: problem,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
-          DarkCta(label: 'Complete Payment ${rupees(due)}', onPressed: () => Navigator.pop(ctx, true)),
+          DarkCta(
+            label: 'Complete Payment ${rupees(due)}',
+            onPressed: () {
+              if (restaurant && method != 'cash' && ref.text.trim().length < 4) {
+                return set(() => problem = method == 'card' ? 'Enter the last 4 digits or the approval code.' : 'Enter the UTR or transaction id.');
+              }
+              Navigator.pop(ctx, true);
+            },
+          ),
         ]),
       ),
     );
     if (go != true) return;
-    await _run(() => _api.pay(v.id, method: method, tendered: method == 'cash' ? num.tryParse(tender.text) : null, version: v.version, key: key));
+    await _run(() => _api.pay(v.id, method: method, tendered: method == 'cash' ? num.tryParse(tender.text) : null,
+        reference: method == 'cash' ? null : ref.text.trim(), version: v.version, key: key));
   }
 
   Future<void> _acceptanceSheet() async {
