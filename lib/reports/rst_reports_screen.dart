@@ -18,7 +18,7 @@ import '../ui/xlsx.dart';
 import 'rst_reports_api.dart';
 
 /// Restaurant reports V1 (founder, 30 Oct 2026, from the "Mini Restaurant Reporting Blueprint"): Sales (Summary, Items, Categories),
-/// Payments (Payment mode, Cashier & day close), Audit (Discounts, Leakage). Every figure comes from the database (migration 0636) for the
+/// Payments (Payment mode, Cashier & day end), Audit (Discounts, Leakage). Every figure comes from the database (migration 0636) for the
 /// signed-in business and the outlet the app is showing; nothing is worked out or made up here.
 class RstReportsScreen extends StatelessWidget {
   const RstReportsScreen({super.key, this.api, this.bill, this.today, this.openFeed});
@@ -78,7 +78,7 @@ class RstReportsScreen extends StatelessWidget {
             ])),
             Entrance(index: 1, child: group('PAYMENTS', const [
               ('payments', 'Payment mode', 'Cash, UPI, card, split bills, refunds, reconciliation', LucideIcons.wallet),
-              ('cashiers', 'Cashier & day close', 'Who took what, and the cash count of each day', LucideIcons.userCheck),
+              ('cashiers', 'Cashier & day end', "Who took what, and each Day end's cash count", LucideIcons.userCheck),
             ])),
             Entrance(index: 2, child: group('AUDIT', const [
               ('discounts', 'Discounts', 'Coupons, service charge waived, free dishes', LucideIcons.badgePercent),
@@ -101,7 +101,7 @@ class RstReportsScreen extends StatelessWidget {
 
 const _titles = {
   'sales': 'Sales summary', 'items': 'Item-wise sales', 'categories': 'Category-wise sales', 'payments': 'Payment mode',
-  'cashiers': 'Cashier & day close', 'discounts': 'Discounts', 'audit': 'Leakage audit', 'cancellations': 'Cancellations & refunds',
+  'cashiers': 'Cashier & day end', 'discounts': 'Discounts', 'audit': 'Leakage audit', 'cancellations': 'Cancellations & refunds',
 };
 const _methods = {'cash': 'Cash', 'upi': 'UPI', 'card': 'Card', 'wallet': 'Wallet', 'due': 'On credit', 'online': 'Online', 'other': 'Other'};
 const _channels = {'dine_in': 'Dine-in', 'pickup': 'Takeaway', 'delivery': 'Own delivery', 'online': 'OneLocal', 'swiggy': 'Swiggy', 'zomato': 'Zomato', 'other': 'Other'};
@@ -536,8 +536,8 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
           _line(c.s('name'), rs(c.n('amount_minor')), key: 'rep-cashier-${c.s('name')}',
               sub: '${c.n('bills')} bills · ${(c.raw['methods'] as Map? ?? const {}).entries.map((e) => '${_methods[e.key] ?? e.key} ${rs(e.value as num?)}').join(' · ')}'),
       ]),
-      _note('The restaurant closes by day: each day\'s cash count is below. Shifts are not used for restaurant billing.'),
-      _card('DAY CLOSE', [
+      _note('The restaurant ends each day with Day end: each day\'s cash count is below. Shifts are not used for restaurant billing.'),
+      _card('DAY END', [
         for (final d in days)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
@@ -545,7 +545,7 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
               Row(children: [
                 Expanded(child: Text(dayMonth(d.s('day')), style: inter(15, 800))),
                 if (d.no('counted_minor') == null)
-                  Text('Not closed', style: inter(12.5, 700, color: kMuted))
+                  Text('Not ended', style: inter(12.5, 700, color: kMuted))
                 else
                   Text(d.n('difference_minor') == 0 ? 'Matched' : (d.n('difference_minor') < 0 ? 'Short ${rs(-d.n('difference_minor'))}' : 'Extra ${rs(d.n('difference_minor'))}'),
                       key: ValueKey('rep-close-${d.s('day')}'), style: inter(13, 800, color: d.n('difference_minor') < 0 ? kError : const Color(0xFF15803D))),

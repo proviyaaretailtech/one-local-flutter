@@ -4,6 +4,15 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../ui/i18n.dart';
 import 'home_nav.dart';
 import '../devices/device_manager_screen.dart';
+import '../reports/rst_reports_screen.dart' show RstReportScreen;
+import '../restaurant/rst_page_manager.dart' show RstPageManagerScreen;
+import '../restaurant/rst_plans_screen.dart' show RstPlansScreen;
+import '../settings/rst_devices_screen.dart' show RstDevicesScreen;
+import '../tables/bill_adjust.dart' show AdjustRequestsScreen;
+import '../tables/bill_api.dart' show BillApi;
+import '../tables/dining_areas_screen.dart' show DiningAreasScreen;
+import '../tables/reservations_screen.dart' show ReservationsScreen;
+import '../tables/table_widgets.dart' show TablesEnv;
 
 /// One place or action of the store app that the side menu's search can open: what it is called, where it lives, the words people
 /// might type for it, and how to open it.
@@ -30,6 +39,8 @@ class AppAction {
 /// Every action of the store app the side menu's search can open (founder, 26 Oct 2026: "any action in the application should be
 /// searchable"). Built from the app's open-hooks; one that is not plugged in is left out. [onReports] opens Reports.
 List<AppAction> appActions(BuildContext context, {VoidCallback? onReports}) {
+  // a restaurant has its own pages: never the store's barcodes, shelf labels, quick add product, device or money pages (founder, 3 Nov 2026)
+  if (HomeNav.shell?.kind == 'restaurant') return restaurantActions(context, onReports: onReports);
   final list = <AppAction>[];
   void add(IconData icon, String title, String where, String words, VoidCallback? open) {
     if (open != null) list.add(AppAction(icon, title, where, words, open));
@@ -98,6 +109,88 @@ List<AppAction> appActions(BuildContext context, {VoidCallback? onReports}) {
   add(LucideIcons.bell, 'Notifications', 'Banner', 'notifications alerts messages announcements', route(HomeNav.notifications));
   add(LucideIcons.circleQuestionMark, 'Help & support', 'Side menu', 'help support complaint ticket contact problem', route(HomeNav.support));
   add(LucideIcons.user, 'Manage account', 'Profile', 'account profile name phone password sign in', route(HomeNav.account));
+  return list;
+}
+
+/// Every place a restaurant's search and Ol can open (founder, 3 Nov 2026: "Search the app and Ol show store actions to a restaurant …
+/// Train Ol for restaurant"): the restaurant's own tabs, side menu, Inventory pages, reports, money and devices, each with the words
+/// restaurant staff use for it. Built from the same open-hooks; one that is not plugged in is left out.
+List<AppAction> restaurantActions(BuildContext context, {VoidCallback? onReports}) {
+  final list = <AppAction>[];
+  void add(IconData icon, String title, String where, String words, VoidCallback? open) {
+    if (open != null) list.add(AppAction(icon, title, where, words, open));
+  }
+
+  VoidCallback? route(HomeRoute? r) => r == null ? null : () => r(context);
+  VoidCallback push(Route<Object?> Function() r) => () => Navigator.of(context).push(r());
+  VoidCallback? inventory(String page) => HomeNav.inventory == null ? null : () => HomeNav.inventory!(context, page);
+  VoidCallback report(String kind) => push(() => MaterialPageRoute(builder: (_) => RstReportScreen(kind: kind)));
+  final settings = HomeNav.settings ?? HomeNav.setup;
+
+  // the bottom bar
+  add(LucideIcons.house, 'Home', 'Dashboard', "dashboard today's sales bills kitchen summary start", route(HomeNav.home));
+  add(LucideIcons.receiptText, 'Bill', 'Tables and orders',
+      'bill floor tables table order take order dine in takeaway parcel delivery kot send to kitchen hold generate bill checkout pay', route(HomeNav.tables));
+  add(LucideIcons.bookOpen, 'Menu', 'Menu', 'menu dishes dish items food price category veg out of stock photo description timings', route(HomeNav.menu));
+  add(LucideIcons.plus, 'Add a dish', 'Menu → Quick add', 'add dish new dish item quick add create naya price category', route(HomeNav.menu));
+  add(LucideIcons.shoppingBag, 'Orders', 'Orders', 'orders live orders delivery swiggy zomato onelocal takeaway on call phone held hold send to kitchen collect', route(HomeNav.orders));
+  add(LucideIcons.qrCode, 'All orders', 'Side menu', 'all orders order history past orders old bills', route(HomeNav.orderHistory ?? HomeNav.orders));
+  add(LucideIcons.monitor, 'Kitchen display (KDS)', 'Orders', 'kds kitchen display screen cooking ready chef', route(HomeNav.kitchenDisplay));
+  add(LucideIcons.ticket, 'KOT view', 'Orders', 'kot kitchen ticket tickets reprint kot', route(HomeNav.kotView));
+
+  // the floor
+  add(LucideIcons.calendarClock, 'Reservations', 'Side menu', 'reservations reservation booking book table seat no show guests', push(() => ReservationsScreen.route(TablesEnv())));
+  add(LucideIcons.layoutGrid, 'Table management', 'Bill → ⋮ → Manage tables', 'tables add table rename seats manage tables remove table', inventory('tables'));
+  add(LucideIcons.layers, 'Dining areas', 'Manage tables', 'dining areas area section ac hall rooftop garden floor', push(() => DiningAreasScreen.route(TablesEnv())));
+  add(LucideIcons.qrCode, 'Table QR codes', 'Bill → ⋮', 'table qr code scan guest order from table', route(HomeNav.tableQr));
+  add(LucideIcons.badgeCheck, 'Approvals', 'Side menu', 'approvals approve cancel dish refund void requests manager cashier',
+      push(() => MaterialPageRoute(builder: (_) => AdjustRequestsScreen(api: BillApi()))));
+
+  // money
+  add(LucideIcons.indianRupee, 'Money', 'Side menu', 'money cash drawer upi bank wallet balance money in money out transfer paisa hisab', route(HomeNav.money));
+  add(LucideIcons.moon, 'Day end', 'Money → Cash register', 'day end close day end of day count cash drawer register reopen day galla', route(HomeNav.money));
+  add(LucideIcons.arrowUpRight, 'Money out', 'Money', 'money out expense pay rent salary supplier kharcha paid out', route(HomeNav.money));
+  add(LucideIcons.arrowDownLeft, 'Money in', 'Money', 'money in cash in owner money add cash', route(HomeNav.money));
+  add(LucideIcons.handCoins, 'Dues', 'Money', 'dues credit collect udhar khata bill on credit supplier invoices to pay', route(HomeNav.money));
+  add(LucideIcons.wallet, 'OneLocal Wallet', 'Side menu', 'onelocal wallet settlement payout online orders money', route(HomeNav.wallet));
+
+  // Inventory (side menu)
+  add(LucideIcons.truck, 'Purchase', 'Side menu → Inventory', 'purchase buy supplier purchase order vendor kharid', inventory('purchase'));
+  add(LucideIcons.packageOpen, 'Receive delivery', 'Inventory → Purchase', 'receive delivery goods arrived grn receiving maal aaya', route(HomeNav.grn));
+  add(LucideIcons.table, 'Price control', 'Side menu → Inventory', 'price control dish prices change price rate list', inventory('prices'));
+  add(LucideIcons.clipboardCheck, 'Closing stock check', 'Side menu → Inventory', 'closing stock check count stock end of day ingredients left', inventory('closing'));
+  add(LucideIcons.chefHat, 'Recipe', 'Side menu → Inventory', 'recipe recipes food cost margin profit ingredients per dish', inventory('recipes'));
+  add(LucideIcons.carrot, 'Ingredients', 'Side menu → Inventory', 'ingredients raw material stock vegetables groceries kitchen stock barcode scan ingredient barcodes', inventory('ingredients'));
+  add(LucideIcons.boxes, 'Stock', 'Inventory', 'stock inventory ingredients on hand', route(HomeNav.stock));
+  add(LucideIcons.trendingDown, 'Low stock', 'Inventory', 'low stock running out finished khatam reorder', route(HomeNav.lowStock));
+
+  // the kitchen and devices
+  add(LucideIcons.cookingPot, 'Kitchen setup', 'Settings', 'kitchen setup stations printer groups which dishes go to which kitchen', route(HomeNav.kitchenSetup));
+  add(LucideIcons.printer, 'Devices', 'Settings', 'devices printer printers kot printer receipt printer bill printer thermal bluetooth test print',
+      push(() => RstDevicesScreen.route()));
+
+  // reports
+  add(LucideIcons.fileText, 'Reports', 'Side menu', 'reports sales analytics', onReports);
+  add(LucideIcons.chartColumn, 'Sales summary', 'Reports', 'sales summary report today month revenue net sales gst', report('sales'));
+  add(LucideIcons.utensils, 'Item-wise sales', 'Reports', 'item wise dish wise best selling top dishes report', report('items'));
+  add(LucideIcons.creditCard, 'Payment mode', 'Reports', 'payment mode cash upi card report collections', report('payments'));
+  add(LucideIcons.userCheck, 'Cashier & day end', 'Reports', 'cashier who took money day end cash count report', report('cashiers'));
+  add(LucideIcons.badgePercent, 'Discounts report', 'Reports', 'discounts coupon manual discount report', report('discounts'));
+  add(LucideIcons.shieldAlert, 'Leakage audit', 'Reports', 'leakage revenue leakage audit admin pin cancelled unpaid unsettled day end reopened', report('audit'));
+  add(LucideIcons.undo2, 'Cancellations & refunds', 'Reports', 'cancellations refunds void cancelled dishes report', report('cancellations'));
+
+  // the rest of the side menu
+  add(LucideIcons.circleUser, 'Customers', 'Side menu', 'customers guests contacts phone numbers', route(HomeNav.customers));
+  add(LucideIcons.users, 'Team', 'Side menu', 'team staff waiter captain cashier manager roles invite', route(HomeNav.team));
+  add(LucideIcons.layoutTemplate, 'Page Manager', 'Side menu', 'page manager onelocal page online ads offers reviews profile hours delivery link',
+      push(() => RstPageManagerScreen.route()));
+  add(LucideIcons.link, 'Menu link', 'Page Manager', 'menu link share menu online menu qr whatsapp', route(HomeNav.menuLink));
+  add(LucideIcons.store, 'Business profile', 'Side menu', 'business profile outlet name address phone gst fssai', route(HomeNav.outletInfo ?? settings));
+  add(LucideIcons.settings, 'Settings', 'Side menu', 'settings timings hours phone numbers language bill settings service charge gst', route(settings));
+  add(LucideIcons.crown, 'Subscription plans', 'Side menu', 'subscription plan plans pay renew', push(() => RstPlansScreen.route()));
+  add(LucideIcons.bell, 'Notifications', 'Banner', 'notifications alerts messages', route(HomeNav.notifications));
+  add(LucideIcons.circleQuestionMark, 'Help & support', 'Side menu', 'help support complaint ticket contact problem', route(HomeNav.support));
+  add(LucideIcons.user, 'Manage account', 'Profile', 'account profile name phone password sign out delete account', route(HomeNav.account));
   return list;
 }
 

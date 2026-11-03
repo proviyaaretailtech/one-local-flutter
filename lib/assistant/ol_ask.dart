@@ -14,18 +14,18 @@ import 'ol_tour.dart';
 
 /// Each tab's tip, said the first time that tab is ever opened on this device.
 const _tips = {
-  'Home': "Today's sales, bills and kitchen are here. Tap me any time to find something or to be shown how.",
+  'Home': "Today's sales, bills and kitchen are here, and Revenue leakage. Tap me any time to find something or to be shown how.",
   'Menu': 'Quick add a dish here. Tap ⋮ on a dish for the AI enhancer, description and timings, or to mark it out of stock.',
   'Bill': 'Choose a table, then tap dishes to add them. Takeaway and Delivery need no table.',
-  'Orders': 'Every order is here, newest first. Tap one to see its dishes and where it is.',
+  'Orders': 'Every order is here: Swiggy, Zomato, OneLocal, phone deliveries and takeaways. Tap one to take its payment or see where it is.',
 };
 
 /// 3–4 quick questions per tab, shown above the box in Ask Ol.
 const _quick = {
-  'Home': ['Take an order', "Today's sales", 'Add a dish', 'Settings'],
+  'Home': ['Take an order', 'Add a dish', 'Day end', 'Revenue leakage'],
   'Menu': ['Add a dish', 'Mark out of stock', 'Dish photo', 'Recipe costs'],
-  'Bill': ['Split a bill', 'Takeaway on a table', 'Ready to serve', 'Add a table'],
-  'Orders': ['Order history', 'Take an order', "Today's sales"],
+  'Bill': ['Split a bill', 'Give a discount', 'Cancel a dish', 'Add a table'],
+  'Orders': ['Takeaway payment', 'Send a held order', 'Swiggy and Zomato', 'Order history'],
 };
 
 /// What Ol knows: the words a question may use, and the answer (a sentence, the steps, the tab that has it).
@@ -45,9 +45,15 @@ const _topics = <_Topic>[
     steps: ['Open Bill and tap the Delivery pill', 'Tap the dishes', 'Send to kitchen, then enter the name, phone and address'],
     tab: 'Bill',
   )),
-  _Topic(['split', 'cash', 'card', 'upi', 'pay', 'payment', 'settle', 'generate', 'bill', 'checkout'], OlAnswer(
-    'To split one bill across Cash, Card and UPI:',
-    steps: ['Open Bill and tap the table', 'Tap Generate Bill (Take Payment once it is generated)', 'On Checkout tap Split Pay', 'Type each method\'s amount, then take each payment'],
+  _Topic(['split', 'cash', 'card', 'upi', 'pay', 'payment', 'settle', 'generate', 'bill', 'checkout', 'equally', 'guest', 'share'], OlAnswer(
+    'To split a bill:',
+    steps: [
+      'Open Bill and tap the table',
+      'Tap Generate Bill (Take Payment once it is generated)',
+      'On Checkout tap Split Pay',
+      'Choose By payment method (Cash, Card, UPI amounts), Equally (2 to 20 guests) or By dish (each dish to a guest), then take each part; '
+          'card and UPI need their reference number',
+    ],
     tab: 'Bill',
   )),
   _Topic(['ready', 'serve', 'served', 'kds', 'display', 'waiter'], OlAnswer(
@@ -55,9 +61,13 @@ const _topics = <_Topic>[
     steps: ['Open Bill', 'Tap Ready to serve', 'Mark dishes served as they go to the table'],
     tab: 'Bill',
   )),
-  _Topic(['table', 'add', 'rename', 'seat', 'qr', 'manage', 'clean', 'area', 'floor'], OlAnswer(
+  _Topic(['table', 'add', 'rename', 'seat', 'qr', 'manage', 'clean', 'area', 'floor', 'section', 'hall', 'rooftop'], OlAnswer(
     'Tables are managed from Bill:',
-    steps: ['Open Bill', 'Tap ⋮ at the top', 'Manage tables adds, renames or changes seats; Table QR codes let guests order from their table'],
+    steps: [
+      'Open Bill and tap ⋮ at the top',
+      'Manage tables adds, renames or changes seats; Table QR codes let guests order from their table',
+      'Dining areas (AC Hall, Rooftop …) is at the top of Manage tables: tick which tables are in each',
+    ],
     tab: 'Bill',
   )),
   _Topic(['dish', 'item', 'menu', 'add', 'new', 'price', 'category', 'quick', 'create'], OlAnswer(
@@ -94,9 +104,104 @@ const _topics = <_Topic>[
     steps: ['Tap ☰ at the top left', 'Tap Reports', 'Open Sales summary, Item-wise or Category-wise sales'],
     tab: 'Home',
   )),
-  _Topic(['setting', 'outlet', 'profile', 'gst', 'printer', 'language'], OlAnswer(
+  _Topic(['setting', 'outlet', 'profile', 'gst', 'language', 'timing', 'phone'], OlAnswer(
     'Settings are in the side menu:',
-    steps: ['Open Home', 'Tap ☰ at the top left', 'Tap Settings (outlet info, timings, phone numbers, printers)'],
+    steps: ['Tap ☰ at the top left', 'Tap Settings (outlet info, timings, phone numbers, bill settings, devices, kitchen setup)'],
+    tab: 'Home',
+  )),
+  // ---- trained for the restaurant (founder, 3 Nov 2026): the newer jobs, in the restaurant's own words
+  _Topic(['reservation', 'reserve', 'booking', 'book', 'show', 'seat', 'table'], OlAnswer(
+    'Reservations are in the side menu:',
+    steps: ['Tap ☰ at the top left, then Reservations', 'Tap New reservation for a booking', 'When the guests come, tap Seat; or mark No-show, or Cancel'],
+    tab: 'Home',
+  )),
+  _Topic(['discount', 'coupon', 'code', 'percent', 'off', 'manual'], OlAnswer(
+    'To give a discount:',
+    steps: [
+      'Open Bill, tap the table, then Generate Bill (or Take Payment)',
+      'On Checkout type a discount code and tap Apply, or tap Manual discount (% or ₹, with a reason)',
+      'Once a bill is generated, a change needs an admin PIN and a note; it shows in Revenue leakage',
+    ],
+    tab: 'Bill',
+  )),
+  _Topic(['cancel', 'dish', 'remove', 'wrong', 'refund', 'void', 'return', 'approval', 'approve'], OlAnswer(
+    'To cancel a dish, refund or void a bill:',
+    steps: [
+      'Open Bill and tap the table',
+      'Tap Cancel Item for a dish, or Refund / Void for a paid bill',
+      'A cashier\'s request waits for a manager in ☰ → Approvals',
+    ],
+    tab: 'Bill',
+  )),
+  _Topic(['admin', 'pin', 'locked', 'lock', 'generated', 'change', 'edit'], OlAnswer(
+    'A generated bill is locked: a discount, coupon, cancelled dish or service charge change needs an admin PIN and a note. '
+        'So does cancelling an order after its KOT went to the kitchen. Each one shows in Revenue leakage on Home.',
+    tab: 'Bill',
+  )),
+  _Topic(['reference', 'utr', 'approval', 'last', 'digit', 'transaction', 'upi', 'card'], OlAnswer(
+    'A card or UPI payment always keeps its reference: at Checkout type the card\'s last 4 digits or approval code, or the UPI UTR / '
+        'transaction id. Delivery paid at the door asks for it too.',
+    tab: 'Bill',
+  )),
+  _Topic(['takeaway', 'delivery', 'pay', 'payment', 'collect', 'counter', 'parcel'], OlAnswer(
+    'To take payment for a takeaway or a phone delivery:',
+    steps: ['Open Orders and tap Takeaway (or On call delivery)', 'Tap the order, then Complete Payment', 'The Checkout has coupon, manual discount and Split Pay, like a table\'s bill'],
+    tab: 'Orders',
+  )),
+  _Topic(['held', 'hold', 'send', 'kitchen', 'saved', 'later'], OlAnswer(
+    'Takeaways and deliveries put on Hold wait in Orders:',
+    steps: ['Open Orders and tap Takeaway or On call delivery', 'Find the held order', 'Tap Send to kitchen when the guest confirms'],
+    tab: 'Orders',
+  )),
+  _Topic(['swiggy', 'zomato', 'onelocal', 'aggregator', 'accept', 'rider', 'online'], OlAnswer(
+    'Swiggy, Zomato and OneLocal orders come into Orders:',
+    steps: ['Open Orders and tap the source\'s card', 'Accept the order, then Mark ready', 'Picked up when the rider takes it; it is paid on its own platform'],
+    tab: 'Orders',
+  )),
+  _Topic(['kds', 'kot', 'kitchen', 'display', 'ticket', 'chef', 'reprint'], OlAnswer(
+    'The kitchen screens are in Orders: KDS view shows each dish to cook and Ready; KOT view lists the kitchen tickets (and reprints them).',
+    tab: 'Orders',
+  )),
+  _Topic(['day', 'end', 'close', 'count', 'drawer', 'register', 'reopen', 'galla'], OlAnswer(
+    'To end the day:',
+    steps: [
+      'Tap ☰, then Money, and open Cash register',
+      'It lists any bills still open: settle them first if you can',
+      'Tap Day end · count the cash and type what is in the drawer (bills left open need a note and go to Revenue leakage)',
+      'The owner can Reopen day with a reason',
+    ],
+    tab: 'Home',
+  )),
+  _Topic(['leakage', 'revenue', 'audit', 'unsettled', 'unpaid', 'cheat', 'loss'], OlAnswer(
+    'Revenue leakage is on Home: changes made with an admin PIN, bills left unsettled at Day end and days reopened. '
+        'Tap Leakage audit there (or ☰ → Reports → Leakage audit) for every cancelled, unpaid and changed bill.',
+    tab: 'Home',
+  )),
+  _Topic(['money', 'expense', 'out', 'in', 'cash', 'bank', 'due', 'credit', 'udhar', 'supplier', 'pay'], OlAnswer(
+    'Money is in the side menu:',
+    steps: ['Tap ☰ at the top left, then Money', 'Money in, Money out and Transfer are at the top', 'Cash register (with Day end) and Dues (bills on credit, supplier invoices) are below'],
+    tab: 'Home',
+  )),
+  _Topic(['purchase', 'buy', 'supplier', 'vendor', 'receive', 'delivery', 'grn', 'goods'], OlAnswer(
+    'Buying from suppliers is in the side menu:',
+    steps: ['Tap ☰ at the top left, then Inventory', 'Purchase makes a purchase order and receives the goods', 'Closing stock check counts what is left; Price control changes dish prices'],
+    tab: 'Home',
+  )),
+  _Topic(['printer', 'device', 'bluetooth', 'thermal', 'station', 'setup', 'kot'], OlAnswer(
+    'Printers and kitchen stations are in Settings:',
+    steps: ['Tap ☰, then Settings', 'Devices adds a receipt or KOT printer and test prints', 'Kitchen setup says which dishes go to which kitchen station'],
+    tab: 'Home',
+  )),
+  _Topic(['team', 'staff', 'waiter', 'captain', 'cashier', 'role', 'invite'], OlAnswer(
+    'Your team is in the side menu: tap ☰, then Team, to invite staff and choose what each role (captain, cashier, manager) may do.',
+    tab: 'Home',
+  )),
+  _Topic(['customer', 'guest', 'number', 'contact'], OlAnswer(
+    'Guests saved on bills are in ☰ → Customer. On a bill, tap Add customer at the top of Checkout to save the name and number.',
+    tab: 'Home',
+  )),
+  _Topic(['page', 'link', 'ad', 'offer', 'review', 'share', 'online', 'menu'], OlAnswer(
+    'Your OneLocal page is in ☰ → Page Manager: profile, hours, delivery, offers, ads and reviews. Share your menu with the Menu link.',
     tab: 'Home',
   )),
 ];
@@ -163,7 +268,7 @@ class _Topic {
 class OlGuide {
   const OlGuide();
 
-  static const notSure = "I'm not sure about that one yet. Try asking about orders, tables, takeaway, splitting a bill, dishes, recipes or sales.";
+  static const notSure = "I'm not sure about that one yet. Try asking about orders, tables, splitting a bill, discounts, Day end, reservations, dishes or sales.";
 
   String greeting(String tab, DateTime now) {
     final h = now.hour;

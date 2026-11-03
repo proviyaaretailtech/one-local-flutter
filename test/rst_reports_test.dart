@@ -167,11 +167,11 @@ void main() {
     expect(find.textContaining('refunds ₹50'), findsOneWidget);
   });
 
-  testWidgets('Cashier & day close: who took what by method, and the day not closed yet', (t) async {
+  testWidgets('Cashier & day end: who took what by method, and the day not ended yet', (t) async {
     await show(t, RstReportScreen(kind: 'cashiers', api: Fake().api, today: today));
     expect(textOf(t, 'rep-cashier-Asha Cashier'), '₹1,289');
     expect(find.textContaining('5 bills'), findsOneWidget);
-    expect(find.text('Not closed'), findsOneWidget);
+    expect(find.text('Not ended'), findsOneWidget);
   });
 
   testWidgets('Discounts: the coupon, who applied it, the service charge waived with its reason, the free dish', (t) async {
