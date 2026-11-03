@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../home/home_nav.dart';
 import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'availability_screen.dart';
@@ -32,6 +33,9 @@ const _items = [
 
 /// The top-bar menu of every Service POS screen.
 Future<void> showServiceMenu(BuildContext context, ServiceApi api, {String business = '', ValueChanged<String>? onNavigate, String current = 'calendar'}) async {
+  // Inside the app (2 Nov 2026): ☰ is the service side menu (lib/service/service_nav.dart); this sheet is only for a screen opened alone.
+  final side = HomeNav.openMenu;
+  if (side != null) return side(context);
   final pick = await showOrderSheet<String>(context, title: 'Service', body: (ctx) => Column(mainAxisSize: MainAxisSize.min, children: [
         for (final (id, label, icon) in _items)
           ListTile(

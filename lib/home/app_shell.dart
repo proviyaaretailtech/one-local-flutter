@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../assistant/ol_bot.dart';
+import '../service/service_nav.dart' show kServiceTabs;
+import '../service/service_ol.dart';
 import '../ui/app_tab_bar.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -52,7 +54,7 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
       );
 
   static String _known(String? k) => k == 'restaurant' || k == 'service' ? k! : 'store';
-  List<BarTab> get _tabs => _kind == 'restaurant' ? kHubTabs : kStoreTabs;
+  List<BarTab> get _tabs => switch (_kind) { 'restaurant' => kHubTabs, 'service' => kServiceTabs, _ => kStoreTabs };
 
   @override
   void initState() {
@@ -114,6 +116,12 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
     if (!show(label)) HomeNav.go(context, null, label);
   }
 
+  /// Ol, the service guide, opens a tab, and a page in it when there is one (on the tab's own stack, so the bar stays).
+  void _olOpen(String tab, Widget Function()? page) {
+    if (!show(tab) || page == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _navigators[tab]?.currentState?.push(MaterialPageRoute(builder: (_) => page())));
+  }
+
   void _back() {
     final nav = _navigators[_current]?.currentState;
     if (nav != null && nav.canPop()) {
@@ -159,10 +167,15 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
           ),
           ),
         ),
-        // the restaurant bar ends with Ol, the helper (founder, 27 Oct 2026): tips for this tab, and "Ask Ol" to find anything
+        // the restaurant bar ends with Ol, the helper (founder, 27 Oct 2026): tips for this tab, and "Ask Ol" to find anything; the service
+        // bar ends with Ol the guide (founder, 3 Nov 2026), who takes you anywhere in the Service POS
         bottomNavigationBar: (_popups[_current] ?? 0) > 0
             ? null
-            : FloatingTabBar(tabs: tabs, onTap: _tap, current: _current, trailing: _kind == 'restaurant' ? OlBot(current: _current, onNavigate: _tap) : null),
+            : FloatingTabBar(tabs: tabs, onTap: _tap, current: _current, trailing: switch (_kind) {
+              'restaurant' => OlBot(current: _current, onNavigate: _tap),
+              'service' => ServiceOl(current: _current, open: _olOpen),
+              _ => null,
+            }),
       ),
     );
   }

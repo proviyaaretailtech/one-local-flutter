@@ -431,7 +431,7 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
             ),
           const SizedBox(height: 8),
           _line('Subtotal', rupees(q.subtotal)),
-          _line('GST · ${q.gstPct == q.gstPct.roundToDouble() ? q.gstPct.toInt() : q.gstPct}%', rupees(q.gst)),
+          if (q.gstPct > 0) _line('GST · ${q.gstPct == q.gstPct.roundToDouble() ? q.gstPct.toInt() : q.gstPct}%', rupees(q.gst)),
           if (q.roundOff != 0) _line('Round off', rupees(q.roundOff)),
           if (q.deposit > 0) ...[_line('Advance now', rupees(q.deposit)), _line('Due at studio', rupees(q.dueAtStudio))],
           const Divider(height: 22, color: kLine),

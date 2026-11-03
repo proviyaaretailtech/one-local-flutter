@@ -15,6 +15,8 @@ Map<String, dynamic> dashboard({String? closed, List<Map<String, dynamic>>? next
       'today': {'visits': 8, 'upcoming': 3, 'in_progress': 1, 'completed': 4, 'no_show': 0, 'cancelled': 1},
       'money': {'today': 4150, 'month': 63936},
       'available_slots': 6,
+      'free_now': ['Neha Rao', 'Arjun Kumar', 'Meera Iyer'],
+      'today_sources': {'offline': 7, 'online': 1},
       'providers': {'all': 8, 'available': 5, 'on_job': 2, 'off_duty': 1},
       'attention': {'advances_waiting': 2, 'to_bill': 1, 'no_show_to_decide': 0},
       'next_up': next ??
@@ -44,8 +46,8 @@ void main() {
     testWidgets('a service business gets its own dashboard, not the store one', (t) async {
       final rpc = await showService(t);
       expect(rpc.of('svc_dashboard'), hasLength(1));
-      for (final text in ['VISITS · TODAY', '8', '4 done · 3 to come', 'MONEY · TODAY', '₹4,150', '₹63,936 this month', 'FREE SLOTS', '6', '5 providers free', 'Open today',
-        'Indiranagar Studio · Thursday, 8 October 2026', 'Needs attention', 'Advances waiting: 2', 'Visits to bill: 1', 'Next visits', '10:00 – 11:05 AM · Precision haircut + Hair spa',
+      for (final text in ['Dashboard', 'Visits today', '8', '7 offline · 1 online', 'Money today', '₹4,150', '₹63,936 this month', 'Free slots', '6', 'Neha, Arjun +1 free now', 'Open today',
+        'Thursday, 8 October 2026 · Indiranagar Studio', 'Needs attention', 'Advances waiting: 2', 'Visits to bill: 1', 'Next visits', '10:00 – 11:05 AM · Precision haircut + Hair spa',
         'Riya Sharma · Neha Rao', 'Providers', 'Available', 'On a job', 'Off duty', 'This month', '41 completed', 'TOP SERVICES · MONTH', 'Active packages', 'Members', 'Sold this month']) {
         expect(find.textContaining(text), findsWidgets, reason: text);
       }
@@ -61,6 +63,43 @@ void main() {
       await t.tap(find.byKey(const ValueKey('tab-Bill')));
       await t.pumpAndSettle();
       expect(HomeNav.partnerType, 'calendar-opened');
+    });
+
+    testWidgets('the three figures open what they count: visits as a list, money taken today, who is free and their free slots (2 Nov 2026)', (t) async {
+      final rpc = FakeRpc({
+        'svc_dashboard': (_) => dashboard(),
+        'svc_calendar': (_) => {'date': '2026-10-08', 'date_label': 'Thursday', 'location': {'name': 'Main'}, 'week': [], 'counts': {'available_slots': 6, 'providers': 5}, 'providers': [], 'appointments': []},
+        'svc_bill_list': (_) => {'counts': {'today': 2}, 'paid_today': 4150, 'due_amount': 0, 'paid_this_month': 63936, 'bills': []},
+        'svc_free_slots': (_) => {'date_label': 'Thursday, 8 October', 'slot_minutes': 30, 'total': 6, 'free_now': ['Neha Rao'], 'people': [
+              {'staff_id': 's1', 'name': 'Neha Rao', 'title': 'Stylist', 'state': 'free_now', 'count': 2, 'slots': [{'time': '11:00', 'label': '11:00 AM'}, {'time': '11:30', 'label': '11:30 AM'}]},
+            ]},
+      });
+      await showTall(t, ControlCentreScreen(api: FakeHome(summary: summaryJson(kind: 'service')), serviceApi: rpc.api, now: () => DateTime.utc(2026, 10, 8, 10)));
+      Future<void> open(String key) async {
+        await t.tap(find.byKey(ValueKey(key)));
+        await t.pumpAndSettle();
+      }
+
+      await open('tile-visits');
+      expect(find.text('Bookings'), findsWidgets);
+      expect(rpc.of('svc_calendar').last.$2['view'], 'day');
+      expect(find.text('No bookings on this day. Tap New booking to add one.'), findsOneWidget, reason: 'the List view');
+      await t.pageBack();
+      await t.pumpAndSettle();
+
+      await open('tile-money');
+      expect(rpc.of('svc_bill_list').last.$2, {'filter': 'today'});
+      expect(find.text('Taken today'), findsOneWidget);
+      expect(find.text('2 bills · ₹4,150 taken'), findsOneWidget);
+      await t.pageBack();
+      await t.pumpAndSettle();
+
+      await open('tile-slots');
+      // which slots and who is free (founder, 2 Nov 2026)
+      expect(rpc.of('svc_free_slots'), hasLength(1));
+      for (final s in ['Free slots', 'Who is free', 'Neha Rao', 'Free now', '11:00 AM', '11:30 AM']) {
+        expect(find.text(s), findsWidgets, reason: s);
+      }
     });
 
     testWidgets('a visit opens its detail', (t) async {

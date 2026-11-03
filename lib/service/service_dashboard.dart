@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../home/home_nav.dart';
 import '../home/home_widgets.dart';
+import '../orders/order_widgets.dart' show kChipGreen, kBadBg, kBadText, kGreenText;
 import '../outlets/outlet_header.dart';
 import '../outlets/outlet_scope.dart';
 import '../ui/theme.dart';
+import 'bills_screen.dart';
+import 'bookings_screen.dart';
+import 'free_slots_screen.dart';
 import 'service_api.dart';
-import 'service_widgets.dart' show svcRupees, svcStatus;
+import 'service_widgets.dart' show SoftCountUp, svcRupees, svcStatus;
 import 'visit_screens.dart';
 
 /// The home screen of a service business: the same shell as the store and restaurant dashboards (navy band with three figures, then cards),
@@ -76,17 +81,61 @@ class _ServiceHomeBodyState extends State<ServiceHomeBody> {
         },
       );
 
-  Widget _tile(String label, String value, String chip) => Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: kNavyTile, borderRadius: BorderRadius.circular(10)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(9, 700, color: const Color(0xFF9CA3AF))),
-          const SizedBox(height: 4),
-          Text(value, style: inter(18, 800, color: Colors.white)),
-          const SizedBox(height: 4),
-          Text(chip, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(9, 600, color: kLime)),
+  /// A figure: a coloured icon, what it is, the number (counting up, like the store's tiles) and a short note; tapping it opens what it
+  /// counts (founder, 2 Nov 2026). [tint] is the icon's (background, colour).
+  /// Who is free right now, by first name (founder, 2 Nov 2026): "Arjun, Meera +2 free now".
+  static String _whoIsFree(List<String> names) {
+    if (names.isEmpty) return 'Nobody free now';
+    final first = names.map((n) => n.trim().split(' ').first).toList();
+    return '${first.take(2).join(', ')}${first.length > 2 ? ' +${first.length - 2}' : ''} free now';
+  }
+
+  Widget _tile(String label, num value, String chip,
+          {required String key, required Widget Function() open, required IconData icon, required (Color, Color) tint, String Function(num v)? format}) =>
+      Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: kLine)),
+        child: InkWell(
+          key: ValueKey(key),
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _push(open()),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(color: tint.$1, shape: BoxShape.circle),
+                  child: Icon(icon, size: 15, color: tint.$2),
+                ),
+                const Spacer(),
+                const Icon(LucideIcons.chevronRight, size: 15, color: kMuted),
+              ]),
+              const SizedBox(height: 8),
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11.5, 500, color: kMuted)),
+              const SizedBox(height: 2),
+              SoftCountUp(value, format: format, style: inter(19, 800)),
+              const SizedBox(height: 2),
+              Text(chip, maxLines: 2, style: inter(10.5, 600, color: kLink, height: 1.25)),
+            ]),
+          ),
+        ),
+      );
+
+  /// One "operations today" figure: an icon, the count and what it counts.
+  Widget _miniStat(IconData icon, int n, String label, Color color) => Expanded(
+        child: Row(children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 5),
+          Flexible(child: Text('$n $label', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12, 600, color: n > 0 ? kInk : kMuted))),
         ]),
       );
+
+  Future<void> _push(Widget page) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+    if (mounted) _reload();
+  }
 
   Widget _content(ServiceDashboardData d) {
     final t = d.today, a = d.attention, p = d.providers;
@@ -100,44 +149,59 @@ class _ServiceHomeBodyState extends State<ServiceHomeBody> {
       children: [
         // the outlet header (specs/outlets-multi)
         OutletHeader(title: d.locationName, onMenu: widget.onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), dashboard: true, allowAll: false),
-        Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 0), child: Text('OneLocal', style: inter(24, 800, height: 1.1))),
-        Container(
-          color: kNavy,
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        // "Dashboard" and a light summary in the store's look (founder, 2 Nov 2026: no "OneLocal" here, and the dark block looked heavy)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Row(children: [
+            Expanded(child: Text('Dashboard', style: inter(24, 800, height: 1.1))),
+            Container(
+              key: const ValueKey('open-status'),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(color: d.closed == null ? kChipGreen : kBadBg, borderRadius: BorderRadius.circular(999)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Dot(d.closed == null ? kLink : kRed),
+                const SizedBox(width: 6),
+                Text(d.closed == null ? 'Open today' : 'Closed today', style: inter(12, 700, color: d.closed == null ? kGreenText : kBadText)),
+              ]),
+            ),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Text('${d.dateLabel} · ${d.locationName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12.5, 400, color: kMuted)),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              Dot(d.closed == null ? kLime : kRed),
-              const SizedBox(width: 8),
-              Text(d.closed == null ? 'Open today' : 'Closed today', style: inter(12, 700, color: d.closed == null ? kLime : Colors.white)),
-              const SizedBox(width: 12),
-              Expanded(child: Text('${d.locationName} · ${d.dateLabel}', textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10, 400, color: const Color(0xFFD1D5DB)))),
-            ]),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(child: _tile('VISITS · TODAY', '${t.i('visits')}', '${t.i('completed')} done · ${t.i('upcoming')} to come')),
-              const SizedBox(width: 8),
-              Expanded(child: _tile('MONEY · TODAY', svcRupees(d.money.n('today')), '${svcRupees(d.money.n('month'))} this month')),
-              const SizedBox(width: 8),
-              Expanded(child: _tile('FREE SLOTS', '${d.availableSlots}', '${p.i('available')} providers free')),
-            ]),
-            const SizedBox(height: 10),
+            IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                // offline (logged in the POS) and online (booked in the customer app), founder 2 Nov 2026
+                Expanded(child: _tile('Visits today', t.i('visits'), '${d.todayOffline} offline · ${d.todayOnline} online', key: 'tile-visits',
+                    icon: LucideIcons.calendarCheck, tint: (kChipGreen, kGreenText), open: () => BookingsScreen(api: widget.api, mode: 'list'))),
+                const SizedBox(width: 8),
+                Expanded(child: _tile('Money today', d.money.n('today'), format: svcRupees, '${svcRupees(d.money.n('month'))} this month', key: 'tile-money',
+                    icon: LucideIcons.indianRupee, tint: (const Color(0xFFE6EEFF), const Color(0xFF1D4ED8)), open: () => BillsScreen(api: widget.api, filter: 'today'))),
+                const SizedBox(width: 8),
+                Expanded(child: _tile('Free slots', d.availableSlots, _whoIsFree(d.freeNow), key: 'tile-slots',
+                    icon: LucideIcons.clock, tint: (const Color(0xFFFFF4E0), const Color(0xFFB45309)), open: () => FreeSlotsScreen(api: widget.api))),
+              ]),
+            ),
+            const SizedBox(height: 8),
+            // what is happening now: in progress, no-shows, cancellations; tap for the calendar
             Material(
-              color: const Color(0xFF0E1F12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Color(0xFF2F4F1F))),
+              color: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: kLine)),
               child: InkWell(
-                borderRadius: BorderRadius.circular(10),
+                key: const ValueKey('operations-today'),
+                borderRadius: BorderRadius.circular(16),
                 onTap: () => HomeNav.go(context, HomeNav.service, 'Appointments'),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(children: [
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('OPERATIONS · TODAY', style: inter(10, 700, color: kLime)),
-                        const SizedBox(height: 2),
-                        Text('${t.i('in_progress')} in progress · ${t.i('no_show')} no-show · ${t.i('cancelled')} cancelled', style: inter(10.5, 400, color: const Color(0xFFD1D5DB))),
-                      ]),
-                    ),
-                    Text('Calendar', style: inter(10, 500, color: kMuted)),
+                    _miniStat(LucideIcons.loader, t.i('in_progress'), 'in progress', kGreenText),
+                    _miniStat(LucideIcons.userX, t.i('no_show'), 'no-show', const Color(0xFFB45309)),
+                    _miniStat(LucideIcons.circleX, t.i('cancelled'), 'cancelled', kBadText),
+                    const Icon(LucideIcons.chevronRight, size: 16, color: kMuted),
                   ]),
                 ),
               ),

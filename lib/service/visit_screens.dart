@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../devices/bill_receipt.dart';
 import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'service_api.dart';
 import 'service_widgets.dart';
+import 'visit_receipt.dart';
 
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const _monthsLong = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -170,7 +172,11 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     final label = _primaryLabel;
     return [
       _VisitHeader(title: a.displayNo, sub: [a.customer, if (a.customerPhone.isNotEmpty) svcPhone(a.customerPhone)].join(' · '), tag: _typeTag(a.fulfilment)),
-      _chipLine(a.statusLabel, a.tone),
+      // the status, and where the booking came from (founder, 2 Nov 2026)
+      Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [svcStatus(a.statusLabel, a.tone), SourceTag(online: a.online)]),
+      ),
       SvcCard(title: a.title, children: [
         SvcKV('Provider', a.resource == null ? a.provider : '${a.provider} · ${a.resource}'),
         SvcKV('Schedule', '${a.dateLabel} · ${a.timeLabel}'),
@@ -180,7 +186,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
       SvcCard(title: 'Payment', children: [
         SvcKV('Services', svcRupees(b.n('subtotal'))),
         if (b.n('discount') > 0) SvcKV('Discount', '−${svcRupees(b.n('discount'))}${a.credits.isNotEmpty ? ' · ${a.credits.first.s('plan')}' : ''}'),
-        SvcKV('GST · ${b.n('gst_pct').toStringAsFixed(b.n('gst_pct') % 1 == 0 ? 0 : 1)}%', svcRupees(b.n('gst_amount'))),
+        if (b.n('gst_pct') > 0) SvcKV('GST · ${b.n('gst_pct').toStringAsFixed(b.n('gst_pct') % 1 == 0 ? 0 : 1)}%', svcRupees(b.n('gst_amount'))),
         if (first != null) SvcKV(a.status == 'completed' ? 'Paid' : 'Deposit paid', '${svcRupees(b.n('paid'))} · ${_methodLabel(first.s('method'))} · ${_dayTime(_at(first.raw['at']) ?? DateTime.now())}'),
         if (b.n('refunded') > 0) SvcKV('Refunded', svcRupees(b.n('refunded'))),
         if (a.status != 'cancelled' && a.status != 'no_show') SvcKV('Balance due', '${svcRupees(b.n('due'))}${b.n('due') > 0 ? ' · Pay ${a.onLocation ? 'on completion' : 'at studio'}' : ''}'),
@@ -636,10 +642,13 @@ class _ExtraFormState extends State<_ExtraForm> {
 /// Figma 105 "Service Billing": every charge, the final bill with GST and any package or membership discount, what was paid, the balance,
 /// the tax split and GSTIN; then the payment through the same order and payment records as every sale.
 class ServiceBillingScreen extends StatefulWidget {
-  const ServiceBillingScreen({super.key, required this.api, required this.id, this.business = '', this.onNavigate});
+  const ServiceBillingScreen({super.key, required this.api, required this.id, this.business = '', this.onNavigate, this.openUrl, this.printer});
   final ServiceApi api;
   final String id, business;
   final ValueChanged<String>? onNavigate;
+  // passed on to the receipt (tests pass fakes)
+  final Future<bool> Function(Uri url)? openUrl;
+  final Future<void> Function(BuildContext context, BillReceipt bill)? printer;
   @override
   State<ServiceBillingScreen> createState() => _ServiceBillingScreenState();
 }
@@ -677,9 +686,10 @@ class _ServiceBillingScreenState extends State<ServiceBillingScreen> {
     try {
       final r = await widget.api.bill(a.id, method: pay?.$1, tendered: pay?.$2, version: a.version, key: _key!);
       if (!mounted) return;
-      showToast(context, '${r.displayNo} completed${due > 0 ? ' · ${svcRupees(due)} collected' : ''}.');
       setState(() => _a = r);
-      Navigator.of(context).pop(r);
+      // the receipt takes this screen's place: print it or send the bill's link on WhatsApp, then Done goes back to the visit
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+          builder: (_) => ServiceReceiptScreen(api: widget.api, visit: r, business: widget.business, onNavigate: widget.onNavigate, openUrl: widget.openUrl, printer: widget.printer)));
     } on ServiceApiException catch (e) {
       if (mounted) showToast(context, e.message);
       if (e.status < 500) _key = null;
@@ -723,7 +733,7 @@ class _ServiceBillingScreenState extends State<ServiceBillingScreen> {
         const Kick('Final bill'),
         const SizedBox(height: 8),
         KeyValue('Charges subtotal', svcRupees(b.n('subtotal')), size: 14),
-        KeyValue('GST ($pct% on ${svcRupees(b.n('taxable'))})', svcRupees(b.n('gst_amount')), size: 14),
+        if (b.n('gst_pct') > 0) KeyValue('GST ($pct% on ${svcRupees(b.n('taxable'))})', svcRupees(b.n('gst_amount')), size: 14),
         if (b.n('service_charge') > 0) KeyValue('Service charge', svcRupees(b.n('service_charge')), size: 14),
         if (b.n('discount') > 0)
           Padding(
@@ -751,7 +761,9 @@ class _ServiceBillingScreenState extends State<ServiceBillingScreen> {
         if (materials.isNotEmpty)
           SvcKV('Materials', '${svcRupees(materials.fold<num>(0, (s, x) => s + x.n('amount')))} approved at ${_clock(_at(materials.last.raw['approved_at']) ?? DateTime.now())}', labelWidth: 120),
         if (b.n('discount') > 0) SvcKV('Discount', plan == null ? 'Applied at booking' : '$plan · Prepaid plan', labelWidth: 120),
-        SvcKV('Tax split', 'CGST ${svcRupees(b.n('cgst'))} + SGST ${svcRupees(b.n('sgst'))}', labelWidth: 120),
+        b.n('gst_pct') > 0
+            ? SvcKV('Tax split', 'CGST ${svcRupees(b.n('cgst'))} + SGST ${svcRupees(b.n('sgst'))}', labelWidth: 120)
+            : SvcKV('GST', 'None · not GST-registered', labelWidth: 120),
         if (b.s('gstin').isNotEmpty) SvcKV('GSTIN', b.s('gstin'), labelWidth: 120),
       ]),
       Padding(
