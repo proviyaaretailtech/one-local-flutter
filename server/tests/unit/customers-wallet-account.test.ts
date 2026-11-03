@@ -10,7 +10,7 @@ const ID = '51000000-0000-0000-0000-0000000000d1';
 
 test('every function is listed as a db entry; reads are "read", writes are "write"; none uses the service role', () => {
   const reads = ['cust_list', 'cust_lookup', 'cust_view', 'wallet_overview', 'wallet_movements', 'wallet_settlement_view', 'acct_get'];
-  const writes = ['cust_save', 'cust_attach_order', 'acct_save_name', 'acct_sync_contact', 'acct_signed_out_everywhere'];
+  const writes = ['cust_save', 'cust_attach_order', 'acct_save_name', 'acct_sync_contact', 'acct_signed_out_everywhere', 'acct_sign_out_devices'];
   for (const a of [...reads, ...writes]) {
     const e = lookup(a);
     assert.ok(e, a);
@@ -35,6 +35,13 @@ test('customer form: name and phone required, dates as YYYY-MM-DD, extra keys ke
   assert.ok(!cu.Save.safeParse({ first_name: 'A', phone: '123' }).success);
   assert.ok(!cu.Save.safeParse({ first_name: 'A', phone: '9876543210', date_of_birth: '01/05/1990' }).success);
   assert.ok(!cu.SaveName.safeParse({ name: ' x ' }).success);
+});
+
+test('sign out devices: one or more session ids, nothing else', () => {
+  assert.ok(cu.SignOutDevices.safeParse({ session_ids: [ID] }).success);
+  assert.ok(!cu.SignOutDevices.safeParse({ session_ids: [] }).success);
+  assert.ok(!cu.SignOutDevices.safeParse({ session_ids: ['nope'] }).success);
+  assert.ok(!cu.SignOutDevices.safeParse({ session_ids: [ID], user_id: ID }).success);
 });
 
 test('CUST_, WALLET_ and ACCT_ errors map to statuses', () => {

@@ -49,7 +49,11 @@ export const RmRecord = obj({ direction: z.enum(['in', 'out', 'move'], { message
   party: z.string().max(60).optional(), party_phone: z.string().max(20).optional(), reference: z.string().max(60).optional(), note: z.string().max(300).optional(),
   from_account: rmAccount.optional(), to_account: rmAccount.optional(), entry_date: day.optional(), bill_receipt_id: id.optional(), ...key });
 export const RmVoid = z.object({ id, reason: z.string().trim().min(3, 'Say why (3 to 200 characters).').max(200) }).loose();
-export const RmClose = obj({ day: day.optional(), counted_minor: z.number({ message: 'Enter the cash you counted.' }).int().min(0).max(99_999_999_999) });
+// 0650: Day end: with bills still open, confirm_open_bills and a note (they go to Revenue leakage)
+export const RmClose = obj({ day: day.optional(), counted_minor: z.number({ message: 'Enter the cash you counted.' }).int().min(0).max(99_999_999_999),
+  confirm_open_bills: z.boolean().optional(), note: z.string().trim().max(200, 'Keep the note under 200 characters.').optional() });
+// 0650: reopen an ended day (the owner and admins), with the reason
+export const RmReopen = obj({ day: day.optional(), reason: z.string({ message: 'Write why the day is reopened.' }).trim().min(3, 'Write why the day is reopened.').max(200, 'Keep the reason under 200 characters.') });
 export const RmContacts = z.object({ q: z.string().max(60).optional() }).loose();
 export const RmContactSave = z.object({ id: id.optional(), name: z.string().trim().min(1, 'Enter a name.').max(60), phone: z.string().max(20).optional(),
   upi_id: z.string().max(260).optional() }).loose();

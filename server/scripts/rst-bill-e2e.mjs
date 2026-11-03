@@ -99,7 +99,7 @@ try {
   const n1 = await rpc(A, 'rst_bill_note', { order_id: o2, note: 'No onions' });
   ok('kitchen note saved', n1.s === 200 && n1.j.notes === 'No onions', n1);
   ok('kitchen note: business B 404', (await rpc(B, 'rst_bill_note', { order_id: o2, note: 'x' })).s === 404);
-  const w = await rpc(A, 'rst_bill_pay', { order_id: o2, method: 'card' }, k());
+  const w = await rpc(A, 'rst_bill_pay', { order_id: o2, method: 'card', reference: '4821' }, k());
   ok('T14 paid in one go by card: 1019', w.s === 200 && Number(w.j.amount) === 1019 && w.j.order_paid && w.j.table_settled, w);
 } catch (e) {
   fail++; console.log('FAIL (crash)', e?.message);

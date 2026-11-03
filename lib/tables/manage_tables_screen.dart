@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../inventory/inventory_api.dart' show Facts;
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import 'dining_areas_screen.dart';
 import 'tables_api.dart';
 import 'table_widgets.dart';
 
@@ -124,6 +125,28 @@ class _ManageTablesScreenState extends State<ManageTablesScreen> {
         children: [
           if (d == null && _error == null) tablesLoading(),
           if (d == null && _error != null) TablesError(_error!, onRetry: _load),
+          // 0646: the floor's sections (AC Hall, Rooftop …) and which tables are in each
+          if (d != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Material(
+                color: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFECEDE8))),
+                child: ListTile(
+                  key: const ValueKey('open-dining-areas'),
+                  leading: const Icon(LucideIcons.layers, color: kInk),
+                  title: Text('Dining areas', style: inter(15.5, 800)),
+                  subtitle: Text('AC Hall, Rooftop, Garden … and which tables are in each', style: inter(12.5, 500, color: kMuted)),
+                  trailing: const Icon(LucideIcons.chevronRight, size: 18, color: kMuted),
+                  onTap: () async {
+                    if (await Navigator.of(context).push(DiningAreasScreen.route(widget.env)) == true) {
+                      _changed = true;
+                      await _load();
+                    }
+                  },
+                ),
+              ),
+            ),
           if (d != null && !canManage)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),

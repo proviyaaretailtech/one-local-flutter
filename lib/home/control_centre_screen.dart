@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../app.dart' show closeScreensOnSignOut;
 import '../auth/auth_repository.dart';
 import '../auth/partner_api.dart';
 import '../ui/theme.dart';
@@ -108,8 +109,10 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
   }
 
   void _signOut() {
+    // the dashboard sits in a tab's own navigator inside the app shell: close the shell too, back to the sign-in screen
+    final root = Navigator.of(context, rootNavigator: true);
     (widget.auth ?? AuthRepository()).signOut();
-    Navigator.of(context).popUntil((r) => r.isFirst);
+    closeScreensOnSignOut(root);
   }
 
   /// Opens the side menu over [from] (any screen's ☰, through [HomeNav.openMenu]), or over the dashboard.
@@ -154,7 +157,8 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
               Navigator.pop(ctx);
               HomeNav.go(c, HomeNav.settings ?? HomeNav.setup, 'Settings');
             }),
-            _MenuRow(icon: LucideIcons.logOut, label: tr('Sign out'), onTap: () {
+            _MenuRow(icon: LucideIcons.logOut, label: tr('Sign out'), onTap: () async {
+              if (!await confirmSignOut(ctx) || !ctx.mounted) return;
               Navigator.pop(ctx);
               _signOut();
             }),

@@ -117,7 +117,7 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
     _readySeen.addAll(ready);
     _movedSeen.addAll(moved);
     // an order the kitchen had was cancelled (0618): the alarm, once; on opening the board only remembered
-    final cancelled = {for (final x in _d?.l('cancelled') ?? const <Facts>[]) x.s('order_id')};
+    final cancelled = {for (final x in _d?.l('cancelled') ?? const <Facts>[]) x.so('alert_id') ?? x.s('order_id')};
     final newCancel = !first && cancelled.difference(_cancelSeen).isNotEmpty;
     _cancelSeen.addAll(cancelled);
     if (first || KdsBoardScreen.muted) return;
@@ -433,9 +433,9 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
     final blink = DateTime.now().second.isEven;
     return [
       for (final x in _d?.l('cancelled') ?? const <Facts>[])
-        if (!KdsBoardScreen.dismissedCancels.contains(x.s('order_id')))
+        if (!KdsBoardScreen.dismissedCancels.contains(x.so('alert_id') ?? x.s('order_id')))
           AnimatedContainer(
-            key: ValueKey('kds-cancel-${x.s('display_no')}'),
+            key: ValueKey(x.b('partial') ? 'kds-cancel-item-${x.s('alert_id')}' : 'kds-cancel-${x.s('display_no')}'),
             duration: const Duration(milliseconds: 350),
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
@@ -449,7 +449,8 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('CANCELLED · Stop cooking', style: inter(15, 900, color: Colors.white)),
+                  // 0640: one dish (or part of it) cancelled after its KOT went, the rest of the order still cooks
+                  Text(x.b('partial') ? 'ITEM CANCELLED · Do not make' : 'CANCELLED · Stop cooking', style: inter(15, 900, color: Colors.white)),
                   Text(
                     [
                       '#${x.s('display_no')}',
@@ -480,7 +481,7 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
               TextButton(
                 key: ValueKey('kds-cancel-ok-${x.s('display_no')}'),
                 style: TextButton.styleFrom(backgroundColor: Colors.white, foregroundColor: const Color(0xFFB91C1C), visualDensity: VisualDensity.compact),
-                onPressed: () => setState(() => KdsBoardScreen.dismissedCancels.add(x.s('order_id'))),
+                onPressed: () => setState(() => KdsBoardScreen.dismissedCancels.add(x.so('alert_id') ?? x.s('order_id'))),
                 child: Text('Got it', style: inter(13, 800, color: const Color(0xFFB91C1C))),
               ),
             ]),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,12 +11,21 @@ import 'settings/settings_api.dart';
 import 'ui/language_step.dart';
 import 'ui/theme.dart';
 
+/// The app's own navigator: signing out closes every screen opened over the [AuthGate] (the app shell and anything above it).
+final appNavigator = GlobalKey<NavigatorState>();
+
+/// Back to the first screen, the [AuthGate], which shows the sign-in splash once nobody is signed in (founder, 2 Nov 2026: "after
+/// Sign out it should go to the sign-in page"). Every way out (the side bar, Switch account, Sign out of all devices, an expired
+/// session) comes through here.
+void closeScreensOnSignOut([NavigatorState? nav]) => (nav ?? appNavigator.currentState)?.popUntil((r) => r.isFirst);
+
 class PosApp extends StatelessWidget {
   const PosApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: appNavigator,
       title: 'OneLocal Partner',
       debugShowCheckedModeBanner: false,
       theme: posTheme(),
@@ -41,6 +52,22 @@ class _AuthGateState extends State<AuthGate> {
 
   /// Whose plan is known: a different login (or none) reads it again.
   String? _planFor;
+
+  StreamSubscription<AuthState>? _signOuts;
+
+  @override
+  void initState() {
+    super.initState();
+    _signOuts = Supabase.instance.client.auth.onAuthStateChange.listen((s) {
+      if (s.event == AuthChangeEvent.signedOut && mounted) closeScreensOnSignOut(Navigator.maybeOf(context, rootNavigator: true));
+    });
+  }
+
+  @override
+  void dispose() {
+    _signOuts?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

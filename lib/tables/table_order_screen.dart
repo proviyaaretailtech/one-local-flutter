@@ -4,7 +4,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../inventory/inventory_api.dart';
 import '../ui/theme.dart';
 import 'actions_screen.dart';
+import 'bill_adjust.dart';
 import 'bill_api.dart';
+import 'bill_discount_sheet.dart' show showManualDiscountSheet;
 import 'bill_receipt_popup.dart';
 import 'bill_pay_screen.dart';
 import 'bill_widgets.dart' show billRouteName;
@@ -202,6 +204,41 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                 await Navigator.of(context).push(MaterialPageRoute(builder: (_) => MergeScreen(env: widget.env, startTableId: widget.tableId)));
                 if (mounted) _load();
               }),
+              // 0640: cancel a dish (all of it or part), and the bill's payment details with Refund and Void
+              tile('Cancel Item', 'cancel_items', LucideIcons.circleX, const Color(0xFFB91C1C), () async {
+                final id = billOrder?.so('id') ?? d.l('orders').firstOrNull?.so('id');
+                if (id != null) await showCancelItemsSheet(context, api: _billApi, orderId: id);
+                if (mounted) _load();
+              }),
+              // 0645: the discount is given before the bill is generated (after it, the bill is locked: an admin PIN and a note)
+              _ActionTile(
+                key: const ValueKey('act-discount'),
+                label: 'Discount',
+                icon: LucideIcons.badgePercent,
+                tint: const Color(0xFFB45309),
+                enabled: billOrder != null,
+                onTap: _busy || billOrder == null
+                    ? null
+                    : () async {
+                        final saved = await showManualDiscountSheet(context, api: _billApi, order: billOrder);
+                        if (!context.mounted) return;
+                        if (saved) showToast(context, 'Discount saved on the bill.');
+                        _load();
+                      },
+              ),
+              _ActionTile(
+                key: const ValueKey('act-payments'),
+                label: 'Refund / Void',
+                icon: LucideIcons.undo2,
+                tint: const Color(0xFF2563EB),
+                enabled: billOrder != null,
+                onTap: _busy || billOrder == null
+                    ? null
+                    : () async {
+                        await Navigator.of(context).push(BillMoneyScreen.route(_billApi, billOrder.s('id')));
+                        if (mounted) _load();
+                      },
+              ),
               // "Hand to guest": the guest orders on this phone with the table's published menu (0561, guest_staff_place)
               _ActionTile(key: const ValueKey('hand-to-guest'), label: 'Hand to guest', icon: LucideIcons.smartphone, tint: kInk, enabled: true, onTap: _busy ? null : _handToGuest),
             ],

@@ -36,7 +36,9 @@ const key = { idempotency_key: z.string().trim().max(90, 'The idempotency key is
 const money = z.number({ message: 'Enter an amount.' }).positive('Enter an amount above zero.').max(1_000_000, 'The amount is too large.');
 const method = z.enum(['cash', 'card', 'upi'], { message: 'Choose cash, card or UPI.' });
 const obj = <T extends z.ZodRawShape>(shape: T) => z.object(shape).loose();
-export const BillView = obj({ location_id: id.nullish(), table_id: id });
+// 0649: a table's bill, or a takeaway / delivery bill by its order
+export const BillView = obj({ location_id: id.nullish(), table_id: id.optional(), order_id: id.optional() })
+  .refine(b => !!b.table_id !== !!b.order_id, { message: 'Open a table or an order.', path: ['table_id'] });
 export const BillOrder = obj({ order_id: id });
 export const BillSplit = obj({
   order_id: id,
@@ -61,6 +63,23 @@ export const BillDiscount = obj({ order_id: id, kind: z.enum(['amount', 'percent
   reason: z.string().trim().max(120, 'Keep the reason under 120 characters.').optional() })
   .refine(b => b.kind !== 'percent' || b.value <= 100, { message: 'A percentage is at most 100.', path: ['value'] });
 export const BillNote = obj({ order_id: id, note: z.string().max(300, 'A note can be up to 300 characters.').nullish() });
+// 0640: cancel dishes (all of a line or part of it), refund and void a bill, and the manager's approval of what a cashier asked. Who may do
+// what, the amounts and every state are the database's.
+const reason = (max: number) => z.string({ message: 'Say why.' }).trim().min(3, 'Say why (3 characters or more).').max(max, `Keep the reason under ${max} characters.`);
+const back = z.enum(['cash', 'upi', 'card', 'other'], { message: 'Choose how the money goes back.' });
+export const ItemsCancel = obj({
+  order_id: id,
+  items: z.array(obj({ item_id: id, qty: z.number().int('Cancel whole dishes.').min(1, 'Cancel at least one.').max(999) }))
+    .min(1, 'Choose a dish to cancel.').max(50, 'At most 50 dishes at a time.'),
+  reason: reason(200), ...key,
+});
+export const BillRefund = obj({ order_id: id, amount: money, method: back, reason: reason(300), ...key });
+export const BillVoid = obj({ order_id: id, method: back.nullish(), reason: reason(200), ...key });
+export const RequestsList = obj({ order_id: id.nullish() });
+// 0643: a takeaway or delivery order held on the floor sent to the kitchen from Orders → Hold
+export const HoldSend = obj({ order_id: id, ...key });
+export const RequestDecide = obj({ request_id: id, decision: z.enum(['approve', 'reject'], { message: 'Approve or reject.' }),
+  note: z.string().trim().max(200, 'Keep the note under 200 characters.').nullish() });
 export const ReceiptLog = obj({
   order_id: id, channel: z.enum(['print', 'whatsapp', 'sms', 'email'], { message: 'Print, WhatsApp, SMS or email.' }),
   to: z.string().trim().max(200).nullish(),
@@ -80,3 +99,8 @@ export const PrinterSave = obj({ id: id.nullish(), location_id: id.nullish(), na
   label_size: z.enum(['38x25', '50x25', '50x30', '75x50', '100x50']).nullish(), copies: z.number().int().min(1).max(5).optional(),
   auto_cut: z.boolean().optional(), is_default: z.boolean().optional() });
 export const PrinterId = obj({ id });
+// 0645: the admin PIN. An owner or admin sets their own (6 digits); someone at the till types one to change a generated bill or cancel an
+// order after its KOT. Never logged: these bodies are not echoed anywhere.
+export const AdminPinSet = z.object({ pin: z.string({ message: 'Enter 6 digits.' }).regex(/^\d{6}$/, 'The admin PIN is 6 digits.') }).strict();
+export const AdminPinCheck = z.object({ pin: z.string({ message: 'Enter the admin PIN.' }).max(12, 'The admin PIN is 6 digits.') }).strict();
+export const AdminPinStatus = z.object({}).strict();

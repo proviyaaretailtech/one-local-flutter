@@ -9,6 +9,23 @@ import 'home_nav.dart';
 import 'home_widgets.dart';
 import '../ui/i18n.dart';
 
+/// "Are you sure you want to sign out?" with No and Yes (founder, 2 Nov 2026). True only on Yes; tapping outside counts as No.
+Future<bool> confirmSignOut(BuildContext context) async {
+  final yes = await showOlDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      key: const ValueKey('signout-confirm'),
+      backgroundColor: Colors.white,
+      title: Text(tr('Are you sure you want to sign out?'), style: inter(17, 700)),
+      actions: [
+        TextButton(key: const ValueKey('signout-no'), onPressed: () => Navigator.pop(ctx, false), child: Text(tr('No'), style: inter(14, 600, color: kMuted))),
+        TextButton(key: const ValueKey('signout-yes'), onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Yes'), style: inter(14, 700, color: kError))),
+      ],
+    ),
+  );
+  return yes == true;
+}
+
 /// One row of the side nav. [open] is null when the screen is not built yet: the row is then
 /// greyed with a "Soon" tag instead of looking live and answering with a toast (control rule).
 class SideNavEntry {
@@ -310,7 +327,10 @@ class _StoreSideNavState extends State<_StoreSideNav> {
                 ),
               ),
               const SizedBox(height: 8),
-              _NavRow(icon: LucideIcons.logOut, label: tr('Sign out'), danger: true, onTap: () => _go(context, widget.onSignOut)),
+              _NavRow(icon: LucideIcons.logOut, label: tr('Sign out'), danger: true, onTap: () async {
+                // asked over the open menu: No leaves the menu as it was
+                if (await confirmSignOut(context) && context.mounted) _go(context, widget.onSignOut);
+              }),
             ]),
           ),
         ),

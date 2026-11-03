@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/orders/cart_screen.dart';
+import 'package:vinii_pos/tables/bill_api.dart';
 import 'package:vinii_pos/orders/order_screen.dart';
 import 'package:vinii_pos/orders/orders_api.dart';
 import 'package:vinii_pos/orders/orders_home.dart';
@@ -15,6 +18,9 @@ import 'helpers.dart';
 import 'order_fixtures.dart';
 
 /// Fake server: records each request and answers from [handler].
+/// Real answers of the restaurant Checkout for a takeaway bill (server/scripts/rst-counter-bill-e2e.mjs with FIXTURES=…).
+final Map<String, dynamic> counterFx = jsonDecode(File('test/fixtures/rst_counter_bill_server.json').readAsStringSync()) as Map<String, dynamic>;
+
 class FakeServer {
   FakeServer(this.handler);
   final http.Response Function(http.Request r) handler;
@@ -235,6 +241,75 @@ void main() {
       expect(jsonDecode(s.where('POST', '/checkout').last.body).containsKey('tendered'), isFalse);
     });
 
+    testWidgets('a restaurant\'s cart: Send to kitchen & checkout holds it, sends it to the kitchen, then opens the restaurant Checkout (0649)', (t) async {
+      HomeNav.shell = _Shell('restaurant');
+      addTearDown(() => HomeNav.shell = null);
+      final s = FakeServer((r) {
+        final p = r.url.path;
+        if (p.endsWith('/quote')) return ok(quote());
+        if (p.endsWith('/hold')) return ok(view('checkout'));
+        if (p.endsWith('/rpc/rst_hold_send')) return ok({'order_id': orderId, 'kot': {}});
+        return ok(view('pending'));
+      });
+      final billCalls = <http.Request>[];
+      final bill = BillApi(baseUrl: 'http://bill.test', accessToken: () => 't', client: MockClient((r) async {
+        billCalls.add(r);
+        // the captured takeaway bill, as the order this cart was held as
+        final v = jsonDecode(jsonEncode(counterFx['view_takeaway'])) as Map<String, dynamic>;
+        ((v['orders'] as List).first as Map)['id'] = orderId;
+        return ok(v);
+      }));
+      await showTall(t, CartScreen(api: s.api, bill: bill, initialLines: [CartLine(menuItemId: 'm1', name: 'Amul Butter 500g')]));
+      expect(find.textContaining('Proceed to Checkout'), findsNothing);
+      await t.tap(find.textContaining('Send to kitchen & checkout'));
+      await t.pumpAndSettle();
+      final hold = s.where('POST', '/hold').single;
+      final send = s.where('POST', '/rpc/rst_hold_send').single;
+      expect(jsonDecode(send.body), {'order_id': orderId, 'idempotency_key': '${hold.headers['Idempotency-Key']!.replaceAll(':hold', '')}:send'});
+      expect(s.where('POST', '/checkout'), isEmpty, reason: 'the store checkout is not used in a restaurant');
+      expect(jsonDecode(billCalls.first.body), {'order_id': orderId});
+      expect(find.text('Takeaway #P-00001'), findsOneWidget);
+      expect(find.text('CURRENT ITEMS (TAKEAWAY #P-00001)'), findsOneWidget);
+    });
+
+    testWidgets('a store\'s Split Pay: the parts must add up, a UPI part sends its UTR; the cart is held, then split-paid with one key', (t) async {
+      final s = FakeServer((r) {
+        final p = r.url.path;
+        if (p.endsWith('/quote')) return ok(quote());
+        if (p.endsWith('/hold')) return ok(view('checkout'));
+        if (p.endsWith('/rpc/pos_split_pay')) return ok({'order_id': orderId, 'replayed': false, 'parts': 2});
+        return ok(view('pending'));
+      });
+      await showTall(t, CartScreen(api: s.api, initialLines: [CartLine(menuItemId: 'm1', name: 'Amul Butter 500g')]));
+      await t.tap(find.textContaining('Proceed to Checkout'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Split Pay'));
+      await t.pumpAndSettle();
+      expect(find.text('Total due ₹1,058. Add 2 to 4 parts; they must add up to the total.'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('split-amount-0')), '500');
+      await t.pump();
+      expect(find.text('₹558 still to allocate'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('split-rest-1')));
+      await t.pump();
+      expect(find.text('Adds up'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('split-reference-1')), 'UTR4040');
+      await t.tap(find.textContaining('Complete Payment'));
+      await t.pumpAndSettle();
+      expect(s.where('POST', '/checkout'), isEmpty, reason: 'never the old method "split" at checkout');
+      final hold = s.where('POST', '/hold').single;
+      final pay = s.where('POST', '/rpc/pos_split_pay').single;
+      expect(jsonDecode(pay.body), {
+        'order_id': orderId,
+        'payments': [
+          {'method': 'cash', 'amount': 500},
+          {'method': 'upi', 'amount': 558, 'reference': 'UTR4040'},
+        ],
+        'expected_updated_at': view('checkout')['version'],
+      });
+      expect(hold.headers['Idempotency-Key'], '${pay.headers['Idempotency-Key']}:hold');
+      expect(find.text('Order Confirmation'), findsOneWidget);
+    });
+
     testWidgets('quantity stepper requotes; coupon refusal is shown as the server says it', (t) async {
       final s = FakeServer((r) {
         final b = jsonDecode(r.body) as Map;
@@ -344,6 +419,37 @@ void main() {
       expect(find.text('Order Confirmation'), findsOneWidget);
     });
 
+    testWidgets('held bill in a restaurant: UPI needs the UTR, which is sent with the payment (0648)', (t) async {
+      HomeNav.shell = _Shell('restaurant');
+      addTearDown(() => HomeNav.shell = null);
+      final s = FakeServer((r) => r.method == 'GET' ? ok(view('checkout')) : ok(view('pending')));
+      await showTall(t, OrderScreen(api: s.api, orderId: orderId));
+      await t.tap(find.text('Complete Payment'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('UPI / QR'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Complete Payment ₹1,840'));
+      await t.pumpAndSettle();
+      expect(find.text('Enter the UTR or transaction id.'), findsOneWidget);
+      expect(s.where('POST', '/pay'), isEmpty);
+      await t.enterText(find.byKey(const ValueKey('pay-reference')), ' 431298765012 ');
+      await t.tap(find.text('Complete Payment ₹1,840'));
+      await t.pumpAndSettle();
+      expect(jsonDecode(s.where('POST', '/pay').single.body), {'method': 'upi', 'reference': '431298765012', 'version': '2026-10-16T12:53:00.000Z'});
+    });
+
+    testWidgets('held bill in a store: UPI without a reference still goes through', (t) async {
+      final s = FakeServer((r) => r.method == 'GET' ? ok(view('checkout')) : ok(view('pending')));
+      await showTall(t, OrderScreen(api: s.api, orderId: orderId));
+      await t.tap(find.text('Complete Payment'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('UPI / QR'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Complete Payment ₹1,840'));
+      await t.pumpAndSettle();
+      expect(jsonDecode(s.where('POST', '/pay').single.body), {'method': 'upi', 'version': '2026-10-16T12:53:00.000Z'});
+    });
+
     testWidgets('print says honestly that no printer is connected', (t) async {
       final s = FakeServer((_) => ok(view('completed')));
       await showTall(t, OrderScreen(api: s.api, orderId: orderId));
@@ -362,4 +468,14 @@ void main() {
       expect((jsonDecode(s.where('POST', '/quote').single.body)['lines'] as List), hasLength(5));
     });
   });
+}
+
+class _Shell implements TabShell {
+  _Shell(this.kind);
+  @override
+  String kind;
+  @override
+  void setKind(String k) => kind = k;
+  @override
+  bool show(String label) => false;
 }

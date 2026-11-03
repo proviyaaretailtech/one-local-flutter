@@ -5,6 +5,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../api/net_guard.dart';
 import '../home/home_nav.dart';
+import '../tables/admin_pin.dart' show withAdminPin;
+import '../tables/bill_adjust.dart' show BillMoneyScreen;
+import '../tables/bill_api.dart' show BillApi;
+import '../tables/bill_pay_screen.dart' show BillPayScreen;
+import '../tables/table_widgets.dart' show TablesEnv;
 import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import '../ui/whatsapp.dart';
@@ -19,10 +24,13 @@ import '../ui/motion.dart';
 /// Every placed order state from Figma section E: Checkout (held bill), Order Confirmation, Preparing, Picked, Ready, In Transit,
 /// Exception, Cancelled, and Completed. What the screen says and which buttons it shows come from the server's view of the order.
 class OrderScreen extends StatefulWidget {
-  const OrderScreen({super.key, this.api, required this.orderId, this.initial, this.onNavigate, this.onDeliveryStatus});
+  const OrderScreen({super.key, this.api, required this.orderId, this.initial, this.onNavigate, this.onDeliveryStatus, this.bill});
   final OrdersApi? api;
   final String orderId;
   final OrderView? initial;
+
+  /// A restaurant's Payment details (0640: refunds, void, cancelled dishes); tests pass their own.
+  final BillApi? bill;
   final ValueChanged<String>? onNavigate;
 
   /// Delivery status opens the delivery update list (founder, 29 Oct 2026) instead of the store's courier sheet. The Orders board passes
@@ -98,10 +106,17 @@ class _OrderScreenState extends State<OrderScreen> {
       case 'refresh':
         await _load();
       case 'pay':
-        await _paySheet();
+        if (HomeNav.shell?.kind == 'restaurant' && v.counterBill) {
+          // 0649: coupon, manual discount, split and references, as on a table's bill
+          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => BillPayScreen(env: TablesEnv(), tableId: '', orderId: v.id, bill: widget.bill)));
+          await _load();
+        } else {
+          await _paySheet();
+        }
       case 'cancel':
         final reason = await _textSheet('Cancel bill', 'Why is this bill cancelled?', 'Cancel bill');
-        if (reason != null) await _run(() => _api.cancel(v.id, reason: reason, version: v.version));
+        // 0645: an order the kitchen has, or a generated bill, is cancelled with an admin PIN and a note
+        if (reason != null) await _run(() async => await withAdminPin(context, pins: widget.bill ?? BillApi(), run: (admin) => _api.cancel(v.id, reason: reason, version: v.version, admin: admin)) ?? v);
       case 'online_reject':
         final reason = await _textSheet('Reject order', 'Why can this order not be made?', 'Reject order');
         if (reason != null) await _act('online_reject', reason: reason);
@@ -204,6 +219,14 @@ class _OrderScreenState extends State<OrderScreen> {
       if (primary != null) _button(primary, dark: true),
       if (secondary != null) ...[const SizedBox(height: 10), _button(secondary, dark: false)],
       for (final l in links) ...[const SizedBox(height: 8), UnderLink('${l['label'] ?? ''}', onTap: _busy ? null : () => _onAction('${l['id'] ?? ''}'))],
+      // a restaurant's bill: payments, refund history, Refund / Void and the dishes cancelled (0640)
+      if (HomeNav.shell?.kind == 'restaurant' || widget.bill != null) ...[
+        const SizedBox(height: 8),
+        UnderLink('Payments, refunds & cancelled items', key: const ValueKey('order-payments'), onTap: _busy ? null : () async {
+          await Navigator.of(context).push(BillMoneyScreen.route(widget.bill ?? BillApi(), v.id));
+          if (mounted) _load();
+        }),
+      ],
     ];
     return ListView(padding: const EdgeInsets.fromLTRB(12, 14, 12, 16), children: staggered([
       OrderHeaderCard(
@@ -308,6 +331,10 @@ class _OrderScreenState extends State<OrderScreen> {
     final due = num.tryParse('${v.payment['due']}') ?? 0;
     var method = 'cash';
     final tender = TextEditingController(text: due == due.roundToDouble() ? due.toInt().toString() : due.toString());
+    // 0648: a card or UPI payment keeps its reference (required for a restaurant; the database checks)
+    final ref = TextEditingController();
+    final restaurant = HomeNav.shell?.kind == 'restaurant';
+    String? problem;
     final key = OrdersApi.newKey();
     final go = await showOrderSheet<bool>(
       context,
@@ -328,13 +355,34 @@ class _OrderScreenState extends State<OrderScreen> {
               decoration: const InputDecoration(labelText: 'Cash received (₹)'),
             ),
           ],
+          if (method == 'card' || method == 'upi') ...[
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('pay-reference'),
+              controller: ref,
+              maxLength: 60,
+              decoration: InputDecoration(
+                labelText: method == 'card' ? 'Card reference (last 4 digits or approval code)' : 'UPI reference (UTR or transaction id)',
+                errorText: problem,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
-          DarkCta(label: 'Complete Payment ${rupees(due)}', onPressed: () => Navigator.pop(ctx, true)),
+          DarkCta(
+            label: 'Complete Payment ${rupees(due)}',
+            onPressed: () {
+              if (restaurant && method != 'cash' && ref.text.trim().length < 4) {
+                return set(() => problem = method == 'card' ? 'Enter the last 4 digits or the approval code.' : 'Enter the UTR or transaction id.');
+              }
+              Navigator.pop(ctx, true);
+            },
+          ),
         ]),
       ),
     );
     if (go != true) return;
-    await _run(() => _api.pay(v.id, method: method, tendered: method == 'cash' ? num.tryParse(tender.text) : null, version: v.version, key: key));
+    await _run(() => _api.pay(v.id, method: method, tendered: method == 'cash' ? num.tryParse(tender.text) : null,
+        reference: method == 'cash' ? null : ref.text.trim(), version: v.version, key: key));
   }
 
   Future<void> _acceptanceSheet() async {

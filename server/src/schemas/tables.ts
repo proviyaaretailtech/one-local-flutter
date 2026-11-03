@@ -25,7 +25,12 @@ export const Reserve = obj({
   notes: z.string().max(300, 'Special notes can be up to 300 characters.').nullish(),
   idempotency_key: z.string().trim().max(100, 'The idempotency key is too long.').optional(),
 }).refine(v => !!(v.scheduled_at || v.local_date), { message: 'Choose a date and time.' });
-export const ReserveCancel = obj({ id, outcome: z.enum(['cancelled', 'no_show'], { message: 'Unknown outcome.' }).optional() });
+export const ReserveCancel = obj({ id, outcome: z.enum(['cancelled', 'no_show'], { message: 'Unknown outcome.' }).optional(),
+  reason: z.string().trim().max(200, 'Keep the reason under 200 characters.').nullish() });
+// 0642: the bookings of one day (the store's calendar), and seating the guests who arrived (at their table or another free one)
+export const ReservationsList = obj({ location_id: id.nullish(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Dates look like 2026-11-03.').nullish(),
+  status: z.enum(['upcoming', 'seated', 'cancelled', 'no_show', 'all'], { message: 'Unknown filter.' }).optional() });
+export const ReserveSeat = obj({ location_id: id.nullish(), id, table_id: id.nullish() });
 export const Transfer = obj({ from_table_id: id, to_table_id: id });
 export const Merge = obj({ table_ids: z.array(id, { message: 'Choose the tables to join.' }).min(2, 'Choose at least two tables.').max(8, 'You can join up to eight tables.') });
 export const Split = obj({ merge_id: id.optional(), table_id: id.optional() }).refine(v => !!(v.merge_id || v.table_id), { message: 'Choose the joined tables to split.' });
@@ -68,3 +73,13 @@ export const TableSave = obj({
   seats: z.number({ message: 'Enter the seats.' }).int().min(1, 'Seats are 1 to 50.').max(50, 'Seats are 1 to 50.'),
 });
 export const TableRemove = obj({ id });
+// 0646: dining areas (AC Hall, Rooftop, Garden …): list with stats and the next bookings; add / change, on / off, order, delete (only when
+// empty), which tables are in an area. The outlet, the manager's right and joined tables are the database's.
+const areaType = z.enum(['indoor', 'outdoor', 'rooftop', 'ac_hall', 'garden', 'private', 'bar', 'terrace'], { message: 'Choose the kind of area.' });
+export const Areas = obj({ location_id: id.nullish() });
+export const AreaSave = obj({ location_id: id.nullish(), id: id.nullish(),
+  name: z.string({ message: 'Give the area a name.' }).trim().min(1, 'Give the area a name.').max(40, 'An area name is up to 40 characters.'), area_type: areaType.optional() });
+export const AreaActive = obj({ location_id: id.nullish(), id, active: z.boolean({ message: 'On or off.' }) });
+export const AreaReorder = obj({ location_id: id.nullish(), ids: z.array(id).min(1).max(30) });
+export const AreaRef = obj({ location_id: id.nullish(), id });
+export const AreaTables = obj({ location_id: id.nullish(), id, table_ids: z.array(id).max(200) });

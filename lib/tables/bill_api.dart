@@ -30,7 +30,11 @@ class BillApi {
   }
 
   /// The bill of a table: its open orders (oldest first) with items, money, paid, due, coupon, note, split plan and payments.
-  Future<Facts> view(String tableId) => _call('rst_bill_view', {'table_id': tableId, if (locationId != null && locationId!.isNotEmpty) 'location_id': locationId});
+  /// 0649: a takeaway or delivery bill has no table: [tableId] is empty and [orderId] names it.
+  Future<Facts> view(String tableId, {String? orderId}) => _call('rst_bill_view', {
+        if (tableId.isNotEmpty) 'table_id': tableId else 'order_id': orderId,
+        if (locationId != null && locationId!.isNotEmpty) 'location_id': locationId,
+      });
 
   /// [mode] equal | item | amount. [parts]: per guest {label, method, amount (amount mode), item_ids (item mode)}.
   Future<Facts> split(String orderId, {required String mode, int? guests, required List<Map<String, Object?>> parts, required String key}) =>
@@ -41,12 +45,21 @@ class BillApi {
       'rst_bill_pay', {'order_id': orderId, 'part_id': partId, 'method': method, 'tendered': tendered, 'reference': reference, 'idempotency_key': key},
       key: key);
 
-  Future<Facts> coupon(String orderId, String code) => _call('rst_bill_coupon', {'order_id': orderId, 'code': code.trim()});
+  /// [admin] (0645): on a generated bill, the admin PIN pass and note ({admin_pass, admin_note}) from [withAdminPin].
+  Future<Facts> coupon(String orderId, String code, {Map<String, String>? admin}) =>
+      _call('rst_bill_coupon', {'order_id': orderId, 'code': code.trim(), ...?admin});
 
   /// A manual discount (0637): [kind] 'amount' (₹) or 'percent', with a reason; 0 takes it off. Over the business's limit only a manager
-  /// may give it (the database says so).
-  Future<Facts> discount(String orderId, {required String kind, required num value, String reason = ''}) =>
-      _call('rst_bill_discount', {'order_id': orderId, 'kind': kind, 'value': value, 'reason': reason.trim()});
+  /// may give it (the database says so). On a generated bill it needs [admin] (0645).
+  Future<Facts> discount(String orderId, {required String kind, required num value, String reason = '', Map<String, String>? admin}) =>
+      _call('rst_bill_discount', {'order_id': orderId, 'kind': kind, 'value': value, 'reason': reason.trim(), ...?admin});
+
+  // ---- 0645: the admin PIN (an owner or admin sets their own; anyone types one to change a generated bill or cancel after the KOT)
+  Future<Facts> adminPinStatus() => _call('rst_admin_pin_status', {});
+  Future<Facts> adminPinSet(String pin) => _call('rst_admin_pin_set', {'pin': pin});
+
+  /// {ok: true, pass_id, approver} or {ok: false, tries_left}; too many wrong tries is an error (429).
+  Future<Facts> adminPinCheck(String pin) => _call('rst_admin_pin_check', {'pin': pin});
 
   Future<Facts> note(String orderId, String note) => _call('rst_bill_note', {'order_id': orderId, 'note': note.trim()});
 
@@ -62,6 +75,35 @@ class BillApi {
     final saved = await _call('cust_save', {'first_name': name.trim(), 'phone': phone});
     await _call('cust_attach_order', {'order_id': orderId, 'customer_id': saved.s('customer_id')});
   }
+
+  // ---- 0640: cancel dishes, refund, void, and a manager's approval. Each answers {status: cancelled | refunded | voided | requested, order}.
+
+  /// One order's payment details: money (paid, refunded, refundable, payment_status), items, payments, refunds, cancelled_items, void,
+  /// requests waiting, and what this person may do (can / unavailable).
+  Future<Facts> adjustView(String orderId) => _call('rst_order_adjust', {'order_id': orderId});
+
+  /// Cancels [lines] (item id → how many). A dish already cooking or served, or a generated bill, needs a manager: others get 'requested'.
+  Future<Facts> cancelItems(String orderId, Map<String, int> lines, {required String reason, required String key, Map<String, String>? admin}) => _call('rst_items_cancel', {
+        'order_id': orderId,
+        'items': [for (final e in lines.entries) {'item_id': e.key, 'qty': e.value}],
+        'reason': reason.trim(),
+        'idempotency_key': key,
+        ...?admin,
+      }, key: key);
+
+  /// A refund through the shared refund (pos_refund); a cashier's is a request a manager approves.
+  Future<Facts> refund(String orderId, {required num amount, required String method, required String reason, required String key}) =>
+      _call('rst_bill_refund', {'order_id': orderId, 'amount': amount, 'method': method, 'reason': reason.trim(), 'idempotency_key': key}, key: key);
+
+  /// Voids the bill: unpaid it is cancelled; money taken goes back by [method] first. Owner and admin; others ask.
+  Future<Facts> voidBill(String orderId, {required String reason, String? method, required String key}) =>
+      _call('rst_bill_void', {'order_id': orderId, 'reason': reason.trim(), 'method': method, 'idempotency_key': key}, key: key);
+
+  Future<List<Facts>> requests({String? orderId}) async => (await _call('rst_requests_list', {'order_id': orderId})).l('requests');
+
+  /// [approve] true does the action now as the approver; false rejects it.
+  Future<Facts> decide(String requestId, {required bool approve, String? note}) =>
+      _call('rst_request_decide', {'request_id': requestId, 'decision': approve ? 'approve' : 'reject', 'note': note});
 }
 
 const _methodNames = {'cash': 'Cash', 'card': 'Card', 'upi': 'UPI', 'split': 'Split', 'wallet': 'Wallet', 'other': 'Other'};
@@ -86,6 +128,14 @@ String money(num? v) {
     grouped = '${parts.join(',')},$last3';
   }
   return '${(v ?? 0) < 0 ? '-' : ''}₹$grouped${paise == 0 ? '' : '.${paise.toString().padLeft(2, '0')}'}';
+}
+
+/// Where a bill is (0649): "Table T1", or "Takeaway #P-00012" / "Delivery #P-00013" for a bill with no table; null before it loads.
+String? billPlace(Facts? view) {
+  final t = view?.mo('table'), c = view?.mo('counter');
+  if (t != null) return 'Table ${t.s('label')}';
+  if (c != null) return '${c.s('label')} #${c.s('display_no')}';
+  return null;
 }
 
 /// The plain-text bill / receipt (Print Bill, Print, WhatsApp, SMS, email). [bill] is one order as `rst_bill_view` or `rst_receipt_view` return it.

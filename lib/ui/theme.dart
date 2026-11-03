@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -72,15 +74,26 @@ const kRegistrationGradient = LinearGradient(
 
 /// Page shell: scrolling content, then a pinned action area. While the phone's keyboard is open (founder, 1 Nov 2026: the email and
 /// password fields hid behind it) the actions scroll with the content instead, so the field being typed in always has room to show.
-class ScreenShell extends StatelessWidget {
+/// On a phone the keyboard is also counted as open while a field on the page is being typed in: a phone browser often shrinks the
+/// page for its keyboard instead of reporting it (founder, 2 Nov 2026: the fields still hid on the phone).
+class ScreenShell extends StatefulWidget {
   const ScreenShell({super.key, required this.children, required this.actions, this.gradient});
   final List<Widget> children;
   final List<Widget> actions;
   final Gradient? gradient;
 
   @override
+  State<ScreenShell> createState() => _ScreenShellState();
+}
+
+class _ScreenShellState extends State<ScreenShell> {
+  bool _typing = false;
+
+  @override
   Widget build(BuildContext context) {
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final phone = defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0 || (phone && _typing);
+    final children = widget.children, actions = widget.actions, gradient = widget.gradient;
     final actionArea = Padding(
       padding: EdgeInsets.fromLTRB(kPadX, 16, kPadX, keyboard ? 16 : 28),
       child: Column(
@@ -98,9 +111,15 @@ class ScreenShell extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [...staggered(children), if (keyboard) actionArea]),
+                child: Focus(
+                  // true while a field on the page has the cursor (the buttons below never take it)
+                  canRequestFocus: false,
+                  skipTraversal: true,
+                  onFocusChange: (on) => setState(() => _typing = on),
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [...staggered(children), if (keyboard) actionArea]),
+                  ),
                 ),
               ),
               if (!keyboard) actionArea,
@@ -377,6 +396,61 @@ InputDecoration get plainInput => const InputDecoration(border: InputBorder.none
 /// How much room a field keeps around it when the keyboard scrolls it into view: its label above, a little space below.
 const kFieldScrollPadding = EdgeInsets.fromLTRB(20, 64, 20, 40);
 
+/// Keeps [child] (a field with its label) in view while its field has the cursor: when it is tapped and each time the screen changes size
+/// (the keyboard sliding up, or a phone browser shrinking the page for it), the page scrolls just enough to show it whole.
+class KeepInViewWhileTyping extends StatefulWidget {
+  const KeepInViewWhileTyping({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<KeepInViewWhileTyping> createState() => _KeepInViewWhileTypingState();
+}
+
+class _KeepInViewWhileTypingState extends State<KeepInViewWhileTyping> with WidgetsBindingObserver {
+  bool _typing = false;
+  Timer? _again;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    _again?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (_typing) _show();
+  }
+
+  void _focus(bool on) {
+    _typing = on;
+    _again?.cancel();
+    if (!on) return;
+    _show();
+    // again once the keyboard has finished sliding up
+    _again = Timer(const Duration(milliseconds: 400), () {
+      if (mounted && _typing) _show();
+    });
+  }
+
+  void _show() => WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted || Scrollable.maybeOf(context) == null) return;
+        // the bottom first (out of view below), then the top (pushed up past the top edge); a field already in view stays put
+        await Scrollable.ensureVisible(context, duration: const Duration(milliseconds: 150), alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd);
+        if (!mounted) return;
+        await Scrollable.ensureVisible(context, duration: const Duration(milliseconds: 150), alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart);
+      });
+
+  @override
+  Widget build(BuildContext context) => Focus(canRequestFocus: false, skipTraversal: true, onFocusChange: _focus, child: widget.child);
+}
+
 /// Label above a field. [labelSize]/[labelWeight] differ between screens (13/500 vs 14/600).
 class LabeledField extends StatelessWidget {
   const LabeledField({
@@ -423,7 +497,8 @@ class LabeledField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return KeepInViewWhileTyping(
+        child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: inter(labelSize, labelWeight)),
@@ -472,7 +547,7 @@ class LabeledField extends StatelessWidget {
           ),
         ),
       ],
-    );
+    ));
   }
 }
 

@@ -8,11 +8,19 @@ import '../ui/theme.dart';
 import 'add_station_screen.dart';
 import 'kitchen_widgets.dart';
 import 'station_detail_screen.dart';
+import '../settings/rst_devices_screen.dart' show RstDevicesScreen;
+import '../tables/dining_areas_screen.dart' show DiningAreasScreen;
+import '../tables/table_widgets.dart' show TablesEnv;
+import '../tables/tables_api.dart' show TablesApi;
 
-/// Figma "Kitchen Configuration" (title bar: "Kitchen Setup"): kitchen stations, printer groups and preparation areas.
+/// Figma "Kitchen Configuration" (title bar: "Kitchen Setup"): kitchen stations, printer groups and the dining areas. Add printer opens
+/// Settings → Devices (0638); the areas are table management's (0646: Dining areas).
 class KitchenSetupScreen extends StatefulWidget {
-  const KitchenSetupScreen({super.key, required this.env});
+  const KitchenSetupScreen({super.key, required this.env, this.tables});
   final KitchenEnv env;
+
+  /// The dining areas' calls (0646); tests pass their own.
+  final TablesApi? tables;
   static Route<void> route(KitchenEnv env) => MaterialPageRoute(settings: const RouteSettings(name: KitchenEnv.setupRoute), builder: (_) => KitchenSetupScreen(env: env));
   @override
   State<KitchenSetupScreen> createState() => _KitchenSetupScreenState();
@@ -20,8 +28,9 @@ class KitchenSetupScreen extends StatefulWidget {
 
 class _KitchenSetupScreenState extends State<KitchenSetupScreen> {
   KitchenEnv get env => widget.env;
-  Facts? _d;
+  Facts? _d, _areas;
   String? _error;
+  late final TablesApi _tables = widget.tables ?? TablesApi();
 
   @override
   void initState() {
@@ -41,6 +50,21 @@ class _KitchenSetupScreenState extends State<KitchenSetupScreen> {
       if (!mounted) return;
       setState(() => _error = errorSentence(e));
     }
+    // the dining areas: extra, the rest of the page stands without them
+    try {
+      final a = await _tables.areas();
+      if (mounted) setState(() => _areas = a);
+    } catch (_) {}
+  }
+
+  Future<void> _devices() async {
+    await Navigator.of(context).push(RstDevicesScreen.route());
+    if (mounted) _load();
+  }
+
+  Future<void> _manageAreas() async {
+    await Navigator.of(context).push(DiningAreasScreen.route(TablesEnv(api: _tables)));
+    if (mounted) _load();
   }
 
   Future<void> _add(Facts d) async {
@@ -54,14 +78,14 @@ class _KitchenSetupScreenState extends State<KitchenSetupScreen> {
         title: 'Kitchen Setup',
         onRefresh: _load,
         child: ListView(padding: const EdgeInsets.fromLTRB(14, 16, 14, 24), children: [
-          const KitchenHeading('Stations, printers & prep areas', subtitle: 'Set up where orders are prepared and printed.'),
+          const KitchenHeading('Stations, printers & dining areas', subtitle: 'Set up where orders are prepared and printed.'),
           InvLoad<Facts>(data: _d, error: _error, onRetry: _load, builder: _body),
         ]),
       );
 
   List<Widget> _body(Facts d) {
     final can = d.m('can').b('configure');
-    final stations = d.l('stations'), printers = d.l('printers'), areas = d.l('prep_areas');
+    final stations = d.l('stations'), printers = d.l('printers'), areas = _areas?.l('areas') ?? const <Facts>[];
     final unassigned = d.l('unassigned');
     return [
       if (unassigned.isNotEmpty)
@@ -98,18 +122,26 @@ class _KitchenSetupScreenState extends State<KitchenSetupScreen> {
       ),
       _Section(
         title: 'Printer groups',
-        action: can ? KitchenAddButton('Add printer', onPressed: () => env.later(context, 'Adding a printer')) : null,
+        action: can ? KitchenAddButton('Add printer', onPressed: _devices) : null,
         children: [
           if (printers.isEmpty) _Empty('No printer groups yet', 'Add a printer to print kitchen tickets.'),
           for (var i = 0; i < printers.length; i++) _Row(title: printers[i].s('name'), sub: 'Printer group', last: i == printers.length - 1),
         ],
       ),
       _Section(
-        title: 'Preparation areas',
-        action: can ? KitchenAddButton('Add area', onPressed: () => env.later(context, 'Adding a preparation area')) : null,
+        title: 'Dining areas',
+        // the floor's sections live in table management (0646): this opens them there
+        action: KitchenAddButton(areas.isEmpty ? 'Add area' : 'Manage areas', onPressed: _manageAreas),
         children: [
-          if (areas.isEmpty) _Empty('No preparation areas yet', 'Create an area to organize kitchen prep.'),
-          for (var i = 0; i < areas.length; i++) _Row(title: areas[i].s('name'), sub: 'Preparation area', last: i == areas.length - 1),
+          if (areas.isEmpty) _Empty('No dining areas yet', 'Sections of the floor (AC Hall, Rooftop …), set up in table management.'),
+          for (var i = 0; i < areas.length; i++)
+            _Row(
+              key: ValueKey('kitchen-area-${areas[i].s('name')}'),
+              title: areas[i].s('name'),
+              sub: areas[i].n('table_count') == 0 ? 'No tables yet' : '${areas[i].n('table_count').toInt()} tables${areas[i].b('active') ? '' : ' · off'}',
+              last: i == areas.length - 1,
+              onTap: _manageAreas,
+            ),
         ],
       ),
       // Kitchen setup is optional (founder, 2026-10-20): with nothing set up, every order goes to the Main Kitchen queue and billing and KOTs work.

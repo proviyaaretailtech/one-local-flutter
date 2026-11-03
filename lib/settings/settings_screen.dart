@@ -8,6 +8,7 @@ import '../states/state_kit.dart' show StateTone, StatusCard;
 import '../ui/i18n.dart';
 import '../ui/theme.dart';
 import 'activity_log_screen.dart';
+import '../tables/admin_pin.dart' show AdminPinScreen;
 import 'rst_devices_screen.dart';
 import 'returns_screens.dart';
 import 'settings_api.dart';
@@ -274,7 +275,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return [
       _Part(
         'store',
-        'Store',
+        // a restaurant reaches this as Business profile (the side menu), not as a store
+        HomeNav.shell?.kind == 'restaurant' ? 'Business profile' : 'Store',
         LucideIcons.store,
         '${clock12(s.opensAt)} – ${clock12(s.closesAt)} · ${s.address == null ? 'location not added' : 'location set'}',
         [
@@ -288,7 +290,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SettingRow(
             icon: LucideIcons.qrCode,
             title: tr('Payment QR'),
-            subtitle: s.qrUploaded ? 'QR uploaded' : 'Upload or manage your store QR code',
+            subtitle: s.qrUploaded ? 'QR uploaded' : (HomeNav.shell?.kind == 'restaurant' ? 'Upload or manage your payment QR code' : 'Upload or manage your store QR code'),
             actions: [RowAction(tr('Edit'), onTap: () => _sheet(openQrSheet))],
           ),
         ],
@@ -409,6 +411,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (HomeNav.shell?.kind == 'restaurant')
         _Part('devices', 'Devices', LucideIcons.printer, 'Receipt, kitchen (KOT) and barcode label printers', const [],
             open: () => Navigator.of(context).push(RstDevicesScreen.route())),
+      // kitchen stations, printer groups and dining areas (it had no button that opened it)
+      if (HomeNav.shell?.kind == 'restaurant' && HomeNav.kitchenSetup != null)
+        _Part('kitchen_setup', 'Kitchen setup', LucideIcons.chefHat, 'Kitchen stations, printer groups and dining areas', const [],
+            open: () => HomeNav.kitchenSetup!(context)),
+      // 0645: the owner's / admin's PIN that unlocks a generated bill or a cancel after the KOT
+      if (HomeNav.shell?.kind == 'restaurant')
+        _Part('admin_pin', 'Admin PIN', LucideIcons.keyRound, 'Needed to change a generated bill or cancel an order the kitchen has', const [],
+            open: () => Navigator.of(context).push(AdminPinScreen.route())),
       // a restaurant's three pages that left the side bar (founder, 29 Oct 2026: "put them in Settings")
       if (HomeNav.shell?.kind == 'restaurant')
         _Part('restaurant', 'Purchases, menu link & delivery', LucideIcons.utensils, 'Purchase orders · public menu link · delivery settings', [

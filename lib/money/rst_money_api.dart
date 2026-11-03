@@ -30,7 +30,16 @@ class RstMoneyApi {
   Future<Map<String, dynamic>> record(Map<String, Object?> body, {required String key}) => _call('rmoney_record', body, key: key);
   Future<Map<String, dynamic>> voidEntry(String id, String reason) => _call('rmoney_void', {'id': id, 'reason': reason});
   Future<Map<String, dynamic>> register({String? day}) => _call('rmoney_register', {'day': day});
-  Future<Map<String, dynamic>> closeDay(int countedMinor, {String? day}) => _call('rmoney_close_day', {'counted_minor': countedMinor, 'day': day});
+  /// Day end (0650): with bills still open, [confirmOpenBills] and a [note] (they go to Revenue leakage).
+  Future<Map<String, dynamic>> closeDay(int countedMinor, {String? day, bool confirmOpenBills = false, String? note}) => _call('rmoney_close_day', {
+        'counted_minor': countedMinor,
+        'day': day,
+        if (confirmOpenBills) 'confirm_open_bills': true,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      });
+
+  /// Reopens an ended day (0650; the owner and admins) with the [reason]; the day is counted again at its next Day end.
+  Future<Map<String, dynamic>> reopenDay(String reason, {String? day}) => _call('rmoney_reopen_day', {'reason': reason.trim(), 'day': day});
   Future<Map<String, dynamic>> dues() => _call('rmoney_dues', {});
   Future<Map<String, dynamic>> contacts({String q = ''}) => _call('rmoney_contacts_list', {'q': q.trim().isEmpty ? null : q.trim()});
   Future<Map<String, dynamic>> saveContact({String? id, required String name, String phone = '', String upiId = ''}) =>

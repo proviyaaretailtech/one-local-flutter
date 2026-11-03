@@ -1,0 +1,294 @@
+{
+  "register_open": {
+    "day": "2026-11-03",
+    "closed": null,
+    "reopens": [],
+    "can_close": true,
+    "can_reopen": false,
+    "open_bills": {
+      "list": [
+        {
+          "bill": "P-00001",
+          "place": "Table T7",
+          "status": "sent_to_kitchen",
+          "order_id": "710bcdf8-b96a-48ad-b8f0-da6aaa5a960e",
+          "due_minor": 42000,
+          "opened_at": "2026-11-03T12:45:15.931031+00:00"
+        },
+        {
+          "bill": "P-00002",
+          "place": "Takeaway",
+          "status": "sent_to_kitchen",
+          "order_id": "5973e998-ec44-498c-a08d-a6504ef76d52",
+          "due_minor": 10500,
+          "opened_at": "2026-11-03T12:45:15.988955+00:00"
+        },
+        {
+          "bill": "P-00003",
+          "place": "Takeaway",
+          "status": "in_billing",
+          "order_id": "a106c2c4-7fe6-421c-8224-7970a75f86e7",
+          "due_minor": 21000,
+          "opened_at": "2026-11-03T12:45:16.029331+00:00"
+        }
+      ],
+      "count": 3,
+      "tables": 1,
+      "due_minor": 73500
+    },
+    "opening_minor": 0,
+    "refunds_minor": 0,
+    "expected_minor": 0,
+    "other_in_minor": 0,
+    "paid_out_minor": 0,
+    "cash_sales_minor": 0
+  },
+  "register_closed": {
+    "day": "2026-11-03",
+    "closed": {
+      "at": "2026-11-03T12:45:16.807542+00:00",
+      "by": "ZZ mgr",
+      "note": "Table T7 still eating; takeaways not collected",
+      "open_bills": 3,
+      "counted_minor": 50000,
+      "expected_minor": 0,
+      "open_due_minor": 73500,
+      "difference_minor": 50000
+    },
+    "reopens": [],
+    "can_close": false,
+    "can_reopen": false,
+    "open_bills": {
+      "list": [
+        {
+          "bill": "P-00001",
+          "place": "Table T7",
+          "status": "sent_to_kitchen",
+          "order_id": "710bcdf8-b96a-48ad-b8f0-da6aaa5a960e",
+          "due_minor": 42000,
+          "opened_at": "2026-11-03T12:45:15.931031+00:00"
+        },
+        {
+          "bill": "P-00002",
+          "place": "Takeaway",
+          "status": "sent_to_kitchen",
+          "order_id": "5973e998-ec44-498c-a08d-a6504ef76d52",
+          "due_minor": 10500,
+          "opened_at": "2026-11-03T12:45:15.988955+00:00"
+        },
+        {
+          "bill": "P-00003",
+          "place": "Takeaway",
+          "status": "in_billing",
+          "order_id": "a106c2c4-7fe6-421c-8224-7970a75f86e7",
+          "due_minor": 21000,
+          "opened_at": "2026-11-03T12:45:16.029331+00:00"
+        }
+      ],
+      "count": 3,
+      "tables": 1,
+      "due_minor": 73500
+    },
+    "opening_minor": 0,
+    "refunds_minor": 0,
+    "expected_minor": 0,
+    "other_in_minor": 0,
+    "paid_out_minor": 0,
+    "cash_sales_minor": 0
+  },
+  "audit": {
+    "to": "2026-11-03",
+    "from": "2026-11-03",
+    "unpaid": {
+      "list": [],
+      "bills": 0,
+      "value_minor": 0
+    },
+    "day_end": {
+      "reopened": {
+        "list": [],
+        "count": 0
+      },
+      "unsettled": {
+        "list": [
+          {
+            "at": "2026-11-03T12:45:16.807542+00:00",
+            "by": "ZZ mgr",
+            "day": "2026-11-03",
+            "bill": "P-00003",
+            "note": "Table T7 still eating; takeaways not collected",
+            "place": "Takeaway",
+            "order_id": "a106c2c4-7fe6-421c-8224-7970a75f86e7",
+            "due_minor": 21000
+          },
+          {
+            "at": "2026-11-03T12:45:16.807542+00:00",
+            "by": "ZZ mgr",
+            "day": "2026-11-03",
+            "bill": "P-00001",
+            "note": "Table T7 still eating; takeaways not collected",
+            "place": "Table T7",
+            "order_id": "710bcdf8-b96a-48ad-b8f0-da6aaa5a960e",
+            "due_minor": 42000
+          },
+          {
+            "at": "2026-11-03T12:45:16.807542+00:00",
+            "by": "ZZ mgr",
+            "day": "2026-11-03",
+            "bill": "P-00002",
+            "note": "Table T7 still eating; takeaways not collected",
+            "place": "Takeaway",
+            "order_id": "5973e998-ec44-498c-a08d-a6504ef76d52",
+            "due_minor": 10500
+          }
+        ],
+        "count": 3,
+        "due_minor": 73500
+      }
+    },
+    "refunds": {
+      "list": [],
+      "count": 0,
+      "amount_minor": 0
+    },
+    "reprints": {
+      "list": [],
+      "count": 0
+    },
+    "cancelled": {
+      "list": [],
+      "bills": 0,
+      "after_kot": 0,
+      "value_minor": 0
+    },
+    "overrides": {
+      "list": [],
+      "count": 0
+    },
+    "after_bill": {
+      "list": [],
+      "count": 0
+    },
+    "not_recorded": [
+      "price_edit"
+    ]
+  },
+  "register_reopened": {
+    "day": "2026-11-03",
+    "closed": null,
+    "reopens": [
+      {
+        "at": "2026-11-03T12:45:17.355534+00:00",
+        "by": "ZZ own",
+        "reason": "Counted the float twice",
+        "counted_minor": 50000
+      }
+    ],
+    "can_close": true,
+    "can_reopen": false,
+    "open_bills": {
+      "list": [
+        {
+          "bill": "P-00001",
+          "place": "Table T7",
+          "status": "sent_to_kitchen",
+          "order_id": "710bcdf8-b96a-48ad-b8f0-da6aaa5a960e",
+          "due_minor": 42000,
+          "opened_at": "2026-11-03T12:45:15.931031+00:00"
+        },
+        {
+          "bill": "P-00002",
+          "place": "Takeaway",
+          "status": "sent_to_kitchen",
+          "order_id": "5973e998-ec44-498c-a08d-a6504ef76d52",
+          "due_minor": 10500,
+          "opened_at": "2026-11-03T12:45:15.988955+00:00"
+        },
+        {
+          "bill": "P-00003",
+          "place": "Takeaway",
+          "status": "in_billing",
+          "order_id": "a106c2c4-7fe6-421c-8224-7970a75f86e7",
+          "due_minor": 21000,
+          "opened_at": "2026-11-03T12:45:16.029331+00:00"
+        }
+      ],
+      "count": 3,
+      "tables": 1,
+      "due_minor": 73500
+    },
+    "opening_minor": 0,
+    "refunds_minor": 0,
+    "expected_minor": 0,
+    "other_in_minor": 0,
+    "paid_out_minor": 0,
+    "cash_sales_minor": 0
+  },
+  "insights": {
+    "mix": {
+      "by": [
+        {
+          "key": "dine_in",
+          "label": "Dine in",
+          "sales": 420,
+          "orders": 1
+        },
+        {
+          "key": "takeaway",
+          "label": "Takeaway",
+          "sales": 315,
+          "orders": 2
+        },
+        {
+          "key": "delivery",
+          "label": "Delivery",
+          "sales": 105,
+          "orders": 1
+        }
+      ],
+      "sales": 840,
+      "orders": 4,
+      "avg_bill": 210
+    },
+    "top": [
+      {
+        "qty": 4,
+        "name": "Lassi",
+        "sales": 400
+      },
+      {
+        "qty": 1,
+        "name": "Thali",
+        "sales": 400
+      }
+    ],
+    "menu": {
+      "low": [
+        {
+          "name": "Lassi",
+          "can_make": 0
+        },
+        {
+          "name": "Thali",
+          "can_make": 0
+        }
+      ],
+      "out": 2,
+      "dishes": 2,
+      "no_photo": 2,
+      "high_cost": [],
+      "no_recipe": 2,
+      "food_cost_avg": null,
+      "no_description": 2
+    },
+    "ready": 0,
+    "leakage": {
+      "latest": [],
+      "reopened": 1,
+      "unsettled": 6,
+      "admin_changes": 0,
+      "unsettled_due_minor": 147000
+    },
+    "payments": []
+  }
+}

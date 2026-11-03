@@ -28,6 +28,8 @@ export const ChannelDelivery = z.object({
   rider_name: z.string().max(60).nullish(), rider_phone: z.string().max(20).nullish(), eta_minutes: z.number().int().min(1).max(240).nullish(),
   // 0620: how money due at the door was collected, on delivered
   payment_method: z.enum(['cash', 'upi', 'card'], { message: 'Paid by cash, UPI or card.' }).nullish(),
+  // 0648: the card or UPI reference number of a payment at the door
+  reference: z.string().trim().max(60, 'The reference number is up to 60 characters.').nullish(),
 }).loose();
 export const AutoAcceptSet = z.object({ location_id: id.nullish(), on: z.boolean({ message: 'on is true or false.' }) }).loose();
 export const HoldList = z.object({ location_id: id.nullish(), channel, q }).loose();

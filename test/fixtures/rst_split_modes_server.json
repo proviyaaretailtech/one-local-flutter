@@ -1,0 +1,257 @@
+{
+  "view_equal": {
+    "can": {
+      "pay": true,
+      "note": true,
+      "split": true,
+      "coupon": true
+    },
+    "table": {
+      "id": "a6c47b2c-e46b-435a-8f4b-8221e8e167b2",
+      "label": "R9703",
+      "seats": 4,
+      "labels": [
+        "R9703"
+      ],
+      "area_name": null,
+      "main_table_id": "a6c47b2c-e46b-435a-8f4b-8221e8e167b2"
+    },
+    "orders": [
+      {
+        "id": "c21c4c42-e72a-4603-a06f-08550cba0719",
+        "due": 1218,
+        "paid": 0,
+        "items": [
+          {
+            "id": "d20ae635-246b-4f32-8a17-4aaed58fe39f",
+            "qty": 2,
+            "name": "Thali",
+            "add_ons": [],
+            "variant": null,
+            "in_combo": false,
+            "takeaway": false,
+            "line_total": 1000,
+            "unit_price": 500
+          },
+          {
+            "id": "06d82482-a076-4ec1-b228-dab21c5faed2",
+            "qty": 2,
+            "name": "Lassi",
+            "add_ons": [],
+            "variant": null,
+            "in_combo": false,
+            "takeaway": false,
+            "line_total": 160,
+            "unit_price": 80
+          }
+        ],
+        "notes": "ZZ-TEST ref",
+        "split": null,
+        "total": 1218,
+        "status": "awaiting_payment",
+        "gst_pct": 5,
+        "discount": 0,
+        "payments": [],
+        "subtotal": 1160,
+        "round_off": 0,
+        "created_at": "2026-11-03T10:39:11.080862+00:00",
+        "display_no": "Z9703",
+        "gst_amount": 58,
+        "updated_at": "2026-11-03T10:39:11.778742+00:00",
+        "coupon_code": null,
+        "customer_id": null,
+        "customer_name": null,
+        "bill_generated": true,
+        "customer_phone": null,
+        "service_charge": 0,
+        "manual_discount": null,
+        "discount_limit_pct": 10
+      }
+    ],
+    "location": {
+      "id": "d0d0fc56-02ab-4a18-a66a-caf06de143cf",
+      "name": "Golden ZZ REF mw0k2a48 - Main"
+    },
+    "unavailable": {
+      "pay": null,
+      "coupon": null
+    },
+    "receipt_printer": null,
+    "current_order_id": "c21c4c42-e72a-4603-a06f-08550cba0719"
+  },
+  "split_equal": {
+    "id": "2c4ba997-30b7-4c63-8e94-745077048481",
+    "due": 1218,
+    "mode": "equal",
+    "parts": [
+      {
+        "id": "98128e38-e141-4d0c-8d8a-c4198d149bbf",
+        "label": "Guest 1",
+        "amount": 406,
+        "method": "cash",
+        "status": "open",
+        "paid_at": null,
+        "part_no": 1,
+        "item_ids": [],
+        "paid_method": null
+      },
+      {
+        "id": "55baaa58-e82d-4694-8ed2-27e3236003e8",
+        "label": "Guest 2",
+        "amount": 406,
+        "method": "cash",
+        "status": "open",
+        "paid_at": null,
+        "part_no": 2,
+        "item_ids": [],
+        "paid_method": null
+      },
+      {
+        "id": "afc8f12a-b9f0-4e25-a99d-9090549ef38a",
+        "label": "Guest 3",
+        "amount": 406,
+        "method": "cash",
+        "status": "open",
+        "paid_at": null,
+        "part_no": 3,
+        "item_ids": [],
+        "paid_method": null
+      }
+    ],
+    "status": "active",
+    "order_id": "c21c4c42-e72a-4603-a06f-08550cba0719",
+    "replayed": false,
+    "open_parts": 3,
+    "paid_parts": 0
+  },
+  "view_dish": {
+    "can": {
+      "pay": true,
+      "note": true,
+      "split": true,
+      "coupon": true
+    },
+    "table": {
+      "id": "92beda76-1aae-4640-aa33-123d34a51c28",
+      "label": "R9704",
+      "seats": 4,
+      "labels": [
+        "R9704"
+      ],
+      "area_name": null,
+      "main_table_id": "92beda76-1aae-4640-aa33-123d34a51c28"
+    },
+    "orders": [
+      {
+        "id": "a2539bcd-f5d3-4ee8-a7e2-3d4a9c080afb",
+        "due": 840,
+        "paid": 0,
+        "items": [
+          {
+            "id": "276bcf1a-1616-43f0-81b8-826acf1ca138",
+            "qty": 1,
+            "name": "Thali",
+            "add_ons": [],
+            "variant": null,
+            "in_combo": false,
+            "takeaway": false,
+            "line_total": 500,
+            "unit_price": 500
+          },
+          {
+            "id": "c643b698-51b0-4df3-93d7-75e2cc52f46a",
+            "qty": 1,
+            "name": "Dosa",
+            "add_ons": [],
+            "variant": null,
+            "in_combo": false,
+            "takeaway": false,
+            "line_total": 200,
+            "unit_price": 200
+          },
+          {
+            "id": "324cd514-3778-4893-95a9-6211560a3057",
+            "qty": 2,
+            "name": "Coffee",
+            "add_ons": [],
+            "variant": null,
+            "in_combo": false,
+            "takeaway": false,
+            "line_total": 100,
+            "unit_price": 50
+          }
+        ],
+        "notes": "ZZ-TEST ref",
+        "split": null,
+        "total": 840,
+        "status": "awaiting_payment",
+        "gst_pct": 5,
+        "discount": 0,
+        "payments": [],
+        "subtotal": 800,
+        "round_off": 0,
+        "created_at": "2026-11-03T10:39:13.019435+00:00",
+        "display_no": "Z9704",
+        "gst_amount": 40,
+        "updated_at": "2026-11-03T10:39:13.974321+00:00",
+        "coupon_code": null,
+        "customer_id": null,
+        "customer_name": null,
+        "bill_generated": true,
+        "customer_phone": null,
+        "service_charge": 0,
+        "manual_discount": null,
+        "discount_limit_pct": 10
+      }
+    ],
+    "location": {
+      "id": "d0d0fc56-02ab-4a18-a66a-caf06de143cf",
+      "name": "Golden ZZ REF mw0k2a48 - Main"
+    },
+    "unavailable": {
+      "pay": null,
+      "coupon": null
+    },
+    "receipt_printer": null,
+    "current_order_id": "a2539bcd-f5d3-4ee8-a7e2-3d4a9c080afb"
+  },
+  "split_dish": {
+    "id": "50fc75a4-fa27-4e52-b01f-599c66b1abac",
+    "due": 840,
+    "mode": "item",
+    "parts": [
+      {
+        "id": "a3284ac9-0a9a-4d1e-9038-055820a7c6ed",
+        "label": "Guest 1",
+        "amount": 525,
+        "method": "cash",
+        "status": "open",
+        "paid_at": null,
+        "part_no": 1,
+        "item_ids": [
+          "276bcf1a-1616-43f0-81b8-826acf1ca138"
+        ],
+        "paid_method": null
+      },
+      {
+        "id": "32290636-55e2-4263-9b84-f8a49af66a9c",
+        "label": "Guest 2",
+        "amount": 315,
+        "method": "cash",
+        "status": "open",
+        "paid_at": null,
+        "part_no": 2,
+        "item_ids": [
+          "324cd514-3778-4893-95a9-6211560a3057",
+          "c643b698-51b0-4df3-93d7-75e2cc52f46a"
+        ],
+        "paid_method": null
+      }
+    ],
+    "status": "active",
+    "order_id": "a2539bcd-f5d3-4ee8-a7e2-3d4a9c080afb",
+    "replayed": false,
+    "open_parts": 2,
+    "paid_parts": 0
+  }
+}

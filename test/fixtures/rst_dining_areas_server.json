@@ -1,0 +1,76 @@
+{
+ "areas": {
+  "can": {
+   "manage": true
+  },
+  "areas": [
+   {
+    "id": "7390a317-c463-4664-b9f0-9624862b93ee",
+    "name": "AC Hall 1",
+    "seats": 8,
+    "active": true,
+    "tables": [
+     {
+      "id": "ea05b8cc-5b01-4937-8084-05200060b235",
+      "label": "A1",
+      "seats": 4
+     },
+     {
+      "id": "e3b68698-e473-4d68-b249-d2b83f1ff902",
+      "label": "A2",
+      "seats": 4
+     }
+    ],
+    "area_type": "ac_hall",
+    "sort_order": 1,
+    "table_count": 2
+   },
+   {
+    "id": "40c90ebd-b37d-4f82-8416-acd3152a4b4b",
+    "name": "Rooftop",
+    "seats": 0,
+    "active": true,
+    "tables": [],
+    "area_type": "rooftop",
+    "sort_order": 2,
+    "table_count": 0
+   }
+  ],
+  "stats": {
+   "areas": 2,
+   "active": 2,
+   "in_use": 1,
+   "tables": 3,
+   "largest": {
+    "name": "AC Hall 1",
+    "tables": 2
+   },
+   "inactive": 0,
+   "needs_tables": 1,
+   "tables_linked": 2,
+   "tables_unassigned": 1
+  },
+  "types": [
+   "indoor",
+   "outdoor",
+   "rooftop",
+   "ac_hall",
+   "garden",
+   "private",
+   "bar",
+   "terrace"
+  ],
+  "upcoming": [
+   {
+    "id": "fa69e648-9c4a-4545-8bba-d520a2b1f026",
+    "guests": 2,
+    "area_name": null,
+    "guest_name": "Asha",
+    "local_date": "2026-11-04",
+    "local_time": "17:20",
+    "table_label": "A3",
+    "scheduled_at": "2026-11-04T11:50:43.735+00:00"
+   }
+  ]
+ }
+}

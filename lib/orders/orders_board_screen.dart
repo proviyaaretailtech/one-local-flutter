@@ -150,7 +150,8 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
     return at == null ? window : window - _now().difference(at).inSeconds;
   }
 
-  List<ChannelOrder> get _waiting => [for (final o in _sources?.orders ?? const <ChannelOrder>[]) if (o.stage == 'new') o];
+  // waiting to be accepted: a new order from a customer or an app; one the restaurant held itself (0643) is not waiting on anyone
+  List<ChannelOrder> get _waiting => [for (final o in _sources?.orders ?? const <ChannelOrder>[]) if (o.stage == 'new' && !o.held && o.source != 'takeaway') o];
 
   /// Per source, the most urgent new order's seconds left.
   Map<String, int> get _countdown {
@@ -199,6 +200,23 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
     await _loadSources();
   }
 
+  /// Send to kitchen (0643): a takeaway or delivery order held on the floor gets its KOT. One key per order, kept for a retry.
+  final _sendKeys = <String, String>{};
+  Future<void> _sendHeld(ChannelOrder o) async {
+    if (!_accepting.add(o.id)) return;
+    setState(() {});
+    try {
+      final r = await _api.sendHeld(o.id, key: _sendKeys[o.id] ??= OrdersApi.newKey());
+      _sendKeys.remove(o.id);
+      final kot = (r['kot'] as Map?)?['kot_no'];
+      if (mounted) showToast(context, '#${o.displayNo} sent to the kitchen${kot == null ? '' : ' · KOT $kot'}.');
+    } catch (e) {
+      if (mounted) showToast(context, errorSentence(e));
+    }
+    _accepting.remove(o.id);
+    await _loadSources();
+  }
+
   // delivery updates (0619): orders being moved on, so their button shows it is busy
   final _delivering = <String>{};
 
@@ -222,7 +240,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
 
   /// Moves an online order on: ready, out for delivery (asks the rider, their number and the minutes first) or delivered / picked up.
   Future<void> _deliver(ChannelOrder o, String step) async {
-    String? name, phone, paid;
+    String? name, phone, paid, reference;
     int? eta;
     if (step == 'out') {
       final r = await _askRider(o);
@@ -233,11 +251,16 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
     if (step == 'delivered' && o.collectAtDoor) {
       paid = await _askPaid(o);
       if (paid == null) return;
+      // 0648: card or UPI at the door keeps its reference number
+      if (paid != 'cash') {
+        reference = await _askReference(o, paid);
+        if (reference == null) return;
+      }
     }
     if (!_delivering.add(o.id)) return;
     if (mounted) setState(() {});
     try {
-      final msg = await _api.deliveryUpdate(o.id, step, riderName: name, riderPhone: phone, etaMinutes: eta, paymentMethod: paid);
+      final msg = await _api.deliveryUpdate(o.id, step, riderName: name, riderPhone: phone, etaMinutes: eta, paymentMethod: paid, reference: reference);
       if (mounted) showToast(context, msg.isEmpty ? 'Updated.' : '$msg.');
     } catch (e) {
       if (mounted) showToast(context, errorSentence(e));
@@ -264,6 +287,38 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
           ],
         ),
       );
+
+  /// The card's last 4 digits / approval code, or the UPI UTR, of money collected at the door (0648); null for Cancel.
+  Future<String?> _askReference(ChannelOrder o, String method) {
+    final c = TextEditingController();
+    String? problem;
+    return showOlDialog<String>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, set) => AlertDialog(
+          title: Text(method == 'card' ? 'Card reference' : 'UPI reference', style: inter(18, 700)),
+          content: TextField(
+            key: const ValueKey('paid-reference'),
+            controller: c,
+            autofocus: true,
+            maxLength: 60,
+            decoration: InputDecoration(
+              labelText: method == 'card' ? 'Last 4 digits or approval code' : 'UTR or transaction id',
+              errorText: problem,
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
+            FilledButton(
+              key: const ValueKey('paid-reference-go'),
+              onPressed: () => c.text.trim().length < 4 ? set(() => problem = 'Enter at least 4 characters.') : Navigator.pop(d, c.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   /// Out for delivery: who takes it, their number, and about how long (all optional).
   Future<(String?, String?, int?)?> _askRider(ChannelOrder o) {
@@ -575,6 +630,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
           onOpenOrder: _openOrder,
           secondsLeft: _secondsLeft,
           onAccept: (o) => _accept(o),
+          onSendHeld: _sendHeld,
           accepting: _accepting,
           onDeliver: _deliver,
           onUpdateCustomer: _updateCustomer,

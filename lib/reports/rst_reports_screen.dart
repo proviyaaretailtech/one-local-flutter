@@ -83,6 +83,7 @@ class RstReportsScreen extends StatelessWidget {
             Entrance(index: 2, child: group('AUDIT', const [
               ('discounts', 'Discounts', 'Coupons, service charge waived, free dishes', LucideIcons.badgePercent),
               ('audit', 'Leakage audit', 'Cancelled and unpaid bills, reprints, changes after the bill', LucideIcons.shieldAlert),
+              ('cancellations', 'Cancellations & refunds', 'Dishes cancelled, KOT items stopped, bills voided, refunds', LucideIcons.circleX),
             ])),
             if (openFeed != null)
               TextButton.icon(
@@ -100,7 +101,7 @@ class RstReportsScreen extends StatelessWidget {
 
 const _titles = {
   'sales': 'Sales summary', 'items': 'Item-wise sales', 'categories': 'Category-wise sales', 'payments': 'Payment mode',
-  'cashiers': 'Cashier & day close', 'discounts': 'Discounts', 'audit': 'Leakage audit',
+  'cashiers': 'Cashier & day close', 'discounts': 'Discounts', 'audit': 'Leakage audit', 'cancellations': 'Cancellations & refunds',
 };
 const _methods = {'cash': 'Cash', 'upi': 'UPI', 'card': 'Card', 'wallet': 'Wallet', 'due': 'On credit', 'online': 'Online', 'other': 'Other'};
 const _channels = {'dine_in': 'Dine-in', 'pickup': 'Takeaway', 'delivery': 'Own delivery', 'online': 'OneLocal', 'swiggy': 'Swiggy', 'zomato': 'Zomato', 'other': 'Other'};
@@ -280,6 +281,13 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
             [b.s('bill'), b.s('at'), b.n('gross_minor') / 100, b.s('kind'), b.s('coupon'), b.n('discount_minor') / 100, b.s('reason'),
              b.s('kind') == 'manual' ? b.s('given_by') : b.s('coupon_by'), b.s('approved_by'), b.n('waived_minor') / 100, b.s('waive_reason'), b.s('waived_by')],
         ],
+      'cancellations' => [
+          ['What', 'Bill', 'At', 'Dish', 'Qty', 'KOT', 'Amount (Rs)', 'Reason', 'By', 'Approved by'],
+          for (final x in r.m('items').l('list'))
+            ['Dish cancelled', x.s('display_no'), x.s('at'), x.s('name'), x.n('qty'), x.s('kot_no'), x.n('value'), x.s('reason'), x.s('by'), x.s('approved_by')],
+          for (final x in r.m('voids').l('list')) ['Bill voided', x.s('display_no'), x.s('at'), '', '', '', x.n('total'), x.s('reason'), x.s('by'), x.s('approved_by')],
+          for (final x in r.m('refunds').l('list')) ['Refund', x.s('display_no'), x.s('at'), '', '', '', x.n('amount'), x.s('reason'), x.s('by'), ''],
+        ],
       _ => [
           ['What', 'Bill', 'At', 'Amount (Rs)', 'By', 'Reason / detail'],
           for (final c in r.m('cancelled').l('list')) ['Cancelled', c.s('bill'), c.s('at'), c.n('value_minor') / 100, c.s('by'), c.s('reason')],
@@ -287,6 +295,9 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
           for (final p in r.m('reprints').l('list')) ['Reprint', p.s('bill'), p.s('at'), '', p.s('by'), p.s('what')],
           for (final a in r.m('after_bill').l('list')) ['After the bill', a.s('bill'), a.s('at'), '', a.s('by'), a.s('what')],
           for (final f in r.m('refunds').l('list')) ['Refund', f.s('bill'), f.s('at'), f.n('amount_minor') / 100, f.s('by'), f.s('reason')],
+          for (final x in r.m('day_end').m('unsettled').l('list'))
+            ['Left unsettled at day end', x.s('bill'), x.s('at'), x.n('due_minor') / 100, x.s('by'), '${x.s('place')}${x.s('note').isEmpty ? '' : ' · ${x.s('note')}'}'],
+          for (final x in r.m('day_end').m('reopened').l('list')) ['Day reopened', x.s('day'), x.s('at'), x.n('counted_minor') / 100, x.s('by'), x.s('reason')],
         ],
     };
     final name = '${widget.kind}-${RstReportsApi.day(_from)}${_from == _to ? '' : '-to-${RstReportsApi.day(_to)}'}.xlsx';
@@ -573,6 +584,8 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
           _line('Bill ${b.s('bill')}', b.n('discount_minor') > 0 ? '−${rs(b.n('discount_minor'))}' : '−${rs(b.n('waived_minor'))}', key: 'rep-disc-${b.s('order_id')}',
               sub: [
                 _time(b.s('at')),
+                // 0644: the discount's real share of the dishes on the bill
+                if (b.no('pct') != null) '${b.n('pct') == b.n('pct').roundToDouble() ? b.n('pct').round() : b.n('pct').toStringAsFixed(1)}% off',
                 if (b.s('coupon').isNotEmpty) 'Coupon ${b.s('coupon')}${b.s('coupon_by').isEmpty ? '' : ' by ${b.s('coupon_by')}'}',
                 if (b.s('kind') == 'manual')
                   'Manual: ${b.s('reason')}${b.s('given_by').isEmpty ? '' : ' by ${b.s('given_by')}'}${b.s('approved_by').isEmpty ? '' : ' · approved by ${b.s('approved_by')}'}',
@@ -586,11 +599,116 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
     ];
   }
 
+  // 0640: dishes cancelled (before or after the KOT), bills voided and refunds, with who asked, who approved and why
+  List<Widget> _cancellations(Facts r) {
+    final i = r.m('items'), v = r.m('voids'), f = r.m('refunds'), q = r.m('requests');
+    return [
+      _kpis([
+        ('can-items', 'Dishes cancelled', '${i.n('count')}', rs(i.n('value_minor'))),
+        ('can-kot', 'After the KOT', '${i.n('after_kot')}', 'the kitchen was told'),
+        ('can-voids', 'Bills voided', '${v.n('count')}', rs(v.n('value_minor'))),
+        ('can-refunds', 'Refunds', '${f.n('count')}', rs(f.n('amount_minor'))),
+      ]),
+      const SizedBox(height: 12),
+      if (i.n('count') == 0 && v.n('count') == 0 && f.n('count') == 0) _empty('No cancellations or refunds in this period.'),
+      if (i.l('list').isNotEmpty)
+        _card('DISHES CANCELLED', [
+          for (final x in i.l('list'))
+            _line('${_qty(x.n('qty'))}× ${x.s('name')} · Bill ${x.s('display_no')}', '−${rs(x.n('value') * 100)}', key: 'rep-can-${x.s('order_id')}-${x.s('at')}',
+                sub: [
+                  _time(x.s('at')),
+                  if (x.s('kot_no').isNotEmpty) 'KOT ${x.s('kot_no')}' else 'not sent to the kitchen',
+                  x.s('reason'),
+                  if (x.s('by').isNotEmpty) 'by ${x.s('by')}',
+                  if (x.s('approved_by').isNotEmpty) 'approved by ${x.s('approved_by')}',
+                ].join(' · '),
+                onTap: () => _openBill(x.s('order_id'))),
+        ]),
+      if (v.l('list').isNotEmpty)
+        _card('BILLS VOIDED', [
+          for (final x in v.l('list'))
+            _line('Bill ${x.s('display_no')}', rs(x.n('total') * 100), color: kError,
+                sub: [
+                  _time(x.s('at')),
+                  if (x.n('refunded') > 0) '${rs(x.n('refunded') * 100)} refunded',
+                  x.s('reason'),
+                  if (x.s('by').isNotEmpty) 'by ${x.s('by')}',
+                  if (x.s('approved_by').isNotEmpty) 'approved by ${x.s('approved_by')}',
+                ].join(' · '),
+                onTap: () => _openBill(x.s('order_id'))),
+        ]),
+      if (f.l('list').isNotEmpty)
+        _card('REFUNDS', [
+          for (final x in f.l('list'))
+            _line('Bill ${x.s('display_no')}', rs(x.n('amount') * 100),
+                sub: [_time(x.s('at')), _methods[x.s('method')] ?? x.s('method'), if (x.s('kind') == 'cancel') 'void', if (x.s('by').isNotEmpty) 'by ${x.s('by')}', x.s('reason')].join(' · '),
+                onTap: () => _openBill(x.s('order_id'))),
+        ]),
+      if (q.n('asked') > 0) _note('${q.n('asked')} asked for approval in this period, ${q.n('rejected')} rejected.'),
+    ];
+  }
+
   List<Widget> _audit(Facts r) {
-    final c = r.m('cancelled'), u = r.m('unpaid'), p = r.m('reprints'), a = r.m('after_bill'), f = r.m('refunds');
-    final nothing = c.n('bills') == 0 && u.n('bills') == 0 && p.n('count') == 0 && a.n('count') == 0 && f.n('count') == 0;
+    final c = r.m('cancelled'), u = r.m('unpaid'), p = r.m('reprints'), a = r.m('after_bill'), f = r.m('refunds'), o = r.m('overrides');
+    final du = r.m('day_end').m('unsettled'), dr = r.m('day_end').m('reopened');
+    final nothing = c.n('bills') == 0 && u.n('bills') == 0 && p.n('count') == 0 && a.n('count') == 0 && f.n('count') == 0 && o.n('count') == 0 &&
+        du.n('count') == 0 && dr.n('count') == 0;
     Widget event(Facts e) => _line('Bill ${e.s('bill')}', _time(e.s('at')), sub: '${e.s('what')}${e.s('by').isEmpty ? '' : ' · ${e.s('by')}'}', onTap: () => _openBill(e.s('order_id')));
     return [
+      // 0645: changes made with an admin PIN (a generated bill changed, an order cancelled after its KOT), first and in red
+      if (o.n('count') > 0)
+        Container(
+          key: const ValueKey('rep-overrides'),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFFCA5A5), width: 1.4)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Icon(LucideIcons.keyRound, size: 18, color: kError),
+              const SizedBox(width: 8),
+              Expanded(child: Text('CHANGED WITH AN ADMIN PIN · ${o.n('count').toInt()}', style: inter(12.5, 800, color: kError).copyWith(letterSpacing: 1))),
+            ]),
+            const SizedBox(height: 8),
+            for (final x in o.l('list'))
+              _line('Bill ${x.s('bill')}', _time(x.s('at')), color: kError, key: 'rep-override-${x.s('order_id')}-${x.s('at')}',
+                  sub: [
+                    x.s('what'),
+                    if (x.s('by').isNotEmpty) 'by ${x.s('by')}',
+                    if (x.s('approved_by').isNotEmpty) 'PIN of ${x.s('approved_by')}',
+                  ].join(' · '),
+                  onTap: () => _openBill(x.s('order_id'))),
+          ]),
+        ),
+      // 0650: bills left open at Day end, and ended days reopened
+      if (du.n('count') > 0 || dr.n('count') > 0)
+        Container(
+          key: const ValueKey('rep-day-end'),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFFCA5A5), width: 1.4)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Icon(LucideIcons.moon, size: 18, color: kError),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                    [
+                      if (du.n('count') > 0) 'LEFT UNSETTLED AT DAY END · ${du.n('count').toInt()} · ${rs(du.n('due_minor'))}',
+                      if (dr.n('count') > 0) 'DAY REOPENED · ${dr.n('count').toInt()}',
+                    ].join('   '),
+                    style: inter(12.5, 800, color: kError).copyWith(letterSpacing: 1)),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            for (final x in du.l('list'))
+              _line('${x.s('place')} · bill ${x.s('bill')}', rs(x.n('due_minor')), color: kError, key: 'rep-unsettled-${x.s('order_id')}-${x.s('at')}',
+                  sub: [_time(x.s('at')), if (x.s('by').isNotEmpty) 'Day end by ${x.s('by')}', if (x.s('note').isNotEmpty) x.s('note')].join(' · '),
+                  onTap: () => _openBill(x.s('order_id'))),
+            for (final x in dr.l('list'))
+              _line('Day ${x.s('day')} reopened', _time(x.s('at')), color: kError, key: 'rep-reopened-${x.s('at')}',
+                  sub: [if (x.s('by').isNotEmpty) 'by ${x.s('by')}', 'counted ${rs(x.n('counted_minor'))}', x.s('reason')].join(' · ')),
+          ]),
+        ),
       _kpis([
         ('audit-cancelled', 'Cancelled bills', '${c.n('bills')}', rs(c.n('value_minor'))),
         ('audit-unpaid', 'Billed, not paid', '${u.n('bills')}', rs(u.n('value_minor'))),
@@ -606,7 +724,7 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
                 sub: [_time(x.s('at')), if (x.b('kot_sent')) 'after the kitchen got it', if (x.s('by').isNotEmpty) 'by ${x.s('by')}', if (x.s('reason').isNotEmpty) x.s('reason')].join(' · '),
                 onTap: () => _openBill(x.s('order_id'))),
         ]),
-      if (u.n('bills') > 0) _card('BILLED, NOT PAID BY THE END OF THE DAY', [for (final b in u.l('list')) _billRow(b)]),
+      if (u.n('bills') > 0) _card('BILLED, NOT PAID YET', [for (final b in u.l('list')) _billRow(b)]),
       if (f.n('count') > 0)
         _card('REFUNDS', [
           for (final x in f.l('list'))
@@ -615,7 +733,7 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
         ]),
       if (a.n('count') > 0) _card('CHANGED AFTER THE BILL', [for (final e in a.l('list')) event(e)]),
       if (p.n('count') > 0) _card('REPRINTS', [for (final e in p.l('list')) event(e)]),
-      _note('Removing a single dish and editing a price are not possible in the POS, so they cannot happen unseen.'),
+      _note('Dishes cancelled one by one, KOT items stopped and bills voided are in Cancellations & refunds. Editing a price is not possible in the POS.'),
     ];
   }
 
@@ -679,6 +797,7 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
                   'payments' => _payments(r),
                   'cashiers' => _cashiers(r),
                   'discounts' => _discounts(r),
+                  'cancellations' => _cancellations(r),
                   _ => _audit(r),
                 },
               ]),

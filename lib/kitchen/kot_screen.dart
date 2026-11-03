@@ -8,6 +8,8 @@ import '../api/net_guard.dart';
 import '../inventory/inventory_api.dart' show Facts;
 import '../orders/order_screen.dart';
 import '../orders/orders_api.dart' show rupees;
+import '../tables/bill_adjust.dart' show showCancelItemsSheet;
+import '../tables/bill_api.dart' show BillApi;
 import '../tables/table_order_screen.dart';
 import '../tables/table_widgets.dart' show TablesEnv;
 import '../ui/motion.dart';
@@ -21,8 +23,11 @@ import 'kitchen_widgets.dart';
 /// segment each, how many dishes are ready, the stations with a tick, and Serve, Bill, Print, KDS and View.
 /// Optimised 28 Oct 2026: count tiles for the four statuses in one row, orders with dishes to serve first, compact cards (see below).
 class KotScreen extends StatefulWidget {
-  const KotScreen({super.key, required this.env, this.openOrder});
+  const KotScreen({super.key, required this.env, this.openOrder, this.bill});
   final KitchenEnv env;
+
+  /// Cancel item's calls (0640); tests pass their own.
+  final BillApi? bill;
 
   /// Opens an order's own page (Bill and View); tests pass their own. By default: the table's order for dine-in, else the order page.
   final void Function(BuildContext context, Facts order)? openOrder;
@@ -77,7 +82,13 @@ class _KotScreenState extends State<KotScreen> {
 
   /// A customer, the restaurant or a platform cancelled an order the kitchen has: the same alarm as the KDS, once per order.
   void _alarm(Facts d) {
-    final now = {for (final o in d.l('orders')) if (o.s('stage') == 'cancelled' && o.m('cancel').b('recent')) o.s('id')};
+    final now = {
+      for (final o in d.l('orders')) ...[
+        if (o.s('stage') == 'cancelled' && o.m('cancel').b('recent')) o.s('id'),
+        // 0640: a dish cancelled after its KOT went sounds the same alarm, once
+        for (final c in o.l('item_cancels')) if (c.b('recent')) '${o.s('id')}:${c.s('at')}',
+      ],
+    };
     final seen = _cancelSeen;
     _cancelSeen = {...?seen, ...now};
     if (seen != null && now.difference(seen).isNotEmpty && !KdsBoardScreen.muted) widget.env.sounds.cancelled();
@@ -107,6 +118,15 @@ class _KotScreenState extends State<KotScreen> {
         await widget.env.api.act(o.s('latest_ticket'), 'print');
         if (mounted) showToast(context, 'Latest KOT of #${o.s('display_no')} sent to the printer.');
       });
+
+  /// Cancel item (0640): dishes already on this order's KOTs, how many and why; the kitchen is told at once (a manager approves a dish
+  /// already cooking or served).
+  Future<void> _cancelItem(Facts o) async {
+    setState(() => _busy.add(o.s('id')));
+    await showCancelItemsSheet(context, api: widget.bill ?? BillApi(), orderId: o.s('id'), kitchenOnly: true);
+    if (mounted) setState(() => _busy.remove(o.s('id')));
+    await _load();
+  }
 
   Future<void> _open(Facts o) async {
     final open = widget.openOrder;
@@ -212,6 +232,7 @@ class _KotScreenState extends State<KotScreen> {
                       onPrint: () => _print(o),
                       onKds: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => KdsBoardScreen(env: widget.env))),
                       onView: () => _open(o),
+                      onCancelItem: const {'online', 'swiggy', 'zomato'}.contains(o.s('channel')) ? null : () => _cancelItem(o),
                     ),
                   ),
                   ),
@@ -228,10 +249,13 @@ class _KotScreenState extends State<KotScreen> {
 /// ready KOT and the stations; one progress bar; and one main action for the stage (Serve when dishes wait, else Bill), with print,
 /// KDS and View as small buttons. Completed orders are quiet and grey; the timer is red only while an order is still cooking and late.
 class _OrderKotCard extends StatelessWidget {
-  const _OrderKotCard({required this.order, required this.busy, required this.onServe, required this.onBill, required this.onPrint, required this.onKds, required this.onView});
+  const _OrderKotCard({required this.order, required this.busy, required this.onServe, required this.onBill, required this.onPrint, required this.onKds, required this.onView, this.onCancelItem});
   final Facts order;
   final bool busy;
   final VoidCallback onServe, onBill, onPrint, onKds, onView;
+
+  /// Cancel a dish on this order's KOTs (0640); null for orders the restaurant does not change here (apps, aggregators).
+  final VoidCallback? onCancelItem;
 
   static const _purple = Color(0xFF7C3AED), _purpleSoft = Color(0xFFEDE4FF), _green = Color(0xFF15803D), _greenSoft = Color(0xFFDCFCE7);
   static const _red = Color(0xFFD1213B);
@@ -430,7 +454,22 @@ class _OrderKotCard extends StatelessWidget {
                     small(LucideIcons.chefHat, 'kot-kds-$no', 'Open the KDS', onKds),
                     const SizedBox(width: 6),
                     small(LucideIcons.eye, 'kot-view-$no', 'View the order', onView),
+                    if (!completed && onCancelItem != null) ...[
+                      const SizedBox(width: 6),
+                      small(LucideIcons.circleX, 'kot-cancelitem-$no', 'Cancel item', onCancelItem!),
+                    ],
                   ]),
+                  // the KOT history: dishes cancelled after the KOT went, how many and why (0640)
+                  for (final (n, c) in o.l('item_cancels').indexed)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        '${c.b('recent') ? 'STOP · ' : ''}${c.n('qty').toInt()}× ${c.s('name')} cancelled${c.no('kot_no') != null ? ' (KOT ${c.s('kot_no')})' : ''}'
+                        '${(c.so('reason') ?? '').isEmpty ? '' : ' · “${c.s('reason')}”'}${(c.so('by') ?? '').isEmpty ? '' : ' · ${c.s('by')}'}',
+                        key: ValueKey('kot-itemcancel-$no-$n'),
+                        style: inter(11.5, 700, color: c.b('recent') ? const Color(0xFFD1213B) : kMuted),
+                      ),
+                    ),
                 ]),
               ),
             ),

@@ -39,9 +39,14 @@ class BillPaidScreen extends StatelessWidget {
           change: r.n('change'),
           branch: r.so('location_name'),
           when: paidAt == null ? '' : '${paidAt.day}/${paidAt.month}/${paidAt.year} · ${clock12(paidAt)}',
-          onNewOrder: () => backToTables(context),
+          // 0649: a takeaway or delivery bill goes back to where it was opened (Orders)
+          onNewOrder: () => tableId.isEmpty ? Navigator.of(context).pop() : backToTables(context),
           onPrintReceipt: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => BillReceiptScreen(env: env, orderId: r.s('order_id'), bill: bill))),
-          footnote: r.b('table_settled') ? 'The table is free: it shows Cleaning on the floor, then Available.' : 'This table still has an open bill.',
+          footnote: tableId.isEmpty
+              ? (r.b('order_paid') ? 'The bill is paid.' : '${money(r.n('due'))} is still due on this bill.')
+              : r.b('table_settled')
+                  ? 'The table is free: it shows Cleaning on the floor, then Available.'
+                  : 'This table still has an open bill.',
         ),
         if (next != null) ...[
           const SizedBox(height: 14),

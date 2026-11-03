@@ -27,6 +27,9 @@ class OrderView {
   bool get online => raw['online'] == true;
   String get channelLabel => _s('channel_label');
   String? get placeLabel => raw['place_label'] as String?;
+
+  /// 0649: a restaurant's takeaway or delivery bill (no table) is taken at the restaurant Checkout, not the store's pay sheet.
+  bool get counterBill => raw['table_id'] == null && (raw['channel'] == 'pickup' || raw['channel'] == 'delivery');
   String get customer => _s('customer');
   String get placedAt => _s('placed_at');
   String get orderStatus => _s('order_status');
@@ -177,6 +180,9 @@ class ChannelOrder {
 
   /// Swiggy and Zomato send their own riders: the restaurant only packs and hands over.
   bool get aggregatorRider => source == 'swiggy' || source == 'zomato';
+
+  /// Held on the floor (0643): its dishes are not with the kitchen yet; Send to kitchen sends them.
+  bool get held => raw['held'] == true;
 
   /// What is still to collect (0620): 0 once paid; and whether the customer paid in the OneLocal app.
   num get due => (raw['due'] as num?) ?? 0;
@@ -373,11 +379,15 @@ class OrdersApi {
   /// Accept one new delivery order (0610): a held order goes to the kitchen; a OneLocal app order is accepted. [auto] when auto-accept did it.
   Future<void> acceptOrder(String orderId, {bool auto = false}) async => _rpc('rst_channel_accept', {'order_id': orderId, if (auto) 'auto': true});
 
+  /// Sends a held takeaway or delivery order's dishes to the kitchen (0643): a KOT; answers {kot: {kot_no, dishes}, display_no}.
+  Future<Map<String, dynamic>> sendHeld(String orderId, {required String key}) => _rpc('rst_hold_send', {'order_id': orderId, 'idempotency_key': key}, key: key);
+
   /// Turn auto-accept on or off for the business (owner or manager).
   /// A delivery update (0619): [step] ready | out | delivered; for out, the rider, their number and the minutes it will take.
   /// For delivered, [paymentMethod] (cash | upi | card) is how the money due was collected at the door (0620).
-  Future<String> deliveryUpdate(String orderId, String step, {String? riderName, String? riderPhone, int? etaMinutes, String? paymentMethod}) async =>
-      '${(await _rpc('rst_channel_delivery', {'order_id': orderId, 'step': step, 'rider_name': ?riderName, 'rider_phone': ?riderPhone, 'eta_minutes': ?etaMinutes, 'payment_method': ?paymentMethod}))['message'] ?? ''}';
+  /// [reference] (0648): the card or UPI reference number of money collected at the door.
+  Future<String> deliveryUpdate(String orderId, String step, {String? riderName, String? riderPhone, int? etaMinutes, String? paymentMethod, String? reference}) async =>
+      '${(await _rpc('rst_channel_delivery', {'order_id': orderId, 'step': step, 'rider_name': ?riderName, 'rider_phone': ?riderPhone, 'eta_minutes': ?etaMinutes, 'payment_method': ?paymentMethod, 'reference': ?reference}))['message'] ?? ''}';
 
   Future<bool> setAutoAccept(bool on) async => (await _rpc('rst_auto_accept_set', {'on': on}))['auto_accept'] == true;
 
@@ -419,8 +429,14 @@ class OrdersApi {
         'version': version,
       }));
 
-  Future<OrderView> cancel(String id, {required String reason, Object? version}) async =>
-      OrderView(await _send('POST', '/$id/cancel', body: {'reason': reason, 'version': version}));
+  /// [admin] (0645): a restaurant order with the kitchen or a generated bill needs the admin PIN pass and note ({admin_pass, admin_note}).
+  /// Split Pay on the cart (`pos_split_pay`): 2 to 4 parts ({method, amount, tendered?, reference?}) that add up to what the held bill
+  /// owes; each card or UPI part with its reference (0648). [key] makes a retry take nothing twice.
+  Future<void> splitPay(String id, List<Map<String, Object?>> parts, {Object? version, required String key}) =>
+      _rpc('pos_split_pay', {'order_id': id, 'payments': parts, if (version is String && version.isNotEmpty) 'expected_updated_at': version}, key: key);
+
+  Future<OrderView> cancel(String id, {required String reason, Object? version, Map<String, String>? admin}) async =>
+      OrderView(await _send('POST', '/$id/cancel', body: {'reason': reason, 'version': version, ...?admin}));
 
   late final RpcClient _rpcClient = RpcClient(client: _http, baseUrl: _base, accessToken: _token);
 

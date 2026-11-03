@@ -241,6 +241,15 @@ export const MANIFEST: Entry[] = [
   db('tbl_history', { args: tbl.History, map: P, rate: 'read', roles: 'floor staff' }),
   db('tbl_reserve', { args: tbl.Reserve, map: P, rate: 'write', idem: true, roles: 'staff with order:place (or table manager)' }),
   db('tbl_reserve_cancel', { args: tbl.ReserveCancel, map: P, rate: 'write', roles: 'staff with order:place (or table manager)' }),
+  db('tbl_reservations_list', { args: tbl.ReservationsList, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  db('tbl_reserve_seat', { args: tbl.ReserveSeat, map: P, rate: 'write', roles: 'staff with order:place (or table manager)' }),
+  // 0646: dining areas (read: floor staff; changes: table managers)
+  db('tbl_areas', { args: tbl.Areas, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  db('tbl_area_save', { args: tbl.AreaSave, map: P, rate: 'write', roles: 'table managers' }),
+  db('tbl_area_set_active', { args: tbl.AreaActive, map: P, rate: 'write', roles: 'table managers' }),
+  db('tbl_area_reorder', { args: tbl.AreaReorder, map: P, rate: 'write', roles: 'table managers' }),
+  db('tbl_area_delete', { args: tbl.AreaRef, map: P, rate: 'write', roles: 'table managers' }),
+  db('tbl_area_tables', { args: tbl.AreaTables, map: P, rate: 'write', roles: 'table managers' }),
   db('tbl_transfer', { args: tbl.Transfer, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('tbl_merge', { args: tbl.Merge, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('tbl_split', { args: tbl.Split, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
@@ -313,6 +322,18 @@ export const MANIFEST: Entry[] = [
   db('rst_printer_delete', { args: rst.PrinterId, map: P, rate: 'write', roles: 'owners, admins and managers (Settings)' }),
   db('rst_printer_tested', { args: rst.PrinterId, map: P, rate: 'write', roles: 'owners, admins and managers (Settings)' }),
   db('rst_bill_note', { args: rst.BillNote, map: P, rate: 'write', roles: 'staff with order:place or order:update_status' }),
+  // 0640: cancel a dish or KOT item, refund and void a bill (the refund is the shared pos_refund), a manager's approval of a cashier's ask
+  db('rst_items_cancel', { args: rst.ItemsCancel, map: P, rate: 'write', idem: true, roles: 'floor staff (started, served or billed dishes: managers; others ask)' }),
+  db('rst_bill_refund', { args: rst.BillRefund, map: P, rate: 'money', idem: true, roles: 'managers (cashiers ask)' }),
+  db('rst_bill_void', { args: rst.BillVoid, map: P, rate: 'money', idem: true, roles: 'owner and admin (managers and cashiers ask)' }),
+  db('rst_requests_list', { args: rst.RequestsList, map: P, rate: 'read', roles: 'floor staff and cashiers' }),
+  db('rst_request_decide', { args: rst.RequestDecide, map: P, rate: 'money', roles: 'managers (voids: owner and admin), never the person who asked' }),
+  db('rst_order_adjust', { args: rst.BillOrder, map: P, rate: 'read', roles: 'floor staff and cashiers' }),
+  db('rst_hold_send', { args: rst.HoldSend, map: P, rate: 'write', idem: true, roles: 'staff with order:place or order:update_status' }),
+  // 0645: admin PIN (set by owner / admin; checked at the till, 5 wrong tries in 15 minutes lock it); a generated bill or a cancel after the KOT needs its pass
+  db('rst_admin_pin_set', { args: rst.AdminPinSet, map: P, rate: 'secure', roles: 'owner and admin (their own PIN)' }),
+  db('rst_admin_pin_status', { args: rst.AdminPinStatus, map: P, rate: 'read', roles: ANY }),
+  db('rst_admin_pin_check', { args: rst.AdminPinCheck, map: P, rate: 'secure', roles: 'staff of the business' }),
   db('rst_receipt_view', { args: rst.BillOrder, map: P, rate: 'read', roles: 'floor staff or staff allowed to take payment' }),
   db('rst_receipt_log', { args: rst.ReceiptLog, map: P, rate: 'write', roles: 'floor staff or staff allowed to take payment' }),
   db('svc_calendar', { args: svc.Calendar, map: P, rate: 'read', roles: STAFF }),
@@ -427,6 +448,7 @@ export const MANIFEST: Entry[] = [
   db('rmoney_contacts_list', { args: mo.RmContacts, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('rmoney_record', { args: mo.RmRecord, map: P, rate: 'money', idem: true, roles: 'staff with money:record' }),
   db('rmoney_close_day', { args: mo.RmClose, map: P, rate: 'money', roles: 'staff with money:record' }),
+  db('rmoney_reopen_day', { args: mo.RmReopen, map: P, rate: 'money', roles: 'the owner and admins (money:approve; checked in the database)' }),
   db('rmoney_contact_save', { args: mo.RmContactSave, map: P, rate: 'write', roles: 'staff with money:record' }),
   db('rmoney_void', { args: mo.RmVoid, map: P, rate: 'money', roles: 'staff with money:approve' }),
   // ---- team, section L (0440). Body = the function's `p` object; the database checks organisation, place and role (owner/admin invite and change people;
@@ -551,6 +573,7 @@ export const MANIFEST: Entry[] = [
   db('acct_save_name', { args: cu.SaveName, map: P, rate: 'write', roles: ANY }),
   db('acct_sync_contact', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
   db('acct_signed_out_everywhere', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
+  db('acct_sign_out_devices', { args: cu.SignOutDevices, map: P, rate: 'write', roles: ANY }),
   db('acct_delete_preview', { ...empty, map: () => ({}), roles: ANY }),
   db('acct_delete_request', { args: cu.DeleteRequest, map: P, rate: 'write', roles: ANY }),
   db('acct_delete_cancel', { ...empty, rate: 'write', map: () => ({}), roles: ANY }),
@@ -612,6 +635,7 @@ export const MANIFEST: Entry[] = [
   db('rst_report_cashiers', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
   db('rst_report_discounts', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
   db('rst_report_audit', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers with the audit (money:read, pos_audit_log:read)' }),
+  db('rst_report_cancellations', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
 ];
 
 const byAlias = new Map<string, Entry>(MANIFEST.map(e => [e.alias, e]));

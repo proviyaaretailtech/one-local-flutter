@@ -1,4 +1,4 @@
-// Restaurant Money in the store's design (0622): the wallet card, the OneLocal and credit cards, the cash register with Close day, dues,
+// Restaurant Money in the store's design (0622): the wallet card, the OneLocal and credit cards, the cash register with Day end, dues,
 // Money in / Money out with dates, methods and Add / Pay money, and Transfer (UPI app with the amount filled in, card, move between accounts).
 import 'dart:convert';
 import 'dart:typed_data';
@@ -121,7 +121,7 @@ void main() {
     expect(find.byType(AdsHomeScreen), findsOneWidget);
   });
 
-  testWidgets('Close day: the counted cash is sent; the drawer then says it is closed and how much was short', (t) async {
+  testWidgets('Day end: the counted cash is sent; the drawer then says the day ended and how much was short', (t) async {
     final f = Fake();
     await show(t, RstMoneyScreen(api: f.api, walletApi: f.wallet, today: today));
     await tap(t, find.byKey(const ValueKey('rm-close-day')));

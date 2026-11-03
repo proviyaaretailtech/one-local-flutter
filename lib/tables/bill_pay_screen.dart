@@ -7,6 +7,8 @@ import '../inventory/inventory_widgets.dart' show qty;
 import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import '../ui/whatsapp_icon.dart';
+import 'admin_pin.dart';
+import 'bill_adjust.dart' show BillMoneyScreen;
 import 'bill_api.dart';
 import 'bill_discount_sheet.dart';
 import 'bill_customer.dart';
@@ -27,6 +29,7 @@ import '../settings/store_qr.dart';
 class BillPayScreen extends StatefulWidget {
   const BillPayScreen({super.key, required this.env, required this.tableId, this.bill, this.part, this.orderId, this.openUrl});
   final TablesEnv env;
+  /// Empty for a takeaway or delivery bill (0649): then [orderId] (or the part's order) names the bill.
   final String tableId;
   final BillApi? bill;
 
@@ -50,7 +53,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
   String? _error, _payError;
   bool _busy = false;
   late String _method = widget.part?.s('method') ?? 'cash';
-  final _received = TextEditingController();
+  final _received = TextEditingController(), _reference = TextEditingController();
   final _code = TextEditingController();
   String? _payKey; // the key of the tap in flight; kept only when the server gave no answer, so a retry cannot pay twice
 
@@ -63,6 +66,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
   @override
   void dispose() {
     _received.dispose();
+    _reference.dispose();
     _code.dispose();
     super.dispose();
   }
@@ -84,7 +88,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
 
   Future<void> _load() async {
     try {
-      final v = await _api.view(widget.tableId);
+      final v = await _api.view(widget.tableId, orderId: widget.part?.so('order_id') ?? widget.orderId);
       if (!mounted) return;
       setState(() {
         _v = v;
@@ -107,10 +111,13 @@ class _BillPayScreenState extends State<BillPayScreen> {
     if (_code.text.trim().isEmpty) return showToast(context, 'Enter a discount code.');
     setState(() => _busy = true);
     try {
-      await _api.coupon(o.s('id'), _code.text);
-      _received.clear();
-      await _load();
-      if (mounted) showToast(context, 'Discount applied.');
+      // 0645: on a generated bill a code needs an admin PIN and a note
+      final done = await withAdminPin(context, pins: _api, run: (admin) => _api.coupon(o.s('id'), _code.text, admin: admin));
+      if (done != null) {
+        _received.clear();
+        await _load();
+        if (mounted) showToast(context, 'Discount applied.');
+      }
     } catch (e) {
       if (mounted) showToast(context, sayError(e));
     }
@@ -164,8 +171,15 @@ class _BillPayScreenState extends State<BillPayScreen> {
     if (_method == 'cash') {
       tendered = typedAmount(_received.text);
       if (tendered == null || tendered < _due) return setState(() => _payError = 'Enter at least ${money(_due)} received.');
-    } else if (!await _confirmed(_method == 'card' ? 'card' : 'UPI')) {
-      return;
+    } else {
+      // 0648: the card's last digits / approval code, or the UPI UTR, is always kept with the payment
+      final ref = _reference.text.trim();
+      if (ref.length < 4) {
+        return setState(() => _payError = _method == 'card'
+            ? 'Enter the card reference: the last 4 digits or the approval code on the slip.'
+            : 'Enter the UPI reference: the UTR or transaction id the guest\'s app shows.');
+      }
+      if (!await _confirmed(_method == 'card' ? 'card' : 'UPI')) return;
     }
     setState(() {
       _busy = true;
@@ -173,7 +187,8 @@ class _BillPayScreenState extends State<BillPayScreen> {
     });
     final key = _payKey ??= BillApi.newKey();
     try {
-      final r = await _api.pay(o.s('id'), partId: widget.part?.s('id'), method: _method, tendered: tendered, key: key);
+      final r = await _api.pay(o.s('id'), partId: widget.part?.s('id'), method: _method, tendered: tendered,
+          reference: _method == 'cash' ? null : _reference.text.trim(), key: key);
       _payKey = null;
       if (!mounted) return;
       if (r.b('order_paid')) {
@@ -212,7 +227,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
     var digits = to.replaceAll(RegExp(r'\D'), '');
     if (digits.length == 10) digits = '91$digits';
     if (digits.length < 11) return showToast(context, 'Enter a 10-digit mobile number.');
-    final text = billText(o, table: _v!.m('table').s('label'));
+    final text = billText(o, table: _v!.mo('table')?.so('label'));
     final uri = channel == 'whatsapp' ? Uri.parse('https://wa.me/$digits?text=${Uri.encodeComponent(text)}') : Uri(scheme: 'sms', path: '+$digits', query: 'body=${Uri.encodeComponent(text)}'); // %20, not +, for spaces
     if (!await _open(uri) && mounted) showToast(context, channel == 'whatsapp' ? 'WhatsApp could not be opened.' : 'The SMS app could not be opened.');
   }
@@ -228,7 +243,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
   Widget build(BuildContext context) {
     final v = _v;
     final o = _order;
-    final t = v?.m('table');
+    final place = billPlace(v);
     final orders = v?.l('orders') ?? const <Facts>[];
     final part = widget.part;
     final idx = o == null ? 0 : orders.indexWhere((x) => x.s('id') == o.s('id')) + 1;
@@ -236,10 +251,10 @@ class _BillPayScreenState extends State<BillPayScreen> {
     return TablesPage(
       env: widget.env,
       title: 'Checkout',
-      subtitle: t == null
+      subtitle: place == null
           ? ' '
           : [
-              'Table ${t.s('label')}',
+              place,
               if (part != null) part.s('label'),
               if (part == null && orders.length > 1) 'Bill $idx of ${orders.length}',
             ].join(' · '),
@@ -248,11 +263,11 @@ class _BillPayScreenState extends State<BillPayScreen> {
       children: [
         if (v == null && _error == null) tablesLoading(),
         if (_error != null) TablesError(_error!, onRetry: _load),
-        if (v != null && o == null) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text('No open bill on this table.', style: inter(15, 400, color: kMuted)))),
+        if (v != null && o == null) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text(widget.tableId.isEmpty ? 'This bill is already settled.' : 'No open bill on this table.', style: inter(15, 400, color: kMuted)))),
         if (v != null && o != null) ...[
           // who the bill is for (founder, 30 Oct 2026): name and number, before the bill is paid
           BillCustomerButton(api: _api, order: o, onSaved: _load),
-          BillCard(title: 'CURRENT ITEMS (TABLE ${t!.s('label').toUpperCase()})', children: [
+          BillCard(title: 'CURRENT ITEMS (${(place ?? '').toUpperCase()})', children: [
             // eaten here first, then the dishes packed to take away on the same bill (0606)
             for (final i in billItems(o).where((i) => !i.b('takeaway'))) ...[
               BillLine('${qty(i.n('qty'))} × ${i.s('name')}${(i.so('variant') ?? '').isEmpty ? '' : ' (${i.s('variant')})'}', money(i.n('line_total'))),
@@ -361,6 +376,18 @@ class _BillPayScreenState extends State<BillPayScreen> {
               const SizedBox(height: 14),
               const StoreQrCard(key: ValueKey('bill-store-qr'), big: true),
             ],
+            // 0648: a card or UPI payment always keeps its reference number
+            if (_method == 'card' || _method == 'upi') ...[
+              const SizedBox(height: 14),
+              Text(_method == 'card' ? 'Card reference (last 4 digits or approval code)' : 'UPI reference (UTR or transaction id)', style: inter(15, 500, color: kMuted)),
+              const SizedBox(height: 8),
+              BillField(
+                fieldKey: const ValueKey('bill-reference'),
+                controller: _reference,
+                hint: _method == 'card' ? 'e.g. 4821 or approval 093512' : 'e.g. 412398765432',
+                onChanged: (_) => setState(() => _payError = null),
+              ),
+            ],
           ]),
           if (_payError != null)
             Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_payError!, key: const ValueKey('pay-error'), style: inter(14.5, 500, color: kError))),
@@ -376,6 +403,19 @@ class _BillPayScreenState extends State<BillPayScreen> {
             const SizedBox(width: 10),
             Expanded(child: _SendButton(key: const ValueKey('bill-print'), tip: 'Print bill', onTap: _printBill, child: const Icon(LucideIcons.printer, size: 26, color: kInk))),
           ]),
+          // 0640: Void bill / Refund and the payment details of this bill
+          if (_order != null)
+            TextButton.icon(
+              key: const ValueKey('bill-void-refund'),
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      await Navigator.of(context).push(BillMoneyScreen.route(_api, _order!.s('id')));
+                      if (mounted) await _load();
+                    },
+              icon: const Icon(LucideIcons.undo2, size: 18, color: Color(0xFF2563EB)),
+              label: Text('Void bill / Refund · payment details', style: inter(14, 700, color: const Color(0xFF2563EB))),
+            ),
         ],
       ],
     );
