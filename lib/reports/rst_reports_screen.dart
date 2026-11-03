@@ -581,6 +581,8 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
           _line('Bill ${b.s('bill')}', b.n('discount_minor') > 0 ? '−${rs(b.n('discount_minor'))}' : '−${rs(b.n('waived_minor'))}', key: 'rep-disc-${b.s('order_id')}',
               sub: [
                 _time(b.s('at')),
+                // 0644: the discount's real share of the dishes on the bill
+                if (b.no('pct') != null) '${b.n('pct') == b.n('pct').roundToDouble() ? b.n('pct').round() : b.n('pct').toStringAsFixed(1)}% off',
                 if (b.s('coupon').isNotEmpty) 'Coupon ${b.s('coupon')}${b.s('coupon_by').isEmpty ? '' : ' by ${b.s('coupon_by')}'}',
                 if (b.s('kind') == 'manual')
                   'Manual: ${b.s('reason')}${b.s('given_by').isEmpty ? '' : ' by ${b.s('given_by')}'}${b.s('approved_by').isEmpty ? '' : ' · approved by ${b.s('approved_by')}'}',

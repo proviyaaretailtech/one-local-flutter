@@ -194,6 +194,7 @@ void main() {
     (d['bills'] as List).add({
       'order_id': 'o-manual', 'bill': 'P-00009', 'at': '2026-10-31T08:00:00Z', 'gross_minor': 20000, 'discount_minor': 4000, 'kind': 'manual',
       'reason': "Owner's friend", 'given_by': 'Meera Manager', 'approved_by': 'Meera Manager', 'waived_minor': 0,
+      'pct': 9.5, 'given_pct': 10, // 0644: the real share of the dishes (an amount given at 10% on a bill that grew)
     });
     fx['discounts_manual'] = d;
     final client = MockClient((r) async => http.Response(jsonEncode(fx['discounts_manual']), 200, headers: {'content-type': 'application/json; charset=utf-8'}));
@@ -201,6 +202,7 @@ void main() {
     expect(textOf(t, 'rep-manual'), '₹40');
     expect(textOf(t, 'rep-coupon'), '₹20');
     expect(find.textContaining("Manual: Owner's friend by Meera Manager · approved by Meera Manager"), findsOneWidget);
+    expect(find.textContaining('9.5% off'), findsOneWidget, reason: 'the discount as a share of the dishes on the bill');
   });
 
   testWidgets('Leakage audit: the cancelled bill after the KOT with who and why, the reprint, the change after the bill, the refund', (t) async {
