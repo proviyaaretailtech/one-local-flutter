@@ -178,6 +178,9 @@ class ChannelOrder {
   /// Swiggy and Zomato send their own riders: the restaurant only packs and hands over.
   bool get aggregatorRider => source == 'swiggy' || source == 'zomato';
 
+  /// Held on the floor (0643): its dishes are not with the kitchen yet; Send to kitchen sends them.
+  bool get held => raw['held'] == true;
+
   /// What is still to collect (0620): 0 once paid; and whether the customer paid in the OneLocal app.
   num get due => (raw['due'] as num?) ?? 0;
   bool get prepaid => raw['prepaid'] == true;
@@ -372,6 +375,9 @@ class OrdersApi {
 
   /// Accept one new delivery order (0610): a held order goes to the kitchen; a OneLocal app order is accepted. [auto] when auto-accept did it.
   Future<void> acceptOrder(String orderId, {bool auto = false}) async => _rpc('rst_channel_accept', {'order_id': orderId, if (auto) 'auto': true});
+
+  /// Sends a held takeaway or delivery order's dishes to the kitchen (0643): a KOT; answers {kot: {kot_no, dishes}, display_no}.
+  Future<Map<String, dynamic>> sendHeld(String orderId, {required String key}) => _rpc('rst_hold_send', {'order_id': orderId, 'idempotency_key': key}, key: key);
 
   /// Turn auto-accept on or off for the business (owner or manager).
   /// A delivery update (0619): [step] ready | out | delivered; for out, the rider, their number and the minutes it will take.

@@ -18,6 +18,7 @@ class ChannelLook {
     'swiggy': ChannelLook(Color(0xFFF46A0A), Color(0xFFFF9A3C), LucideIcons.bike, Color(0xFFE35F00)),
     'zomato': ChannelLook(Color(0xFFCB202D), Color(0xFFF0505C), LucideIcons.utensilsCrossed, Color(0xFFCB202D)),
     'on_call': ChannelLook(Color(0xFF5B21B6), Color(0xFF8B5CF6), LucideIcons.phoneCall, Color(0xFF6D28D9)),
+    'takeaway': ChannelLook(Color(0xFF0F766E), Color(0xFF14B8A6), LucideIcons.shoppingBag, Color(0xFF0F766E)),
   };
   static ChannelLook of(String key) => _looks[key] ?? const ChannelLook(Color(0xFF374151), Color(0xFF6B7280), LucideIcons.shoppingBag, kInk);
 }
@@ -40,6 +41,7 @@ class ChannelLogo extends StatelessWidget {
       'onelocal' => image('onelocal.jpg', zoom: 1.55),
       'swiggy' => image('swiggy.png', zoom: 1.25),
       'zomato' => image('zomato.png', zoom: 1.1),
+      'takeaway' => ColoredBox(color: Colors.white, child: Center(child: Icon(LucideIcons.shoppingBag, size: height * 0.55, color: const Color(0xFF0F766E)))),
       _ => ColoredBox(
           color: Colors.white,
           child: Stack(children: [
@@ -297,7 +299,7 @@ class _StackedCardState extends State<_StackedCard> with SingleTickerProviderSta
 
 /// One source's orders: back, "Swiggy · 3", a pill per source to switch, and the order cards (tap to open, ⌄ for the dishes).
 class ChannelOrdersList extends StatefulWidget {
-  const ChannelOrdersList({super.key, required this.data, required this.channel, required this.onChannel, required this.onBack, required this.onOpenOrder, this.secondsLeft, this.onAccept, this.accepting = const {}, this.onDeliver, this.onUpdateCustomer, this.delivering = const {}, this.focusId});
+  const ChannelOrdersList({super.key, required this.data, required this.channel, required this.onChannel, required this.onBack, required this.onOpenOrder, this.secondsLeft, this.onAccept, this.onSendHeld, this.accepting = const {}, this.onDeliver, this.onUpdateCustomer, this.delivering = const {}, this.focusId});
 
   /// An order to open, highlight and scroll to (Delivery status from its page).
   final String? focusId;
@@ -311,6 +313,9 @@ class ChannelOrdersList extends StatefulWidget {
   /// Seconds a new order has left to be accepted (0 or less: late); null for an order that is not new.
   final int? Function(ChannelOrder order)? secondsLeft;
   final ValueChanged<ChannelOrder>? onAccept;
+
+  /// Send to kitchen for an order held on the floor (0643).
+  final ValueChanged<ChannelOrder>? onSendHeld;
   final Set<String> accepting;
   final String channel;
   final ValueChanged<String> onChannel;
@@ -440,9 +445,10 @@ class _ChannelOrdersListState extends State<ChannelOrdersList> {
           child: _OrderCard(
             order: o,
             ink: look.ink,
-            secondsLeft: o.stage == 'new' ? widget.secondsLeft?.call(o) : null,
+            secondsLeft: o.stage == 'new' && !o.held ? widget.secondsLeft?.call(o) : null,
             accepting: widget.accepting.contains(o.id),
-            onAccept: o.stage == 'new' && widget.onAccept != null ? () => widget.onAccept!(o) : null,
+            onAccept: o.stage == 'new' && !o.held && o.source != 'takeaway' && widget.onAccept != null ? () => widget.onAccept!(o) : null,
+            onSendHeld: o.held && widget.onSendHeld != null ? () => widget.onSendHeld!(o) : null,
             open: _open.contains(o.id),
             onTap: () => widget.onOpenOrder(o.id),
             onToggle: () => setState(() => _open.contains(o.id) ? _open.remove(o.id) : _open.add(o.id)),
@@ -492,13 +498,13 @@ class _Pill extends StatelessWidget {
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, required this.ink, required this.open, required this.onTap, required this.onToggle, this.secondsLeft, this.onAccept, this.accepting = false, this.onDeliver, this.onUpdateCustomer, this.delivering = false});
+  const _OrderCard({required this.order, required this.ink, required this.open, required this.onTap, required this.onToggle, this.secondsLeft, this.onAccept, this.onSendHeld, this.accepting = false, this.onDeliver, this.onUpdateCustomer, this.delivering = false});
   final ChannelOrder order;
   final void Function(String step)? onDeliver;
   final VoidCallback? onUpdateCustomer;
   final bool delivering;
   final int? secondsLeft;
-  final VoidCallback? onAccept;
+  final VoidCallback? onAccept, onSendHeld;
   final bool accepting;
   final Color ink;
   final bool open;
@@ -609,8 +615,15 @@ class _OrderCard extends StatelessWidget {
       'swiggy' => 'Swiggy${o.ref == null ? '' : ' #${o.ref}'}',
       'zomato' => 'Zomato${o.ref == null ? '' : ' #${o.ref}'}',
       'onelocal' => 'OneLocal app',
+      'takeaway' => 'Takeaway',
       _ => 'Phone order',
     };
+    // 0643: held on the floor (not with the kitchen yet); a takeaway is collected at the counter, not delivered
+    final stageText = o.held
+        ? 'Held · not sent to the kitchen'
+        : o.source == 'takeaway'
+            ? switch (o.stage) { 'ready' => 'Ready · for pickup', 'delivered' => 'Collected', _ => channelStageLabel(o.stage, o.source) }
+            : channelStageLabel(o.stage, o.source);
     return Material(
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: ink.withValues(alpha: 0.35), width: 1.3)),
@@ -635,7 +648,7 @@ class _OrderCard extends StatelessWidget {
             Row(children: [
               Container(width: 8, height: 8, decoration: BoxDecoration(color: _stageColor(o.stage), shape: BoxShape.circle)),
               const SizedBox(width: 6),
-              Expanded(child: Text(channelStageLabel(o.stage, o.source), key: ValueKey('channel-stage-${o.displayNo}'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, 600))),
+              Expanded(child: Text(stageText, key: ValueKey('channel-stage-${o.displayNo}'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, 600))),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(color: ink.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
@@ -676,8 +689,24 @@ class _OrderCard extends StatelessWidget {
                 ),
               ]),
             ],
-            // the delivery update (0619): where it is, the rider, and the next step
-            if (onDeliver != null && o.stage != 'new') _delivery(context),
+            // held on the floor (0643): send its dishes to the kitchen
+            if (onSendHeld != null) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  key: ValueKey('channel-send-${o.displayNo}'),
+                  style: FilledButton.styleFrom(backgroundColor: ink, visualDensity: VisualDensity.compact, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                  onPressed: accepting ? null : onSendHeld,
+                  icon: accepting
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(LucideIcons.chefHat, size: 16),
+                  label: Text('Send to kitchen', style: inter(13.5, 800, color: Colors.white)),
+                ),
+              ),
+            ],
+            // the delivery update (0619): where it is, the rider, and the next step (not for a takeaway, collected at the counter)
+            if (onDeliver != null && o.stage != 'new' && o.source != 'takeaway') _delivery(context),
             if (open) ...[
               const Divider(height: 14, color: kLine),
               Text(o.items.isEmpty ? 'No dishes' : o.items, style: inter(14, 500)),

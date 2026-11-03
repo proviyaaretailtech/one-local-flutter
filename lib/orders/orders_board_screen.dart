@@ -150,7 +150,8 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
     return at == null ? window : window - _now().difference(at).inSeconds;
   }
 
-  List<ChannelOrder> get _waiting => [for (final o in _sources?.orders ?? const <ChannelOrder>[]) if (o.stage == 'new') o];
+  // waiting to be accepted: a new order from a customer or an app; one the restaurant held itself (0643) is not waiting on anyone
+  List<ChannelOrder> get _waiting => [for (final o in _sources?.orders ?? const <ChannelOrder>[]) if (o.stage == 'new' && !o.held && o.source != 'takeaway') o];
 
   /// Per source, the most urgent new order's seconds left.
   Map<String, int> get _countdown {
@@ -194,6 +195,23 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
       if (mounted) showToast(context, '${auto ? 'Auto-accepted' : 'Accepted'} #${o.displayNo} · ${o.customer}. Sent to the kitchen.');
     } catch (e) {
       if (mounted && !auto) showToast(context, errorSentence(e));
+    }
+    _accepting.remove(o.id);
+    await _loadSources();
+  }
+
+  /// Send to kitchen (0643): a takeaway or delivery order held on the floor gets its KOT. One key per order, kept for a retry.
+  final _sendKeys = <String, String>{};
+  Future<void> _sendHeld(ChannelOrder o) async {
+    if (!_accepting.add(o.id)) return;
+    setState(() {});
+    try {
+      final r = await _api.sendHeld(o.id, key: _sendKeys[o.id] ??= OrdersApi.newKey());
+      _sendKeys.remove(o.id);
+      final kot = (r['kot'] as Map?)?['kot_no'];
+      if (mounted) showToast(context, '#${o.displayNo} sent to the kitchen${kot == null ? '' : ' · KOT $kot'}.');
+    } catch (e) {
+      if (mounted) showToast(context, errorSentence(e));
     }
     _accepting.remove(o.id);
     await _loadSources();
@@ -575,6 +593,7 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
           onOpenOrder: _openOrder,
           secondsLeft: _secondsLeft,
           onAccept: (o) => _accept(o),
+          onSendHeld: _sendHeld,
           accepting: _accepting,
           onDeliver: _deliver,
           onUpdateCustomer: _updateCustomer,

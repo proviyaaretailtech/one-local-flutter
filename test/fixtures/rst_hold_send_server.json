@@ -1,0 +1,92 @@
+{
+ "channel_orders": {
+  "orders": [
+   {
+    "id": "fc465dcf-40cd-4751-b953-086f414f6888",
+    "due": 284,
+    "ref": null,
+    "held": true,
+    "items": "2 × Masala Dosa, 1 × Masala Chai",
+    "phone": "9876543210",
+    "stage": "new",
+    "total": 284,
+    "source": "on_call",
+    "prepaid": false,
+    "customer": "Ravi",
+    "delivery": null,
+    "placed_at": "2026-11-03T06:38:20.854526+00:00",
+    "display_no": "P-00002"
+   },
+   {
+    "id": "53dea114-9cb8-4b50-b710-041ad17d1b9c",
+    "due": 284,
+    "ref": null,
+    "held": true,
+    "items": "2 × Masala Dosa, 1 × Masala Chai",
+    "phone": null,
+    "stage": "new",
+    "total": 284,
+    "source": "takeaway",
+    "prepaid": false,
+    "customer": "Guest",
+    "delivery": null,
+    "placed_at": "2026-11-03T06:38:20.587514+00:00",
+    "display_no": "P-00001"
+   }
+  ],
+  "channels": [
+   {
+    "key": "onelocal",
+    "new": 0,
+    "open": 0,
+    "count": 0,
+    "label": "OneLocal",
+    "names": [],
+    "total": 0
+   },
+   {
+    "key": "swiggy",
+    "new": 0,
+    "open": 0,
+    "count": 0,
+    "label": "Swiggy",
+    "names": [],
+    "total": 0
+   },
+   {
+    "key": "zomato",
+    "new": 0,
+    "open": 0,
+    "count": 0,
+    "label": "Zomato",
+    "names": [],
+    "total": 0
+   },
+   {
+    "key": "on_call",
+    "new": 1,
+    "open": 1,
+    "count": 1,
+    "label": "On call delivery",
+    "names": [
+     "Ravi"
+    ],
+    "total": 284
+   },
+   {
+    "key": "takeaway",
+    "new": 1,
+    "open": 1,
+    "count": 1,
+    "label": "Takeaway",
+    "names": [
+     "Guest"
+    ],
+    "total": 284
+   }
+  ],
+  "cancelled": 0,
+  "auto_accept": false,
+  "accept_window": 60
+ }
+}

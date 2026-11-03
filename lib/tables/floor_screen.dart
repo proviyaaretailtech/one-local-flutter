@@ -329,7 +329,7 @@ class _FloorScreenState extends State<FloorScreen> {
       if (send && kot != null) {
         await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SentToKitchenScreen(env: env, tableLabel: shown, kot: kot)));
       } else {
-        showToast(context, onTable ? 'Saved on $label. Send to the kitchen when ready.' : '$shown saved. Send it to the kitchen from Orders.');
+        showToast(context, onTable ? 'Saved on $label. Send to the kitchen when ready.' : '$shown held. Send it to the kitchen from Orders → ${_mode == 'delivery' ? 'On call delivery' : 'Takeaway'}.');
       }
       if (mounted) _load();
     } catch (e) {

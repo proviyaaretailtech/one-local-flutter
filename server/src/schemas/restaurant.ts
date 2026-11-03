@@ -74,6 +74,8 @@ export const ItemsCancel = obj({
 export const BillRefund = obj({ order_id: id, amount: money, method: back, reason: reason(300), ...key });
 export const BillVoid = obj({ order_id: id, method: back.nullish(), reason: reason(200), ...key });
 export const RequestsList = obj({ order_id: id.nullish() });
+// 0643: a takeaway or delivery order held on the floor sent to the kitchen from Orders → Hold
+export const HoldSend = obj({ order_id: id, ...key });
 export const RequestDecide = obj({ request_id: id, decision: z.enum(['approve', 'reject'], { message: 'Approve or reject.' }),
   note: z.string().trim().max(200, 'Keep the note under 200 characters.').nullish() });
 export const ReceiptLog = obj({

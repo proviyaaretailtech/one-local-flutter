@@ -314,6 +314,7 @@ export const MANIFEST: Entry[] = [
   db('rst_requests_list', { args: rst.RequestsList, map: P, rate: 'read', roles: 'floor staff and cashiers' }),
   db('rst_request_decide', { args: rst.RequestDecide, map: P, rate: 'money', roles: 'managers (voids: owner and admin), never the person who asked' }),
   db('rst_order_adjust', { args: rst.BillOrder, map: P, rate: 'read', roles: 'floor staff and cashiers' }),
+  db('rst_hold_send', { args: rst.HoldSend, map: P, rate: 'write', idem: true, roles: 'staff with order:place or order:update_status' }),
   db('rst_receipt_view', { args: rst.BillOrder, map: P, rate: 'read', roles: 'floor staff or staff allowed to take payment' }),
   db('rst_receipt_log', { args: rst.ReceiptLog, map: P, rate: 'write', roles: 'floor staff or staff allowed to take payment' }),
   db('svc_calendar', { args: svc.Calendar, map: P, rate: 'read', roles: STAFF }),
