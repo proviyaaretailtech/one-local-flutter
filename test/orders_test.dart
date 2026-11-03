@@ -256,6 +256,50 @@ void main() {
       expect([b['method'], b['reference']], ['card', '4821']);
     });
 
+    testWidgets('Split Pay: the parts must add up and a UPI part needs its UTR; the cart is held, then split-paid with one key', (t) async {
+      HomeNav.shell = _Shell('restaurant');
+      addTearDown(() => HomeNav.shell = null);
+      final s = FakeServer((r) {
+        final p = r.url.path;
+        if (p.endsWith('/quote')) return ok(quote());
+        if (p.endsWith('/hold')) return ok(view('checkout'));
+        if (p.endsWith('/rpc/pos_split_pay')) return ok({'order_id': orderId, 'replayed': false, 'parts': 2});
+        return ok(view('pending'));
+      });
+      await showTall(t, CartScreen(api: s.api, initialLines: [CartLine(menuItemId: 'm1', name: 'Amul Butter 500g')]));
+      await t.tap(find.textContaining('Proceed to Checkout'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Split Pay'));
+      await t.pumpAndSettle();
+      expect(find.text('Total due ₹1,058. Add 2 to 4 parts; they must add up to the total.'), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('split-amount-0')), '500');
+      await t.pump();
+      expect(find.text('₹558 still to allocate'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('split-rest-1')));
+      await t.pump();
+      expect(find.text('Adds up'), findsOneWidget);
+      await t.tap(find.textContaining('Complete Payment'));
+      await t.pumpAndSettle();
+      expect(toast('Enter the UPI reference for part 2.'), findsOneWidget);
+      expect(s.where('POST', '/hold'), isEmpty);
+      await t.enterText(find.byKey(const ValueKey('split-reference-1')), 'UTR4040');
+      await t.tap(find.textContaining('Complete Payment'));
+      await t.pumpAndSettle();
+      expect(s.where('POST', '/checkout'), isEmpty, reason: 'never the old method "split" at checkout');
+      final hold = s.where('POST', '/hold').single;
+      final pay = s.where('POST', '/rpc/pos_split_pay').single;
+      expect(jsonDecode(pay.body), {
+        'order_id': orderId,
+        'payments': [
+          {'method': 'cash', 'amount': 500},
+          {'method': 'upi', 'amount': 558, 'reference': 'UTR4040'},
+        ],
+        'expected_updated_at': view('checkout')['version'],
+      });
+      expect(hold.headers['Idempotency-Key'], '${pay.headers['Idempotency-Key']}:hold');
+      expect(find.text('Order Confirmation'), findsOneWidget);
+    });
+
     testWidgets('quantity stepper requotes; coupon refusal is shown as the server says it', (t) async {
       final s = FakeServer((r) {
         final b = jsonDecode(r.body) as Map;

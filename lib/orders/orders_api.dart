@@ -427,6 +427,11 @@ class OrdersApi {
       }));
 
   /// [admin] (0645): a restaurant order with the kitchen or a generated bill needs the admin PIN pass and note ({admin_pass, admin_note}).
+  /// Split Pay on the cart (`pos_split_pay`): 2 to 4 parts ({method, amount, tendered?, reference?}) that add up to what the held bill
+  /// owes; each card or UPI part with its reference (0648). [key] makes a retry take nothing twice.
+  Future<void> splitPay(String id, List<Map<String, Object?>> parts, {Object? version, required String key}) =>
+      _rpc('pos_split_pay', {'order_id': id, 'payments': parts, if (version is String && version.isNotEmpty) 'expected_updated_at': version}, key: key);
+
   Future<OrderView> cancel(String id, {required String reason, Object? version, Map<String, String>? admin}) async =>
       OrderView(await _send('POST', '/$id/cancel', body: {'reason': reason, 'version': version, ...?admin}));
 

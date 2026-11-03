@@ -85,6 +85,22 @@ try {
   r = await rest(OWN, '/checkout', { lines: [{ menu_item_id: mi, qty: 1 }], method: 'card', reference: 'APPR55', notes: 'ZZ-TEST ref' }, k());
   ok('…with the approval code it is paid and saved', r.s === 200 && refs(r.j?.id) === 'card:APPR55', { r, refs: refs(r.j?.id) });
 
+  // the cart's Split Pay: the cart is held (no reason), then pos_split_pay takes every part in one go (it used to send method 'split')
+  const sh1 = await rest(OWN, '/hold', { lines: [{ menu_item_id: mi, qty: 4 }], notes: 'ZZ-TEST ref' }, k()); // 600 + 5% = 630
+  ok('cart Split Pay: the cart is held first', sh1.s === 200 && Number(sh1.j?.total ?? sql(`select total from orders where id='${sh1.j?.id}'`)) === 630, sh1);
+  r = await rest(OWN, '/checkout', { lines: [{ menu_item_id: mi, qty: 1 }], method: 'split', notes: 'ZZ-TEST ref' }, k());
+  ok('…(the old way, method "split" at checkout, is refused)', r.s >= 400, r);
+  const parts = [{ method: 'cash', amount: 300 }, { method: 'upi', amount: 330 }];
+  r = await rpc(OWN, 'pos_split_pay', { order_id: sh1.j?.id, payments: parts }, k());
+  ok('…a UPI part without its reference is refused, nothing taken', r.s === 400 && said(r, /UPI reference/) && refs(sh1.j?.id) === '', r);
+  r = await rpc(OWN, 'pos_split_pay', { order_id: sh1.j?.id, payments: [{ method: 'cash', amount: 300 }, { method: 'upi', amount: 300, reference: 'UTR4040' }] }, k());
+  ok('…parts that do not add up are refused', r.s === 400 && said(r, /add up/), r);
+  const sk = k();
+  r = await rpc(OWN, 'pos_split_pay', { order_id: sh1.j?.id, payments: [{ method: 'cash', amount: 300 }, { method: 'upi', amount: 330, reference: 'UTR4040' }] }, sk);
+  ok('…₹300 cash + ₹330 UPI with the UTR: paid, the reference kept', r.s === 200 && refs(sh1.j?.id) === 'cash:-,upi:UTR4040', { r, refs: refs(sh1.j?.id) });
+  r = await rpc(OWN, 'pos_split_pay', { order_id: sh1.j?.id, payments: [{ method: 'cash', amount: 300 }, { method: 'upi', amount: 330, reference: 'UTR4040' }] }, sk);
+  ok('…the same key again takes nothing twice', r.s === 200 && r.j?.replayed === true && refs(sh1.j?.id) === 'cash:-,upi:UTR4040', r);
+
   // ---- a delivery collected at the door
   const d = bill([['Biryani', 1, 300]], 'delivery', 'sent_to_kitchen');
   r = await rpc(OWN, 'rst_channel_delivery', { order_id: d.o, step: 'delivered', payment_method: 'upi' });

@@ -38,11 +38,24 @@ class CartScreen extends StatefulWidget {
   State<CartScreen> createState() => _CartScreenState();
 }
 
+/// One part of Split Pay: how and how much, and the card or UPI reference.
+class _SplitPart {
+  _SplitPart(this.method);
+  String method;
+  final amount = TextEditingController(), reference = TextEditingController();
+  void dispose() {
+    amount.dispose();
+    reference.dispose();
+  }
+}
+
 class _CartScreenState extends State<CartScreen> {
   late final OrdersApi _api = widget.api ?? OrdersApi();
   late final List<CartLine> _lines = [for (final l in widget.initialLines) CartLine(menuItemId: l.menuItemId, name: l.name, qty: l.qty)];
   final _tender = TextEditingController();
   final _reference = TextEditingController(); // 0648: the card's last 4 digits / approval code, or the UPI UTR
+  final _parts = [_SplitPart('cash'), _SplitPart('upi')]; // Split Pay: 2 to 4 parts
+  OrderView? _placed; // a new cart saved as a held bill for Split Pay; every payment after that goes to it
   final _placedAt = TimeOfDay.now();
   Quote? _quote;
   String? _quoteError;
@@ -84,6 +97,9 @@ class _CartScreenState extends State<CartScreen> {
     _debounce?.cancel();
     _tender.dispose();
     _reference.dispose();
+    for (final p in _parts) {
+      p.dispose();
+    }
     super.dispose();
   }
 
@@ -168,17 +184,63 @@ class _CartScreenState extends State<CartScreen> {
 
   /// Resume: write changed lines to the held order (same order id), then answer its current version.
   Future<Object?> _syncHeld(String key, {String? reason}) async {
-    final r = widget.resume!;
     if (!_linesChanged && reason == null) return _resumeVersion;
-    final v = await _api.updateHold(r.orderId, lines: _linesChanged ? _lines : null, reason: reason, version: _resumeVersion, key: key);
+    final v = await _api.updateHold(_heldId!, lines: _linesChanged ? _lines : null, reason: reason, version: _resumeVersion, key: key);
     _resumeVersion = v;
     _savedLines = _snapshot();
     return v;
   }
 
+  /// The held bill this cart pays: the one resumed, or the one Split Pay saved.
+  String? get _heldId => widget.resume?.orderId ?? _placed?.id;
+
+  num get _splitSum => _parts.fold<num>(0, (n, p) => n + (num.tryParse(p.amount.text.trim()) ?? 0));
+
+  /// Split Pay: the parts must add up to the bill, each card or UPI part with its reference in a restaurant (0648). A new cart is saved
+  /// as a held bill first (no reason), then `pos_split_pay` takes every part in one go; a retry reuses the bill and the key.
+  Future<void> _completeSplit(num total) async {
+    final restaurant = HomeNav.shell?.kind == 'restaurant';
+    for (final (i, p) in _parts.indexed) {
+      final a = num.tryParse(p.amount.text.trim());
+      if (a == null || a <= 0) return showToast(context, 'Enter an amount for part ${i + 1}.');
+      if (restaurant && p.method != 'cash' && p.reference.text.trim().length < 4) {
+        return showToast(context, 'Enter the ${p.method == 'card' ? 'card' : 'UPI'} reference for part ${i + 1}.');
+      }
+    }
+    if ((_splitSum - total).abs() > 0.004) return showToast(context, 'The parts add up to ${rupees(_splitSum)} but ${rupees(total)} is due.');
+    setState(() => _busy = true);
+    _key ??= OrdersApi.newKey();
+    try {
+      if (_heldId == null) {
+        final v = await _api.hold(lines: _lines, key: '${_key!}:hold');
+        _placed = v;
+        _resumeVersion = v.version;
+        _savedLines = _snapshot();
+      }
+      final version = await _syncHeld('${_key!}:lines');
+      await _api.splitPay(_heldId!, [
+        for (final p in _parts)
+          {
+            'method': p.method,
+            'amount': num.parse(p.amount.text.trim()),
+            if (p.method != 'cash' && p.reference.text.trim().isNotEmpty) 'reference': p.reference.text.trim(),
+          },
+      ], version: version, key: _key!);
+      final view = await _api.get(_heldId!);
+      await _linkCustomer(view.id);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => OrderScreen(api: _api, orderId: view.id, initial: view, onNavigate: widget.onNavigate)));
+    } catch (e) {
+      if (mounted) showToast(context, errorSentence(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _complete() async {
     final q = _quote;
     if (q == null || _busy) return;
+    if (_method == 'split') return _completeSplit(q.total);
     if (_method == 'cash' && (_tendered == null || _tendered! <= 0)) {
       showToast(context, 'Enter the cash received.');
       return;
@@ -192,11 +254,10 @@ class _CartScreenState extends State<CartScreen> {
     setState(() => _busy = true);
     _key ??= OrdersApi.newKey();
     try {
-      final r = widget.resume;
       final OrderView view;
-      if (r != null) {
+      if (_heldId != null) {
         final version = await _syncHeld('${_key!}:lines');
-        view = await _api.pay(r.orderId, method: _method, tendered: _method == 'cash' ? _tendered : null, reference: ref.isEmpty ? null : ref, version: version, key: _key!);
+        view = await _api.pay(_heldId!, method: _method, tendered: _method == 'cash' ? _tendered : null, reference: ref.isEmpty ? null : ref, version: version, key: _key!);
       } else {
         view = await _api.checkout(lines: _lines, method: _method, tendered: _method == 'cash' ? _tendered : null, reference: ref.isEmpty ? null : ref, key: _key!);
       }
@@ -223,6 +284,15 @@ class _CartScreenState extends State<CartScreen> {
         if (!mounted) return;
         showToast(context, '#${r.displayNo} is still on hold.');
         Navigator.of(context).pop();
+        return;
+      }
+      final placed = _placed;
+      if (placed != null) {
+        // Split Pay already saved this cart as a held bill: keep that one
+        await _syncHeld(key, reason: reason);
+        final view = await _api.get(placed.id);
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => OrderScreen(api: _api, orderId: view.id, initial: view, onNavigate: widget.onNavigate)));
         return;
       }
       final view = await _api.hold(lines: _lines, key: key, reason: reason);
@@ -289,6 +359,10 @@ class _CartScreenState extends State<CartScreen> {
             _itemsCard(units),
             const SizedBox(height: 12),
             _methodCard(),
+            if (_checkout && _method == 'split') ...[
+              const SizedBox(height: 12),
+              _splitCard(total),
+            ],
             const SizedBox(height: 12),
             if (q != null)
               BillSummary(
@@ -369,6 +443,98 @@ class _CartScreenState extends State<CartScreen> {
           SmallPill('Apply Coupon', bg: kChipGreen, fg: kGreenText, border: kChipGreen, onTap: _lines.isEmpty ? null : _applyCoupon),
           SmallPill('Add Tip', onTap: () => showToast(context, 'Tips are not set up for counter bills yet.')),
           SmallPill('Add Items', bg: kLime, border: kLime, onTap: _addItems),
+        ]),
+      ]),
+    );
+  }
+
+  /// Split Pay: 2 to 4 parts, each a method and an amount (card and UPI with their reference); they must add up to the bill.
+  Widget _splitCard(num total) {
+    final left = total - _splitSum;
+    void changed() => setState(() => _key = null);
+    return OrderCardBox(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Kick('Split payment'),
+        const SizedBox(height: 4),
+        Text('Total due ${rupees(total)}. Add 2 to 4 parts; they must add up to the total.', style: inter(13, 400, color: kMuted)),
+        const SizedBox(height: 10),
+        for (final (i, p) in _parts.indexed)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                DropdownButton<String>(
+                  key: ValueKey('split-method-$i'),
+                  value: p.method,
+                  underline: const SizedBox.shrink(),
+                  items: const [
+                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                    DropdownMenuItem(value: 'card', child: Text('Card')),
+                    DropdownMenuItem(value: 'upi', child: Text('UPI')),
+                  ],
+                  onChanged: (v) {
+                    p.method = v!;
+                    changed();
+                  },
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    key: ValueKey('split-amount-$i'),
+                    controller: p.amount,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                    decoration: InputDecoration(prefixText: '₹ ', hintText: 'Amount'),
+                    onChanged: (_) => changed(),
+                  ),
+                ),
+                TextButton(
+                  key: ValueKey('split-rest-$i'),
+                  onPressed: () {
+                    final rest = total - (_splitSum - (num.tryParse(p.amount.text.trim()) ?? 0));
+                    p.amount.text = rest > 0 ? (rest == rest.roundToDouble() ? '${rest.toInt()}' : rest.toStringAsFixed(2)) : '';
+                    changed();
+                  },
+                  child: Text('Rest', style: inter(13, 700, color: kGreenText)),
+                ),
+                if (_parts.length > 2)
+                  IconButton(
+                    key: ValueKey('split-remove-$i'),
+                    tooltip: 'Remove part',
+                    icon: const Icon(LucideIcons.x, size: 16),
+                    onPressed: () {
+                      _parts.removeAt(i).dispose();
+                      changed();
+                    },
+                  ),
+              ]),
+              if (p.method != 'cash')
+                TextField(
+                  key: ValueKey('split-reference-$i'),
+                  controller: p.reference,
+                  maxLength: 60,
+                  onChanged: (_) => changed(),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    labelText: p.method == 'card' ? 'Card reference (last 4 digits or approval code)' : 'UPI reference (UTR or transaction id)',
+                  ),
+                ),
+            ]),
+          ),
+        Row(children: [
+          if (_parts.length < 4)
+            TextButton.icon(
+              key: const ValueKey('split-add'),
+              onPressed: () {
+                _parts.add(_SplitPart('card'));
+                changed();
+              },
+              icon: const Icon(LucideIcons.plus, size: 16),
+              label: const Text('Add part'),
+            ),
+          const Spacer(),
+          Text(left.abs() < 0.005 ? 'Adds up' : (left > 0 ? '${rupees(left)} still to allocate' : '${rupees(-left)} too much'),
+              key: const ValueKey('split-left'), style: inter(13, 700, color: left.abs() < 0.005 ? kGreenText : kWarnText)),
         ]),
       ]),
     );
