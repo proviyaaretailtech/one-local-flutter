@@ -235,6 +235,8 @@ export const MANIFEST: Entry[] = [
   db('tbl_history', { args: tbl.History, map: P, rate: 'read', roles: 'floor staff' }),
   db('tbl_reserve', { args: tbl.Reserve, map: P, rate: 'write', idem: true, roles: 'staff with order:place (or table manager)' }),
   db('tbl_reserve_cancel', { args: tbl.ReserveCancel, map: P, rate: 'write', roles: 'staff with order:place (or table manager)' }),
+  db('tbl_reservations_list', { args: tbl.ReservationsList, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  db('tbl_reserve_seat', { args: tbl.ReserveSeat, map: P, rate: 'write', roles: 'staff with order:place (or table manager)' }),
   db('tbl_transfer', { args: tbl.Transfer, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('tbl_merge', { args: tbl.Merge, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('tbl_split', { args: tbl.Split, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),

@@ -6,6 +6,8 @@ import '../home/home_nav.dart';
 import '../home/side_nav.dart';
 import '../tables/bill_adjust.dart' show AdjustRequestsScreen;
 import '../tables/bill_api.dart' show BillApi;
+import '../tables/reservations_screen.dart' show ReservationsScreen;
+import '../tables/table_widgets.dart' show TablesEnv;
 import 'rst_page_manager.dart';
 import 'rst_plans_screen.dart';
 
@@ -33,6 +35,8 @@ class RestaurantMoreScreen {
     final settings = HomeNav.settings ?? HomeNav.setup;
     return [
       SideNavEntry(LucideIcons.qrCode, 'All Orders', open(HomeNav.orderHistory ?? HomeNav.orders)),
+      // today's bookings: seat, no-show, cancel (0642)
+      SideNavEntry(LucideIcons.calendarClock, 'Reservations', back(() => Navigator.of(context).push(ReservationsScreen.route(TablesEnv())))),
       // cancels, refunds and voids a cashier asked for, waiting for a manager (0640)
       SideNavEntry(LucideIcons.badgeCheck, 'Approvals', back(() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdjustRequestsScreen(api: BillApi()))))),
       SideNavEntry(LucideIcons.indianRupee, 'Money', open(HomeNav.money)),

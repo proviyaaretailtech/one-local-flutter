@@ -25,7 +25,12 @@ export const Reserve = obj({
   notes: z.string().max(300, 'Special notes can be up to 300 characters.').nullish(),
   idempotency_key: z.string().trim().max(100, 'The idempotency key is too long.').optional(),
 }).refine(v => !!(v.scheduled_at || v.local_date), { message: 'Choose a date and time.' });
-export const ReserveCancel = obj({ id, outcome: z.enum(['cancelled', 'no_show'], { message: 'Unknown outcome.' }).optional() });
+export const ReserveCancel = obj({ id, outcome: z.enum(['cancelled', 'no_show'], { message: 'Unknown outcome.' }).optional(),
+  reason: z.string().trim().max(200, 'Keep the reason under 200 characters.').nullish() });
+// 0642: the bookings of one day (the store's calendar), and seating the guests who arrived (at their table or another free one)
+export const ReservationsList = obj({ location_id: id.nullish(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Dates look like 2026-11-03.').nullish(),
+  status: z.enum(['upcoming', 'seated', 'cancelled', 'no_show', 'all'], { message: 'Unknown filter.' }).optional() });
+export const ReserveSeat = obj({ location_id: id.nullish(), id, table_id: id.nullish() });
 export const Transfer = obj({ from_table_id: id, to_table_id: id });
 export const Merge = obj({ table_ids: z.array(id, { message: 'Choose the tables to join.' }).min(2, 'Choose at least two tables.').max(8, 'You can join up to eight tables.') });
 export const Split = obj({ merge_id: id.optional(), table_id: id.optional() }).refine(v => !!(v.merge_id || v.table_id), { message: 'Choose the joined tables to split.' });

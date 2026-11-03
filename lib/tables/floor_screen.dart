@@ -10,6 +10,7 @@ import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'dish_options_sheet.dart';
 import 'guest_orders.dart';
+import 'reservations_screen.dart';
 import 'reserve_screen.dart';
 import 'manage_tables_screen.dart';
 import 'table_deck.dart';
@@ -652,11 +653,18 @@ class _FloorScreenState extends State<FloorScreen> {
               if (v == 'qr') {
                 await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TableQrScreen(env: env)));
                 if (mounted) _load();
+              } else if (v == 'reservations') {
+                await Navigator.of(context).push(ReservationsScreen.route(env));
+                if (mounted) _load();
               } else {
                 await _manage();
               }
             },
             itemBuilder: (_) => [
+              PopupMenuItem(
+                  key: const ValueKey('open-reservations'),
+                  value: 'reservations',
+                  child: Row(children: [const Icon(LucideIcons.calendarClock, size: 18), const SizedBox(width: 10), Text('Reservations', style: inter(14, 500))])),
               PopupMenuItem(key: const ValueKey('open-qr'), value: 'qr', child: Row(children: [const Icon(LucideIcons.qrCode, size: 18), const SizedBox(width: 10), Text('Table QR codes', style: inter(14, 500))])),
               PopupMenuItem(key: const ValueKey('open-manage-tables'), value: 'manage', child: Row(children: [const Icon(LucideIcons.layoutGrid, size: 18), const SizedBox(width: 10), Text('Manage tables', style: inter(14, 500))])),
             ],
@@ -840,7 +848,7 @@ class _TableSheet extends StatefulWidget {
 class _TableSheetState extends State<_TableSheet> {
   Facts? _v;
   String? _error;
-  bool _cleaning = false;
+  bool _cleaning = false, _acting = false;
 
   /// "Mark as clean" (0603): the table is Available at once instead of after its 10 Cleaning minutes; the floor reloads on close.
   Future<void> _markClean(String label) async {
@@ -941,6 +949,20 @@ class _TableSheetState extends State<_TableSheet> {
           const Divider(height: 28, color: kLine),
           if (_v == null && _error == null) Padding(padding: const EdgeInsets.all(20), child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: kInk)))),
           if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_error!, style: inter(14, 400, color: kRedText))),
+          // 0642: the table's bookings (from 3 hours ago on) with Seat, No-show and Cancel, so a reserved table can be dealt with here
+          for (final r in v?.l('reservations') ?? const <Facts>[])
+            ReservationCard(
+              r: r,
+              showTable: false,
+              busy: _acting,
+              onAction: (a) async {
+                setState(() => _acting = true);
+                final changed = await reservationAction(context, widget.env, r, a);
+                if (!mounted) return;
+                setState(() => _acting = false);
+                if (changed) await _load();
+              },
+            ),
           if (status == 'cleaning') ...[
             LimeButton('Mark as clean', key: const ValueKey('sheet-mark-clean'), icon: LucideIcons.sparkles, height: 56, busy: _cleaning, onPressed: () => _markClean(label)),
             const SizedBox(height: 6),

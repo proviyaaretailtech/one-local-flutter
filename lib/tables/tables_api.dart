@@ -84,9 +84,21 @@ class TablesApi {
         'idempotency_key': key,
       }, key: key));
 
-  /// [outcome] is cancelled, or no_show once the booking time has passed.
-  Future<Facts> cancelReservation(String reservationId, {String outcome = 'cancelled'}) async =>
-      Facts(await _call('tbl_reserve_cancel', {'id': reservationId, if (outcome != 'cancelled') 'outcome': outcome}));
+  /// [outcome] is cancelled, or no_show once the booking time has passed; [reason] is kept with the booking.
+  Future<Facts> cancelReservation(String reservationId, {String outcome = 'cancelled', String? reason}) async => Facts(await _call('tbl_reserve_cancel', {
+        'id': reservationId,
+        if (outcome != 'cancelled') 'outcome': outcome,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      }));
+
+  /// The bookings of one day (0642): [date] yyyy-MM-dd in the store's calendar (today when null); [status] upcoming / seated / cancelled /
+  /// no_show / all. Each booking says what may be done with it (`can`: seat, no_show, cancel).
+  Future<Facts> reservations({String? date, String status = 'upcoming'}) async =>
+      Facts(await _call('tbl_reservations_list', {'date': ?date, 'status': status}));
+
+  /// The guests have arrived: seated at their booked table, or at [tableId] (the booking moves there).
+  Future<Facts> seatReservation(String reservationId, {String? tableId}) async =>
+      Facts(await _call('tbl_reserve_seat', {'id': reservationId, 'table_id': ?tableId}));
 
   /// "Confirm Transfer": the open orders and the guests' session move to [toTableId].
   Future<Facts> transfer(String fromTableId, String toTableId) async => Facts(await _call('tbl_transfer', {'from_table_id': fromTableId, 'to_table_id': toTableId}));

@@ -1,0 +1,242 @@
+{
+ "upcoming": {
+  "date": "2026-11-03",
+  "today": "2026-11-03",
+  "counts": {
+   "all": 1,
+   "late": 0,
+   "guests": 3,
+   "seated": 0,
+   "no_show": 0,
+   "upcoming": 1,
+   "cancelled": 0
+  },
+  "local_time": "11:20",
+  "can_reserve": true,
+  "reservations": [
+   {
+    "id": "50923ae6-c5ec-4f9b-9e2d-1bbfd63e3abd",
+    "can": {
+     "seat": true,
+     "cancel": true,
+     "no_show": false
+    },
+    "late": false,
+    "notes": "Window seat",
+    "phone": "+91 98765 43210",
+    "guests": 3,
+    "status": "confirmed",
+    "table_id": "aca9217d-6fa6-4fcb-a00a-3bcdabf6c7af",
+    "seated_at": null,
+    "guest_name": "Asha Rao",
+    "local_date": "2026-11-03",
+    "local_time": "11:50",
+    "outcome_at": null,
+    "table_label": "R1",
+    "scheduled_at": "2026-11-03T06:20:20.948+00:00",
+    "outcome_reason": null
+   }
+  ]
+ },
+ "view_reserved": {
+  "merge": null,
+  "since": null,
+  "table": {
+   "id": "aca9217d-6fa6-4fcb-a00a-3bcdabf6c7af",
+   "label": "R1",
+   "seats": 4,
+   "area_id": null,
+   "area_name": null,
+   "own_seats": 4,
+   "min_capacity": 1,
+   "main_table_id": "aca9217d-6fa6-4fcb-a00a-3bcdabf6c7af"
+  },
+  "guests": null,
+  "orders": [],
+  "status": "reserved",
+  "waiter": null,
+  "allowed": [
+   "start_order",
+   "history",
+   "merge",
+   "reserve"
+  ],
+  "channel": null,
+  "bill_total": 0,
+  "reserved_at": "2026-11-03T06:20:20.948+00:00",
+  "reservations": [
+   {
+    "id": "50923ae6-c5ec-4f9b-9e2d-1bbfd63e3abd",
+    "can": {
+     "seat": true,
+     "cancel": true,
+     "no_show": false
+    },
+    "late": false,
+    "notes": "Window seat",
+    "phone": "+91 98765 43210",
+    "guests": 3,
+    "status": "confirmed",
+    "table_id": "aca9217d-6fa6-4fcb-a00a-3bcdabf6c7af",
+    "seated_at": null,
+    "guest_name": "Asha Rao",
+    "local_date": "2026-11-03",
+    "local_time": "11:50",
+    "outcome_at": null,
+    "table_label": "R1",
+    "scheduled_at": "2026-11-03T06:20:20.948+00:00",
+    "outcome_reason": null
+   }
+  ],
+  "elapsed_minutes": null
+ },
+ "seated": {
+  "moved": false,
+  "table": {
+   "id": "aca9217d-6fa6-4fcb-a00a-3bcdabf6c7af",
+   "label": "R1",
+   "seats": 4
+  },
+  "reservation": {
+   "id": "50923ae6-c5ec-4f9b-9e2d-1bbfd63e3abd",
+   "late": false,
+   "notes": "Window seat",
+   "phone": "+91 98765 43210",
+   "guests": 3,
+   "status": "seated",
+   "table_id": "aca9217d-6fa6-4fcb-a00a-3bcdabf6c7af",
+   "seated_at": "2026-11-03T05:50:21.038213+00:00",
+   "guest_name": "Asha Rao",
+   "local_date": "2026-11-03",
+   "local_time": "11:50",
+   "outcome_at": "2026-11-03T05:50:21.038213+00:00",
+   "table_label": "R1",
+   "scheduled_at": "2026-11-03T06:20:20.948+00:00",
+   "outcome_reason": null
+  }
+ },
+ "no_show": {
+  "reservation": {
+   "id": "d03f490d-7e90-4410-994a-ec07715616b1",
+   "late": false,
+   "notes": "Window seat",
+   "phone": "+91 98765 43210",
+   "guests": 2,
+   "status": "no_show",
+   "table_id": "32bdaab8-407c-452a-89b7-600b27a38a24",
+   "seated_at": null,
+   "guest_name": "Meera",
+   "local_date": "2026-11-03",
+   "local_time": "10:55",
+   "outcome_at": "2026-11-03T05:50:21.89707+00:00",
+   "table_label": "R6",
+   "scheduled_at": "2026-11-03T05:25:21.768989+00:00",
+   "outcome_reason": "Did not answer the phone"
+  }
+ },
+ "all": {
+  "date": "2026-11-03",
+  "today": "2026-11-03",
+  "counts": {
+   "all": 4,
+   "late": 0,
+   "guests": 7,
+   "seated": 2,
+   "no_show": 1,
+   "upcoming": 0,
+   "cancelled": 1
+  },
+  "local_time": "11:20",
+  "can_reserve": true,
+  "reservations": [
+   {
+    "id": "d03f490d-7e90-4410-994a-ec07715616b1",
+    "can": {
+     "seat": false,
+     "cancel": false,
+     "no_show": false
+    },
+    "late": false,
+    "notes": "Window seat",
+    "phone": "+91 98765 43210",
+    "guests": 2,
+    "status": "no_show",
+    "table_id": "32bdaab8-407c-452a-89b7-600b27a38a24",
+    "seated_at": null,
+    "guest_name": "Meera",
+    "local_date": "2026-11-03",
+    "local_time": "10:55",
+    "outcome_at": "2026-11-03T05:50:21.89707+00:00",
+    "table_label": "R6",
+    "scheduled_at": "2026-11-03T05:25:21.768989+00:00",
+    "outcome_reason": "Did not answer the phone"
+   },
+   {
+    "id": "50923ae6-c5ec-4f9b-9e2d-1bbfd63e3abd",
+    "can": {
+     "seat": false,
+     "cancel": false,
+     "no_show": false
+    },
+    "late": false,
+    "notes": "Window seat",
+    "phone": "+91 98765 43210",
+    "guests": 3,
+    "status": "seated",
+    "table_id": "aca9217d-6fa6-4fcb-a00a-3bcdabf6c7af",
+    "seated_at": "2026-11-03T05:50:21.038213+00:00",
+    "guest_name": "Asha Rao",
+    "local_date": "2026-11-03",
+    "local_time": "11:50",
+    "outcome_at": "2026-11-03T05:50:21.038213+00:00",
+    "table_label": "R1",
+    "scheduled_at": "2026-11-03T06:20:20.948+00:00",
+    "outcome_reason": null
+   },
+   {
+    "id": "91d910ce-1e4d-47fc-b289-963160196d2c",
+    "can": {
+     "seat": false,
+     "cancel": false,
+     "no_show": false
+    },
+    "late": false,
+    "notes": "Window seat",
+    "phone": "+91 98765 43210",
+    "guests": 4,
+    "status": "seated",
+    "table_id": "8c69d285-ac44-4568-a960-406801696181",
+    "seated_at": "2026-11-03T05:50:21.369255+00:00",
+    "guest_name": "Kiran",
+    "local_date": "2026-11-03",
+    "local_time": "12:05",
+    "outcome_at": "2026-11-03T05:50:21.369255+00:00",
+    "table_label": "R4",
+    "scheduled_at": "2026-11-03T06:35:21.096+00:00",
+    "outcome_reason": null
+   },
+   {
+    "id": "80d54634-70e0-41cc-8a6b-88fc676d1626",
+    "can": {
+     "seat": false,
+     "cancel": false,
+     "no_show": false
+    },
+    "late": false,
+    "notes": "Window seat",
+    "phone": "+91 98765 43210",
+    "guests": 2,
+    "status": "cancelled",
+    "table_id": "88468b78-231c-4e22-89b5-5b2f7adcb71a",
+    "seated_at": null,
+    "guest_name": "Later Guest",
+    "local_date": "2026-11-03",
+    "local_time": "16:20",
+    "outcome_at": "2026-11-03T05:50:21.606206+00:00",
+    "table_label": "R2",
+    "scheduled_at": "2026-11-03T10:50:21.066+00:00",
+    "outcome_reason": "Guest called to cancel"
+   }
+  ]
+ }
+}
