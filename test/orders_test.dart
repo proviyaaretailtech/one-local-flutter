@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/orders/cart_screen.dart';
+import 'package:vinii_pos/tables/bill_api.dart';
 import 'package:vinii_pos/orders/order_screen.dart';
 import 'package:vinii_pos/orders/orders_api.dart';
 import 'package:vinii_pos/orders/orders_home.dart';
@@ -16,6 +18,9 @@ import 'helpers.dart';
 import 'order_fixtures.dart';
 
 /// Fake server: records each request and answers from [handler].
+/// Real answers of the restaurant Checkout for a takeaway bill (server/scripts/rst-counter-bill-e2e.mjs with FIXTURES=…).
+final Map<String, dynamic> counterFx = jsonDecode(File('test/fixtures/rst_counter_bill_server.json').readAsStringSync()) as Map<String, dynamic>;
+
 class FakeServer {
   FakeServer(this.handler);
   final http.Response Function(http.Request r) handler;
@@ -236,29 +241,38 @@ void main() {
       expect(jsonDecode(s.where('POST', '/checkout').last.body).containsKey('tendered'), isFalse);
     });
 
-    testWidgets('a restaurant\'s cart by card needs the reference, then sends it (0648)', (t) async {
+    testWidgets('a restaurant\'s cart: Send to kitchen & checkout holds it, sends it to the kitchen, then opens the restaurant Checkout (0649)', (t) async {
       HomeNav.shell = _Shell('restaurant');
       addTearDown(() => HomeNav.shell = null);
-      final s = FakeServer((r) => r.url.path.endsWith('/quote') ? ok(quote()) : ok(view('pending')));
-      await showTall(t, CartScreen(api: s.api, initialLines: [CartLine(menuItemId: 'm1', name: 'Amul Butter 500g')]));
-      await t.tap(find.textContaining('Proceed to Checkout'));
+      final s = FakeServer((r) {
+        final p = r.url.path;
+        if (p.endsWith('/quote')) return ok(quote());
+        if (p.endsWith('/hold')) return ok(view('checkout'));
+        if (p.endsWith('/rpc/rst_hold_send')) return ok({'order_id': orderId, 'kot': {}});
+        return ok(view('pending'));
+      });
+      final billCalls = <http.Request>[];
+      final bill = BillApi(baseUrl: 'http://bill.test', accessToken: () => 't', client: MockClient((r) async {
+        billCalls.add(r);
+        // the captured takeaway bill, as the order this cart was held as
+        final v = jsonDecode(jsonEncode(counterFx['view_takeaway'])) as Map<String, dynamic>;
+        ((v['orders'] as List).first as Map)['id'] = orderId;
+        return ok(v);
+      }));
+      await showTall(t, CartScreen(api: s.api, bill: bill, initialLines: [CartLine(menuItemId: 'm1', name: 'Amul Butter 500g')]));
+      expect(find.textContaining('Proceed to Checkout'), findsNothing);
+      await t.tap(find.textContaining('Send to kitchen & checkout'));
       await t.pumpAndSettle();
-      await t.tap(find.text('Card'));
-      await t.pumpAndSettle();
-      await t.tap(find.textContaining('Complete Payment'));
-      await t.pumpAndSettle();
-      expect(toast('Enter the card reference: the last 4 digits or the approval code.'), findsOneWidget);
-      expect(s.where('POST', '/checkout'), isEmpty);
-      await t.enterText(find.byKey(const ValueKey('cart-reference')), '4821');
-      await t.tap(find.textContaining('Complete Payment'));
-      await t.pumpAndSettle();
-      final b = jsonDecode(s.where('POST', '/checkout').single.body) as Map;
-      expect([b['method'], b['reference']], ['card', '4821']);
+      final hold = s.where('POST', '/hold').single;
+      final send = s.where('POST', '/rpc/rst_hold_send').single;
+      expect(jsonDecode(send.body), {'order_id': orderId, 'idempotency_key': '${hold.headers['Idempotency-Key']!.replaceAll(':hold', '')}:send'});
+      expect(s.where('POST', '/checkout'), isEmpty, reason: 'the store checkout is not used in a restaurant');
+      expect(jsonDecode(billCalls.first.body), {'order_id': orderId});
+      expect(find.text('Takeaway #P-00001'), findsOneWidget);
+      expect(find.text('CURRENT ITEMS (TAKEAWAY #P-00001)'), findsOneWidget);
     });
 
-    testWidgets('Split Pay: the parts must add up and a UPI part needs its UTR; the cart is held, then split-paid with one key', (t) async {
-      HomeNav.shell = _Shell('restaurant');
-      addTearDown(() => HomeNav.shell = null);
+    testWidgets('a store\'s Split Pay: the parts must add up, a UPI part sends its UTR; the cart is held, then split-paid with one key', (t) async {
       final s = FakeServer((r) {
         final p = r.url.path;
         if (p.endsWith('/quote')) return ok(quote());
@@ -278,10 +292,6 @@ void main() {
       await t.tap(find.byKey(const ValueKey('split-rest-1')));
       await t.pump();
       expect(find.text('Adds up'), findsOneWidget);
-      await t.tap(find.textContaining('Complete Payment'));
-      await t.pumpAndSettle();
-      expect(toast('Enter the UPI reference for part 2.'), findsOneWidget);
-      expect(s.where('POST', '/hold'), isEmpty);
       await t.enterText(find.byKey(const ValueKey('split-reference-1')), 'UTR4040');
       await t.tap(find.textContaining('Complete Payment'));
       await t.pumpAndSettle();

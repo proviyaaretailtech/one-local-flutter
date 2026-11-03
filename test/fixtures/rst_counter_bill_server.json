@@ -1,0 +1,312 @@
+{
+  "view_takeaway": {
+    "can": {
+      "pay": true,
+      "note": true,
+      "split": true,
+      "coupon": true
+    },
+    "table": null,
+    "orders": [
+      {
+        "id": "9b387bf9-ca3e-4e45-988a-2473118dd5b0",
+        "due": 525,
+        "paid": 0,
+        "items": [
+          {
+            "id": "aa949ca9-478f-497b-8854-bc79641bd7eb",
+            "qty": 1,
+            "name": "Thali",
+            "add_ons": [],
+            "variant": null,
+            "in_combo": false,
+            "takeaway": false,
+            "line_total": 400,
+            "unit_price": 400
+          },
+          {
+            "id": "f85eaa37-82a5-4fd1-afc3-dc68979f0d6c",
+            "qty": 1,
+            "name": "Lassi",
+            "add_ons": [],
+            "variant": null,
+            "in_combo": false,
+            "takeaway": false,
+            "line_total": 100,
+            "unit_price": 100
+          }
+        ],
+        "notes": null,
+        "split": null,
+        "total": 525,
+        "status": "sent_to_kitchen",
+        "channel": "pickup",
+        "gst_pct": 5,
+        "discount": 0,
+        "payments": [],
+        "subtotal": 500,
+        "round_off": 0,
+        "created_at": "2026-11-03T11:51:34.668435+00:00",
+        "display_no": "P-00001",
+        "gst_amount": 25,
+        "updated_at": "2026-11-03T11:51:34.668435+00:00",
+        "coupon_code": null,
+        "customer_id": null,
+        "customer_name": null,
+        "bill_generated": true,
+        "customer_phone": null,
+        "service_charge": 0,
+        "manual_discount": null,
+        "discount_limit_pct": 10
+      }
+    ],
+    "counter": {
+      "label": "Takeaway",
+      "channel": "pickup",
+      "customer": null,
+      "order_id": "9b387bf9-ca3e-4e45-988a-2473118dd5b0",
+      "display_no": "P-00001"
+    },
+    "location": {
+      "id": "6427e89b-d124-458e-834c-6f15e1df5075",
+      "name": "Golden ZZ CTR mw0mnhsm - Main"
+    },
+    "unavailable": {
+      "pay": null,
+      "coupon": null
+    },
+    "receipt_printer": null,
+    "current_order_id": "9b387bf9-ca3e-4e45-988a-2473118dd5b0"
+  },
+  "pay_part": {
+    "due": 236.5,
+    "amount": 236.5,
+    "change": 0,
+    "method": "card",
+    "paid_at": "2026-11-03T11:51:35.469563+00:00",
+    "part_id": "67e55e42-0f3e-41a0-bad7-1067cc57010e",
+    "order_id": "9b387bf9-ca3e-4e45-988a-2473118dd5b0",
+    "replayed": false,
+    "tendered": null,
+    "display_no": "P-00001",
+    "order_paid": false,
+    "part_label": "Guest 1",
+    "order_total": 473,
+    "location_name": "Golden ZZ CTR mw0mnhsm - Main",
+    "next_order_id": null,
+    "table_settled": true,
+    "payment_method": "card"
+  },
+  "pay_last": {
+    "due": 0,
+    "amount": 236.5,
+    "change": 0,
+    "method": "upi",
+    "paid_at": "2026-11-03T11:51:35.520407+00:00",
+    "part_id": "6b1111b7-ae47-4ee7-bac3-d45ae7817ce7",
+    "order_id": "9b387bf9-ca3e-4e45-988a-2473118dd5b0",
+    "replayed": false,
+    "tendered": null,
+    "display_no": "P-00001",
+    "order_paid": true,
+    "part_label": "Guest 2",
+    "order_total": 473,
+    "location_name": "Golden ZZ CTR mw0mnhsm - Main",
+    "next_order_id": null,
+    "table_settled": true,
+    "payment_method": "split"
+  },
+  "receipt": {
+    "id": "9b387bf9-ca3e-4e45-988a-2473118dd5b0",
+    "due": 0,
+    "paid": 473,
+    "sent": [],
+    "items": [
+      {
+        "id": "aa949ca9-478f-497b-8854-bc79641bd7eb",
+        "qty": 1,
+        "name": "Thali",
+        "add_ons": [],
+        "variant": null,
+        "in_combo": false,
+        "takeaway": false,
+        "line_total": 400,
+        "unit_price": 400
+      },
+      {
+        "id": "f85eaa37-82a5-4fd1-afc3-dc68979f0d6c",
+        "qty": 1,
+        "name": "Lassi",
+        "add_ons": [],
+        "variant": null,
+        "in_combo": false,
+        "takeaway": false,
+        "line_total": 100,
+        "unit_price": 100
+      }
+    ],
+    "notes": null,
+    "split": {
+      "id": "5f3649b4-7e98-4a3b-88d0-69904f45a172",
+      "due": 473,
+      "mode": "equal",
+      "parts": [
+        {
+          "id": "67e55e42-0f3e-41a0-bad7-1067cc57010e",
+          "label": "Guest 1",
+          "amount": 236.5,
+          "method": "cash",
+          "status": "paid",
+          "paid_at": "2026-11-03T11:51:35.459609+00:00",
+          "part_no": 1,
+          "item_ids": [],
+          "paid_method": "card"
+        },
+        {
+          "id": "6b1111b7-ae47-4ee7-bac3-d45ae7817ce7",
+          "label": "Guest 2",
+          "amount": 236.5,
+          "method": "cash",
+          "status": "paid",
+          "paid_at": "2026-11-03T11:51:35.513663+00:00",
+          "part_no": 2,
+          "item_ids": [],
+          "paid_method": "upi"
+        }
+      ],
+      "status": "completed",
+      "order_id": "9b387bf9-ca3e-4e45-988a-2473118dd5b0",
+      "open_parts": 0,
+      "paid_parts": 2
+    },
+    "total": 473,
+    "status": "paid",
+    "channel": "pickup",
+    "gst_pct": 5,
+    "paid_at": "2026-11-03T11:51:35.513663+00:00",
+    "business": "Golden ZZ CTR mw0mnhsm",
+    "discount": 50,
+    "location": {
+      "id": "6427e89b-d124-458e-834c-6f15e1df5075",
+      "name": "Golden ZZ CTR mw0mnhsm - Main"
+    },
+    "payments": [
+      {
+        "at": "2026-11-03T11:51:35.469563+00:00",
+        "id": "0e8e30f6-31da-44c4-bef1-65c2a488448e",
+        "amount": 236.5,
+        "method": "card",
+        "tendered": null
+      },
+      {
+        "at": "2026-11-03T11:51:35.520407+00:00",
+        "id": "9e84b14f-c01d-4488-8668-a7304f35beaa",
+        "amount": 236.5,
+        "method": "upi",
+        "tendered": null
+      }
+    ],
+    "subtotal": 500,
+    "round_off": 0.5,
+    "created_at": "2026-11-03T11:51:34.668435+00:00",
+    "display_no": "P-00001",
+    "gst_amount": 22.5,
+    "updated_at": "2026-11-03T11:51:35.513663+00:00",
+    "coupon_code": null,
+    "customer_id": null,
+    "table_label": null,
+    "customer_name": null,
+    "bill_generated": false,
+    "customer_phone": null,
+    "payment_method": "split",
+    "service_charge": 0,
+    "manual_discount": {
+      "by": "ZZ own",
+      "kind": "percent",
+      "value": 10,
+      "reason": "Regular guest",
+      "approved_by": "Staff"
+    },
+    "receipt_printer": null,
+    "discount_limit_pct": 10
+  },
+  "view_held": {
+    "can": {
+      "pay": false,
+      "note": true,
+      "split": false,
+      "coupon": true
+    },
+    "table": null,
+    "orders": [
+      {
+        "id": "46259140-e990-4b6d-98cd-3e1ba5485a06",
+        "due": 525,
+        "paid": 0,
+        "items": [
+          {
+            "id": "2745b6eb-97a2-45bc-ada1-535133071714",
+            "qty": 1,
+            "name": "Lassi",
+            "add_ons": [],
+            "variant": null,
+            "in_combo": false,
+            "takeaway": false,
+            "line_total": 100,
+            "unit_price": 100
+          },
+          {
+            "id": "aeffea3c-8af8-4267-a083-3677f49fa1ab",
+            "qty": 1,
+            "name": "Thali",
+            "add_ons": [],
+            "variant": null,
+            "in_combo": false,
+            "takeaway": false,
+            "line_total": 400,
+            "unit_price": 400
+          }
+        ],
+        "notes": null,
+        "split": null,
+        "total": 525,
+        "status": "in_billing",
+        "channel": "pickup",
+        "gst_pct": 5,
+        "discount": 0,
+        "payments": [],
+        "subtotal": 500,
+        "round_off": 0,
+        "created_at": "2026-11-03T11:51:36.238301+00:00",
+        "display_no": "P-00002",
+        "gst_amount": 25,
+        "updated_at": "2026-11-03T11:51:36.238301+00:00",
+        "coupon_code": null,
+        "customer_id": null,
+        "customer_name": null,
+        "bill_generated": false,
+        "customer_phone": null,
+        "service_charge": 0,
+        "manual_discount": null,
+        "discount_limit_pct": 10
+      }
+    ],
+    "counter": {
+      "label": "Takeaway",
+      "channel": "pickup",
+      "customer": null,
+      "order_id": "46259140-e990-4b6d-98cd-3e1ba5485a06",
+      "display_no": "P-00002"
+    },
+    "location": {
+      "id": "6427e89b-d124-458e-834c-6f15e1df5075",
+      "name": "Golden ZZ CTR mw0mnhsm - Main"
+    },
+    "unavailable": {
+      "pay": "Send the order to the kitchen first.",
+      "coupon": null
+    },
+    "receipt_printer": null,
+    "current_order_id": "46259140-e990-4b6d-98cd-3e1ba5485a06"
+  }
+}

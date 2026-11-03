@@ -8,6 +8,9 @@ import '../api/net_guard.dart';
 import '../customers/customer_picker.dart';
 import '../customers/customers_api.dart';
 import '../home/home_nav.dart';
+import '../tables/bill_api.dart' show BillApi;
+import '../tables/bill_pay_screen.dart' show BillPayScreen;
+import '../tables/table_widgets.dart' show TablesEnv;
 import '../ui/theme.dart';
 import 'order_screen.dart';
 import 'order_widgets.dart';
@@ -28,12 +31,13 @@ class ResumeHold {
 /// Every total on screen is the server's quote; the phone only keeps which items and how many.
 /// With [resume] it is the cart of a held bill instead (see [ResumeHold]).
 class CartScreen extends StatefulWidget {
-  const CartScreen({super.key, this.api, this.initialLines = const [], this.onNavigate, this.customersApi, this.resume});
+  const CartScreen({super.key, this.api, this.initialLines = const [], this.onNavigate, this.customersApi, this.resume, this.bill});
   final OrdersApi? api;
   final CustomersApi? customersApi; // S5.5: the bill's customer
   final List<CartLine> initialLines;
   final ValueChanged<String>? onNavigate;
   final ResumeHold? resume;
+  final BillApi? bill; // the restaurant Checkout's (0649); tests pass a fake
   @override
   State<CartScreen> createState() => _CartScreenState();
 }
@@ -237,6 +241,34 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  /// 0649: a restaurant takes a takeaway at its own Checkout (coupon, manual discount, split, references): the cart is saved as a held
+  /// bill (a resumed one keeps its lines in step) and sent to the kitchen (`rst_hold_send`; a held bill the kitchen never got cannot be
+  /// paid), then the Checkout opens on it in place of the cart.
+  Future<void> _restaurantCheckout() async {
+    if (_busy || _lines.isEmpty) return;
+    setState(() => _busy = true);
+    final key = _key ??= OrdersApi.newKey();
+    try {
+      if (_heldId == null) {
+        final v = await _api.hold(lines: _lines, key: '$key:hold');
+        _placed = v;
+        _resumeVersion = v.version;
+        _savedLines = _snapshot();
+      } else {
+        await _syncHeld('$key:lines');
+      }
+      final id = _heldId!;
+      await _api.sendHeld(id, key: '$key:send');
+      await _linkCustomer(id);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => BillPayScreen(env: TablesEnv(), tableId: '', orderId: id, bill: widget.bill)));
+    } catch (e) {
+      if (mounted) showToast(context, errorSentence(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _complete() async {
     final q = _quote;
     if (q == null || _busy) return;
@@ -379,7 +411,10 @@ class _CartScreenState extends State<CartScreen> {
               OrderCardBox(child: Text(_quoteError ?? (_lines.isEmpty ? 'Add items to see the bill.' : 'Pricing…'), style: inter(13, 400, color: kMuted))),
             const SizedBox(height: 16),
             if (!_checkout) ...[
-              DarkCta(label: 'Proceed to Checkout ${rupees(total)}', onPressed: q == null ? null : () => setState(() => _checkout = true)),
+              DarkCta(
+                  label: HomeNav.shell?.kind == 'restaurant' ? 'Send to kitchen & checkout ${rupees(total)}' : 'Proceed to Checkout ${rupees(total)}',
+                  busy: _busy,
+                  onPressed: q == null ? null : () => HomeNav.shell?.kind == 'restaurant' ? _restaurantCheckout() : setState(() => _checkout = true)),
               const SizedBox(height: 10),
               LightCta(label: tr('Edit cart items'), onPressed: _addItems),
             ] else

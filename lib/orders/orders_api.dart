@@ -27,6 +27,9 @@ class OrderView {
   bool get online => raw['online'] == true;
   String get channelLabel => _s('channel_label');
   String? get placeLabel => raw['place_label'] as String?;
+
+  /// 0649: a restaurant's takeaway or delivery bill (no table) is taken at the restaurant Checkout, not the store's pay sheet.
+  bool get counterBill => raw['table_id'] == null && (raw['channel'] == 'pickup' || raw['channel'] == 'delivery');
   String get customer => _s('customer');
   String get placedAt => _s('placed_at');
   String get orderStatus => _s('order_status');

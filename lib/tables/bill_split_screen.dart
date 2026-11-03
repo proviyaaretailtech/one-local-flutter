@@ -69,7 +69,7 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
 
   Future<void> _load() async {
     try {
-      final v = await _api.view(widget.tableId);
+      final v = await _api.view(widget.tableId, orderId: widget.orderId);
       if (!mounted) return;
       setState(() {
         _v = v;
@@ -177,13 +177,13 @@ class _BillSplitScreenState extends State<BillSplitScreen> {
     final v = _v;
     final o = _order;
     final split = _split;
-    final t = v?.m('table');
+    final place = billPlace(v);
     final open = split?.l('parts').where((p) => p.s('status') == 'open').toList() ?? const <Facts>[];
     final paidAny = (split?.n('paid_parts') ?? 0) > 0;
     return TablesPage(
       env: widget.env,
       title: 'Split the bill',
-      subtitle: t == null || o == null ? ' ' : 'Table ${t.s('label')} · ${money(o.n('due'))}',
+      subtitle: place == null || o == null ? ' ' : '$place · ${money(o.n('due'))}',
       back: true,
       onRefresh: _load,
       children: [

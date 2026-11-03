@@ -8,6 +8,8 @@ import '../home/home_nav.dart';
 import '../tables/admin_pin.dart' show withAdminPin;
 import '../tables/bill_adjust.dart' show BillMoneyScreen;
 import '../tables/bill_api.dart' show BillApi;
+import '../tables/bill_pay_screen.dart' show BillPayScreen;
+import '../tables/table_widgets.dart' show TablesEnv;
 import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import '../ui/whatsapp.dart';
@@ -104,7 +106,13 @@ class _OrderScreenState extends State<OrderScreen> {
       case 'refresh':
         await _load();
       case 'pay':
-        await _paySheet();
+        if (HomeNav.shell?.kind == 'restaurant' && v.counterBill) {
+          // 0649: coupon, manual discount, split and references, as on a table's bill
+          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => BillPayScreen(env: TablesEnv(), tableId: '', orderId: v.id, bill: widget.bill)));
+          await _load();
+        } else {
+          await _paySheet();
+        }
       case 'cancel':
         final reason = await _textSheet('Cancel bill', 'Why is this bill cancelled?', 'Cancel bill');
         // 0645: an order the kitchen has, or a generated bill, is cancelled with an admin PIN and a note

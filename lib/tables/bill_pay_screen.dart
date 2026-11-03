@@ -29,6 +29,7 @@ import '../settings/store_qr.dart';
 class BillPayScreen extends StatefulWidget {
   const BillPayScreen({super.key, required this.env, required this.tableId, this.bill, this.part, this.orderId, this.openUrl});
   final TablesEnv env;
+  /// Empty for a takeaway or delivery bill (0649): then [orderId] (or the part's order) names the bill.
   final String tableId;
   final BillApi? bill;
 
@@ -87,7 +88,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
 
   Future<void> _load() async {
     try {
-      final v = await _api.view(widget.tableId);
+      final v = await _api.view(widget.tableId, orderId: widget.part?.so('order_id') ?? widget.orderId);
       if (!mounted) return;
       setState(() {
         _v = v;
@@ -226,7 +227,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
     var digits = to.replaceAll(RegExp(r'\D'), '');
     if (digits.length == 10) digits = '91$digits';
     if (digits.length < 11) return showToast(context, 'Enter a 10-digit mobile number.');
-    final text = billText(o, table: _v!.m('table').s('label'));
+    final text = billText(o, table: _v!.mo('table')?.so('label'));
     final uri = channel == 'whatsapp' ? Uri.parse('https://wa.me/$digits?text=${Uri.encodeComponent(text)}') : Uri(scheme: 'sms', path: '+$digits', query: 'body=${Uri.encodeComponent(text)}'); // %20, not +, for spaces
     if (!await _open(uri) && mounted) showToast(context, channel == 'whatsapp' ? 'WhatsApp could not be opened.' : 'The SMS app could not be opened.');
   }
@@ -242,7 +243,7 @@ class _BillPayScreenState extends State<BillPayScreen> {
   Widget build(BuildContext context) {
     final v = _v;
     final o = _order;
-    final t = v?.m('table');
+    final place = billPlace(v);
     final orders = v?.l('orders') ?? const <Facts>[];
     final part = widget.part;
     final idx = o == null ? 0 : orders.indexWhere((x) => x.s('id') == o.s('id')) + 1;
@@ -250,10 +251,10 @@ class _BillPayScreenState extends State<BillPayScreen> {
     return TablesPage(
       env: widget.env,
       title: 'Checkout',
-      subtitle: t == null
+      subtitle: place == null
           ? ' '
           : [
-              'Table ${t.s('label')}',
+              place,
               if (part != null) part.s('label'),
               if (part == null && orders.length > 1) 'Bill $idx of ${orders.length}',
             ].join(' · '),
@@ -262,11 +263,11 @@ class _BillPayScreenState extends State<BillPayScreen> {
       children: [
         if (v == null && _error == null) tablesLoading(),
         if (_error != null) TablesError(_error!, onRetry: _load),
-        if (v != null && o == null) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text('No open bill on this table.', style: inter(15, 400, color: kMuted)))),
+        if (v != null && o == null) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text(widget.tableId.isEmpty ? 'This bill is already settled.' : 'No open bill on this table.', style: inter(15, 400, color: kMuted)))),
         if (v != null && o != null) ...[
           // who the bill is for (founder, 30 Oct 2026): name and number, before the bill is paid
           BillCustomerButton(api: _api, order: o, onSaved: _load),
-          BillCard(title: 'CURRENT ITEMS (TABLE ${t!.s('label').toUpperCase()})', children: [
+          BillCard(title: 'CURRENT ITEMS (${(place ?? '').toUpperCase()})', children: [
             // eaten here first, then the dishes packed to take away on the same bill (0606)
             for (final i in billItems(o).where((i) => !i.b('takeaway'))) ...[
               BillLine('${qty(i.n('qty'))} × ${i.s('name')}${(i.so('variant') ?? '').isEmpty ? '' : ' (${i.s('variant')})'}', money(i.n('line_total'))),

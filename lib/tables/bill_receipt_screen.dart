@@ -144,7 +144,13 @@ class _BillReceiptScreenState extends State<BillReceiptScreen> {
             ]),
           ),
           const SizedBox(height: 16),
-          DarkLimeButton('Back to tables', key: const ValueKey('back-to-tables'), onPressed: () => backToTables(context)),
+          // 0649: a takeaway or delivery bill (no table) goes back past the payment screen to where it was opened
+          if (r.so('table_label') == null)
+            DarkLimeButton('Done', key: const ValueKey('receipt-done'), onPressed: () => Navigator.of(context)
+              ..pop()
+              ..pop())
+          else
+            DarkLimeButton('Back to tables', key: const ValueKey('back-to-tables'), onPressed: () => backToTables(context)),
         ],
       ],
     );

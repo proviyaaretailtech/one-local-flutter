@@ -30,7 +30,11 @@ class BillApi {
   }
 
   /// The bill of a table: its open orders (oldest first) with items, money, paid, due, coupon, note, split plan and payments.
-  Future<Facts> view(String tableId) => _call('rst_bill_view', {'table_id': tableId, if (locationId != null && locationId!.isNotEmpty) 'location_id': locationId});
+  /// 0649: a takeaway or delivery bill has no table: [tableId] is empty and [orderId] names it.
+  Future<Facts> view(String tableId, {String? orderId}) => _call('rst_bill_view', {
+        if (tableId.isNotEmpty) 'table_id': tableId else 'order_id': orderId,
+        if (locationId != null && locationId!.isNotEmpty) 'location_id': locationId,
+      });
 
   /// [mode] equal | item | amount. [parts]: per guest {label, method, amount (amount mode), item_ids (item mode)}.
   Future<Facts> split(String orderId, {required String mode, int? guests, required List<Map<String, Object?>> parts, required String key}) =>
@@ -124,6 +128,14 @@ String money(num? v) {
     grouped = '${parts.join(',')},$last3';
   }
   return '${(v ?? 0) < 0 ? '-' : ''}₹$grouped${paise == 0 ? '' : '.${paise.toString().padLeft(2, '0')}'}';
+}
+
+/// Where a bill is (0649): "Table T1", or "Takeaway #P-00012" / "Delivery #P-00013" for a bill with no table; null before it loads.
+String? billPlace(Facts? view) {
+  final t = view?.mo('table'), c = view?.mo('counter');
+  if (t != null) return 'Table ${t.s('label')}';
+  if (c != null) return '${c.s('label')} #${c.s('display_no')}';
+  return null;
 }
 
 /// The plain-text bill / receipt (Print Bill, Print, WhatsApp, SMS, email). [bill] is one order as `rst_bill_view` or `rst_receipt_view` return it.

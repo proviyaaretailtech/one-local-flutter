@@ -36,7 +36,9 @@ const key = { idempotency_key: z.string().trim().max(90, 'The idempotency key is
 const money = z.number({ message: 'Enter an amount.' }).positive('Enter an amount above zero.').max(1_000_000, 'The amount is too large.');
 const method = z.enum(['cash', 'card', 'upi'], { message: 'Choose cash, card or UPI.' });
 const obj = <T extends z.ZodRawShape>(shape: T) => z.object(shape).loose();
-export const BillView = obj({ location_id: id.nullish(), table_id: id });
+// 0649: a table's bill, or a takeaway / delivery bill by its order
+export const BillView = obj({ location_id: id.nullish(), table_id: id.optional(), order_id: id.optional() })
+  .refine(b => !!b.table_id !== !!b.order_id, { message: 'Open a table or an order.', path: ['table_id'] });
 export const BillOrder = obj({ order_id: id });
 export const BillSplit = obj({
   order_id: id,

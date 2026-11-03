@@ -182,6 +182,9 @@ export function shapeView(v: Row) {
     danger: stage === 'exception',
     channel_label: channelLabel(o),
     place_label: v.table_label ?? null,
+    // 0649: a restaurant takes a takeaway / delivery bill (no table) at its own Checkout
+    channel: o.channel ?? null,
+    table_id: o.table_id ?? null,
     customer: o.customer_name || 'Guest',
     // the number the till saved on the bill: the pay screen sends the bill to it on WhatsApp (founder, 1 Nov 2026)
     customer_phone: o.customer_phone || null,
