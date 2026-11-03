@@ -9,6 +9,7 @@ import '../account/wallet_screen.dart';
 import '../ads/ads_api.dart';
 import '../ads/ads_screens.dart' show AdsHomeScreen;
 import '../api/net_guard.dart';
+import '../outlets/outlet_scope.dart';
 import '../ui/app_header.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -180,6 +181,13 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
     _load();
     _loadWallet();
     _loadCredits();
+    OutletScope.selected.addListener(_load); // 0653: Money follows the outlet chosen at the top
+  }
+
+  @override
+  void dispose() {
+    OutletScope.selected.removeListener(_load);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -471,6 +479,13 @@ class _RmRegisterPartState extends State<RmRegisterPart> {
   void initState() {
     super.initState();
     _load();
+    OutletScope.selected.addListener(_load); // 0653: the drawer of the outlet chosen at the top
+  }
+
+  @override
+  void dispose() {
+    OutletScope.selected.removeListener(_load);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -614,6 +629,37 @@ class _RmRegisterPartState extends State<RmRegisterPart> {
     if (mounted) setState(() => _busy = false);
   }
 
+  /// Several outlets, none chosen: each outlet's day; a tap chooses it for the whole app (as the switcher at the top does).
+  Widget _outlets(Map<String, dynamic> r) => Container(
+        key: const ValueKey('rm-register-outlets'),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+        decoration: rmCard(),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Cash drawer · ${dayMonth(r['day'] as String?)}', style: inter(17, 800)),
+          const SizedBox(height: 4),
+          Text('Each outlet has its own drawer and its own Day end. Choose one.', style: inter(13, 500, color: kMuted)),
+          const SizedBox(height: 8),
+          for (final o in ((r['outlets'] as List?) ?? const []).cast<Map>())
+            // its own Material, so the tap shows on the card
+            Material(
+              type: MaterialType.transparency,
+              child: ListTile(
+              key: ValueKey('rm-outlet-${o['id']}'),
+              contentPadding: EdgeInsets.zero,
+              title: Text('${o['name']}', style: inter(15, 700)),
+              subtitle: Text(
+                  [
+                    if (o['ended'] == true) 'Day ended' else 'Day open',
+                    if ((o['open_bills'] as num? ?? 0) > 0) '${o['open_bills']} bill${o['open_bills'] == 1 ? '' : 's'} open',
+                  ].join(' · '),
+                  style: inter(12.5, 500, color: o['ended'] == true ? kMuted : kRmGreen)),
+              trailing: const Icon(LucideIcons.chevronRight, size: 18),
+              onTap: () => OutletScope.selected.value = '${o['id']}',
+              ),
+            ),
+        ]),
+      );
+
   /// The bills still open: how many, what is due, and the first few by place.
   Widget _openBillsCard(Map<String, dynamic> open, {bool inDialog = false}) {
     final n = (open['count'] as num? ?? 0).toInt();
@@ -651,6 +697,8 @@ class _RmRegisterPartState extends State<RmRegisterPart> {
         child: Center(child: _error == null ? const CircularProgressIndicator() : Text(_error!, textAlign: TextAlign.center, style: inter(14, 500, color: kMuted))),
       );
     }
+    // 0653: several outlets and none chosen: each outlet's day, to choose one (its drawer and its Day end)
+    if (r['choose_outlet'] == true) return _outlets(r);
     final closed = (r['closed'] as Map?)?.cast<String, dynamic>();
     Widget line(String label, num? minor, {String sign = '', Color? color, String? key}) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
@@ -664,7 +712,17 @@ class _RmRegisterPartState extends State<RmRegisterPart> {
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       decoration: rmCard(),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Cash drawer · ${dayMonth(r['day'] as String?)}', style: inter(17, 800)),
+        // 0653: with several outlets, which outlet's drawer this is, and the way back to all of them
+        if ((r['outlet_count'] as num? ?? 1) > 1)
+          Row(children: [
+            Expanded(
+              child: Text('Cash drawer · ${r['location_name'] ?? ''} · ${dayMonth(r['day'] as String?)}',
+                  key: const ValueKey('rm-register-outlet'), style: inter(17, 800)),
+            ),
+            TextButton(key: const ValueKey('rm-all-outlets'), onPressed: () => OutletScope.selected.value = null, child: Text('All outlets', style: inter(13, 700))),
+          ])
+        else
+          Text('Cash drawer · ${dayMonth(r['day'] as String?)}', style: inter(17, 800)),
         const SizedBox(height: 10),
         line('Opening cash', r['opening_minor'] as num?, key: 'rm-opening'),
         line('Cash sales', r['cash_sales_minor'] as num?, sign: '+', color: kRmGreen, key: 'rm-cash-sales'),

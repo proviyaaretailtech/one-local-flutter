@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
+import '../outlets/outlet_scope.dart';
 
 /// The restaurant's Money in the store's design (`rmoney_*`, migration 0622): the wallet (cash drawer, UPI, bank), Money in / out, Transfer,
 /// the cash register and its close, dues, and contacts to pay. Supplier invoices are paid through `money_invoice_pay`.
@@ -18,7 +19,11 @@ class RstMoneyApi {
 
   Future<Map<String, dynamic>> _call(String fn, Map<String, Object?> args, {String? key}) async {
     try {
-      return await _rpc.callMap(fn, {...args}..removeWhere((_, v) => v == null), key);
+      // 0653: Money is for the outlet chosen at the top of the app (OutletScope); none chosen = all outlets, and a cash entry or a Day end
+      // then asks for one when the business has several
+      // (the restaurant's own rmoney_* calls only; money_invoice_pay is shared and keeps its own shape)
+      final outlet = fn.startsWith('rmoney_') ? OutletScope.selected.value : null;
+      return await _rpc.callMap(fn, {'location_id': outlet, ...args}..removeWhere((_, v) => v == null), key);
     } on RpcException catch (e) {
       throw PartnerApiException(e.status, e.message);
     }
