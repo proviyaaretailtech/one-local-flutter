@@ -275,7 +275,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return [
       _Part(
         'store',
-        'Store',
+        // a restaurant reaches this as Business profile (the side menu), not as a store
+        HomeNav.shell?.kind == 'restaurant' ? 'Business profile' : 'Store',
         LucideIcons.store,
         '${clock12(s.opensAt)} – ${clock12(s.closesAt)} · ${s.address == null ? 'location not added' : 'location set'}',
         [
@@ -289,7 +290,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SettingRow(
             icon: LucideIcons.qrCode,
             title: tr('Payment QR'),
-            subtitle: s.qrUploaded ? 'QR uploaded' : 'Upload or manage your store QR code',
+            subtitle: s.qrUploaded ? 'QR uploaded' : (HomeNav.shell?.kind == 'restaurant' ? 'Upload or manage your payment QR code' : 'Upload or manage your store QR code'),
             actions: [RowAction(tr('Edit'), onTap: () => _sheet(openQrSheet))],
           ),
         ],
