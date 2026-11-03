@@ -62,6 +62,34 @@ class BillApi {
     final saved = await _call('cust_save', {'first_name': name.trim(), 'phone': phone});
     await _call('cust_attach_order', {'order_id': orderId, 'customer_id': saved.s('customer_id')});
   }
+
+  // ---- 0640: cancel dishes, refund, void, and a manager's approval. Each answers {status: cancelled | refunded | voided | requested, order}.
+
+  /// One order's payment details: money (paid, refunded, refundable, payment_status), items, payments, refunds, cancelled_items, void,
+  /// requests waiting, and what this person may do (can / unavailable).
+  Future<Facts> adjustView(String orderId) => _call('rst_order_adjust', {'order_id': orderId});
+
+  /// Cancels [lines] (item id → how many). A dish already cooking or served, or a generated bill, needs a manager: others get 'requested'.
+  Future<Facts> cancelItems(String orderId, Map<String, int> lines, {required String reason, required String key}) => _call('rst_items_cancel', {
+        'order_id': orderId,
+        'items': [for (final e in lines.entries) {'item_id': e.key, 'qty': e.value}],
+        'reason': reason.trim(),
+        'idempotency_key': key,
+      }, key: key);
+
+  /// A refund through the shared refund (pos_refund); a cashier's is a request a manager approves.
+  Future<Facts> refund(String orderId, {required num amount, required String method, required String reason, required String key}) =>
+      _call('rst_bill_refund', {'order_id': orderId, 'amount': amount, 'method': method, 'reason': reason.trim(), 'idempotency_key': key}, key: key);
+
+  /// Voids the bill: unpaid it is cancelled; money taken goes back by [method] first. Owner and admin; others ask.
+  Future<Facts> voidBill(String orderId, {required String reason, String? method, required String key}) =>
+      _call('rst_bill_void', {'order_id': orderId, 'reason': reason.trim(), 'method': method, 'idempotency_key': key}, key: key);
+
+  Future<List<Facts>> requests({String? orderId}) async => (await _call('rst_requests_list', {'order_id': orderId})).l('requests');
+
+  /// [approve] true does the action now as the approver; false rejects it.
+  Future<Facts> decide(String requestId, {required bool approve, String? note}) =>
+      _call('rst_request_decide', {'request_id': requestId, 'decision': approve ? 'approve' : 'reject', 'note': note});
 }
 
 const _methodNames = {'cash': 'Cash', 'card': 'Card', 'upi': 'UPI', 'split': 'Split', 'wallet': 'Wallet', 'other': 'Other'};

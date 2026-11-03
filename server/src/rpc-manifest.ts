@@ -305,6 +305,13 @@ export const MANIFEST: Entry[] = [
   db('rst_printer_delete', { args: rst.PrinterId, map: P, rate: 'write', roles: 'owners, admins and managers (Settings)' }),
   db('rst_printer_tested', { args: rst.PrinterId, map: P, rate: 'write', roles: 'owners, admins and managers (Settings)' }),
   db('rst_bill_note', { args: rst.BillNote, map: P, rate: 'write', roles: 'staff with order:place or order:update_status' }),
+  // 0640: cancel a dish or KOT item, refund and void a bill (the refund is the shared pos_refund), a manager's approval of a cashier's ask
+  db('rst_items_cancel', { args: rst.ItemsCancel, map: P, rate: 'write', idem: true, roles: 'floor staff (started, served or billed dishes: managers; others ask)' }),
+  db('rst_bill_refund', { args: rst.BillRefund, map: P, rate: 'money', idem: true, roles: 'managers (cashiers ask)' }),
+  db('rst_bill_void', { args: rst.BillVoid, map: P, rate: 'money', idem: true, roles: 'owner and admin (managers and cashiers ask)' }),
+  db('rst_requests_list', { args: rst.RequestsList, map: P, rate: 'read', roles: 'floor staff and cashiers' }),
+  db('rst_request_decide', { args: rst.RequestDecide, map: P, rate: 'money', roles: 'managers (voids: owner and admin), never the person who asked' }),
+  db('rst_order_adjust', { args: rst.BillOrder, map: P, rate: 'read', roles: 'floor staff and cashiers' }),
   db('rst_receipt_view', { args: rst.BillOrder, map: P, rate: 'read', roles: 'floor staff or staff allowed to take payment' }),
   db('rst_receipt_log', { args: rst.ReceiptLog, map: P, rate: 'write', roles: 'floor staff or staff allowed to take payment' }),
   db('svc_calendar', { args: svc.Calendar, map: P, rate: 'read', roles: STAFF }),
@@ -593,6 +600,7 @@ export const MANIFEST: Entry[] = [
   db('rst_report_cashiers', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
   db('rst_report_discounts', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
   db('rst_report_audit', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers with the audit (money:read, pos_audit_log:read)' }),
+  db('rst_report_cancellations', { args: rep.Range, map: P, rate: 'read', roles: 'owner, admin and managers (money:read)' }),
 ];
 
 const byAlias = new Map<string, Entry>(MANIFEST.map(e => [e.alias, e]));

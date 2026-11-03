@@ -1,0 +1,1001 @@
+{
+ "cancelled": {
+  "lines": [
+   {
+    "qty": 2,
+    "name": "Naan",
+    "sent": true,
+    "whole": false,
+    "kot_id": "ec3e3338-b76d-45a9-b1e3-658d19c988d3",
+    "kot_no": 9101,
+    "status": "pending",
+    "item_id": "489999e2-c428-4dd0-8a75-56b307880dac",
+    "variant": null,
+    "unit_price": 50
+   }
+  ],
+  "order": {
+   "id": "88f64586-70f6-4dcf-ae32-ff9966f4822a",
+   "can": {
+    "void": false,
+    "refund": false,
+    "is_owner": false,
+    "is_manager": false,
+    "cancel_items": true
+   },
+   "void": null,
+   "items": [
+    {
+     "id": "528fe546-3dbb-42ed-bdb8-8c3d04fe5fad",
+     "qty": 2,
+     "name": "Paneer",
+     "sent": true,
+     "kot_no": 9101,
+     "status": "pending",
+     "variant": null,
+     "kot_status": "preparing",
+     "unit_price": 320,
+     "ordered_qty": 2,
+     "cancelled_qty": 0,
+     "needs_manager": false
+    },
+    {
+     "id": "489999e2-c428-4dd0-8a75-56b307880dac",
+     "qty": 2,
+     "name": "Naan",
+     "sent": true,
+     "kot_no": 9101,
+     "status": "pending",
+     "variant": null,
+     "kot_status": "preparing",
+     "unit_price": 50,
+     "ordered_qty": 4,
+     "cancelled_qty": 2,
+     "needs_manager": false
+    },
+    {
+     "id": "c1d3e3ae-eb90-41e8-8056-727b9d988dbf",
+     "qty": 1,
+     "name": "Tikka",
+     "sent": true,
+     "kot_no": 9101,
+     "status": "preparing",
+     "variant": null,
+     "kot_status": "preparing",
+     "unit_price": 600,
+     "ordered_qty": 1,
+     "cancelled_qty": 0,
+     "needs_manager": true
+    },
+    {
+     "id": "2c24ec1d-2202-452b-a4f8-10d39c7d7bf0",
+     "qty": 0,
+     "name": "Lassi",
+     "sent": false,
+     "kot_no": null,
+     "status": "cancelled",
+     "variant": null,
+     "kot_status": null,
+     "unit_price": 100,
+     "ordered_qty": 1,
+     "cancelled_qty": 1,
+     "needs_manager": false
+    }
+   ],
+   "money": {
+    "paid": 0,
+    "total": 1407,
+    "refunded": 0,
+    "on_credit": 0,
+    "refundable": 0,
+    "payment_status": "unpaid"
+   },
+   "status": "sent_to_kitchen",
+   "channel": "dine_in",
+   "paid_at": null,
+   "refunds": [],
+   "discount": 0,
+   "payments": [],
+   "requests": [],
+   "subtotal": 1340,
+   "round_off": 0,
+   "display_no": "Z9101",
+   "gst_amount": 67,
+   "table_label": "R1",
+   "unavailable": {
+    "void": "Your role cannot void bills.",
+    "refund": "No money was taken on this bill.",
+    "cancel_items": null
+   },
+   "service_charge": 0,
+   "cancelled_items": [
+    {
+     "at": "2026-11-02T13:29:11.245089+00:00",
+     "by": "ZZ cap",
+     "qty": 1,
+     "was": "pending",
+     "name": "Lassi",
+     "value": 100,
+     "kot_no": null,
+     "reason": "Added by mistake",
+     "item_id": "2c24ec1d-2202-452b-a4f8-10d39c7d7bf0",
+     "variant": null,
+     "approved_by": null
+    },
+    {
+     "at": "2026-11-02T13:29:11.758936+00:00",
+     "by": "ZZ cap",
+     "qty": 2,
+     "was": "pending",
+     "name": "Naan",
+     "value": 100,
+     "kot_no": "9101",
+     "reason": "Guest wants only two",
+     "item_id": "489999e2-c428-4dd0-8a75-56b307880dac",
+     "variant": null,
+     "approved_by": null
+    }
+   ]
+  },
+  "status": "cancelled",
+  "order_id": "88f64586-70f6-4dcf-ae32-ff9966f4822a",
+  "replayed": false,
+  "new_total": 1407,
+  "old_total": 1512,
+  "approved_by": null,
+  "order_status": "sent_to_kitchen"
+ },
+ "requested": {
+  "order": {
+   "id": "88f64586-70f6-4dcf-ae32-ff9966f4822a",
+   "can": {
+    "void": false,
+    "refund": false,
+    "is_owner": false,
+    "is_manager": false,
+    "cancel_items": true
+   },
+   "void": null,
+   "items": [
+    {
+     "id": "528fe546-3dbb-42ed-bdb8-8c3d04fe5fad",
+     "qty": 2,
+     "name": "Paneer",
+     "sent": true,
+     "kot_no": 9101,
+     "status": "pending",
+     "variant": null,
+     "kot_status": "preparing",
+     "unit_price": 320,
+     "ordered_qty": 2,
+     "cancelled_qty": 0,
+     "needs_manager": false
+    },
+    {
+     "id": "489999e2-c428-4dd0-8a75-56b307880dac",
+     "qty": 2,
+     "name": "Naan",
+     "sent": true,
+     "kot_no": 9101,
+     "status": "pending",
+     "variant": null,
+     "kot_status": "preparing",
+     "unit_price": 50,
+     "ordered_qty": 4,
+     "cancelled_qty": 2,
+     "needs_manager": false
+    },
+    {
+     "id": "c1d3e3ae-eb90-41e8-8056-727b9d988dbf",
+     "qty": 1,
+     "name": "Tikka",
+     "sent": true,
+     "kot_no": 9101,
+     "status": "preparing",
+     "variant": null,
+     "kot_status": "preparing",
+     "unit_price": 600,
+     "ordered_qty": 1,
+     "cancelled_qty": 0,
+     "needs_manager": true
+    },
+    {
+     "id": "2c24ec1d-2202-452b-a4f8-10d39c7d7bf0",
+     "qty": 0,
+     "name": "Lassi",
+     "sent": false,
+     "kot_no": null,
+     "status": "cancelled",
+     "variant": null,
+     "kot_status": null,
+     "unit_price": 100,
+     "ordered_qty": 1,
+     "cancelled_qty": 1,
+     "needs_manager": false
+    }
+   ],
+   "money": {
+    "paid": 0,
+    "total": 1407,
+    "refunded": 0,
+    "on_credit": 0,
+    "refundable": 0,
+    "payment_status": "unpaid"
+   },
+   "status": "sent_to_kitchen",
+   "channel": "dine_in",
+   "paid_at": null,
+   "refunds": [],
+   "discount": 0,
+   "payments": [],
+   "requests": [
+    {
+     "at": "2026-11-02T13:29:13.12985+00:00",
+     "action": "item_cancel",
+     "amount": 600,
+     "reason": "Guest left the table",
+     "message": "Asked to cancel 1× Tikka: Guest left the table",
+     "payload": {
+      "label": "1× Tikka",
+      "lines": [
+       {
+        "qty": 1,
+        "item_id": "c1d3e3ae-eb90-41e8-8056-727b9d988dbf"
+       }
+      ]
+     },
+     "asked_by": "ZZ cap",
+     "order_id": "88f64586-70f6-4dcf-ae32-ff9966f4822a",
+     "display_no": "Z9101",
+     "may_decide": false,
+     "request_id": "2bc7b123-d0f0-4fab-8288-d42790cb3b93",
+     "asked_by_id": "bed12176-580b-446b-ad9e-a5cc84981100",
+     "table_label": "R1"
+    }
+   ],
+   "subtotal": 1340,
+   "round_off": 0,
+   "display_no": "Z9101",
+   "gst_amount": 67,
+   "table_label": "R1",
+   "unavailable": {
+    "void": "Your role cannot void bills.",
+    "refund": "No money was taken on this bill.",
+    "cancel_items": null
+   },
+   "service_charge": 0,
+   "cancelled_items": [
+    {
+     "at": "2026-11-02T13:29:11.245089+00:00",
+     "by": "ZZ cap",
+     "qty": 1,
+     "was": "pending",
+     "name": "Lassi",
+     "value": 100,
+     "kot_no": null,
+     "reason": "Added by mistake",
+     "item_id": "2c24ec1d-2202-452b-a4f8-10d39c7d7bf0",
+     "variant": null,
+     "approved_by": null
+    },
+    {
+     "at": "2026-11-02T13:29:11.758936+00:00",
+     "by": "ZZ cap",
+     "qty": 2,
+     "was": "pending",
+     "name": "Naan",
+     "value": 100,
+     "kot_no": "9101",
+     "reason": "Guest wants only two",
+     "item_id": "489999e2-c428-4dd0-8a75-56b307880dac",
+     "variant": null,
+     "approved_by": null
+    }
+   ]
+  },
+  "status": "requested",
+  "replayed": false,
+  "request_id": "2bc7b123-d0f0-4fab-8288-d42790cb3b93"
+ },
+ "requests": {
+  "requests": [
+   {
+    "at": "2026-11-02T13:29:13.12985+00:00",
+    "action": "item_cancel",
+    "amount": 600,
+    "reason": "Guest left the table",
+    "message": "Asked to cancel 1× Tikka: Guest left the table",
+    "payload": {
+     "label": "1× Tikka",
+     "lines": [
+      {
+       "qty": 1,
+       "item_id": "c1d3e3ae-eb90-41e8-8056-727b9d988dbf"
+      }
+     ]
+    },
+    "asked_by": "ZZ cap",
+    "order_id": "88f64586-70f6-4dcf-ae32-ff9966f4822a",
+    "display_no": "Z9101",
+    "may_decide": true,
+    "request_id": "2bc7b123-d0f0-4fab-8288-d42790cb3b93",
+    "asked_by_id": "bed12176-580b-446b-ad9e-a5cc84981100",
+    "table_label": "R1"
+   }
+  ]
+ },
+ "paid_mgr": {
+  "id": "61f1dafa-363b-4a3e-864c-367a45cc3834",
+  "can": {
+   "void": true,
+   "refund": true,
+   "is_owner": false,
+   "is_manager": true,
+   "cancel_items": false
+  },
+  "void": null,
+  "items": [
+   {
+    "id": "64ddca48-e612-4c63-b638-4510d03b1d53",
+    "qty": 4,
+    "name": "Thali",
+    "sent": true,
+    "kot_no": 9104,
+    "status": "delivered",
+    "variant": null,
+    "kot_status": "delivered",
+    "unit_price": 250,
+    "ordered_qty": 4,
+    "cancelled_qty": 0,
+    "needs_manager": true
+   }
+  ],
+  "money": {
+   "paid": 1050,
+   "total": 1050,
+   "refunded": 50,
+   "on_credit": 0,
+   "refundable": 1000,
+   "payment_status": "partly_refunded"
+  },
+  "status": "paid",
+  "channel": "dine_in",
+  "paid_at": "2026-11-02T13:29:19.937329+00:00",
+  "refunds": [
+   {
+    "at": "2026-11-02T13:29:20.489153+00:00",
+    "by": "ZZ mgr",
+    "id": "f60a798c-a1f6-4255-b51d-e132b9da37e9",
+    "kind": "goodwill",
+    "amount": 50,
+    "method": "cash",
+    "reason": "Cold soup",
+    "asked_by": "ZZ cash",
+    "reference": "request:86489d55-4807-4d7f-b96a-a5dcc15b1f01"
+   }
+  ],
+  "discount": 0,
+  "payments": [
+   {
+    "at": "2026-11-02T13:29:19.947324+00:00",
+    "by": "ZZ cash",
+    "id": "ed327045-c462-4d67-8c75-a6b9521c630f",
+    "amount": 1050,
+    "method": "cash",
+    "reference": null
+   }
+  ],
+  "requests": [],
+  "subtotal": 1000,
+  "round_off": 0,
+  "display_no": "Z9104",
+  "gst_amount": 50,
+  "table_label": "R4",
+  "unavailable": {
+   "void": null,
+   "refund": null,
+   "cancel_items": "Money was taken on this bill; give a refund instead."
+  },
+  "service_charge": 0,
+  "cancelled_items": []
+ },
+ "paid_cash": {
+  "id": "61f1dafa-363b-4a3e-864c-367a45cc3834",
+  "can": {
+   "void": true,
+   "refund": true,
+   "is_owner": false,
+   "is_manager": false,
+   "cancel_items": false
+  },
+  "void": null,
+  "items": [
+   {
+    "id": "64ddca48-e612-4c63-b638-4510d03b1d53",
+    "qty": 4,
+    "name": "Thali",
+    "sent": true,
+    "kot_no": 9104,
+    "status": "delivered",
+    "variant": null,
+    "kot_status": "delivered",
+    "unit_price": 250,
+    "ordered_qty": 4,
+    "cancelled_qty": 0,
+    "needs_manager": true
+   }
+  ],
+  "money": {
+   "paid": 1050,
+   "total": 1050,
+   "refunded": 50,
+   "on_credit": 0,
+   "refundable": 1000,
+   "payment_status": "partly_refunded"
+  },
+  "status": "paid",
+  "channel": "dine_in",
+  "paid_at": "2026-11-02T13:29:19.937329+00:00",
+  "refunds": [
+   {
+    "at": "2026-11-02T13:29:20.489153+00:00",
+    "by": "ZZ mgr",
+    "id": "f60a798c-a1f6-4255-b51d-e132b9da37e9",
+    "kind": "goodwill",
+    "amount": 50,
+    "method": "cash",
+    "reason": "Cold soup",
+    "asked_by": "ZZ cash",
+    "reference": "request:86489d55-4807-4d7f-b96a-a5dcc15b1f01"
+   }
+  ],
+  "discount": 0,
+  "payments": [
+   {
+    "at": "2026-11-02T13:29:19.947324+00:00",
+    "by": "ZZ cash",
+    "id": "ed327045-c462-4d67-8c75-a6b9521c630f",
+    "amount": 1050,
+    "method": "cash",
+    "reference": null
+   }
+  ],
+  "requests": [],
+  "subtotal": 1000,
+  "round_off": 0,
+  "display_no": "Z9104",
+  "gst_amount": 50,
+  "table_label": "R4",
+  "unavailable": {
+   "void": null,
+   "refund": null,
+   "cancel_items": "Money was taken on this bill; give a refund instead."
+  },
+  "service_charge": 0,
+  "cancelled_items": []
+ },
+ "refunded": {
+  "paid": 1050,
+  "order": {
+   "id": "61f1dafa-363b-4a3e-864c-367a45cc3834",
+   "can": {
+    "void": true,
+    "refund": true,
+    "is_owner": false,
+    "is_manager": true,
+    "cancel_items": false
+   },
+   "void": null,
+   "items": [
+    {
+     "id": "64ddca48-e612-4c63-b638-4510d03b1d53",
+     "qty": 4,
+     "name": "Thali",
+     "sent": true,
+     "kot_no": 9104,
+     "status": "delivered",
+     "variant": null,
+     "kot_status": "delivered",
+     "unit_price": 250,
+     "ordered_qty": 4,
+     "cancelled_qty": 0,
+     "needs_manager": true
+    }
+   ],
+   "money": {
+    "paid": 1050,
+    "total": 1050,
+    "refunded": 100,
+    "on_credit": 0,
+    "refundable": 950,
+    "payment_status": "partly_refunded"
+   },
+   "status": "paid",
+   "channel": "dine_in",
+   "paid_at": "2026-11-02T13:29:19.937329+00:00",
+   "refunds": [
+    {
+     "at": "2026-11-02T13:29:20.489153+00:00",
+     "by": "ZZ mgr",
+     "id": "f60a798c-a1f6-4255-b51d-e132b9da37e9",
+     "kind": "goodwill",
+     "amount": 50,
+     "method": "cash",
+     "reason": "Cold soup",
+     "asked_by": "ZZ cash",
+     "reference": "request:86489d55-4807-4d7f-b96a-a5dcc15b1f01"
+    },
+    {
+     "at": "2026-11-02T13:29:21.05174+00:00",
+     "by": "ZZ mgr",
+     "id": "1c8275df-6673-4d8a-b3b9-90f836f0bdaf",
+     "kind": "goodwill",
+     "amount": 50,
+     "method": "upi",
+     "reason": "Goodwill",
+     "asked_by": null,
+     "reference": "e2e-1fca51ea-6696-477d-a0e7-fbb4b4d5bcaf"
+    }
+   ],
+   "discount": 0,
+   "payments": [
+    {
+     "at": "2026-11-02T13:29:19.947324+00:00",
+     "by": "ZZ cash",
+     "id": "ed327045-c462-4d67-8c75-a6b9521c630f",
+     "amount": 1050,
+     "method": "cash",
+     "reference": null
+    }
+   ],
+   "requests": [],
+   "subtotal": 1000,
+   "round_off": 0,
+   "display_no": "Z9104",
+   "gst_amount": 50,
+   "table_label": "R4",
+   "unavailable": {
+    "void": null,
+    "refund": null,
+    "cancel_items": "Money was taken on this bill; give a refund instead."
+   },
+   "service_charge": 0,
+   "cancelled_items": []
+  },
+  "total": 1050,
+  "amount": 50,
+  "status": "refunded",
+  "order_id": "61f1dafa-363b-4a3e-864c-367a45cc3834",
+  "refunded": 100,
+  "replayed": false,
+  "on_credit": 0,
+  "refund_id": "1c8275df-6673-4d8a-b3b9-90f836f0bdaf",
+  "refundable": 950,
+  "approved_by": null,
+  "payment_status": "partly_refunded"
+ },
+ "report": {
+  "to": "2026-11-02",
+  "from": "2026-11-02",
+  "items": {
+   "list": [
+    {
+     "at": "2026-11-02T13:29:18.237188+00:00",
+     "by": "ZZ cap",
+     "qty": 1,
+     "was": "pending",
+     "name": "Pizza",
+     "value": 500,
+     "kot_no": "9103",
+     "reason": "One pizza only",
+     "order_id": "786939b8-9064-458b-b594-d1a63c8bc04e",
+     "display_no": "Z9103",
+     "approved_by": null
+    },
+    {
+     "at": "2026-11-02T13:29:16.281299+00:00",
+     "by": "ZZ mgr",
+     "qty": 1,
+     "was": "pending",
+     "name": "Rice",
+     "value": 200,
+     "kot_no": "9102",
+     "reason": "Out of rice",
+     "order_id": "e534fa93-51b2-4ee5-8016-795df0ae2e6b",
+     "display_no": "Z9102",
+     "approved_by": null
+    },
+    {
+     "at": "2026-11-02T13:29:13.478638+00:00",
+     "by": "ZZ cap",
+     "qty": 1,
+     "was": "preparing",
+     "name": "Tikka",
+     "value": 600,
+     "kot_no": "9101",
+     "reason": "Guest left the table",
+     "order_id": "88f64586-70f6-4dcf-ae32-ff9966f4822a",
+     "display_no": "Z9101",
+     "approved_by": "ZZ mgr"
+    },
+    {
+     "at": "2026-11-02T13:29:11.758936+00:00",
+     "by": "ZZ cap",
+     "qty": 2,
+     "was": "pending",
+     "name": "Naan",
+     "value": 100,
+     "kot_no": "9101",
+     "reason": "Guest wants only two",
+     "order_id": "88f64586-70f6-4dcf-ae32-ff9966f4822a",
+     "display_no": "Z9101",
+     "approved_by": null
+    },
+    {
+     "at": "2026-11-02T13:29:11.245089+00:00",
+     "by": "ZZ cap",
+     "qty": 1,
+     "was": "pending",
+     "name": "Lassi",
+     "value": 100,
+     "kot_no": null,
+     "reason": "Added by mistake",
+     "order_id": "88f64586-70f6-4dcf-ae32-ff9966f4822a",
+     "display_no": "Z9101",
+     "approved_by": null
+    }
+   ],
+   "count": 6,
+   "after_kot": 5,
+   "value_minor": 150000
+  },
+  "voids": {
+   "list": [
+    {
+     "at": "2026-11-02T13:29:24.239243+00:00",
+     "by": "ZZ own",
+     "total": 252,
+     "reason": "Guest walked out before eating",
+     "order_id": "fd614ff5-2793-43d5-ad41-a9e8e920d0db",
+     "refunded": 0,
+     "display_no": "Z9106",
+     "approved_by": null
+    },
+    {
+     "at": "2026-11-02T13:29:22.749944+00:00",
+     "by": "ZZ mgr",
+     "total": 630,
+     "reason": "Wrong table billed",
+     "order_id": "757a7a7c-13f9-4296-acbb-292db971ed01",
+     "refunded": 630,
+     "display_no": "Z9105",
+     "approved_by": "ZZ own"
+    }
+   ],
+   "count": 2,
+   "value_minor": 88200
+  },
+  "refunds": {
+   "list": [
+    {
+     "at": "2026-11-02T13:29:22.739749+00:00",
+     "by": "ZZ own",
+     "kind": "cancel",
+     "amount": 630,
+     "method": "upi",
+     "reason": "Bill void: Wrong table billed",
+     "order_id": "757a7a7c-13f9-4296-acbb-292db971ed01",
+     "display_no": "Z9105"
+    },
+    {
+     "at": "2026-11-02T13:29:21.37895+00:00",
+     "by": "ZZ mgr",
+     "kind": "goodwill",
+     "amount": 950,
+     "method": "cash",
+     "reason": "Full refund of the rest",
+     "order_id": "61f1dafa-363b-4a3e-864c-367a45cc3834",
+     "display_no": "Z9104"
+    },
+    {
+     "at": "2026-11-02T13:29:21.05174+00:00",
+     "by": "ZZ mgr",
+     "kind": "goodwill",
+     "amount": 50,
+     "method": "upi",
+     "reason": "Goodwill",
+     "order_id": "61f1dafa-363b-4a3e-864c-367a45cc3834",
+     "display_no": "Z9104"
+    },
+    {
+     "at": "2026-11-02T13:29:20.489153+00:00",
+     "by": "ZZ mgr",
+     "kind": "goodwill",
+     "amount": 50,
+     "method": "cash",
+     "reason": "Cold soup",
+     "order_id": "61f1dafa-363b-4a3e-864c-367a45cc3834",
+     "display_no": "Z9104"
+    }
+   ],
+   "count": 4,
+   "amount_minor": 168000
+  },
+  "requests": {
+   "asked": 5,
+   "rejected": 1
+  }
+ },
+ "open_cap": {
+  "id": "88f64586-70f6-4dcf-ae32-ff9966f4822a",
+  "can": {
+   "void": false,
+   "refund": false,
+   "is_owner": false,
+   "is_manager": false,
+   "cancel_items": true
+  },
+  "void": null,
+  "items": [
+   {
+    "id": "528fe546-3dbb-42ed-bdb8-8c3d04fe5fad",
+    "qty": 2,
+    "name": "Paneer",
+    "sent": true,
+    "kot_no": 9101,
+    "status": "pending",
+    "variant": null,
+    "kot_status": "new",
+    "unit_price": 320,
+    "ordered_qty": 2,
+    "cancelled_qty": 0,
+    "needs_manager": false
+   },
+   {
+    "id": "489999e2-c428-4dd0-8a75-56b307880dac",
+    "qty": 2,
+    "name": "Naan",
+    "sent": true,
+    "kot_no": 9101,
+    "status": "pending",
+    "variant": null,
+    "kot_status": "new",
+    "unit_price": 50,
+    "ordered_qty": 4,
+    "cancelled_qty": 2,
+    "needs_manager": false
+   },
+   {
+    "id": "c1d3e3ae-eb90-41e8-8056-727b9d988dbf",
+    "qty": 0,
+    "name": "Tikka",
+    "sent": true,
+    "kot_no": 9101,
+    "status": "cancelled",
+    "variant": null,
+    "kot_status": "new",
+    "unit_price": 600,
+    "ordered_qty": 1,
+    "cancelled_qty": 1,
+    "needs_manager": false
+   },
+   {
+    "id": "2c24ec1d-2202-452b-a4f8-10d39c7d7bf0",
+    "qty": 0,
+    "name": "Lassi",
+    "sent": false,
+    "kot_no": null,
+    "status": "cancelled",
+    "variant": null,
+    "kot_status": null,
+    "unit_price": 100,
+    "ordered_qty": 1,
+    "cancelled_qty": 1,
+    "needs_manager": false
+   }
+  ],
+  "money": {
+   "paid": 0,
+   "total": 777,
+   "refunded": 0,
+   "on_credit": 0,
+   "refundable": 0,
+   "payment_status": "unpaid"
+  },
+  "status": "sent_to_kitchen",
+  "channel": "dine_in",
+  "paid_at": null,
+  "refunds": [],
+  "discount": 0,
+  "payments": [],
+  "requests": [],
+  "subtotal": 740,
+  "round_off": 0,
+  "display_no": "Z9101",
+  "gst_amount": 37,
+  "table_label": "R1",
+  "unavailable": {
+   "void": "Your role cannot void bills.",
+   "refund": "No money was taken on this bill.",
+   "cancel_items": null
+  },
+  "service_charge": 0,
+  "cancelled_items": [
+   {
+    "at": "2026-11-02T13:29:11.245089+00:00",
+    "by": "ZZ cap",
+    "qty": 1,
+    "was": "pending",
+    "name": "Lassi",
+    "value": 100,
+    "kot_no": null,
+    "reason": "Added by mistake",
+    "item_id": "2c24ec1d-2202-452b-a4f8-10d39c7d7bf0",
+    "variant": null,
+    "approved_by": null
+   },
+   {
+    "at": "2026-11-02T13:29:11.758936+00:00",
+    "by": "ZZ cap",
+    "qty": 2,
+    "was": "pending",
+    "name": "Naan",
+    "value": 100,
+    "kot_no": "9101",
+    "reason": "Guest wants only two",
+    "item_id": "489999e2-c428-4dd0-8a75-56b307880dac",
+    "variant": null,
+    "approved_by": null
+   },
+   {
+    "at": "2026-11-02T13:29:13.478638+00:00",
+    "by": "ZZ cap",
+    "qty": 1,
+    "was": "preparing",
+    "name": "Tikka",
+    "value": 600,
+    "kot_no": "9101",
+    "reason": "Guest left the table",
+    "item_id": "c1d3e3ae-eb90-41e8-8056-727b9d988dbf",
+    "variant": null,
+    "approved_by": "ZZ mgr"
+   }
+  ]
+ },
+ "open_mgr": {
+  "id": "88f64586-70f6-4dcf-ae32-ff9966f4822a",
+  "can": {
+   "void": true,
+   "refund": false,
+   "is_owner": false,
+   "is_manager": true,
+   "cancel_items": true
+  },
+  "void": null,
+  "items": [
+   {
+    "id": "528fe546-3dbb-42ed-bdb8-8c3d04fe5fad",
+    "qty": 2,
+    "name": "Paneer",
+    "sent": true,
+    "kot_no": 9101,
+    "status": "pending",
+    "variant": null,
+    "kot_status": "new",
+    "unit_price": 320,
+    "ordered_qty": 2,
+    "cancelled_qty": 0,
+    "needs_manager": false
+   },
+   {
+    "id": "489999e2-c428-4dd0-8a75-56b307880dac",
+    "qty": 2,
+    "name": "Naan",
+    "sent": true,
+    "kot_no": 9101,
+    "status": "pending",
+    "variant": null,
+    "kot_status": "new",
+    "unit_price": 50,
+    "ordered_qty": 4,
+    "cancelled_qty": 2,
+    "needs_manager": false
+   },
+   {
+    "id": "c1d3e3ae-eb90-41e8-8056-727b9d988dbf",
+    "qty": 0,
+    "name": "Tikka",
+    "sent": true,
+    "kot_no": 9101,
+    "status": "cancelled",
+    "variant": null,
+    "kot_status": "new",
+    "unit_price": 600,
+    "ordered_qty": 1,
+    "cancelled_qty": 1,
+    "needs_manager": false
+   },
+   {
+    "id": "2c24ec1d-2202-452b-a4f8-10d39c7d7bf0",
+    "qty": 0,
+    "name": "Lassi",
+    "sent": false,
+    "kot_no": null,
+    "status": "cancelled",
+    "variant": null,
+    "kot_status": null,
+    "unit_price": 100,
+    "ordered_qty": 1,
+    "cancelled_qty": 1,
+    "needs_manager": false
+   }
+  ],
+  "money": {
+   "paid": 0,
+   "total": 777,
+   "refunded": 0,
+   "on_credit": 0,
+   "refundable": 0,
+   "payment_status": "unpaid"
+  },
+  "status": "sent_to_kitchen",
+  "channel": "dine_in",
+  "paid_at": null,
+  "refunds": [],
+  "discount": 0,
+  "payments": [],
+  "requests": [],
+  "subtotal": 740,
+  "round_off": 0,
+  "display_no": "Z9101",
+  "gst_amount": 37,
+  "table_label": "R1",
+  "unavailable": {
+   "void": null,
+   "refund": "No money was taken on this bill.",
+   "cancel_items": null
+  },
+  "service_charge": 0,
+  "cancelled_items": [
+   {
+    "at": "2026-11-02T13:29:11.245089+00:00",
+    "by": "ZZ cap",
+    "qty": 1,
+    "was": "pending",
+    "name": "Lassi",
+    "value": 100,
+    "kot_no": null,
+    "reason": "Added by mistake",
+    "item_id": "2c24ec1d-2202-452b-a4f8-10d39c7d7bf0",
+    "variant": null,
+    "approved_by": null
+   },
+   {
+    "at": "2026-11-02T13:29:11.758936+00:00",
+    "by": "ZZ cap",
+    "qty": 2,
+    "was": "pending",
+    "name": "Naan",
+    "value": 100,
+    "kot_no": "9101",
+    "reason": "Guest wants only two",
+    "item_id": "489999e2-c428-4dd0-8a75-56b307880dac",
+    "variant": null,
+    "approved_by": null
+   },
+   {
+    "at": "2026-11-02T13:29:13.478638+00:00",
+    "by": "ZZ cap",
+    "qty": 1,
+    "was": "preparing",
+    "name": "Tikka",
+    "value": 600,
+    "kot_no": "9101",
+    "reason": "Guest left the table",
+    "item_id": "c1d3e3ae-eb90-41e8-8056-727b9d988dbf",
+    "variant": null,
+    "approved_by": "ZZ mgr"
+   }
+  ]
+ }
+}

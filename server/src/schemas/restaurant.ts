@@ -61,6 +61,21 @@ export const BillDiscount = obj({ order_id: id, kind: z.enum(['amount', 'percent
   reason: z.string().trim().max(120, 'Keep the reason under 120 characters.').optional() })
   .refine(b => b.kind !== 'percent' || b.value <= 100, { message: 'A percentage is at most 100.', path: ['value'] });
 export const BillNote = obj({ order_id: id, note: z.string().max(300, 'A note can be up to 300 characters.').nullish() });
+// 0640: cancel dishes (all of a line or part of it), refund and void a bill, and the manager's approval of what a cashier asked. Who may do
+// what, the amounts and every state are the database's.
+const reason = (max: number) => z.string({ message: 'Say why.' }).trim().min(3, 'Say why (3 characters or more).').max(max, `Keep the reason under ${max} characters.`);
+const back = z.enum(['cash', 'upi', 'card', 'other'], { message: 'Choose how the money goes back.' });
+export const ItemsCancel = obj({
+  order_id: id,
+  items: z.array(obj({ item_id: id, qty: z.number().int('Cancel whole dishes.').min(1, 'Cancel at least one.').max(999) }))
+    .min(1, 'Choose a dish to cancel.').max(50, 'At most 50 dishes at a time.'),
+  reason: reason(200), ...key,
+});
+export const BillRefund = obj({ order_id: id, amount: money, method: back, reason: reason(300), ...key });
+export const BillVoid = obj({ order_id: id, method: back.nullish(), reason: reason(200), ...key });
+export const RequestsList = obj({ order_id: id.nullish() });
+export const RequestDecide = obj({ request_id: id, decision: z.enum(['approve', 'reject'], { message: 'Approve or reject.' }),
+  note: z.string().trim().max(200, 'Keep the note under 200 characters.').nullish() });
 export const ReceiptLog = obj({
   order_id: id, channel: z.enum(['print', 'whatsapp', 'sms', 'email'], { message: 'Print, WhatsApp, SMS or email.' }),
   to: z.string().trim().max(200).nullish(),

@@ -83,6 +83,7 @@ class RstReportsScreen extends StatelessWidget {
             Entrance(index: 2, child: group('AUDIT', const [
               ('discounts', 'Discounts', 'Coupons, service charge waived, free dishes', LucideIcons.badgePercent),
               ('audit', 'Leakage audit', 'Cancelled and unpaid bills, reprints, changes after the bill', LucideIcons.shieldAlert),
+              ('cancellations', 'Cancellations & refunds', 'Dishes cancelled, KOT items stopped, bills voided, refunds', LucideIcons.circleX),
             ])),
             if (openFeed != null)
               TextButton.icon(
@@ -100,7 +101,7 @@ class RstReportsScreen extends StatelessWidget {
 
 const _titles = {
   'sales': 'Sales summary', 'items': 'Item-wise sales', 'categories': 'Category-wise sales', 'payments': 'Payment mode',
-  'cashiers': 'Cashier & day close', 'discounts': 'Discounts', 'audit': 'Leakage audit',
+  'cashiers': 'Cashier & day close', 'discounts': 'Discounts', 'audit': 'Leakage audit', 'cancellations': 'Cancellations & refunds',
 };
 const _methods = {'cash': 'Cash', 'upi': 'UPI', 'card': 'Card', 'wallet': 'Wallet', 'due': 'On credit', 'online': 'Online', 'other': 'Other'};
 const _channels = {'dine_in': 'Dine-in', 'pickup': 'Takeaway', 'delivery': 'Own delivery', 'online': 'OneLocal', 'swiggy': 'Swiggy', 'zomato': 'Zomato', 'other': 'Other'};
@@ -279,6 +280,13 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
           for (final b in r.l('bills'))
             [b.s('bill'), b.s('at'), b.n('gross_minor') / 100, b.s('kind'), b.s('coupon'), b.n('discount_minor') / 100, b.s('reason'),
              b.s('kind') == 'manual' ? b.s('given_by') : b.s('coupon_by'), b.s('approved_by'), b.n('waived_minor') / 100, b.s('waive_reason'), b.s('waived_by')],
+        ],
+      'cancellations' => [
+          ['What', 'Bill', 'At', 'Dish', 'Qty', 'KOT', 'Amount (Rs)', 'Reason', 'By', 'Approved by'],
+          for (final x in r.m('items').l('list'))
+            ['Dish cancelled', x.s('display_no'), x.s('at'), x.s('name'), x.n('qty'), x.s('kot_no'), x.n('value'), x.s('reason'), x.s('by'), x.s('approved_by')],
+          for (final x in r.m('voids').l('list')) ['Bill voided', x.s('display_no'), x.s('at'), '', '', '', x.n('total'), x.s('reason'), x.s('by'), x.s('approved_by')],
+          for (final x in r.m('refunds').l('list')) ['Refund', x.s('display_no'), x.s('at'), '', '', '', x.n('amount'), x.s('reason'), x.s('by'), ''],
         ],
       _ => [
           ['What', 'Bill', 'At', 'Amount (Rs)', 'By', 'Reason / detail'],
@@ -586,6 +594,55 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
     ];
   }
 
+  // 0640: dishes cancelled (before or after the KOT), bills voided and refunds, with who asked, who approved and why
+  List<Widget> _cancellations(Facts r) {
+    final i = r.m('items'), v = r.m('voids'), f = r.m('refunds'), q = r.m('requests');
+    return [
+      _kpis([
+        ('can-items', 'Dishes cancelled', '${i.n('count')}', rs(i.n('value_minor'))),
+        ('can-kot', 'After the KOT', '${i.n('after_kot')}', 'the kitchen was told'),
+        ('can-voids', 'Bills voided', '${v.n('count')}', rs(v.n('value_minor'))),
+        ('can-refunds', 'Refunds', '${f.n('count')}', rs(f.n('amount_minor'))),
+      ]),
+      const SizedBox(height: 12),
+      if (i.n('count') == 0 && v.n('count') == 0 && f.n('count') == 0) _empty('No cancellations or refunds in this period.'),
+      if (i.l('list').isNotEmpty)
+        _card('DISHES CANCELLED', [
+          for (final x in i.l('list'))
+            _line('${_qty(x.n('qty'))}× ${x.s('name')} · Bill ${x.s('display_no')}', '−${rs(x.n('value') * 100)}', key: 'rep-can-${x.s('order_id')}-${x.s('at')}',
+                sub: [
+                  _time(x.s('at')),
+                  if (x.s('kot_no').isNotEmpty) 'KOT ${x.s('kot_no')}' else 'not sent to the kitchen',
+                  x.s('reason'),
+                  if (x.s('by').isNotEmpty) 'by ${x.s('by')}',
+                  if (x.s('approved_by').isNotEmpty) 'approved by ${x.s('approved_by')}',
+                ].join(' · '),
+                onTap: () => _openBill(x.s('order_id'))),
+        ]),
+      if (v.l('list').isNotEmpty)
+        _card('BILLS VOIDED', [
+          for (final x in v.l('list'))
+            _line('Bill ${x.s('display_no')}', rs(x.n('total') * 100), color: kError,
+                sub: [
+                  _time(x.s('at')),
+                  if (x.n('refunded') > 0) '${rs(x.n('refunded') * 100)} refunded',
+                  x.s('reason'),
+                  if (x.s('by').isNotEmpty) 'by ${x.s('by')}',
+                  if (x.s('approved_by').isNotEmpty) 'approved by ${x.s('approved_by')}',
+                ].join(' · '),
+                onTap: () => _openBill(x.s('order_id'))),
+        ]),
+      if (f.l('list').isNotEmpty)
+        _card('REFUNDS', [
+          for (final x in f.l('list'))
+            _line('Bill ${x.s('display_no')}', rs(x.n('amount') * 100),
+                sub: [_time(x.s('at')), _methods[x.s('method')] ?? x.s('method'), if (x.s('kind') == 'cancel') 'void', if (x.s('by').isNotEmpty) 'by ${x.s('by')}', x.s('reason')].join(' · '),
+                onTap: () => _openBill(x.s('order_id'))),
+        ]),
+      if (q.n('asked') > 0) _note('${q.n('asked')} asked for approval in this period, ${q.n('rejected')} rejected.'),
+    ];
+  }
+
   List<Widget> _audit(Facts r) {
     final c = r.m('cancelled'), u = r.m('unpaid'), p = r.m('reprints'), a = r.m('after_bill'), f = r.m('refunds');
     final nothing = c.n('bills') == 0 && u.n('bills') == 0 && p.n('count') == 0 && a.n('count') == 0 && f.n('count') == 0;
@@ -615,7 +672,7 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
         ]),
       if (a.n('count') > 0) _card('CHANGED AFTER THE BILL', [for (final e in a.l('list')) event(e)]),
       if (p.n('count') > 0) _card('REPRINTS', [for (final e in p.l('list')) event(e)]),
-      _note('Removing a single dish and editing a price are not possible in the POS, so they cannot happen unseen.'),
+      _note('Dishes cancelled one by one, KOT items stopped and bills voided are in Cancellations & refunds. Editing a price is not possible in the POS.'),
     ];
   }
 
@@ -679,6 +736,7 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
                   'payments' => _payments(r),
                   'cashiers' => _cashiers(r),
                   'discounts' => _discounts(r),
+                  'cancellations' => _cancellations(r),
                   _ => _audit(r),
                 },
               ]),

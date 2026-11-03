@@ -7,6 +7,7 @@ import '../inventory/inventory_widgets.dart' show qty;
 import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import '../ui/whatsapp_icon.dart';
+import 'bill_adjust.dart' show BillMoneyScreen;
 import 'bill_api.dart';
 import 'bill_discount_sheet.dart';
 import 'bill_customer.dart';
@@ -376,6 +377,19 @@ class _BillPayScreenState extends State<BillPayScreen> {
             const SizedBox(width: 10),
             Expanded(child: _SendButton(key: const ValueKey('bill-print'), tip: 'Print bill', onTap: _printBill, child: const Icon(LucideIcons.printer, size: 26, color: kInk))),
           ]),
+          // 0640: Void bill / Refund and the payment details of this bill
+          if (_order != null)
+            TextButton.icon(
+              key: const ValueKey('bill-void-refund'),
+              onPressed: _busy
+                  ? null
+                  : () async {
+                      await Navigator.of(context).push(BillMoneyScreen.route(_api, _order!.s('id')));
+                      if (mounted) await _load();
+                    },
+              icon: const Icon(LucideIcons.undo2, size: 18, color: Color(0xFF2563EB)),
+              label: Text('Void bill / Refund · payment details', style: inter(14, 700, color: const Color(0xFF2563EB))),
+            ),
         ],
       ],
     );
