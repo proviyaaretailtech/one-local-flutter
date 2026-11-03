@@ -1,0 +1,465 @@
+{
+  "dish": {
+    "id": "69ad37c6-c7b6-4817-a97f-78b57b07b8cc",
+    "name": "Thali",
+    "draft": false,
+    "course": "eat",
+    "images": [],
+    "presets": [
+      {
+        "slot": "morning",
+        "ends_at": "12:00",
+        "starts_at": "06:00"
+      },
+      {
+        "slot": "evening",
+        "ends_at": "20:00",
+        "starts_at": "16:00"
+      },
+      {
+        "slot": "night",
+        "ends_at": "24:00",
+        "starts_at": "20:00"
+      }
+    ],
+    "station": "main",
+    "version": 1,
+    "can_edit": true,
+    "category": null,
+    "channels": {
+      "qr": true,
+      "one_local": true
+    },
+    "currency": "INR",
+    "in_stock": true,
+    "variants": [],
+    "food_type": "veg",
+    "image_url": null,
+    "description": null,
+    "ingredients": [],
+    "location_id": "1fd138d1-4292-4e22-b777-dfeaeb217dbb",
+    "price_minor": 40000,
+    "availability": [],
+    "prep_minutes": 10,
+    "orderable_now": true
+  },
+  "dish_off_qr": {
+    "id": "69ad37c6-c7b6-4817-a97f-78b57b07b8cc",
+    "name": "Thali",
+    "draft": false,
+    "course": "eat",
+    "images": [],
+    "presets": [
+      {
+        "slot": "morning",
+        "ends_at": "12:00",
+        "starts_at": "06:00"
+      },
+      {
+        "slot": "evening",
+        "ends_at": "20:00",
+        "starts_at": "16:00"
+      },
+      {
+        "slot": "night",
+        "ends_at": "24:00",
+        "starts_at": "20:00"
+      }
+    ],
+    "station": "main",
+    "version": 2,
+    "can_edit": true,
+    "category": null,
+    "channels": {
+      "qr": false,
+      "one_local": true
+    },
+    "currency": "INR",
+    "in_stock": true,
+    "variants": [],
+    "food_type": "veg",
+    "image_url": null,
+    "description": null,
+    "ingredients": [],
+    "location_id": "1fd138d1-4292-4e22-b777-dfeaeb217dbb",
+    "price_minor": 40000,
+    "availability": [],
+    "prep_minutes": 10,
+    "orderable_now": true
+  },
+  "dashboard_owner": {
+    "kot": {
+      "all": 1,
+      "new": 1,
+      "ready": 0,
+      "served": 0,
+      "delayed": 0,
+      "critical": 0,
+      "in_progress": 0
+    },
+    "date": "2026-11-03",
+    "last7": [
+      {
+        "date": "2026-10-28",
+        "label": "Wed",
+        "sales": 0,
+        "orders": 0
+      },
+      {
+        "date": "2026-10-29",
+        "label": "Thu",
+        "sales": 0,
+        "orders": 0
+      },
+      {
+        "date": "2026-10-30",
+        "label": "Fri",
+        "sales": 0,
+        "orders": 0
+      },
+      {
+        "date": "2026-10-31",
+        "label": "Sat",
+        "sales": 0,
+        "orders": 0
+      },
+      {
+        "date": "2026-11-01",
+        "label": "Sun",
+        "sales": 0,
+        "orders": 0
+      },
+      {
+        "date": "2026-11-02",
+        "label": "Mon",
+        "sales": 0,
+        "orders": 0
+      },
+      {
+        "date": "2026-11-03",
+        "label": "Tue",
+        "sales": 893,
+        "orders": 1
+      }
+    ],
+    "prev7": {
+      "sales": 0,
+      "orders": 0
+    },
+    "sales": {
+      "gross": 893,
+      "today": 793,
+      "refunds": 100,
+      "paid_bills": 1
+    },
+    "scope": "all",
+    "orders": {
+      "new": 0,
+      "live": 0,
+      "today": 1,
+      "in_progress": 0
+    },
+    "tables": {
+      "all": 1,
+      "cleaning": 1,
+      "occupied": 0,
+      "reserved": 0,
+      "available": 0
+    },
+    "channel": {
+      "outlets": 1,
+      "open_outlets": 0
+    },
+    "outlets": [
+      {
+        "id": "1fd138d1-4292-4e22-b777-dfeaeb217dbb",
+        "name": "Golden ZZ CSM mw0rekq6 - Main"
+      }
+    ],
+    "business": "Golden ZZ CSM mw0rekq6",
+    "location": {
+      "id": null,
+      "name": "All outlets (1)"
+    },
+    "onelocal": {
+      "open": 0,
+      "scope": "business",
+      "today": 0,
+      "sales_today": 0
+    },
+    "date_label": "Tuesday, 3 November 2026",
+    "not_reported": [
+      "complaints",
+      "reviews"
+    ],
+    "outlet_count": 1,
+    "is_restaurant": true,
+    "ingredients_low": {
+      "low": 0,
+      "critical": 0
+    },
+    "ingredients_items": []
+  },
+  "dashboard_captain": {
+    "kot": {
+      "all": 1,
+      "new": 1,
+      "ready": 0,
+      "served": 0,
+      "delayed": 0,
+      "critical": 0,
+      "in_progress": 0
+    },
+    "date": "2026-11-03",
+    "last7": [
+      {
+        "date": "2026-10-28",
+        "label": "Wed",
+        "orders": 0
+      },
+      {
+        "date": "2026-10-29",
+        "label": "Thu",
+        "orders": 0
+      },
+      {
+        "date": "2026-10-30",
+        "label": "Fri",
+        "orders": 0
+      },
+      {
+        "date": "2026-10-31",
+        "label": "Sat",
+        "orders": 0
+      },
+      {
+        "date": "2026-11-01",
+        "label": "Sun",
+        "orders": 0
+      },
+      {
+        "date": "2026-11-02",
+        "label": "Mon",
+        "orders": 0
+      },
+      {
+        "date": "2026-11-03",
+        "label": "Tue",
+        "orders": 1
+      }
+    ],
+    "prev7": {
+      "orders": 0
+    },
+    "scope": "all",
+    "orders": {
+      "new": 0,
+      "live": 0,
+      "today": 1,
+      "in_progress": 0
+    },
+    "tables": {
+      "all": 1,
+      "cleaning": 1,
+      "occupied": 0,
+      "reserved": 0,
+      "available": 0
+    },
+    "channel": {
+      "outlets": 1,
+      "open_outlets": 0
+    },
+    "outlets": [
+      {
+        "id": "1fd138d1-4292-4e22-b777-dfeaeb217dbb",
+        "name": "Golden ZZ CSM mw0rekq6 - Main"
+      }
+    ],
+    "business": "Golden ZZ CSM mw0rekq6",
+    "location": {
+      "id": null,
+      "name": "All outlets (1)"
+    },
+    "onelocal": {
+      "open": 0,
+      "scope": "business",
+      "today": 0
+    },
+    "date_label": "Tuesday, 3 November 2026",
+    "money_hidden": true,
+    "not_reported": [
+      "complaints",
+      "reviews"
+    ],
+    "outlet_count": 1,
+    "is_restaurant": true,
+    "ingredients_low": null,
+    "ingredients_items": null
+  },
+  "insights_captain": {
+    "mix": {
+      "by": [
+        {
+          "key": "dine_in",
+          "label": "Dine in",
+          "orders": 1
+        },
+        {
+          "key": "takeaway",
+          "label": "Takeaway",
+          "orders": 0
+        },
+        {
+          "key": "delivery",
+          "label": "Delivery",
+          "orders": 0
+        }
+      ],
+      "orders": 1
+    },
+    "top": [
+      {
+        "qty": 2,
+        "name": "Thali"
+      },
+      {
+        "qty": 1,
+        "name": "Lassi"
+      }
+    ],
+    "menu": {
+      "low": [
+        {
+          "name": "Lassi",
+          "can_make": 0
+        },
+        {
+          "name": "Thali",
+          "can_make": 0
+        }
+      ],
+      "out": 2,
+      "dishes": 2,
+      "no_photo": 2,
+      "high_cost": [],
+      "no_recipe": 2,
+      "food_cost_avg": null,
+      "no_description": 2
+    },
+    "ready": 0,
+    "leakage": null,
+    "money_hidden": true
+  },
+  "insights_owner": {
+    "mix": {
+      "by": [
+        {
+          "key": "dine_in",
+          "label": "Dine in",
+          "sales": 893,
+          "orders": 1
+        },
+        {
+          "key": "takeaway",
+          "label": "Takeaway",
+          "sales": 0,
+          "orders": 0
+        },
+        {
+          "key": "delivery",
+          "label": "Delivery",
+          "sales": 0,
+          "orders": 0
+        }
+      ],
+      "sales": 893,
+      "orders": 1,
+      "avg_bill": 893
+    },
+    "top": [
+      {
+        "qty": 2,
+        "name": "Thali",
+        "sales": 800
+      },
+      {
+        "qty": 1,
+        "name": "Lassi",
+        "sales": 100
+      }
+    ],
+    "menu": {
+      "low": [
+        {
+          "name": "Lassi",
+          "can_make": 0
+        },
+        {
+          "name": "Thali",
+          "can_make": 0
+        }
+      ],
+      "out": 2,
+      "dishes": 2,
+      "no_photo": 2,
+      "high_cost": [],
+      "no_recipe": 2,
+      "food_cost_avg": null,
+      "no_description": 2
+    },
+    "ready": 0,
+    "leakage": {
+      "latest": [],
+      "reopened": 0,
+      "unsettled": 0,
+      "admin_changes": 0,
+      "unsettled_due_minor": 0
+    },
+    "payments": [
+      {
+        "count": 1,
+        "amount": 893,
+        "method": "cash"
+      }
+    ]
+  },
+  "activity_captain": {
+    "more": false,
+    "entries": [
+      {
+        "at": "2026-11-03T14:04:38.41741+00:00",
+        "id": "8ec189a9-2b7e-414e-8715-f4a52407b5e4",
+        "kind": "status_awaiting_payment",
+        "actor": "pos",
+        "message": "P-00001 -> awaiting_payment",
+        "order_id": "98fb19f5-ca74-403a-a2bc-c929901f743d",
+        "display_no": "P-00001",
+        "table_label": "K1",
+        "location_name": "Golden ZZ CSM mw0rekq6 - Main"
+      },
+      {
+        "at": "2026-11-03T14:04:38.148733+00:00",
+        "id": "f07ebbe4-b8ca-42c1-a50d-ea92114756ae",
+        "kind": "kot_fired",
+        "actor": "pos",
+        "message": "KOT 1 sent to the kitchen - 2 dishes",
+        "order_id": "98fb19f5-ca74-403a-a2bc-c929901f743d",
+        "display_no": "P-00001",
+        "table_label": "K1",
+        "location_name": "Golden ZZ CSM mw0rekq6 - Main"
+      },
+      {
+        "at": "2026-11-03T14:04:38.148733+00:00",
+        "id": "956ba09c-bdc1-484f-b874-ee633143fb40",
+        "kind": "placed",
+        "actor": "pos",
+        "message": "Order P-00001 placed - 3 items",
+        "order_id": "98fb19f5-ca74-403a-a2bc-c929901f743d",
+        "display_no": "P-00001",
+        "table_label": "K1",
+        "location_name": "Golden ZZ CSM mw0rekq6 - Main"
+      }
+    ],
+    "limited": true
+  }
+}

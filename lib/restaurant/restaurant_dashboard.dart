@@ -137,7 +137,8 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
 
   Widget _label(String t) => Text(t, style: inter(11, 500, color: kMuted));
 
-  Widget _tabs() => SingleChildScrollView(
+  // 0652: a kitchen or captain login sees My Feed only (the Sales tab is all money)
+  Widget _tabs(RestaurantDashboardData d) => d.moneyHidden ? const SizedBox.shrink() : SingleChildScrollView(
     scrollDirection: Axis.horizontal,
     padding: const EdgeInsets.symmetric(horizontal: 16),
     child: Row(
@@ -170,7 +171,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
       // the outlet header (specs/outlets-multi): "SHOWING DATA FOR / All outlets (N) ▾", bell, ☰; its switcher drives OutletScope
       OutletHeader(title: d.locationName, onMenu: widget.onMenu, safeTop: false, menuKey: const ValueKey('home-menu'), dashboard: true),
       const SizedBox(height: 4),
-      _tabs(),
+      _tabs(d),
       const SizedBox(height: 14),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -178,7 +179,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
           key: ValueKey('rst-tab-body-$_tab'),
           crossAxisAlignment: CrossAxisAlignment.stretch,
           // the tab's sections build in one after another; switching tabs plays it again (lib/ui/motion.dart)
-          children: staggered(switch (_tab) {
+          children: staggered(switch (d.moneyHidden ? 0 : _tab) {
             0 => _feed(d),
             _ => _salesTab(d),
           }),
@@ -339,8 +340,7 @@ class _RestaurantHomeBodyState extends State<RestaurantHomeBody> {
           ],
         ),
       ),
-      const SizedBox(height: 10),
-      _salesToday(d),
+      if (!d.moneyHidden) ...[const SizedBox(height: 10), _salesToday(d)],
       // more from the day's data (0607, 0608): delivery by source, how orders were served, payments, top dishes, menu health
       RestaurantInsights(key: ValueKey('rst-insights-${_location ?? 'all'}-$_refreshes'), api: widget.api, locationId: _location),
       const SizedBox(height: 10),

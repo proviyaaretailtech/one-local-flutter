@@ -5,10 +5,10 @@ import 'package:http/http.dart' as http;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../api/rpc_client.dart';
 import '../inventory/inventory_api.dart' show Facts;
-import '../tables/bill_receipt_popup.dart' show printReceiptPdf;
 import '../tables/table_widgets.dart' show sayError, kLimeBtn;
 import '../ui/app_header.dart';
 import '../ui/i18n.dart';
@@ -38,6 +38,9 @@ String _connName(String c) => _connections.firstWhere((x) => x.$1 == c, orElse: 
 /// Settings → Devices for a restaurant (founder, 1 Nov 2026, like the store's): the printers for receipts, kitchen tickets (KOT) and
 /// barcode labels, how each connects, its paper or label size, copies, and which is the default for its job. Test print sends a test
 /// page through the phone's print system and marks the printer tested; a kitchen printer added here can be chosen for a kitchen station.
+/// Sends a test page to the print dialog; true when it was printed (or sent), false when the dialog was cancelled. Tests replace it.
+Future<bool> Function(Uint8List pdf, String name) printTestPagePdf = (pdf, name) => Printing.layoutPdf(onLayout: (_) async => pdf, name: name);
+
 class RstDevicesScreen extends StatefulWidget {
   const RstDevicesScreen({super.key, this.api});
   final RstDevicesApi? api;
@@ -76,11 +79,28 @@ class _RstDevicesScreenState extends State<RstDevicesScreen> {
     if (saved == true && mounted) _load();
   }
 
+  /// Test print (founder, 3 Nov 2026: it marked a printer tested even when the print dialog was cancelled): a cancelled dialog marks
+  /// nothing, and the printer is marked tested only when the person says the test page came out (a browser cannot tell).
   Future<void> _test(Facts p) async {
     try {
-      await printReceiptPdf(await printerTestPage(p), 'Test ${p.s('name')}.pdf');
+      final sent = await printTestPagePdf(await printerTestPage(p), 'Test ${p.s('name')}.pdf');
+      if (!mounted) return;
+      if (!sent) return showToast(context, tr('Not printed. The printer is not marked as tested.'));
+      final yes = await showOlDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text(tr('Did the test page print?'), style: inter(18, 800)),
+          content: Text(tr('Check the paper from {name}.').replaceAll('{name}', p.s('name')), style: inter(14, 500, color: kMuted)),
+          actions: [
+            TextButton(key: const ValueKey('test-printed-no'), onPressed: () => Navigator.pop(c, false), child: Text(tr('No'), style: inter(14, 600))),
+            TextButton(key: const ValueKey('test-printed-yes'), onPressed: () => Navigator.pop(c, true), child: Text(tr('Yes, it printed'), style: inter(14, 800))),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (yes != true) return showToast(context, tr('Not marked as tested. Check the printer and its connection, then try again.'));
       await _api.tested(p.s('id'));
-      if (mounted) showToast(context, tr('Test page sent. Marked as tested.'));
+      if (mounted) showToast(context, tr('Marked as tested.'));
       _load();
     } catch (e) {
       if (mounted) showToast(context, sayError(e));

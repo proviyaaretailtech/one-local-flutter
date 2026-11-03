@@ -21,6 +21,9 @@ class RestaurantDashboardData {
   const RestaurantDashboardData(this.raw);
   final Map<String, dynamic> raw;
   String get business => (raw['business'] ?? '').toString();
+
+  /// 0652: a kitchen or captain login gets no sales, payments or refunds (the database leaves them out).
+  bool get moneyHidden => raw['money_hidden'] == true;
   String get locationId => (_map(raw['location'])['id'] ?? '').toString();
   String get locationName => (_map(raw['location'])['name'] ?? '').toString();
   String get dateLabel => (raw['date_label'] ?? '').toString();

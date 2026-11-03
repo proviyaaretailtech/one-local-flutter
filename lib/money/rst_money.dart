@@ -285,8 +285,8 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
     );
   }
 
-  /// The OneLocal wallet (what OneLocal owes for app orders), then the ad credits (rupees, 0635: a tap opens Ads) and the discount
-  /// credits (not open yet: "Soon").
+  /// The OneLocal wallet (what OneLocal owes for app orders), then the ad credits (rupees, 0635: a tap opens Ads). The discount credits
+  /// tile is gone (founder, 3 Nov 2026: a dead "Soon" tile; there are no discount credits to show).
   Widget _onelocalCards() {
     Widget credit(String key, String title, String value, String sub, IconData icon, {required bool dark, VoidCallback? onTap}) {
       final bg = dark ? kRmDeep : kRmLime, fg = dark ? Colors.white : kRmDeep, soft = dark ? const Color(0xFFB8BCC4) : const Color(0xFF3F4A12);
@@ -393,8 +393,6 @@ class _RstMoneyScreenState extends State<RstMoneyScreen> {
               _loadWallet(); // money moved to ad credits leaves the OneLocal wallet
             }
           }),
-          const SizedBox(width: 12),
-          credit('rm-discount-credits', 'Discount credits', rs(0), 'Discount against commission', LucideIcons.badgePercent, dark: true),
         ]),
       ),
     ]);

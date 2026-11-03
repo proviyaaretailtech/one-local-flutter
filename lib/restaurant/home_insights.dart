@@ -70,9 +70,9 @@ class _RestaurantInsightsState extends State<RestaurantInsights> {
       if (ch != null && _l(ch['channels']).isNotEmpty) ...[const SizedBox(height: 10), _delivery(ch)],
       if (i != null) ...[
         const SizedBox(height: 10),
-        _served(_m(i['mix'])),
+        _served(_m(i['mix']), hideMoney: i['money_hidden'] == true),
         if (_l(i['payments']).isNotEmpty) ...[const SizedBox(height: 10), _payments(_l(i['payments']))],
-        if (_l(i['top']).isNotEmpty) ...[const SizedBox(height: 10), _top(_l(i['top']))],
+        if (_l(i['top']).isNotEmpty) ...[const SizedBox(height: 10), _top(_l(i['top']), hideMoney: i['money_hidden'] == true)],
         const SizedBox(height: 10),
         _menu(_m(i['menu']), _n(i['ready']).toInt()),
       ],
@@ -167,14 +167,15 @@ class _RestaurantInsightsState extends State<RestaurantInsights> {
   }
 
   // ---- How orders were served: a split bar and the three ways, with the average bill
-  Widget _served(Map<String, dynamic> mix) {
+  /// [hideMoney] (0652): a kitchen or captain login sees the orders, not the bill amounts.
+  Widget _served(Map<String, dynamic> mix, {bool hideMoney = false}) {
     final by = _l(mix['by']);
     final total = _n(mix['orders']);
     const colors = {'dine_in': Color(0xFF2563EB), 'takeaway': Color(0xFFEA580C), 'delivery': Color(0xFF7C3AED)};
     return HomeCard(
       key: const ValueKey('rst-served'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _title('How orders were served', sub: '${total.toInt()} orders today · average bill ${svcRupees(_n(mix['avg_bill']))}'),
+        _title('How orders were served', sub: hideMoney ? '${total.toInt()} orders today' : '${total.toInt()} orders today · average bill ${svcRupees(_n(mix['avg_bill']))}'),
         const SizedBox(height: 10),
         if (total > 0)
           ClipRRect(
@@ -195,8 +196,8 @@ class _RestaurantInsightsState extends State<RestaurantInsights> {
               Container(width: 10, height: 10, decoration: BoxDecoration(color: colors['${b['key']}'] ?? kMuted, shape: BoxShape.circle)),
               const SizedBox(width: 8),
               Expanded(child: Text('${b['label']}', style: inter(12.5, 600))),
-              Text('${_n(b['orders']).toInt()} · ', key: ValueKey('rst-served-${b['key']}'), style: inter(12.5, 500, color: kMuted)),
-              Text(svcRupees(_n(b['sales'])), style: inter(12.5, 700)),
+              Text('${_n(b['orders']).toInt()}${hideMoney ? '' : ' · '}', key: ValueKey('rst-served-${b['key']}'), style: inter(12.5, 500, color: kMuted)),
+              if (!hideMoney) Text(svcRupees(_n(b['sales'])), style: inter(12.5, 700)),
             ]),
           ),
       ]),
@@ -234,7 +235,7 @@ class _RestaurantInsightsState extends State<RestaurantInsights> {
   }
 
   // ---- Top dishes today
-  Widget _top(List<Map<String, dynamic>> top) => HomeCard(
+  Widget _top(List<Map<String, dynamic>> top, {bool hideMoney = false}) => HomeCard(
         key: const ValueKey('rst-top'),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _title('Top dishes today', sub: 'By quantity sold'),
@@ -252,8 +253,8 @@ class _RestaurantInsightsState extends State<RestaurantInsights> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(child: Text('${d['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13, 600))),
-                Text('${_n(d['qty']).toInt()} sold · ', style: inter(12, 500, color: kMuted)),
-                Text(svcRupees(_n(d['sales'])), style: inter(12.5, 700)),
+                Text('${_n(d['qty']).toInt()} sold${hideMoney ? '' : ' · '}', style: inter(12, 500, color: kMuted)),
+                if (!hideMoney) Text(svcRupees(_n(d['sales'])), style: inter(12.5, 700)),
               ]),
             ),
         ]),

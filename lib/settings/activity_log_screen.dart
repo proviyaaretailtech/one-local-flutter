@@ -19,6 +19,7 @@ class ActivityLogScreen extends StatefulWidget {
 class _ActivityLogScreenState extends State<ActivityLogScreen> {
   final _entries = <Map<String, dynamic>>[];
   bool _loading = true, _more = false;
+  bool _limited = false; // 0652: a kitchen or captain login sees the kitchen and floor events only
   String? _error;
 
   @override
@@ -41,6 +42,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
         if (!older) _entries.clear();
         _entries.addAll(got);
         _more = r['more'] == true;
+        _limited = r['limited'] == true;
       });
     } catch (e) {
       if (mounted) setState(() => _error = errorSentence(e));
@@ -69,6 +71,12 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
           child: RefreshIndicator(
             onRefresh: _load,
             child: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 32), children: [
+              if (_limited)
+                Padding(
+                  key: const ValueKey('activity-limited'),
+                  padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
+                  child: Text('Your role sees the kitchen and floor activity. Payments, discounts and refunds are for managers.', style: inter(13, 500, color: kMuted)),
+                ),
               ...rows,
               if (_loading) const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator(strokeWidth: 2.4))),
               if (_error != null)

@@ -8,7 +8,8 @@ import 'menu_api.dart';
 import 'menu_widgets.dart';
 
 /// Figma "Menu – Item detail" with the founder's changes (20 Oct 2026): a Description section with Write with AI, "Select availability"
-/// (Morning, Evening, Night, Custom) instead of "Select Unavailable Duration", and "Apply to Channels" shown as Coming soon.
+/// (Morning, Evening, Night, Custom) instead of "Select Unavailable Duration", and "Apply to Channels" (0652: Table QR and the OneLocal app;
+/// founder, 3 Nov 2026: it was a placeholder).
 /// Nothing is written until the owner presses Save; the database checks the windows, the version and the role.
 class DishScreen extends StatefulWidget {
   const DishScreen({super.key, required this.api, required this.dishId, this.locationId, this.startEditing = false});
@@ -32,6 +33,7 @@ class _DishScreenState extends State<DishScreen> {
   final _descFocus = FocusNode();
   List<ServingWindow> _windows = [];
   bool _aiBusy = false, _saving = false, _aiDraft = false, _changed = false;
+  bool _qr = true, _oneLocal = true; // Apply to Channels
   String? _aiNote; // why AI could not help (not set up, limit reached, ...): manual writing always stays available
   bool _aiNoteIsError = false;
 
@@ -46,6 +48,8 @@ class _DishScreenState extends State<DishScreen> {
     _dish = d;
     _desc.text = d.description;
     _windows = d.availability;
+    _qr = d.onTableQr;
+    _oneLocal = d.onOneLocal;
     _changed = false;
     _aiDraft = false;
   }
@@ -92,7 +96,7 @@ class _DishScreenState extends State<DishScreen> {
     if (d == null || _saving) return;
     setState(() => _saving = true);
     try {
-      final next = await widget.api.save(d.id, d.version, locationId: widget.locationId, description: _desc.text.trim(), availability: _windows);
+      final next = await widget.api.save(d.id, d.version, locationId: widget.locationId, description: _desc.text.trim(), availability: _windows, channels: {'qr': _qr, 'one_local': _oneLocal});
       if (!mounted) return;
       setState(() {
         _take(next);
@@ -105,6 +109,38 @@ class _DishScreenState extends State<DishScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Apply to Channels: where guests can order this dish besides the floor. Saved with Save, like the rest of the dish.
+  Widget _channels(bool edit) {
+    Widget row(String key, String title, String sub, bool value, void Function(bool) set) => SwitchListTile(
+          key: ValueKey('channel-$key'),
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+          title: Text(title, style: inter(14.5, 600)),
+          subtitle: Text(sub, style: inter(12.5, 400, color: kMuted)),
+          value: value,
+          onChanged: edit ? (v) => setState(() {
+                set(v);
+                _changed = true;
+              }) : null,
+        );
+    return Column(key: const ValueKey('dish-channels'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text('Apply to Channels', style: inter(16, 700)),
+      const SizedBox(height: 4),
+      Text('Dine-in at your tables always has it. Swiggy and Zomato: switch the dish off in their own apps.', style: inter(12.5, 400, color: kMuted)),
+      const SizedBox(height: 10),
+      Container(
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: kLine)),
+        child: Column(children: [
+          row('all', 'All channels', 'Table QR and the OneLocal app', _qr && _oneLocal, (v) => _qr = _oneLocal = v),
+          const Divider(height: 1, color: kLine),
+          row('qr', 'Table QR', 'Guests order from the QR code on their table', _qr, (v) => _qr = v),
+          const Divider(height: 1, color: kLine),
+          row('one_local', 'OneLocal app', 'Delivery and pickup orders from the OneLocal app', _oneLocal, (v) => _oneLocal = v),
+        ]),
+      ),
+    ]);
   }
 
   Future<void> _reload() async {
@@ -339,7 +375,7 @@ class _DishScreenState extends State<DishScreen> {
                           ),
                         ),
                       const SizedBox(height: 22),
-                      const ChannelsComingSoon(),
+                      _channels(edit),
                     ],
                   ),
                 );

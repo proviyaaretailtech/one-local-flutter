@@ -72,41 +72,6 @@ class SlotTile extends StatelessWidget {
       );
 }
 
-/// "Apply to Channels" from the Figma frame, shown greyed with a Coming soon tag. The switches do nothing and send nothing.
-class ChannelsComingSoon extends StatelessWidget {
-  const ChannelsComingSoon({super.key});
-  static const channels = ['All Channels', 'Zomato only', 'Swiggy only', 'Dine-in QR'];
-  @override
-  Widget build(BuildContext context) => Opacity(
-        key: const ValueKey('channels-coming-soon'),
-        opacity: 0.5,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            Text('Apply to Channels', style: inter(16, 700)),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: const Color(0xFFE5E7EB), borderRadius: BorderRadius.circular(20)),
-              child: Text('Coming soon', style: inter(11, 600, color: kMuted)),
-            ),
-          ]),
-          const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: kLine)),
-            child: Column(children: [
-              for (final c in channels)
-                ListTile(
-                  dense: true,
-                  enabled: false,
-                  title: Text(c, style: inter(14, 500)),
-                  trailing: Switch(value: false, onChanged: null, key: ValueKey('channel-$c')),
-                ),
-            ]),
-          ),
-        ]),
-      );
-}
-
 class MenuError extends StatelessWidget {
   const MenuError({super.key, required this.error, required this.onRetry});
   final Object error;

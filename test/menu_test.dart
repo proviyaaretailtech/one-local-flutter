@@ -253,21 +253,53 @@ void main() {
     });
   });
 
-  group('dish detail: Apply to Channels', () {
-    testWidgets('shown greyed with Coming soon; the switches do nothing and send nothing', (t) async {
+  group('dish detail: Apply to Channels (0652)', () {
+    SwitchListTile sw(WidgetTester t, String k) => t.widget<SwitchListTile>(find.byKey(ValueKey('channel-$k')));
+
+    testWidgets('Table QR and the OneLocal app, on to start with; switching one off is saved with Save', (t) async {
       final g = dishGateway();
       await showScreen(t, DishScreen(api: g.api, dishId: 'd1'));
       expect(find.text('Apply to Channels'), findsOneWidget);
-      expect(find.text('Coming soon'), findsOneWidget);
-      for (final c in ['All Channels', 'Zomato only', 'Swiggy only', 'Dine-in QR']) {
-        final s = t.widget<Switch>(find.byKey(ValueKey('channel-$c')));
-        expect(s.onChanged, isNull, reason: c);
-        expect(s.value, isFalse);
+      expect(find.text('Coming soon'), findsNothing, reason: 'no placeholder (founder, 3 Nov 2026)');
+      expect(find.textContaining('Swiggy and Zomato: switch the dish off in their own apps'), findsOneWidget);
+      for (final k in ['all', 'qr', 'one_local']) {
+        expect(sw(t, k).value, isTrue, reason: k);
       }
-      await t.tap(find.byKey(const ValueKey('channel-Zomato only')), warnIfMissed: false);
+      await t.ensureVisible(find.byKey(const ValueKey('channel-qr')));
+      await t.tap(find.byKey(const ValueKey('channel-qr')));
       await t.pumpAndSettle();
-      expect(g.calls.map((c) => c.$1), ['rst_menu_item_view']);
-      expect(t.widget<Opacity>(find.byKey(const ValueKey('channels-coming-soon'))).opacity, lessThan(1));
+      expect(sw(t, 'qr').value, isFalse);
+      expect(sw(t, 'all').value, isFalse, reason: 'not every channel any more');
+      expect(g.bodies('rst_menu_item_save'), isEmpty, reason: 'nothing until Save');
+      await t.tap(find.byKey(const ValueKey('dish-save')));
+      await t.pumpAndSettle();
+      expect(g.bodies('rst_menu_item_save').single['channels'], {'qr': false, 'one_local': true});
+    });
+
+    testWidgets("All channels switches both; the dish's saved channels show", (t) async {
+      final g = FakeGateway((fn, b) => switch (fn) {
+            'rst_menu_item_view' => json({...dishJson(), 'channels': {'qr': true, 'one_local': false}}),
+            'rst_menu_item_save' => json({...dishJson(version: 8), 'channels': b['channels']}),
+            _ => json({'detail': 'Not found'}, 404),
+          });
+      await showScreen(t, DishScreen(api: g.api, dishId: 'd1'));
+      expect(sw(t, 'one_local').value, isFalse);
+      expect(sw(t, 'all').value, isFalse);
+      await t.ensureVisible(find.byKey(const ValueKey('channel-all')));
+      await t.tap(find.byKey(const ValueKey('channel-all')));
+      await t.pumpAndSettle();
+      expect([sw(t, 'qr').value, sw(t, 'one_local').value], [true, true]);
+      await t.tap(find.byKey(const ValueKey('dish-save')));
+      await t.pumpAndSettle();
+      expect(g.bodies('rst_menu_item_save').single['channels'], {'qr': true, 'one_local': true});
+    });
+
+    testWidgets('someone who cannot edit the menu sees the channels but cannot switch them', (t) async {
+      final g = FakeGateway((fn, b) => fn == 'rst_menu_item_view' ? json({...dishJson(canEdit: false), 'channels': {'qr': false, 'one_local': true}}) : json({'detail': 'Not found'}, 404));
+      await showScreen(t, DishScreen(api: g.api, dishId: 'd1'));
+      expect(sw(t, 'qr').value, isFalse);
+      expect(sw(t, 'qr').onChanged, isNull);
+      expect(sw(t, 'all').onChanged, isNull);
     });
   });
 
