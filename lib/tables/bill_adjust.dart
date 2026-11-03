@@ -6,6 +6,7 @@ import '../inventory/inventory_api.dart' show Facts;
 import '../ui/app_header.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
+import 'admin_pin.dart';
 import 'bill_api.dart';
 import 'table_widgets.dart';
 
@@ -129,7 +130,9 @@ class _CancelSheetState extends State<_CancelSheet> {
   }
 
   int get _count => _pick.values.fold(0, (s, n) => s + n);
-  bool get _needsManager => widget.items.any((i) => (_pick[i.s('id')] ?? 0) > 0 && i.b('needs_manager')) && !widget.order.m('can').b('is_manager');
+  /// 0645: the bill is generated: an admin PIN and a note do it (asked for when the cancel is sent), not a manager's approval
+  bool get _billed => widget.order.s('status') == 'awaiting_payment';
+  bool get _needsManager => !_billed && widget.items.any((i) => (_pick[i.s('id')] ?? 0) > 0 && i.b('needs_manager')) && !widget.order.m('can').b('is_manager');
 
   void _set(String id, int n) => setState(() {
         _key = null; // a different choice is a different request
@@ -155,8 +158,12 @@ class _CancelSheetState extends State<_CancelSheet> {
       _error = null;
     });
     try {
-      final r = await widget.api.cancelItems(widget.order.s('id'), Map.of(_pick), reason: _reason.text, key: _key ??= BillApi.newKey());
-      if (mounted) Navigator.of(context).pop(r);
+      final key = _key ??= BillApi.newKey();
+      // 0645: on a generated bill an admin PIN and a note do it
+      final r = await withAdminPin(context, pins: widget.api, run: (admin) => widget.api.cancelItems(widget.order.s('id'), Map.of(_pick), reason: _reason.text, key: key, admin: admin));
+      if (!mounted) return;
+      if (r == null) return setState(() => _busy = false);
+      Navigator.of(context).pop(r);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -180,6 +187,12 @@ class _CancelSheetState extends State<_CancelSheet> {
         for (final (n, i) in widget.items.indexed) _line(n, i),
         const SizedBox(height: 10),
         _reasonField(_reason, const ['Added by mistake', 'Guest changed mind', 'Out of stock', 'Taking too long', 'Wrong dish'], 'cancel', () => setState(() => _error = null)),
+        if (_billed)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('This bill is generated: an admin PIN and a note are needed to cancel a dish.',
+                key: const ValueKey('cancel-needs-pin'), style: inter(13, 600, color: _amber)),
+          ),
         if (_needsManager)
           Padding(
             padding: const EdgeInsets.only(top: 6),

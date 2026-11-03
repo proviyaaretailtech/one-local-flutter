@@ -97,3 +97,8 @@ export const PrinterSave = obj({ id: id.nullish(), location_id: id.nullish(), na
   label_size: z.enum(['38x25', '50x25', '50x30', '75x50', '100x50']).nullish(), copies: z.number().int().min(1).max(5).optional(),
   auto_cut: z.boolean().optional(), is_default: z.boolean().optional() });
 export const PrinterId = obj({ id });
+// 0645: the admin PIN. An owner or admin sets their own (6 digits); someone at the till types one to change a generated bill or cancel an
+// order after its KOT. Never logged: these bodies are not echoed anywhere.
+export const AdminPinSet = z.object({ pin: z.string({ message: 'Enter 6 digits.' }).regex(/^\d{6}$/, 'The admin PIN is 6 digits.') }).strict();
+export const AdminPinCheck = z.object({ pin: z.string({ message: 'Enter the admin PIN.' }).max(12, 'The admin PIN is 6 digits.') }).strict();
+export const AdminPinStatus = z.object({}).strict();

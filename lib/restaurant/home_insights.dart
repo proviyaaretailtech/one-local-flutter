@@ -5,6 +5,7 @@ import '../home/home_nav.dart';
 import '../home/home_widgets.dart';
 import '../orders/channel_orders.dart' show ChannelLogo, ChannelLook;
 import '../orders/orders_board_screen.dart' show OrdersBoardScreen;
+import '../reports/rst_reports_screen.dart' show RstReportScreen;
 import '../service/service_widgets.dart' show svcRupees;
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -64,6 +65,8 @@ class _RestaurantInsightsState extends State<RestaurantInsights> {
   Widget build(BuildContext context) {
     final i = _i, ch = _ch;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      // 0645: revenue leakage (the owner and managers who may see the audit): today's changes made with an admin PIN
+      if (i != null && i['leakage'] is Map) ...[const SizedBox(height: 10), _leakage(_m(i['leakage']))],
       if (ch != null && _l(ch['channels']).isNotEmpty) ...[const SizedBox(height: 10), _delivery(ch)],
       if (i != null) ...[
         const SizedBox(height: 10),
@@ -74,6 +77,31 @@ class _RestaurantInsightsState extends State<RestaurantInsights> {
         _menu(_m(i['menu']), _n(i['ready']).toInt()),
       ],
     ]);
+  }
+
+  // ---- Revenue leakage (0645): bills changed or orders cancelled today with an admin PIN; red when there are any. Opens the Leakage audit.
+  Widget _leakage(Map<String, dynamic> l) {
+    final n = _n(l['admin_changes']).toInt();
+    const red = Color(0xFFB91C1C);
+    void open() => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RstReportScreen(kind: 'audit')));
+    return HomeCard(
+      key: const ValueKey('rst-leakage'),
+      onTap: open,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _title('Revenue leakage', sub: 'Changed with an admin PIN today', link: 'Leakage audit', onLink: open, linkKey: const ValueKey('rst-leakage-open')),
+        const SizedBox(height: 8),
+        Row(children: [
+          Icon(n > 0 ? LucideIcons.keyRound : LucideIcons.shieldCheck, size: 18, color: n > 0 ? red : const Color(0xFF15803D)),
+          const SizedBox(width: 8),
+          Text(n == 0 ? 'None today' : '$n change${n == 1 ? '' : 's'} with an admin PIN', key: const ValueKey('rst-leakage-count'), style: inter(14, 800, color: n > 0 ? red : kInk)),
+        ]),
+        for (final x in _l(l['latest']))
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('#${x['bill']} · ${x['what']}${(x['by'] ?? '') == '' ? '' : ' · ${x['by']}'}', maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(12, 500, color: red)),
+          ),
+      ]),
+    );
   }
 
   // ---- Delivery today: one tile per source, with its logo

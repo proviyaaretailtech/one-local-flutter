@@ -41,12 +41,21 @@ class BillApi {
       'rst_bill_pay', {'order_id': orderId, 'part_id': partId, 'method': method, 'tendered': tendered, 'reference': reference, 'idempotency_key': key},
       key: key);
 
-  Future<Facts> coupon(String orderId, String code) => _call('rst_bill_coupon', {'order_id': orderId, 'code': code.trim()});
+  /// [admin] (0645): on a generated bill, the admin PIN pass and note ({admin_pass, admin_note}) from [withAdminPin].
+  Future<Facts> coupon(String orderId, String code, {Map<String, String>? admin}) =>
+      _call('rst_bill_coupon', {'order_id': orderId, 'code': code.trim(), ...?admin});
 
   /// A manual discount (0637): [kind] 'amount' (₹) or 'percent', with a reason; 0 takes it off. Over the business's limit only a manager
-  /// may give it (the database says so).
-  Future<Facts> discount(String orderId, {required String kind, required num value, String reason = ''}) =>
-      _call('rst_bill_discount', {'order_id': orderId, 'kind': kind, 'value': value, 'reason': reason.trim()});
+  /// may give it (the database says so). On a generated bill it needs [admin] (0645).
+  Future<Facts> discount(String orderId, {required String kind, required num value, String reason = '', Map<String, String>? admin}) =>
+      _call('rst_bill_discount', {'order_id': orderId, 'kind': kind, 'value': value, 'reason': reason.trim(), ...?admin});
+
+  // ---- 0645: the admin PIN (an owner or admin sets their own; anyone types one to change a generated bill or cancel after the KOT)
+  Future<Facts> adminPinStatus() => _call('rst_admin_pin_status', {});
+  Future<Facts> adminPinSet(String pin) => _call('rst_admin_pin_set', {'pin': pin});
+
+  /// {ok: true, pass_id, approver} or {ok: false, tries_left}; too many wrong tries is an error (429).
+  Future<Facts> adminPinCheck(String pin) => _call('rst_admin_pin_check', {'pin': pin});
 
   Future<Facts> note(String orderId, String note) => _call('rst_bill_note', {'order_id': orderId, 'note': note.trim()});
 
@@ -70,11 +79,12 @@ class BillApi {
   Future<Facts> adjustView(String orderId) => _call('rst_order_adjust', {'order_id': orderId});
 
   /// Cancels [lines] (item id → how many). A dish already cooking or served, or a generated bill, needs a manager: others get 'requested'.
-  Future<Facts> cancelItems(String orderId, Map<String, int> lines, {required String reason, required String key}) => _call('rst_items_cancel', {
+  Future<Facts> cancelItems(String orderId, Map<String, int> lines, {required String reason, required String key, Map<String, String>? admin}) => _call('rst_items_cancel', {
         'order_id': orderId,
         'items': [for (final e in lines.entries) {'item_id': e.key, 'qty': e.value}],
         'reason': reason.trim(),
         'idempotency_key': key,
+        ...?admin,
       }, key: key);
 
   /// A refund through the shared refund (pos_refund); a cashier's is a request a manager approves.

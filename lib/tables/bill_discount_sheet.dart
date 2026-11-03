@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_api.dart' show Facts;
 import '../ui/theme.dart';
+import 'admin_pin.dart';
 import 'bill_api.dart';
 import 'table_widgets.dart';
 
@@ -66,8 +67,12 @@ class _DiscountSheetState extends State<_DiscountSheet> {
       _error = null;
     });
     try {
-      await widget.api.discount(widget.order.s('id'), kind: remove ? 'amount' : _kind, value: remove ? 0 : _typed, reason: remove ? '' : _reason.text);
-      if (mounted) Navigator.of(context).pop(true);
+      // 0645: on a generated bill the change needs an admin PIN and a note (asked for only when the server says so)
+      final done = await withAdminPin(context, pins: widget.api, run: (admin) => widget.api.discount(widget.order.s('id'),
+          kind: remove ? 'amount' : _kind, value: remove ? 0 : _typed, reason: remove ? '' : _reason.text, admin: admin));
+      if (!mounted) return;
+      if (done == null) return setState(() => _busy = false);
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
         setState(() {

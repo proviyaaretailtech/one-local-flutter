@@ -425,8 +425,9 @@ class OrdersApi {
         'version': version,
       }));
 
-  Future<OrderView> cancel(String id, {required String reason, Object? version}) async =>
-      OrderView(await _send('POST', '/$id/cancel', body: {'reason': reason, 'version': version}));
+  /// [admin] (0645): a restaurant order with the kitchen or a generated bill needs the admin PIN pass and note ({admin_pass, admin_note}).
+  Future<OrderView> cancel(String id, {required String reason, Object? version, Map<String, String>? admin}) async =>
+      OrderView(await _send('POST', '/$id/cancel', body: {'reason': reason, 'version': version, ...?admin}));
 
   late final RpcClient _rpcClient = RpcClient(client: _http, baseUrl: _base, accessToken: _token);
 

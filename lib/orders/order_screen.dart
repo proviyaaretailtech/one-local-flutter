@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../api/net_guard.dart';
 import '../home/home_nav.dart';
+import '../tables/admin_pin.dart' show withAdminPin;
 import '../tables/bill_adjust.dart' show BillMoneyScreen;
 import '../tables/bill_api.dart' show BillApi;
 import '../ui/mobile_input.dart';
@@ -106,7 +107,8 @@ class _OrderScreenState extends State<OrderScreen> {
         await _paySheet();
       case 'cancel':
         final reason = await _textSheet('Cancel bill', 'Why is this bill cancelled?', 'Cancel bill');
-        if (reason != null) await _run(() => _api.cancel(v.id, reason: reason, version: v.version));
+        // 0645: an order the kitchen has, or a generated bill, is cancelled with an admin PIN and a note
+        if (reason != null) await _run(() async => await withAdminPin(context, pins: widget.bill ?? BillApi(), run: (admin) => _api.cancel(v.id, reason: reason, version: v.version, admin: admin)) ?? v);
       case 'online_reject':
         final reason = await _textSheet('Reject order', 'Why can this order not be made?', 'Reject order');
         if (reason != null) await _act('online_reject', reason: reason);

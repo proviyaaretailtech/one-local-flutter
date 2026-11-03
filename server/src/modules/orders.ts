@@ -33,6 +33,8 @@ const POS_ERRORS: Record<string, { status: number; code: string }> = {
   POS_COUPON_MIN: { status: 422, code: 'coupon_minimum' }, POS_COUPON_LIMIT: { status: 422, code: 'coupon_limit' }, POS_COUPON_CUSTOMER: { status: 422, code: 'coupon_customer' }, POS_COUPON_ZERO: { status: 422, code: 'coupon_zero' }, POS_IDEMPOTENCY_MISMATCH: { status: 422, code: 'idempotency_mismatch' },
   OL_IDEMPOTENCY_MISMATCH: { status: 422, code: 'idempotency_mismatch' }, OL_IN_PROGRESS: { status: 409, code: 'in_progress' },
   OL_STATUS_AUTHORITY: { status: 409, code: 'wrong_state' }, OL_ORDER_FROZEN: { status: 409, code: 'wrong_state' },
+  // 0645: a restaurant order with the kitchen or a generated bill is cancelled with an admin PIN pass and a note
+  POS_ADMIN_PIN: { status: 403, code: 'admin_pin_required' },
 };
 
 function dbFail(error: { message?: string; code?: string }): never {
@@ -404,7 +406,11 @@ export async function cancel(request: Request, id: string) {
   const reason = text(body.reason, 200);
   if (reason.length < 3) throw new HttpError(400, 'Say why the bill is cancelled.', undefined, 'bad_request');
   const client = asCaller(request);
-  await call(client, 'pos_set_order_status', { order_id: id, to: 'cancelled', reason, expected_updated_at: typeof body.version === 'string' ? body.version : '' });
+  // 0645: after its KOT or bill, a restaurant order is cancelled with an admin PIN pass and a note (the database checks them)
+  await call(client, 'pos_set_order_status', {
+    order_id: id, to: 'cancelled', reason, expected_updated_at: typeof body.version === 'string' ? body.version : '',
+    admin_pass: typeof body.admin_pass === 'string' ? body.admin_pass.slice(0, 40) : undefined, admin_note: typeof body.admin_note === 'string' ? text(body.admin_note, 200) : undefined,
+  });
   return view(client, id);
 }
 

@@ -646,10 +646,34 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
   }
 
   List<Widget> _audit(Facts r) {
-    final c = r.m('cancelled'), u = r.m('unpaid'), p = r.m('reprints'), a = r.m('after_bill'), f = r.m('refunds');
-    final nothing = c.n('bills') == 0 && u.n('bills') == 0 && p.n('count') == 0 && a.n('count') == 0 && f.n('count') == 0;
+    final c = r.m('cancelled'), u = r.m('unpaid'), p = r.m('reprints'), a = r.m('after_bill'), f = r.m('refunds'), o = r.m('overrides');
+    final nothing = c.n('bills') == 0 && u.n('bills') == 0 && p.n('count') == 0 && a.n('count') == 0 && f.n('count') == 0 && o.n('count') == 0;
     Widget event(Facts e) => _line('Bill ${e.s('bill')}', _time(e.s('at')), sub: '${e.s('what')}${e.s('by').isEmpty ? '' : ' · ${e.s('by')}'}', onTap: () => _openBill(e.s('order_id')));
     return [
+      // 0645: changes made with an admin PIN (a generated bill changed, an order cancelled after its KOT), first and in red
+      if (o.n('count') > 0)
+        Container(
+          key: const ValueKey('rep-overrides'),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          decoration: BoxDecoration(color: const Color(0xFFFFF1F2), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFFCA5A5), width: 1.4)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              const Icon(LucideIcons.keyRound, size: 18, color: kError),
+              const SizedBox(width: 8),
+              Expanded(child: Text('CHANGED WITH AN ADMIN PIN · ${o.n('count').toInt()}', style: inter(12.5, 800, color: kError).copyWith(letterSpacing: 1))),
+            ]),
+            const SizedBox(height: 8),
+            for (final x in o.l('list'))
+              _line('Bill ${x.s('bill')}', _time(x.s('at')), color: kError, key: 'rep-override-${x.s('order_id')}-${x.s('at')}',
+                  sub: [
+                    x.s('what'),
+                    if (x.s('by').isNotEmpty) 'by ${x.s('by')}',
+                    if (x.s('approved_by').isNotEmpty) 'PIN of ${x.s('approved_by')}',
+                  ].join(' · '),
+                  onTap: () => _openBill(x.s('order_id'))),
+          ]),
+        ),
       _kpis([
         ('audit-cancelled', 'Cancelled bills', '${c.n('bills')}', rs(c.n('value_minor'))),
         ('audit-unpaid', 'Billed, not paid', '${u.n('bills')}', rs(u.n('value_minor'))),
@@ -665,7 +689,7 @@ class _RstReportScreenState extends State<RstReportScreen> with WidgetsBindingOb
                 sub: [_time(x.s('at')), if (x.b('kot_sent')) 'after the kitchen got it', if (x.s('by').isNotEmpty) 'by ${x.s('by')}', if (x.s('reason').isNotEmpty) x.s('reason')].join(' · '),
                 onTap: () => _openBill(x.s('order_id'))),
         ]),
-      if (u.n('bills') > 0) _card('BILLED, NOT PAID BY THE END OF THE DAY', [for (final b in u.l('list')) _billRow(b)]),
+      if (u.n('bills') > 0) _card('BILLED, NOT PAID YET', [for (final b in u.l('list')) _billRow(b)]),
       if (f.n('count') > 0)
         _card('REFUNDS', [
           for (final x in f.l('list'))

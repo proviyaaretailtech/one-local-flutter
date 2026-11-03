@@ -6,6 +6,7 @@ import '../ui/theme.dart';
 import 'actions_screen.dart';
 import 'bill_adjust.dart';
 import 'bill_api.dart';
+import 'bill_discount_sheet.dart' show showManualDiscountSheet;
 import 'bill_receipt_popup.dart';
 import 'bill_pay_screen.dart';
 import 'bill_widgets.dart' show billRouteName;
@@ -209,6 +210,22 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                 if (id != null) await showCancelItemsSheet(context, api: _billApi, orderId: id);
                 if (mounted) _load();
               }),
+              // 0645: the discount is given before the bill is generated (after it, the bill is locked: an admin PIN and a note)
+              _ActionTile(
+                key: const ValueKey('act-discount'),
+                label: 'Discount',
+                icon: LucideIcons.badgePercent,
+                tint: const Color(0xFFB45309),
+                enabled: billOrder != null,
+                onTap: _busy || billOrder == null
+                    ? null
+                    : () async {
+                        final saved = await showManualDiscountSheet(context, api: _billApi, order: billOrder);
+                        if (!context.mounted) return;
+                        if (saved) showToast(context, 'Discount saved on the bill.');
+                        _load();
+                      },
+              ),
               _ActionTile(
                 key: const ValueKey('act-payments'),
                 label: 'Refund / Void',

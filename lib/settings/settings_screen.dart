@@ -8,6 +8,7 @@ import '../states/state_kit.dart' show StateTone, StatusCard;
 import '../ui/i18n.dart';
 import '../ui/theme.dart';
 import 'activity_log_screen.dart';
+import '../tables/admin_pin.dart' show AdminPinScreen;
 import 'rst_devices_screen.dart';
 import 'returns_screens.dart';
 import 'settings_api.dart';
@@ -409,6 +410,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (HomeNav.shell?.kind == 'restaurant')
         _Part('devices', 'Devices', LucideIcons.printer, 'Receipt, kitchen (KOT) and barcode label printers', const [],
             open: () => Navigator.of(context).push(RstDevicesScreen.route())),
+      // 0645: the owner's / admin's PIN that unlocks a generated bill or a cancel after the KOT
+      if (HomeNav.shell?.kind == 'restaurant')
+        _Part('admin_pin', 'Admin PIN', LucideIcons.keyRound, 'Needed to change a generated bill or cancel an order the kitchen has', const [],
+            open: () => Navigator.of(context).push(AdminPinScreen.route())),
       // a restaurant's three pages that left the side bar (founder, 29 Oct 2026: "put them in Settings")
       if (HomeNav.shell?.kind == 'restaurant')
         _Part('restaurant', 'Purchases, menu link & delivery', LucideIcons.utensils, 'Purchase orders · public menu link · delivery settings', [

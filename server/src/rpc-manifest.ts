@@ -315,6 +315,10 @@ export const MANIFEST: Entry[] = [
   db('rst_request_decide', { args: rst.RequestDecide, map: P, rate: 'money', roles: 'managers (voids: owner and admin), never the person who asked' }),
   db('rst_order_adjust', { args: rst.BillOrder, map: P, rate: 'read', roles: 'floor staff and cashiers' }),
   db('rst_hold_send', { args: rst.HoldSend, map: P, rate: 'write', idem: true, roles: 'staff with order:place or order:update_status' }),
+  // 0645: admin PIN (set by owner / admin; checked at the till, 5 wrong tries in 15 minutes lock it); a generated bill or a cancel after the KOT needs its pass
+  db('rst_admin_pin_set', { args: rst.AdminPinSet, map: P, rate: 'secure', roles: 'owner and admin (their own PIN)' }),
+  db('rst_admin_pin_status', { args: rst.AdminPinStatus, map: P, rate: 'read', roles: ANY }),
+  db('rst_admin_pin_check', { args: rst.AdminPinCheck, map: P, rate: 'secure', roles: 'staff of the business' }),
   db('rst_receipt_view', { args: rst.BillOrder, map: P, rate: 'read', roles: 'floor staff or staff allowed to take payment' }),
   db('rst_receipt_log', { args: rst.ReceiptLog, map: P, rate: 'write', roles: 'floor staff or staff allowed to take payment' }),
   db('svc_calendar', { args: svc.Calendar, map: P, rate: 'read', roles: STAFF }),

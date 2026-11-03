@@ -7,6 +7,7 @@ import '../inventory/inventory_widgets.dart' show qty;
 import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import '../ui/whatsapp_icon.dart';
+import 'admin_pin.dart';
 import 'bill_adjust.dart' show BillMoneyScreen;
 import 'bill_api.dart';
 import 'bill_discount_sheet.dart';
@@ -108,10 +109,13 @@ class _BillPayScreenState extends State<BillPayScreen> {
     if (_code.text.trim().isEmpty) return showToast(context, 'Enter a discount code.');
     setState(() => _busy = true);
     try {
-      await _api.coupon(o.s('id'), _code.text);
-      _received.clear();
-      await _load();
-      if (mounted) showToast(context, 'Discount applied.');
+      // 0645: on a generated bill a code needs an admin PIN and a note
+      final done = await withAdminPin(context, pins: _api, run: (admin) => _api.coupon(o.s('id'), _code.text, admin: admin));
+      if (done != null) {
+        _received.clear();
+        await _load();
+        if (mounted) showToast(context, 'Discount applied.');
+      }
     } catch (e) {
       if (mounted) showToast(context, sayError(e));
     }
