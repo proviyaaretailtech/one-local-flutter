@@ -14,6 +14,7 @@ import 'side_nav.dart';
 import '../service/history_screen.dart';
 import '../service/service_api.dart';
 import '../service/service_dashboard.dart';
+import '../service/service_nav.dart';
 import '../restaurant/restaurant_api.dart';
 import '../restaurant/restaurant_dashboard.dart';
 import '../restaurant/restaurant_more_screen.dart';
@@ -132,6 +133,11 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
           onReports: () => Navigator.of(c).push(RstReportsScreen.route(openFeed: () => _openHub(c))));
       return;
     }
+    // A service business: the founder's side menu (2 Nov 2026), in the store's side nav look.
+    if (_kind == 'service') {
+      showServiceSideNav(c, name: _personName ?? 'Partner', email: (widget.auth ?? AuthRepository()).currentEmail, onSignOut: _signOut);
+      return;
+    }
     showModalBottomSheet<void>(
       context: c,
       backgroundColor: Colors.white,
@@ -183,6 +189,8 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
         HomeNav.go(context, HomeNav.stock, 'Stock');
       case 'Home':
         break; // already on the dashboard
+      case 'Catalogue' || 'Bookings' || 'Manage':
+        HomeNav.shell?.show(label); // the service bar's tabs live in the app shell
     }
   }
 
@@ -203,7 +211,7 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
           if (shell != null && shell.kind != s.outletKind) WidgetsBinding.instance.addPostFrameCallback((_) => shell.setKind(s.outletKind));
         }
         final loading = snap.connectionState != ConnectionState.done;
-        final tabs = s?.outletKind == 'restaurant' ? kHubTabs : kStoreTabs;
+        final tabs = switch (s?.outletKind) { 'restaurant' => kHubTabs, 'service' => kServiceTabs, _ => kStoreTabs };
         return Scaffold(
           backgroundColor: kBg,
           extendBody: true,

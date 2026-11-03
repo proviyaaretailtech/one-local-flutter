@@ -12,7 +12,9 @@ import 'package:vinii_pos/service/plans_screen.dart';
 import 'package:vinii_pos/service/service_api.dart';
 import 'package:vinii_pos/service/service_widgets.dart';
 import 'package:vinii_pos/service/staff_screen.dart';
+import 'package:vinii_pos/service/visit_receipt.dart';
 import 'package:vinii_pos/service/visit_screens.dart';
+import 'package:vinii_pos/devices/bill_receipt.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
 import 'helpers.dart';
@@ -274,28 +276,90 @@ void main() {
     });
   });
 
-  group('Service Catalogue (Figma 83)', () {
-    testWidgets('draws counts, filters and rows from the server', (t) async {
+  group('Service catalogue (founder design, 3 Nov 2026)', () {
+    testWidgets('Services tab: Add service, search, Filter, status and category chips, and rows with type and status pills', (t) async {
       final s = FakeRpc({'svc_service_list': (_) => serviceList()});
       await show(t, ServiceCatalogueScreen(api: s.api, business: 'Sharma Services · Bengaluru'));
-      for (final text in ['Service Catalogue', '18 services · All fulfilment models', 'Grooming', 'Instant/On-demand', 'Active 16', 'Paused 2', '6 total', 'Precision haircut', 'APT-01 · Grooming',
-        'Active · Appointment', '₹600', '45 min', '₹999/mo', 'Active · Membership', '+ Add service']) {
+      for (final text in ['Service catalogue', '18 services', 'Services', 'Inventory', 'Add service', 'Filter', 'All', 'Active 16', 'Paused 2', 'Grooming', 'Home care',
+        'Precision haircut', 'APT-01 · Grooming', 'Appointment', 'Active', '₹600', '45 min', '₹999/mo', 'Membership']) {
+        expect(find.text(text), findsWidgets, reason: text);
+      }
+      expect(find.text('Draft 0'), findsNothing, reason: 'no draft chip when there are no drafts');
+      expect(find.text('Instant/On-demand'), findsNothing, reason: 'the type is in the Filter sheet');
+      await t.tap(find.byKey(const ValueKey('catalogue-filters')));
+      await t.pumpAndSettle();
+      for (final text in ['Type of service', 'Instant/On-demand', 'Show services', 'Clear filter']) {
         expect(find.text(text), findsWidgets, reason: text);
       }
     });
 
-    testWidgets('filters and search are sent to the server', (t) async {
+    testWidgets('chips and the Filter sheet are sent to the server; tapping a chip again takes it off', (t) async {
       final s = FakeRpc({'svc_service_list': (_) => serviceList()});
       await show(t, ServiceCatalogueScreen(api: s.api));
-      await t.tap(find.text('On-location').first);
-      await t.pumpAndSettle();
-      expect(s.of('svc_service_list').last.$2['type'], 'on_location');
-      await t.tap(find.text('Paused 2'));
+      await t.tap(find.byKey(const ValueKey('chip-paused')));
       await t.pumpAndSettle();
       expect(s.of('svc_service_list').last.$2['status'], 'paused');
+      await t.ensureVisible(find.byKey(const ValueKey('chip-cat-Grooming')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('chip-cat-Grooming')));
+      await t.pumpAndSettle();
+      expect(s.of('svc_service_list').last.$2['category'], 'Grooming');
+      expect(s.of('svc_service_list').last.$2['status'], 'paused');
+      await t.ensureVisible(find.byKey(const ValueKey('chip-paused')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('chip-paused')));
+      await t.pumpAndSettle();
+      expect(s.of('svc_service_list').last.$2['status'], isNull);
+      await t.ensureVisible(find.byKey(const ValueKey('chip-all')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('chip-all')));
+      await t.pumpAndSettle();
+      expect(s.of('svc_service_list').last.$2['category'], isNull);
+
+      final before = s.of('svc_service_list').length;
+      await t.tap(find.byKey(const ValueKey('catalogue-filters')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('On-location').last);
+      await t.pumpAndSettle();
+      expect(s.of('svc_service_list').length, before, reason: 'nothing is sent until Show services');
+      await t.tap(find.text('Show services'));
+      await t.pumpAndSettle();
+      expect(s.of('svc_service_list').last.$2['type'], 'on_location');
+      expect(find.text('Filter · 1'), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('catalogue-search')), 'LOC');
       await t.pumpAndSettle();
       expect(s.of('svc_service_list').last.$2['q'], 'LOC');
+    });
+
+    testWidgets('Add service asks what is being added; each kind opens its own form', (t) async {
+      final s = FakeRpc({'svc_service_list': (_) => serviceList(), 'svc_plan_list': (_) => {'plans': [], 'counts': {}, 'can_edit': true}});
+      await show(t, ServiceCatalogueScreen(api: s.api));
+      await t.tap(find.byKey(const ValueKey('add-service')));
+      await t.pumpAndSettle();
+      for (final text in ['What are you adding?', 'Each one opens its own form.', 'Appointment', 'Event', 'On-location', 'On-demand', 'Package', 'Membership', 'You go to the customer']) {
+        expect(find.text(text), findsWidgets, reason: text);
+      }
+      await t.tap(find.byKey(const ValueKey('add-on_location')));
+      await t.pumpAndSettle();
+      expect(find.byType(ServiceEditScreen), findsOneWidget);
+      expect(t.widget<ServiceEditScreen>(find.byType(ServiceEditScreen)).fulfilment, 'on_location');
+    });
+
+    testWidgets('Inventory tab: the team, who is free, and the services each person does', (t) async {
+      final s = FakeRpc({'svc_service_list': (_) => serviceList(), 'svc_staff_list': (_) => staff(),
+        'svc_inventory': (_) => {'can_edit': true, 'counts': {}, 'places': [], 'tools': [], 'materials': [], 'care': [], 'alerts': [], 'services': []}});
+      await show(t, ServiceCatalogueScreen(api: s.api));
+      expect(s.of('svc_staff_list'), isEmpty, reason: 'the team loads when Inventory is opened');
+      await t.tap(find.byKey(const ValueKey('tab-inventory')));
+      await t.pumpAndSettle();
+      for (final text in ['Team', '+ Add', '5 free now · 2 on a job · 1 off', 'Neha Rao', 'NR', 'Senior stylist · Thu–Sat · 10 AM–7 PM', 'Available', 'Precision haircut · Hair spa',
+        'Arjun Kumar', 'On job', 'AC maintenance · Repairs', '8']) {
+        expect(find.text(text), findsWidgets, reason: text);
+      }
+      expect(find.text('Add service'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('tab-services')));
+      await t.pumpAndSettle();
+      expect(find.text('Add service'), findsOneWidget);
     });
 
     testWidgets('pausing a service sends the whole service back with is_bookable false and a key', (t) async {
@@ -545,6 +609,18 @@ void main() {
       }
     });
 
+    testWidgets('a business that is not GST-registered: no GST lines, says so once', (t) async {
+      final s = FakeRpc({
+        'svc_appointment_view': (_) => appointment(status: 'in_service', actions: ['update', 'bill'], due: 800, paid: 0)
+          ..['bill'] = {'subtotal': 800, 'discount': 0, 'gst_pct': 0, 'gst_amount': 0, 'cgst': 0, 'sgst': 0, 'taxable': 800, 'gstin': null, 'total': 800, 'paid': 0, 'refunded': 0, 'due': 800},
+      });
+      await show(t, ServiceBillingScreen(api: s.api, id: 'ap1'));
+      expect(find.textContaining('GST ('), findsNothing);
+      expect(find.text('Tax split'), findsNothing);
+      expect(find.text('None · not GST-registered'), findsOneWidget);
+      expect(find.text('Continue to payment · ₹800'), findsOneWidget);
+    });
+
     testWidgets('payment: cash with the amount received, one key, the version', (t) async {
       final s = FakeRpc({
         'svc_appointment_view': (_) => appointment(fulfilment: 'on_location', status: 'in_service', actions: ['update', 'bill'], due: 516, paid: 900),
@@ -567,7 +643,63 @@ void main() {
       final call = s.of('svc_bill').single;
       expect(call.$2, {'id': 'ap1', 'method': 'cash', 'tendered': 600, 'expected_version': 3});
       expect(call.$3, startsWith('svc-'));
-      expect(find.text('open'), findsOneWidget, reason: 'billing closes after the visit is completed');
+      expect(find.text('Payment received'), findsOneWidget, reason: 'the receipt takes the billing screen\'s place');
+      await t.tap(find.text('Done'));
+      await t.pumpAndSettle();
+      expect(find.text('open'), findsOneWidget, reason: 'Done goes back to where billing was opened');
+    });
+  });
+
+  group('Service receipt (after payment)', () {
+    // the visit as svc_bill answers once paid: ₹944, ₹200 advance by UPI, then ₹744 cash out of ₹800
+    Map<String, dynamic> paid() => appointment(status: 'completed', actions: [], due: 0, paid: 944)
+      ..['order'] = {'id': 'o1', 'display_no': 'P-00042', 'status': 'paid'}
+      ..['payments'] = [
+        {'method': 'upi', 'amount': 200, 'at': '2026-10-07T12:45:00Z'},
+        {'method': 'cash', 'amount': 744, 'tendered': 800, 'at': '2026-10-08T05:40:00Z'},
+      ];
+
+    testWidgets('amount, cash and change, the bill number; Print sends the visit\'s bill', (t) async {
+      final s = FakeRpc({});
+      BillReceipt? printed;
+      await show(t, ServiceReceiptScreen(api: s.api, visit: AppointmentView(paid()), business: 'Glow Salon', printer: (_, b) async => printed = b));
+      for (final text in ['Payment received', 'Transaction Successful', 'Bill Number', 'P-00042', '₹744', 'Cash', 'Amount Tendered', '₹800', 'Change Returned', '₹56', 'Done', 'Send by WhatsApp']) {
+        expect(find.text(text), findsWidgets, reason: text);
+      }
+      expect(find.text('New Order'), findsNothing, reason: 'a visit is not a till sale');
+      await t.tap(find.text('Print Receipt'));
+      await t.pumpAndSettle();
+      expect(printed!.store, 'Glow Salon');
+      expect(printed!.billNo, 'P-00042');
+      expect(printed!.lines.map((l) => l.name), ['Precision haircut', 'Hair spa']);
+      expect([printed!.total, printed!.gst, printed!.paid, printed!.tendered, printed!.change], [944, 144, 944, 800, 56]);
+    });
+
+    testWidgets('Send by WhatsApp: the public bill link in a short note to the customer\'s number', (t) async {
+      final s = FakeRpc({'pos_bill_link': (_) => {'code': 'AbC123xyz'}});
+      Uri? opened;
+      await show(t, ServiceReceiptScreen(api: s.api, visit: AppointmentView(paid()), business: 'Glow Salon', openUrl: (u) async { opened = u; return true; }));
+      await t.tap(find.text('Send by WhatsApp'));
+      await t.pumpAndSettle();
+      expect(s.of('pos_bill_link').single.$2, {'order_id': 'o1'});
+      expect(opened!.host, 'api.whatsapp.com');
+      expect(opened!.queryParameters['phone'], '919876543210');
+      final text = opened!.queryParameters['text']!;
+      expect(text, contains('Dear Riya Sharma,'));
+      expect(text, contains('Thank you for choosing Glow Salon.'));
+      expect(text, contains('https://one-local-flutter.vercel.app/b/AbC123xyz'));
+      expect(text, isNot(contains('localhost')));
+      expect(text, isNot(contains('shopping')));
+    });
+
+    testWidgets('a refused bill link says why and opens nothing', (t) async {
+      final s = FakeRpc({'pos_bill_link': (_) => refuse(409, 'This bill is not paid yet.', 'wrong_state')});
+      var opened = false;
+      await show(t, ServiceReceiptScreen(api: s.api, visit: AppointmentView(paid()), openUrl: (u) async => opened = true));
+      await t.tap(find.text('Send by WhatsApp'));
+      await t.pumpAndSettle();
+      expect(opened, isFalse);
+      expect(find.text('This bill is not paid yet.'), findsOneWidget);
     });
   });
 

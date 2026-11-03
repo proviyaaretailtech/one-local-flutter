@@ -121,7 +121,16 @@ export function billHtml(b: Row): string {
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const logo = typeof store.logo_url === 'string' && /^https:\/\//.test(store.logo_url)
     ? `<img class="logo" src="${esc(store.logo_url)}" alt="">` : `<div class="mark">${esc(initials)}</div>`;
-  const who = b.customer ? `Hi ${esc(String(b.customer).split(/\s+/)[0])}, thanks for shopping at` : 'Thanks for shopping at';
+  // a service bill (salon, repair, class, online) reads as a service, not as shopping (2 Nov 2026); neutral words for every kind of service
+  const service = b.kind === 'service';
+  const visit = (service && b.visit && typeof b.visit === 'object' ? b.visit : {}) as Row;
+  const hi = b.customer ? `Hi ${esc(String(b.customer).split(/\s+/)[0])}, thanks for` : 'Thanks for';
+  const who = `${hi} ${service ? 'choosing' : 'shopping at'}`;
+  const visitLine = service && (visit.provider || visit.starts_at)
+    ? `<p class="store">Booking${visit.no ? ` ${esc(visit.no)}` : ''}${visit.provider ? ` · with ${esc(visit.provider)}` : ''}${visit.starts_at ? ` · ${esc(when(visit.starts_at))}` : ''}</p>` : '';
+  const count = service
+    ? `${items.length} ${items.length === 1 ? 'service' : 'services'}`
+    : `${items.length} ${items.length === 1 ? 'item' : 'items'} · ${qty(units)} ${units === 1 ? 'unit' : 'units'}`;
   return page(`Bill ${b.bill_no ?? ''} · ${name}`, `<section class="hero"><div class="hero-card">${logo}
   <p class="hello">${who}</p><h1>${esc(name)}</h1>
   <div class="amt">${rupees(b.total)}</div>${statusText ? `<span class="chip ${tone}">${esc(statusText)}${methods && b.status === 'paid' ? ` · ${esc(methods)}` : ''}</span>` : ''}
@@ -135,16 +144,16 @@ export function billHtml(b: Row): string {
   <div class="card"><h2>Bill details</h2>
     <p class="store"><b style="color:var(--ink)">${esc(name)}</b>${branch ? ` · ${esc(branch)}` : ''}</p>
     ${addr ? `<p class="store">${esc(addr)}</p>` : ''}${store.phone ? `<p class="store">Phone ${esc(store.phone)}</p>` : ''}${store.gstin ? `<p class="store">GSTIN ${esc(store.gstin)}</p>` : ''}
-    ${b.customer ? `<p class="store">Customer: ${esc(b.customer)}</p>` : ''}
-    <table><thead><tr><th>Item</th><th class="r">Qty × Price</th><th class="r">Amount</th></tr></thead><tbody>
+    ${b.customer ? `<p class="store">Customer: ${esc(b.customer)}</p>` : ''}${visitLine}
+    <table><thead><tr><th>${service ? 'Service' : 'Item'}</th><th class="r">Qty × Price</th><th class="r">Amount</th></tr></thead><tbody>
     ${items.map(i => `<tr><td class="n">${esc(i.name)}</td><td class="r q">${qty(i.qty)} × ${rupees(i.price)}</td><td class="r">${rupees(i.amount)}</td></tr>`).join('')}
     </tbody></table>
     <div style="border-top:1px dashed var(--line);margin-top:4px;padding-top:8px">${rows.map(([k, v]) => `<div class="row"><span>${k}</span><b>${v}</b></div>`).join('')}
       <div class="total"><span>Total</span><span>${rupees(b.total)}</span></div></div>
-    <p class="store" style="margin-top:10px">${items.length} ${items.length === 1 ? 'item' : 'items'} · ${qty(units)} ${units === 1 ? 'unit' : 'units'}${methods ? ` · Paid by ${esc(methods)}` : ''}</p>
-    <p class="thanks">Thank you for shopping with us!<span>We hope to see you again soon.</span></p>
+    <p class="store" style="margin-top:10px">${count}${methods ? ` · Paid by ${esc(methods)}` : ''}</p>
+    <p class="thanks">${service ? 'Thank you for choosing us!' : 'Thank you for shopping with us!'}<span>We hope to see you again soon.</span></p>
   </div>
-  <p class="foot">${esc(name)} is a <b>OneLocal</b> partner store · paperless bill</p>
+  <p class="foot">${esc(name)} is a <b>OneLocal</b> partner${service ? '' : ' store'} · paperless bill</p>
 </main><div class="toast" id="toast">Link copied</div>`);
 }
 

@@ -27,6 +27,25 @@ test('the page: store, bill no, every item, total, paid status and a Print butto
   assert.ok(!html.includes('7715956686') || html.includes('Phone +917715956686')); // only the store's phone, never the customer's
 });
 
+test('a store bill keeps the shop words', () => {
+  const html = billHtml(bill);
+  for (const s of ['thanks for shopping at', '<th>Item</th>', '2 items · 3 units', 'Thank you for shopping with us!', 'partner store']) assert.ok(html.includes(s), s);
+  assert.ok(!html.includes('Booking '));
+});
+
+test('a service bill reads as a service: who did it and when, services not items, no "shopping"', () => {
+  const html = billHtml({
+    ...bill, kind: 'service', store: { ...bill.store, name: 'Glow Salon', branch: 'Glow Salon - Main' }, customer: 'Anita Joshi',
+    visit: { no: 'APT-0001', provider: 'Neha <b>Patil</b>', starts_at: '2026-11-02T04:45:00Z' },
+    items: [{ name: 'Haircut (women)', qty: 1, price: 600, amount: 600 }, { name: 'Hair wash', qty: 1, price: 150, amount: 150 }],
+  });
+  for (const s of ['Hi Anita, thanks for choosing', 'Glow Salon', 'Booking APT-0001 · with Neha &lt;b&gt;Patil&lt;/b&gt;', '10:15 AM', '<th>Service</th>', '2 services · Paid by Cash',
+    'Thank you for choosing us!', 'is a <b>OneLocal</b> partner · paperless bill']) {
+    assert.ok(html.includes(s), s);
+  }
+  assert.ok(!/shopping|partner store|units/.test(html));
+});
+
 test('a code that is not 12 letters and digits is "not found" without asking the database', async () => {
   const r = await billPage(new Request('http://x/b/nope'), { code: 'nope' });
   assert.equal(r.status, 404);

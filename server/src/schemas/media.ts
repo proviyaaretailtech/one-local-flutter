@@ -29,3 +29,10 @@ export const Decide = z.object({
   // approving the photo also approves its product (barcode, brand, unit, SKU) as standard in the Master library (31 Oct 2026)
   map_product: z.boolean().optional(),
 }).strict();
+
+// Service media (2 Nov 2026, hosted_service_media_2026-11-02.sql): the same pool for services, by kind of service.
+const service = z.string({ message: 'Choose a service.' }).regex(UUID, 'Choose a service.');
+export const SvcPool = z.object({ q }).strict();
+export const SvcOffer = z.object({ service_id: service }).strict();
+export const SvcStandard = z.object({ q, service_id: service.optional(), kind: z.string().max(40, 'Choose a kind of service.').optional() }).strict();
+export const SvcUse = z.object({ pool_id: pool, service_id: service }).strict();

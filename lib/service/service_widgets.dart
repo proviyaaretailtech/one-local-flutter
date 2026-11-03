@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../orders/order_widgets.dart';
 import '../outlets/outlet_header.dart';
 import '../ui/app_header.dart';
+import '../ui/motion.dart';
 import '../ui/theme.dart';
 
 /// Top of every Service POS screen (Figma section I): menu button, OneLocal wordmark, initials avatar, then "Service" and "Business · City".
@@ -32,12 +33,12 @@ class ApptStatusChip extends StatelessWidget {
       _ => (kInfoGreyBg, kInk, kMuted),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Container(width: 7, height: 7, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-        const SizedBox(width: 8),
-        Text(label, style: inter(13, 600, color: fg)),
+        const SizedBox(width: 6),
+        Text(label, style: inter(12, 600, color: fg)),
       ]),
     );
   }
@@ -58,15 +59,15 @@ class ModeChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           onTap: onTap,
           child: Container(
-            height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: selected ? kChipGreen : Colors.white,
               borderRadius: BorderRadius.circular(999),
               border: Border.all(color: selected ? kLink : kLine),
             ),
             // sized to the label, also inside a Wrap (an aligned Container would stretch to the full width)
-            child: Center(widthFactor: 1, child: ExcludeSemantics(child: Text(label, style: inter(14, selected ? 600 : 400, color: selected ? kInk : kMuted)))),
+            child: Center(widthFactor: 1, child: ExcludeSemantics(child: Text(label, style: inter(13, selected ? 600 : 400, color: selected ? kInk : kMuted)))),
           ),
         ),
       );
@@ -86,10 +87,10 @@ class ServicePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final list = ListView(key: scrollKey, padding: const EdgeInsets.fromLTRB(20, 20, 20, 24), children: [
-      Text(title, style: inter(30, 700, height: 1.15)),
-      if (subtitle.isNotEmpty) ...[const SizedBox(height: 8), Text(subtitle, style: inter(14, 400, color: kMuted))],
-      const SizedBox(height: 16),
+    final list = ListView(key: scrollKey, padding: const EdgeInsets.fromLTRB(16, 12, 16, 20), children: [
+      Text(title, style: inter(22, 700, height: 1.15)),
+      if (subtitle.isNotEmpty) ...[const SizedBox(height: 4), Text(subtitle, style: inter(13, 400, color: kMuted))],
+      const SizedBox(height: 12),
       if (error != null)
         OrderCardBox(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(error!, style: inter(13.5, 500)),
@@ -98,7 +99,8 @@ class ServicePage extends StatelessWidget {
       else if (body == null)
         const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(color: kGreenText)))
       else
-        ...body!,
+        // the store's motion (founder's reference video, 29 Oct 2026): sections build in one after another, once
+        for (var i = 0; i < body!.length; i++) Entrance(index: i, child: body![i]),
     ]);
     return Scaffold(
       backgroundColor: kBg,
@@ -127,18 +129,18 @@ class SvcCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final card = OrderCardBox(
-      radius: 18,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      radius: 16,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (title != null) ...[
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: Text(title!, style: inter(18, 700, height: 1.25))), ?trailing]),
-          const SizedBox(height: 10),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: Text(title!, style: inter(16, 700, height: 1.25))), ?trailing]),
+          const SizedBox(height: 6),
         ],
         ...children,
       ]),
     );
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 8),
       child: onTap == null ? card : InkWell(borderRadius: BorderRadius.circular(18), onTap: onTap, child: card),
     );
   }
@@ -146,16 +148,16 @@ class SvcCard extends StatelessWidget {
 
 /// "Label    value" row of the frames: grey label in a fixed column, bold value.
 class SvcKV extends StatelessWidget {
-  const SvcKV(this.k, this.v, {super.key, this.valueColor = kInk, this.labelWidth = 150});
+  const SvcKV(this.k, this.v, {super.key, this.valueColor = kInk, this.labelWidth = 120});
   final String k, v;
   final Color valueColor;
   final double labelWidth;
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(vertical: 3),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: labelWidth, child: Text(k, style: inter(14, 400, color: kMuted))),
-          Expanded(child: Text(v, style: inter(14.5, 600, color: valueColor))),
+          SizedBox(width: labelWidth, child: Text(k, style: inter(13, 400, color: kMuted))),
+          Expanded(child: Text(v, style: inter(13.5, 600, color: valueColor))),
         ]),
       );
 }
@@ -168,13 +170,13 @@ class SvcLine extends StatelessWidget {
   final bool muted;
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(vertical: 3),
         child: Row(children: [
           Container(width: 7, height: 7, decoration: const BoxDecoration(color: kLink, shape: BoxShape.circle)),
           const SizedBox(width: 10),
-          Expanded(child: Text(name, style: inter(14.5, 500, color: muted ? kMuted : kInk))),
+          Expanded(child: Text(name, style: inter(13.5, 500, color: muted ? kMuted : kInk))),
           if (qty != null) ...[TagChip(qty!), const SizedBox(width: 18)],
-          SizedBox(width: 72, child: Text(amount, textAlign: TextAlign.right, style: inter(14.5, 700))),
+          SizedBox(width: 72, child: Text(amount, textAlign: TextAlign.right, style: inter(13.5, 700))),
         ]),
       );
 }
@@ -187,18 +189,18 @@ class SvcSearch extends StatelessWidget {
   final Key? fieldKey;
   @override
   Widget build(BuildContext context) => Container(
-        height: 52,
+        height: 44,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFFD9DBD3))),
         child: Row(children: [
-          const Icon(LucideIcons.search, size: 20, color: kMuted),
+          const Icon(LucideIcons.search, size: 18, color: kMuted),
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
               key: fieldKey,
               onChanged: onChanged,
-              style: inter(15, 400),
-              decoration: InputDecoration(isDense: true, border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, filled: false, hintText: hint, hintStyle: inter(15, 400, color: kHint)),
+              style: inter(14, 400),
+              decoration: InputDecoration(isDense: true, border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, filled: false, hintText: hint, hintStyle: inter(14, 400, color: kHint)),
             ),
           ),
         ]),
@@ -213,8 +215,8 @@ class SvcChips extends StatelessWidget {
   final ValueChanged<String> onSelect;
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Wrap(spacing: 8, runSpacing: 8, children: [
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Wrap(spacing: 6, runSpacing: 6, children: [
           for (final (v, l) in options) ModeChip(l, selected: v == selected, onTap: () => onSelect(v)),
         ]),
       );
@@ -227,14 +229,14 @@ class SvcSectionHead extends StatelessWidget {
   final String? count;
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 8, bottom: 12),
+        padding: const EdgeInsets.only(top: 4, bottom: 8),
         child: Row(children: [
-          Expanded(child: Text(title, style: inter(20, 700))),
+          Expanded(child: Text(title, style: inter(17, 700))),
           if (count != null)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(999), border: Border.all(color: kLine)),
-              child: Text(count!, style: inter(13, 500, color: kMuted)),
+              child: Text(count!, style: inter(12, 500, color: kMuted)),
             ),
         ]),
       );
@@ -327,3 +329,73 @@ String svcRupees(num v) {
 
 /// "+91 98765 43210" for a 10-digit Indian mobile number; anything else as it is.
 String svcPhone(String digits) => digits.length == 10 ? '+91 ${digits.substring(0, 5)} ${digits.substring(5)}' : digits;
+
+/// The "+ New …" button at the top of a service tab (founder, 2 Nov 2026: create actions are seen without scrolling). Slim; dark with lime
+/// text for the main action, white with a line for a second one beside it.
+class SvcTopButton extends StatelessWidget {
+  const SvcTopButton(this.label, {super.key, required this.onTap, this.dark = true});
+  final String label;
+  final VoidCallback onTap;
+  final bool dark;
+  @override
+  Widget build(BuildContext context) => Material(
+        color: dark ? kPrimary : Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: Container(
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), border: dark ? null : Border.all(color: kPrimary)),
+            child: Text(label, style: inter(15, 700, color: dark ? kLime : kPrimary)),
+          ),
+        ),
+      );
+}
+
+/// Where a booking or job came from (founder, 2 Nov 2026): "Booked online" (the customer app, blue) or "Booked offline" (logged in the POS,
+/// grey). [short] says just Online / Offline, for the small blocks of the day view and the board.
+class SourceTag extends StatelessWidget {
+  const SourceTag({super.key, required this.online, this.short = false});
+  final bool online;
+  final bool short;
+  @override
+  Widget build(BuildContext context) {
+    final (bg, fg) = online ? (const Color(0xFFE6EEFF), const Color(0xFF1D4ED8)) : (kInfoGreyBg, kMuted);
+    final label = short ? (online ? 'Online' : 'Offline') : (online ? 'Booked online' : 'Booked offline');
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: short ? 6 : 10, vertical: short ? 1 : 4),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(online ? LucideIcons.smartphone : LucideIcons.store, size: short ? 11 : 13, color: fg),
+        const SizedBox(width: 4),
+        Text(label, style: inter(short ? 10.5 : 12, 600, color: fg)),
+      ]),
+    );
+  }
+}
+
+/// A figure that counts up softly (founder, 2 Nov 2026: the store's count-up felt "too abrupt and fast"): longer, easing out gently so
+/// the last numbers settle slowly, whole numbers while it runs, and the figure fades in as it starts. The exact value shows at the end.
+class SoftCountUp extends StatelessWidget {
+  const SoftCountUp(this.value, {super.key, required this.style, this.format, this.duration = const Duration(milliseconds: 1600)});
+  final num value;
+  final TextStyle style;
+  final String Function(num v)? format;
+  final Duration duration;
+  @override
+  Widget build(BuildContext context) {
+    String write(num v) => format == null ? '${v.round()}' : format!(v);
+    if (reduceMotion(context) || value == 0) return Text(write(value), style: style);
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: duration,
+      curve: Curves.easeOutQuart,
+      builder: (_, t, _) => Opacity(
+        opacity: (0.35 + t * 1.3).clamp(0.0, 1.0),
+        child: Text(t >= 1 ? write(value) : write((value * t).roundToDouble()), style: style),
+      ),
+    );
+  }
+}

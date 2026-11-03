@@ -113,6 +113,33 @@ void main() {
     expect(find.text('root restaurant Bill'), findsOneWidget);
   });
 
+  testWidgets('a service business gets its own bar: Home, Catalogue, Bill, Bookings, then Ol the guide (founder, 3 Nov 2026)', (t) async {
+    await _show(t);
+    HomeNav.shell!.setKind('service');
+    await t.pumpAndSettle();
+    for (final label in ['Home', 'Catalogue', 'Bill', 'Bookings']) {
+      expect(find.byKey(ValueKey('tab-$label')), findsOneWidget, reason: label);
+    }
+    expect(find.byKey(const ValueKey('tab-Manage')), findsNothing, reason: 'Service management is in the side menu now');
+    expect(find.byKey(const ValueKey('service-ol')), findsOneWidget, reason: 'Ol in the last slot');
+    expect(find.byKey(const ValueKey('ol-bot')), findsNothing, reason: "not the restaurant's Ol");
+    expect(find.byKey(const ValueKey('tab-Item')), findsNothing);
+    expect(find.byKey(const ValueKey('tab-Online order')), findsNothing);
+    for (final label in ['Catalogue', 'Bill', 'Bookings']) {
+      await _tab(t, label);
+      expect(find.text('root service $label'), findsOneWidget, reason: label);
+    }
+    expect(HomeNav.shell!.show('Item'), isFalse, reason: 'no store tabs on the service bar');
+  });
+
+  testWidgets('a store keeps its own bar', (t) async {
+    await _show(t);
+    for (final label in ['Home', 'Item', 'Bill', 'Online order']) {
+      expect(find.byKey(ValueKey('tab-$label')), findsOneWidget, reason: label);
+    }
+    expect(find.byKey(const ValueKey('tab-Bookings')), findsNothing);
+  });
+
   testWidgets('the bar steps aside while a sheet or dialog is open in the tab, and comes back after', (t) async {
     await _show(t);
     final ctx = t.element(find.text('root store Home'));

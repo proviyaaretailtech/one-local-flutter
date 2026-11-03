@@ -51,6 +51,7 @@ import 'stock/stock_routes.dart';
 import 'sell/sell_env.dart';
 import 'sell/sell_screen.dart';
 import 'service/calendar_screen.dart';
+import 'service/service_nav.dart';
 import 'service/service_widgets.dart' show ServiceRoutes;
 import 'settings/settings_api.dart' show SettingsApi;
 import 'settings/settings_screen.dart';
@@ -168,7 +169,7 @@ void installRoutes() {
     return false;
   };
   HomeNav.service = (c) {
-    if (HomeNav.shell?.kind == 'service' && _inShell('Bill')) return;   // a service partner's Bill tab is the calendar
+    if (HomeNav.shell?.kind == 'service' && _inShell('Bookings')) return;   // a service partner's calendar is the Bookings tab
     Navigator.of(c).push(MaterialPageRoute(settings: const RouteSettings(name: ServiceRoutes.calendar), builder: (_) => ServiceCalendarScreen(onNavigate: (id) => _tab(c, id))));
   };
   // Section K: money. The server says which screens this person may open; the bottom bar's other tabs go back through _tab.
@@ -275,7 +276,13 @@ bool get _isStore => (HomeNav.shell?.kind ?? 'store') == 'store';
 Widget appShell({AuthRepository? auth}) => AppShell(rootFor: (kind, label) => shellTabRoot(kind, label, auth: auth));
 
 /// The first screen of the bar tab [label] for a business of [kind] ('store', 'restaurant', 'service'); null when the tab has none.
-Widget? shellTabRoot(String kind, String label, {AuthRepository? auth}) => switch (label) {
+Widget? shellTabRoot(String kind, String label, {AuthRepository? auth}) => kind == 'service'
+    // a service business has its own bar (founder's sketch, 2 Nov 2026): lib/service/service_nav.dart
+    ? serviceTabRoot(label, home: ControlCentreScreen(auth: auth), onNavigate: (id) {
+        final tab = serviceTabFor(id);
+        if (tab != null) _inShell(tab);
+      })
+    : switch (label) {
         'Home' => ControlCentreScreen(auth: auth),
         'Item' => Builder(builder: _itemHome),
         'Menu' => const MenuHub(),

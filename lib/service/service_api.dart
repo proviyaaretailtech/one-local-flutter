@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
+import '../api/app_env.dart';
 import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
 
@@ -45,7 +46,15 @@ class AppointmentView extends SvcData {
   String get fulfilment => raw['fulfilment'] == null ? 'appointment' : s('fulfilment');
   bool get onLocation => fulfilment == 'on_location';
   String get customer => raw['customer'] is Map ? _s(_map(raw['customer']), 'name') : s('customer');
-  String get customerPhone => raw['customer'] is Map ? _s(_map(raw['customer']), 'phone') : '';
+  String get customerPhone => raw['customer'] is Map ? _s(_map(raw['customer']), 'phone') : s('customer_phone');
+  String get serviceAddress => s('service_address');
+  /// Calendar rows (svc_calendar, 2 Nov 2026): the order total and what is paid so far; the local day it starts.
+  num get amount => n('amount');
+  num get paid => n('paid');
+  String get day => s('date');
+  /// Booked online in the customer app ('app') or logged offline in the POS ('pos'), 2 Nov 2026.
+  bool get online => s('source') == 'app';
+  DateTime? get startsAt => DateTime.tryParse(s('starts_at'))?.toLocal();
   String get provider => raw['provider'] is Map ? _s(_map(raw['provider']), 'name') : s('provider');
   String? get resource => raw['resource'] is Map ? _s(_map(raw['resource']), 'name') : (raw['resource'] as String?);
   String get location => m('location').s('name');
@@ -78,7 +87,13 @@ class CalendarData {
   int get appointments => (_map(raw['counts'])['appointments'] as num?)?.toInt() ?? 0;
   int get availableSlots => (_map(raw['counts'])['available_slots'] as num?)?.toInt() ?? 0;
   int get providerCount => (_map(raw['counts'])['providers'] as num?)?.toInt() ?? 0;
+  /// Bookings and job visits in the shown range logged offline (POS) and booked online (customer app).
+  int get offlineCount => (_map(raw['counts'])['offline'] as num?)?.toInt() ?? 0;
+  int get onlineCount => (_map(raw['counts'])['online'] as num?)?.toInt() ?? 0;
   List<Map<String, dynamic>> get week => _list(raw['week']);
+  /// View 'month': every day of the month with its booking count (isodow 1 = Monday).
+  List<Map<String, dynamic>> get month => _list(raw['month']);
+  String get monthLabel => _s(raw, 'month_label');
   List<Map<String, dynamic>> get providers => _list(raw['providers']);
   List<AppointmentView> get items => _list(raw['appointments']).map(AppointmentView.new).toList();
 }
@@ -156,10 +171,36 @@ class ServiceDashboardData extends SvcData {
   SvcData get month => m('month');
   SvcData get plans => m('plans');
   int get availableSlots => i('available_slots');
+  /// The people free right now, by name (founder, 2 Nov 2026: the Free slots tile says who).
+  List<String> get freeNow => ls('free_now');
+  /// Today's bookings and job visits: logged offline in the POS and booked online in the customer app.
+  int get todayOffline => m('today_sources').i('offline');
+  int get todayOnline => m('today_sources').i('online');
   List<AppointmentView> get nextUp => l('next_up').map((e) => AppointmentView(e.raw)).toList();
   List<SvcData> get topServices => l('top_services');
 }
 
+
+/// Free slots today (`svc_free_slots`, 2 Nov 2026): for each bookable person, whether they are free now, busy (till when) or off, and their
+/// free start times.
+class FreeSlotsData extends SvcData {
+  const FreeSlotsData(super.raw);
+  String get dateLabel => s('date_label');
+  String? get closed => so('closed');
+  int get total => i('total');
+  int get slotMinutes => i('slot_minutes');
+  List<String> get freeNow => ls('free_now');
+  List<SvcData> get people => l('people');
+}
+
+/// Money from services (`svc_money_split`): taken today and this month, net of refunds, by bookings, jobs, bills made here and packages, by
+/// offline / online and by how it was paid; and what customers still owe.
+class MoneySplitData extends SvcData {
+  const MoneySplitData(super.raw);
+  SvcData get today => m('today');
+  SvcData get month => m('month');
+  num get due => n('due');
+}
 /// Frame 108: the filtered list plus its count (`svc_history`).
 class HistoryData extends SvcData {
   const HistoryData(super.raw);
@@ -205,6 +246,16 @@ class StaffData extends SvcData {
   bool get canEdit => b('can_edit');
 }
 
+/// The catalogue's Inventory tab (`svc_inventory`, 3 Nov 2026): places, tools, materials, customers' items in care, and what needs doing.
+class InventoryData extends SvcData {
+  const InventoryData(super.raw);
+  bool get canEdit => b('can_edit');
+  int count(String section) => m('counts').i(section);
+  List<SvcData> section(String name) => l(name);
+  List<SvcData> get alerts => l('alerts');
+  List<SvcData> get services => l('services');
+}
+
 /// Frame 89 (`svc_schedule`).
 class ScheduleData extends SvcData {
   const ScheduleData(super.raw);
@@ -217,6 +268,95 @@ class ScheduleData extends SvcData {
   SvcData get slot => m('slot');
   List<SvcData> get exceptions => l('exceptions');
   bool get canEdit => b('can_edit');
+}
+
+/// Service management's slot table (`svc_slot_table`, founder's sketch, 2 Nov 2026): one weekday's slots worked out from the saved hours,
+/// how many people work each slot, every day's hours, and the word for workers (from the kind of service chosen at sign-up).
+class SlotTableData extends SvcData {
+  const SlotTableData(super.raw);
+  String get locationId => m('location').s('id');
+  String get locationName => m('location').s('name');
+  int get weekday => i('weekday');
+  String get workerOne => m('worker_word').s('one');
+  String get workerMany => m('worker_word').s('many');
+  int get slotMinutes => i('slot_minutes');
+  List<int> get slotChoices => ls('slot_choices').map(int.parse).toList();
+  SvcData get hours => m('hours');
+  bool get closed => b('closed');
+  List<SvcData> get days => l('days');
+  List<SvcData> get slots => l('slots');
+  List<SvcData> get staff => l('staff');
+  bool get canEdit => b('can_edit');
+}
+
+/// One bill of the Bill tab (`svc_bill_view`, 2 Nov 2026): from a booking or made in the tab; lines, totals, payments.
+class BillView extends SvcData {
+  const BillView(super.raw);
+  String get id => s('id');
+  String get displayNo => s('display_no');
+  String get status => s('status');
+  String get statusLabel => s('status_label');
+  String get tone => s('tone');
+  String get title => s('title');
+  String get customer => s('customer');
+  String get customerPhone => s('customer_phone');
+  String get address => s('address');
+  String get message => s('message');
+  String get dateLabel => s('date_label');
+  bool get fromBooking => s('source') == 'booking';
+  bool get fromJob => s('source') == 'job';
+  SvcData get job => m('job');
+  SvcData get booking => m('booking');
+  List<SvcData> get lines => l('lines');
+  List<SvcData> get payments => l('payments');
+  num get subtotal => n('subtotal');
+  num get discount => n('discount');
+  num get gstPct => n('gst_pct');
+  num get gst => n('gst_amount');
+  num get roundOff => n('round_off');
+  num get total => n('total');
+  num get paid => n('paid');
+  num get due => n('due');
+  num get change => n('change');
+  bool get canCollect => b('can_collect');
+  bool get canOpenBooking => b('can_open_booking');
+}
+
+/// A job (`svc_job_view`, New job, 2 Nov 2026): several services, a team, its visits (one or a repeating series), its bill.
+class JobView extends SvcData {
+  const JobView(super.raw);
+  String get id => s('id');
+  String get displayNo => s('display_no');
+  String get title => s('title');
+  String get instructions => s('instructions');
+  String get status => s('status');
+  String get statusLabel => s('status_label');
+  String get tone => s('tone');
+  String get customer => s('customer');
+  String get customerPhone => s('customer_phone');
+  String get address => s('address');
+  String get repeatLabel => s('repeat_label');
+  bool get online => s('source') == 'app';
+  bool get remindInvoice => b('remind_invoice');
+  List<SvcData> get team => l('team');
+  List<SvcData> get visits => l('visits');
+  BillView get bill => BillView(m('bill').raw);
+  List<String> get actions => ls('actions');
+  bool can(String action) => actions.contains(action);
+  /// After Close: the job asks to be billed now (its "remind me to bill" is on and money is due).
+  bool get billNow => b('bill_now');
+  int get visitsCancelled => i('visits_cancelled');
+}
+
+/// The Bill tab (`svc_bill_list`): the bills for one filter, counts per filter, what is due now and paid this month.
+class BillListData extends SvcData {
+  const BillListData(super.raw);
+  int count(String filter) => m('counts').i(filter);
+  num get dueAmount => n('due_amount');
+  num get paidThisMonth => n('paid_this_month');
+  /// Money taken today, less refunds today (the dashboard's "Money · today").
+  num get paidToday => n('paid_today');
+  List<BillView> get bills => l('bills').map((b) => BillView(b.raw)).toList();
 }
 
 /// Frames 85 and 86 (`svc_plan_list`).
@@ -265,9 +405,13 @@ class ServiceApi {
   Future<Catalogue> catalogue({String? locationId}) async => Catalogue(await _call('svc_catalogue', {'location_id': locationId}));
 
   Future<ServiceDashboardData> dashboard({String? locationId}) async => ServiceDashboardData(await _call('svc_dashboard', {'location_id': locationId}));
+  Future<FreeSlotsData> freeSlots({String? date, String? locationId}) async => FreeSlotsData(await _call('svc_free_slots', {'date': date, 'location_id': locationId}));
+  Future<MoneySplitData> moneySplit({String? locationId}) async => MoneySplitData(await _call('svc_money_split', {'location_id': locationId}));
 
-  Future<CalendarData> calendar({required String date, String view = 'day', String? locationId, String? staffId}) async =>
-      CalendarData(await _call('svc_calendar', {'date': date, 'view': view, 'location_id': locationId, 'staff_id': staffId}));
+  /// [view] is day, week or month. [withCancelled] lists cancelled bookings too (the Bookings board's Cancelled column).
+  /// [source]: 'pos' (offline) or 'app' (online) to show one kind only.
+  Future<CalendarData> calendar({required String date, String view = 'day', String? locationId, String? staffId, bool withCancelled = false, String? source}) async =>
+      CalendarData(await _call('svc_calendar', {'date': date, 'view': view, 'location_id': locationId, 'staff_id': staffId, if (withCancelled) 'with_cancelled': true, 'source': source}));
 
   Future<ServiceQuote> quote({required String serviceId, List<String> addonIds = const [], String? staffId}) async =>
       ServiceQuote(await _call('svc_quote', {'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': staffId}));
@@ -325,6 +469,10 @@ class ServiceApi {
   Future<AppointmentView> bill(String id, {String? method, num? tendered, required int version, required String key}) async =>
       AppointmentView(await _call('svc_bill', key: key, {'id': id, 'method': method, 'tendered': tendered, 'expected_version': version}));
 
+  /// The paid visit's online bill (the same `/b/<code>` page as a store bill, 2 Nov 2026): made once per order, the same link after.
+  /// Always the public OneLocal address, never this PC's server.
+  Future<Uri> billLink(String orderId) async => Uri.parse('${AppEnv.publicWebUrl}/b/${(await _call('pos_bill_link', {'order_id': orderId}))['code']}');
+
   /// During the visit: ticks checklist items, keeps the provider's notes, adds customer-approved materials, or asks for the arrival confirmation.
   Future<AppointmentView> jobUpdate(String id,
           {required int version, required String key, List<String>? done, String? providerNotes, List<Map<String, Object?>>? extras, bool requestConfirmation = false}) async =>
@@ -349,7 +497,88 @@ class ServiceApi {
 
   Future<StaffData> saveProvider(Map<String, Object?> fields, {required String key}) async => StaffData(await _call('svc_provider_save', fields, key: key));
 
+  Future<InventoryData> inventory() async => InventoryData(await _call('svc_inventory', {}));
+
+  /// Add or change a place, tool or material ({id?, kind, name, qty, ...}); `archived: true` removes it. Manager roles.
+  Future<InventoryData> saveInventory(Map<String, Object?> fields, {required String key}) async => InventoryData(await _call('svc_inventory_save', fields, key: key));
+
+  /// A tool going out or coming back, a material added or used.
+  Future<InventoryData> moveInventory(String id, String action, num qty, {String? note, required String key}) async =>
+      InventoryData(await _call('svc_inventory_move', {'id': id, 'action': action, 'qty': qty, 'note': note}, key: key));
+
+  /// Take in a customer's item, change it, or move it on (with_you, in_work, ready, returned).
+  Future<InventoryData> saveCare(Map<String, Object?> fields, {required String key}) async => InventoryData(await _call('svc_care_save', fields, key: key));
+
   Future<ScheduleData> schedule({String? locationId}) async => ScheduleData(await _call('svc_schedule', {'location_id': locationId}));
+
+  /// The Bill tab: bills for [filter] (all, due or paid), searched by bill number, customer or phone.
+  Future<BillListData> bills({String filter = 'all', String q = ''}) async =>
+      BillListData(await _call('svc_bill_list', {'filter': filter, if (q.trim().isNotEmpty) 'q': q.trim()}));
+
+  Future<BillView> billView(String orderId) async => BillView(await _call('svc_bill_view', {'order_id': orderId}));
+
+  /// A new bill (not from a booking): services from the catalogue with quantities, a discount in rupees or percent. Left unpaid.
+  Future<BillView> createBill({required String key, required String customerName, String? customerPhone, String? address, String? title, String? message,
+          required List<Map<String, Object?>> lines, num? discount, num? discountPct}) async =>
+      BillView(await _call('svc_invoice_create', key: key, {
+        'customer_name': customerName,
+        if (customerPhone != null && customerPhone.trim().isNotEmpty) 'customer_phone': customerPhone.trim(),
+        if (address != null && address.trim().isNotEmpty) 'address': address.trim(),
+        if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
+        if (message != null && message.trim().isNotEmpty) 'message': message.trim(),
+        'lines': lines,
+        'discount': discount,
+        'discount_pct': discountPct,
+      }));
+
+  /// Takes what is due on a bill made in the Bill tab (a booking's bill is paid through its visit).
+  Future<BillView> payBill(String orderId, {required String method, num? tendered, required String key}) async =>
+      BillView(await _call('svc_invoice_pay', key: key, {'order_id': orderId, 'method': method, 'tendered': tendered}));
+
+  /// A new job. With [scheduleLater] there are no visits yet; otherwise [date], [start] and [end] ('HH:MM'), repeated [repeatCount] times.
+  Future<JobView> saveJob({
+    required String key,
+    required String customerName,
+    String? customerPhone,
+    String? address,
+    String? title,
+    String? instructions,
+    required List<Map<String, Object?>> lines,
+    num? discount,
+    num? discountPct,
+    List<String> team = const [],
+    bool scheduleLater = false,
+    String? date,
+    String? start,
+    String? end,
+    int arrivalWindowMin = 0,
+    String repeat = 'none',
+    int repeatCount = 1,
+    bool remindInvoice = true,
+  }) async =>
+      JobView(await _call('svc_job_save', key: key, {
+        'customer_name': customerName,
+        if (customerPhone != null && customerPhone.trim().isNotEmpty) 'customer_phone': customerPhone.trim(),
+        if (address != null && address.trim().isNotEmpty) 'address': address.trim(),
+        if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
+        if (instructions != null && instructions.trim().isNotEmpty) 'instructions': instructions.trim(),
+        'lines': lines,
+        'discount': discount,
+        'discount_pct': discountPct,
+        'team': team,
+        if (scheduleLater) 'schedule_later': true else ...{'date': date, 'start': start, 'end': end, 'arrival_window_min': arrivalWindowMin, 'repeat': repeat, if (repeat != 'none') 'repeat_count': repeatCount},
+        'remind_invoice': remindInvoice,
+      }));
+
+  Future<JobView> job(String id) async => JobView(await _call('svc_job_view', {'id': id}));
+
+  /// [action]: start or complete (a visit: [visitId]), close or cancel (the job).
+  Future<JobView> jobAct(String id, String action, {String? visitId, required String key}) async =>
+      JobView(await _call('svc_job_act', key: key, {'id': id, 'action': action, 'visit_id': visitId}));
+
+  /// One weekday (1 = Monday; today when null) of Service management's slot table.
+  Future<SlotTableData> slotTable({int? weekday, String? locationId}) async =>
+      SlotTableData(await _call('svc_slot_table', {'weekday': weekday, 'location_id': locationId}));
 
   Future<ScheduleData> saveSchedule(Map<String, Object?> fields, {required String key}) async => ScheduleData(await _call('svc_schedule_save', fields, key: key));
 
