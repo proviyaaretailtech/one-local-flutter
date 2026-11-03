@@ -56,6 +56,9 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.text('Sign out'));
     await t.pumpAndSettle();
+    // sign out asks first (2 Nov 2026, from main): Yes signs out
+    await t.tap(find.byKey(const ValueKey('signout-yes')));
+    await t.pumpAndSettle();
     expect(signedOut, isTrue);
     // Money (founder, 2 Nov 2026): the service's own Money page
     await t.tap(find.text('menu'));
