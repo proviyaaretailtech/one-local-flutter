@@ -237,6 +237,13 @@ export const MANIFEST: Entry[] = [
   db('tbl_reserve_cancel', { args: tbl.ReserveCancel, map: P, rate: 'write', roles: 'staff with order:place (or table manager)' }),
   db('tbl_reservations_list', { args: tbl.ReservationsList, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
   db('tbl_reserve_seat', { args: tbl.ReserveSeat, map: P, rate: 'write', roles: 'staff with order:place (or table manager)' }),
+  // 0646: dining areas (read: floor staff; changes: table managers)
+  db('tbl_areas', { args: tbl.Areas, map: P, rate: 'read', roles: 'floor staff (order place / update status, or table manager)' }),
+  db('tbl_area_save', { args: tbl.AreaSave, map: P, rate: 'write', roles: 'table managers' }),
+  db('tbl_area_set_active', { args: tbl.AreaActive, map: P, rate: 'write', roles: 'table managers' }),
+  db('tbl_area_reorder', { args: tbl.AreaReorder, map: P, rate: 'write', roles: 'table managers' }),
+  db('tbl_area_delete', { args: tbl.AreaRef, map: P, rate: 'write', roles: 'table managers' }),
+  db('tbl_area_tables', { args: tbl.AreaTables, map: P, rate: 'write', roles: 'table managers' }),
   db('tbl_transfer', { args: tbl.Transfer, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('tbl_merge', { args: tbl.Merge, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),
   db('tbl_split', { args: tbl.Split, map: P, rate: 'write', roles: 'staff who can place and move orders, or a table manager' }),

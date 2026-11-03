@@ -73,3 +73,13 @@ export const TableSave = obj({
   seats: z.number({ message: 'Enter the seats.' }).int().min(1, 'Seats are 1 to 50.').max(50, 'Seats are 1 to 50.'),
 });
 export const TableRemove = obj({ id });
+// 0646: dining areas (AC Hall, Rooftop, Garden …): list with stats and the next bookings; add / change, on / off, order, delete (only when
+// empty), which tables are in an area. The outlet, the manager's right and joined tables are the database's.
+const areaType = z.enum(['indoor', 'outdoor', 'rooftop', 'ac_hall', 'garden', 'private', 'bar', 'terrace'], { message: 'Choose the kind of area.' });
+export const Areas = obj({ location_id: id.nullish() });
+export const AreaSave = obj({ location_id: id.nullish(), id: id.nullish(),
+  name: z.string({ message: 'Give the area a name.' }).trim().min(1, 'Give the area a name.').max(40, 'An area name is up to 40 characters.'), area_type: areaType.optional() });
+export const AreaActive = obj({ location_id: id.nullish(), id, active: z.boolean({ message: 'On or off.' }) });
+export const AreaReorder = obj({ location_id: id.nullish(), ids: z.array(id).min(1).max(30) });
+export const AreaRef = obj({ location_id: id.nullish(), id });
+export const AreaTables = obj({ location_id: id.nullish(), id, table_ids: z.array(id).max(200) });

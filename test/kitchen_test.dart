@@ -114,19 +114,20 @@ void main() {
   });
 
   group('Kitchen Setup (Figma Kitchen Configuration)', () {
-    testWidgets('lists stations, printer groups and the empty preparation areas', (t) async {
+    testWidgets('lists stations, printer groups and the dining areas (none yet)', (t) async {
       final f = Fake();
       await show(t, KitchenSetupScreen(env: f.env()));
       expect(find.text('Kitchen Setup'), findsOneWidget);
-      expect(find.text('Stations, printers & prep areas'), findsOneWidget);
+      expect(find.text('Stations, printers & dining areas'), findsOneWidget);
       for (final n in ['Main Kitchen', 'Tandoor', 'Beverages', 'Sweet shop', 'Cold Desserts']) {
         expect(find.text(n), findsOneWidget);
       }
       expect(find.text('Kitchen station'), findsNWidgets(5));
       expect(find.text('Hot kitchen'), findsOneWidget);
       expect(find.text('Printer group'), findsOneWidget);
-      expect(find.text('No preparation areas yet'), findsOneWidget);
-      expect(find.text('Create an area to organize kitchen prep.'), findsOneWidget);
+      // 0646: the areas are table management's dining areas; with none yet, Add area opens them there
+      expect(find.text('No dining areas yet'), findsOneWidget);
+      expect(find.text('Add area'), findsOneWidget);
       expect(find.text('Add station'), findsOneWidget);
     });
 
@@ -165,11 +166,12 @@ void main() {
       expect(find.text('Main Kitchen'), findsOneWidget);
     });
 
-    testWidgets('Add printer and Add area say they are not in this release (no frame for their forms)', (t) async {
+    testWidgets('Add printer opens Settings → Devices (0638), not a later-release notice', (t) async {
       await show(t, KitchenSetupScreen(env: Fake().env()));
       await t.tap(find.text('Add printer'));
-      await t.pump();
-      expect(find.text('Adding a printer opens in a later release.'), findsOneWidget);
+      await t.pumpAndSettle();
+      expect(find.textContaining('later release'), findsNothing);
+      expect(find.text('Devices'), findsOneWidget);
     });
 
     testWidgets('a failed load shows the reason and Try again reloads', (t) async {

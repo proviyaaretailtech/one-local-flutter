@@ -96,6 +96,21 @@ class TablesApi {
   Future<Facts> reservations({String? date, String status = 'upcoming'}) async =>
       Facts(await _call('tbl_reservations_list', {'date': ?date, 'status': status}));
 
+  // ---- 0646: dining areas (AC Hall, Rooftop …). Floor staff see them; table managers change them.
+
+  /// {areas: [{id, name, area_type, active, sort_order, tables, table_count, seats}], stats, upcoming (next booking per table), types, can}
+  Future<Facts> areas() async => Facts(await _call('tbl_areas', {}));
+  Future<Facts> saveArea({String? id, required String name, required String type}) async =>
+      Facts(await _call('tbl_area_save', {'id': ?id, 'name': name.trim(), 'area_type': type}));
+  Future<Facts> setAreaActive(String id, bool active) async => Facts(await _call('tbl_area_set_active', {'id': id, 'active': active}));
+
+  /// [ids]: every area of the outlet, first to last.
+  Future<Facts> reorderAreas(List<String> ids) async => Facts(await _call('tbl_area_reorder', {'ids': ids}));
+  Future<Facts> deleteArea(String id) async => Facts(await _call('tbl_area_delete', {'id': id}));
+
+  /// The tables in an area: those listed move here; the others in it leave it. Joined tables move together.
+  Future<Facts> setAreaTables(String id, List<String> tableIds) async => Facts(await _call('tbl_area_tables', {'id': id, 'table_ids': tableIds}));
+
   /// The guests have arrived: seated at their booked table, or at [tableId] (the booking moves there).
   Future<Facts> seatReservation(String reservationId, {String? tableId}) async =>
       Facts(await _call('tbl_reserve_seat', {'id': reservationId, 'table_id': ?tableId}));

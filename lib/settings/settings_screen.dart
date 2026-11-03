@@ -411,6 +411,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (HomeNav.shell?.kind == 'restaurant')
         _Part('devices', 'Devices', LucideIcons.printer, 'Receipt, kitchen (KOT) and barcode label printers', const [],
             open: () => Navigator.of(context).push(RstDevicesScreen.route())),
+      // kitchen stations, printer groups and dining areas (it had no button that opened it)
+      if (HomeNav.shell?.kind == 'restaurant' && HomeNav.kitchenSetup != null)
+        _Part('kitchen_setup', 'Kitchen setup', LucideIcons.chefHat, 'Kitchen stations, printer groups and dining areas', const [],
+            open: () => HomeNav.kitchenSetup!(context)),
       // 0645: the owner's / admin's PIN that unlocks a generated bill or a cancel after the KOT
       if (HomeNav.shell?.kind == 'restaurant')
         _Part('admin_pin', 'Admin PIN', LucideIcons.keyRound, 'Needed to change a generated bill or cancel an order the kitchen has', const [],
