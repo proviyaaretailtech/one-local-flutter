@@ -9,6 +9,7 @@ import '../ui/theme.dart';
 import 'ingredients_screen.dart' show LibraryPickerScreen;
 import 'menu_api.dart' show MenuApiException;
 import 'menu_build_api.dart';
+import 'menu_sheets.dart';
 import 'menu_build_widgets.dart';
 import 'menu_widgets.dart' show FoodTypeMark, MenuError;
 
@@ -68,6 +69,8 @@ class _RecipesViewState extends State<RecipesView> {
               const SizedBox(width: 8),
               StatTile(label: 'Average food cost', value: pct(d.avgFoodCostPct), tone: d.avgFoodCostPct == null ? null : foodCostTone(d.avgFoodCostPct)),
             ]),
+            const SizedBox(height: 10),
+            SheetButtons(kind: SheetKind.recipes, api: widget.api, onImported: () => _reload()),
             const SizedBox(height: 12),
             FilterChips(
               keyPrefix: 'rcp-tab',
