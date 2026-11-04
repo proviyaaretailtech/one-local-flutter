@@ -510,6 +510,37 @@ void main() {
       expect(find.byKey(const ValueKey('bill-cart')), findsNothing, reason: 'the cart is emptied once saved');
     });
 
+    testWidgets("after an order goes out the table stays chosen; the next first dish asks: same customer, or a new customer and their table", (t) async {
+      final s = Fake();
+      await show(t, FloorScreen(env: TablesEnv(api: s.api)));
+      await openTablesSheet(t);
+      await tapKey(t, 'table-T4');
+      await tapKey(t, 'dish-square-Dal Makhani');
+      expect(find.text('Same customer or new?'), findsNothing, reason: 'the table was just chosen');
+      await tapKey(t, 'bill-hold');
+      expect(find.text('Table T4'), findsOneWidget, reason: 'the table stays chosen');
+
+      // the same customer: the dish goes on T4, and the next dishes ask nothing
+      await tapKey(t, 'dish-square-Butter Naan');
+      expect(find.text('Same customer or new?'), findsOneWidget);
+      expect(find.byKey(const ValueKey('bill-cart')), findsNothing, reason: 'nothing added before the answer');
+      await tapKey(t, 'customer-same');
+      expect(find.text('Table T4 · 1 item'), findsOneWidget);
+      await tapKey(t, 'dish-square-Butter Naan');
+      expect(find.text('Same customer or new?'), findsNothing);
+      await tapKey(t, 'bill-hold');
+
+      // a new customer: choose their table, the dish goes there
+      await tapKey(t, 'dish-square-Paneer Tikka');
+      await tapKey(t, 'customer-new');
+      expect(find.text('Choose a table'), findsOneWidget);
+      await tapKey(t, 'table-T2');
+      expect(find.text('Table T2'), findsOneWidget);
+      expect(find.text('Table T2 · 1 item'), findsOneWidget);
+      await tapKey(t, 'bill-hold');
+      expect(argsOf(s.calls('tbl_order_add').last)['table_id'], 't2');
+    });
+
     testWidgets('Dine in, Takeaway and Delivery pills sit above Ready to serve; Dine in is chosen at first', (t) async {
       final s = Fake();
       await show(t, FloorScreen(env: TablesEnv(api: s.api)));

@@ -56,6 +56,9 @@ class _FloorScreenState extends State<FloorScreen> {
   String? _menuCat;
   String _menuQuery = ''; // the search beside the Menu title: dish name, any part, any case
   Facts? _orderTable;
+  // the chosen table was picked or confirmed for the dishes being added now; after an order goes out the table stays, but the next first
+  // dish asks whether it is the same customer or a new one (founder, 4 Nov 2026)
+  bool _tableSure = false;
   final _cart = <String, int>{};
   String? _key; // one per intent: kept while the cart does not change, so a retried tap is the same request
   bool _sending = false;
@@ -144,6 +147,7 @@ class _FloorScreenState extends State<FloorScreen> {
     if (t == null || !mounted) return;
     setState(() {
       _orderTable = t;
+      _tableSure = true;
       _key = null;
     });
   }
@@ -166,7 +170,12 @@ class _FloorScreenState extends State<FloorScreen> {
       if (choose != true || !mounted) return;
       final t = await _chooseTable();
       if (t == null || !mounted) return;
-      setState(() => _orderTable = t);
+      setState(() {
+        _orderTable = t;
+        _tableSure = true;
+      });
+    } else if (_onTable && _cart.isEmpty && !_tableSure) {
+      if (!await _sameOrNewCustomer(item) || !mounted) return;
     }
     // a dish with add-ons or combos (0624): one pop-up with its size, add-ons and combos; a dish with only sizes (0611): Small / Medium / Large
     String? size;
@@ -188,6 +197,31 @@ class _FloorScreenState extends State<FloorScreen> {
       _key = null;
       _lastKey[item.s('id')] = k;
     });
+  }
+
+  /// A table still chosen from the last order and a first dish tapped: is it for that table's customer, or a new customer? A new customer
+  /// chooses their table. False when closed without an answer.
+  Future<bool> _sameOrNewCustomer(Facts item) async {
+    final label = _orderTable!.s('label');
+    final same = await showOlDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Same customer or new?'),
+        content: Text('Table $label is still chosen from the last order. Is ${item.s('name')} for the customer at Table $label, or for a new customer?'),
+        actions: [
+          TextButton(key: const ValueKey('customer-new'), onPressed: () => Navigator.pop(c, false), child: const Text('New customer')),
+          TextButton(key: const ValueKey('customer-same'), onPressed: () => Navigator.pop(c, true), child: Text('Table $label', style: inter(14, 700))),
+        ],
+      ),
+    );
+    if (same == null || !mounted) return false;
+    if (!same) {
+      final t = await _chooseTable();
+      if (t == null || !mounted) return false;
+      setState(() => _orderTable = t);
+    }
+    setState(() => _tableSure = true);
+    return true;
   }
 
   /// "Which size?": each size with its price, the default first-ticked. Null when closed.
@@ -321,6 +355,7 @@ class _FloorScreenState extends State<FloorScreen> {
         _extras.clear();
         _key = null;
         _sending = false;
+        _tableSure = false;
       });
       if (send) _loadMenu(); // the dishes sent took their ingredients off stock: "can be made" counts go down
       final kot = r.mo('kot');
