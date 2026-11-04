@@ -256,10 +256,11 @@ void main() {
       final nav = find.byKey(const ValueKey('side-nav'));
       expect(nav, findsOneWidget);
       expect(t.getRect(nav).left, 0, reason: 'slides in from the left, like the store');
-      for (final l in ['All Orders', 'Money', 'Customer', 'Business profile', 'Reports', 'Team', 'Settings', 'One Local Wallet', 'Help & support', 'Subscription plans', 'Sign out']) {
+      for (final l in ['All Orders', 'Money', 'Customer', 'Reports', 'Team', 'Settings', 'One Local Wallet', 'Help & support', 'Subscription plans', 'Sign out']) {
         expect(find.descendant(of: nav, matching: find.text(l)), findsOneWidget, reason: l);
       }
       expect(find.descendant(of: nav, matching: find.text('Kitchen display')), findsNothing, reason: 'the old restaurant links are gone');
+      expect(find.descendant(of: nav, matching: find.text('Business profile')), findsNothing, reason: 'Business profile is in Settings only');
       await t.enterText(find.byKey(const ValueKey('side-nav-search')), 'team');
       await t.pump();
       expect(find.descendant(of: nav, matching: find.text('Team')), findsOneWidget);

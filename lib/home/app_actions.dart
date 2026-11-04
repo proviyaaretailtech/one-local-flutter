@@ -185,7 +185,7 @@ List<AppAction> restaurantActions(BuildContext context, {VoidCallback? onReports
   add(LucideIcons.layoutTemplate, 'Page Manager', 'Side menu', 'page manager onelocal page online ads offers reviews profile hours delivery link',
       push(() => RstPageManagerScreen.route()));
   add(LucideIcons.link, 'Menu link', 'Page Manager', 'menu link share menu online menu qr whatsapp', route(HomeNav.menuLink));
-  add(LucideIcons.store, 'Business profile', 'Side menu', 'business profile outlet name address phone gst fssai', route(HomeNav.outletInfo ?? settings));
+  add(LucideIcons.store, 'Business profile', 'Settings', 'business profile outlet name address phone gst fssai', route(HomeNav.outletInfo ?? settings));
   add(LucideIcons.settings, 'Settings', 'Side menu', 'settings timings hours phone numbers language bill settings service charge gst', route(settings));
   add(LucideIcons.crown, 'Subscription plans', 'Side menu', 'subscription plan plans pay renew', push(() => RstPlansScreen.route()));
   add(LucideIcons.bell, 'Notifications', 'Banner', 'notifications alerts messages', route(HomeNav.notifications));
