@@ -92,7 +92,15 @@ try {
   ok('KDS: the not-sent lassi raises no alert', !(q.j?.cancelled ?? []).some(x => x.order_id === A.o && x.items[0]?.name === 'Lassi'));
   const kv = await rpc(CAP, 'rst_kot_orders', {});
   const kc = kv.j?.orders?.find(x => x.id === A.o);
-  ok('KOT view: history shows 2× Naan cancelled with the reason', kc && kc.item_cancels.length === 1 && kc.item_cancels[0].qty === 2 && kc.item_cancels[0].reason === 'Guest wants only two', kc);
+  const naanC = kc?.item_cancels?.find(x => x.name === 'Naan'), lassiC = kc?.item_cancels?.find(x => x.name === 'Lassi');
+  ok('KOT view: history shows 2× Naan cancelled with the reason', naanC && naanC.qty === 2 && naanC.reason === 'Guest wants only two' && naanC.sent === true, kc);
+  // 0654: the lassi cancelled before its KOT is listed too, without the stop alarm
+  ok('KOT view: the lassi cancelled before the kitchen is listed, not as STOP', lassiC && lassiC.sent === false && lassiC.recent === false && kc.item_cancels.length === 2, kc?.item_cancels);
+  ok('KOT view: the open order with cancelled dishes counts under Cancelled', kc.stage !== 'cancelled' && kv.j.counts.cancelled >= 1, kv.j.counts);
+  const kvc = await rpc(CAP, 'rst_kot_orders', { status: 'cancelled' });
+  ok('KOT view: the Cancelled filter lists it', kvc.j?.orders?.some(x => x.id === A.o), kvc.j?.orders?.map(x => x.display_no));
+  const kvp = await rpc(CAP, 'rst_kot_orders', { status: 'preparing' });
+  ok('KOT view: it still shows under Preparing too', kvp.j?.orders?.some(x => x.id === A.o), kvp.j?.counts);
   ok('KOT ticket still open, cooking (the tikka)', sql(`select status from kot_tickets where id='${A.kot}'`) === 'preparing');
 
   // cooking dish: the captain asks, a manager approves
