@@ -8,10 +8,16 @@ import '../ui/theme.dart';
 /// table, the other tables' bars peek out behind it, each table in its own colour. ⌃ fans the deck out into one bar per table; tapping
 /// a bar brings that table to the front and opens it. Up to [max] tables (the first ones on the floor, in their floor order).
 class TableDeck extends StatefulWidget {
-  const TableDeck({super.key, required this.tables, required this.onOpen, this.max = 5});
+  const TableDeck({super.key, required this.tables, required this.onOpen, this.max = 5, this.pending = const {}, this.focus});
   final List<Facts> tables;
   final ValueChanged<Facts> onOpen;
   final int max;
+
+  /// A table's dishes picked and not sent yet, by table id ("3 items · not sent"): shown on its bar instead of its status.
+  final Map<String, String> pending;
+
+  /// The table being ordered for: its bar comes to the front.
+  final String? focus;
 
   /// One colour per table, by its place in the deck (green, red, orange, blue, purple).
   static const colors = [
@@ -31,6 +37,15 @@ class _TableDeckState extends State<TableDeck> {
   bool _open = false;
 
   List<Facts> get _deck => widget.tables.take(widget.max).toList();
+
+  @override
+  void didUpdateWidget(TableDeck old) {
+    super.didUpdateWidget(old);
+    final i = widget.focus == null ? -1 : _deck.indexWhere((t) => t.s('id') == widget.focus);
+    if (widget.focus != old.focus && i >= 0) _front = i;
+  }
+
+  String _status(Facts t) => widget.pending[t.s('id')] ?? status(t);
 
   static String status(Facts t) {
     final mins = t.n('elapsed_minutes').toInt();
@@ -71,7 +86,7 @@ class _TableDeckState extends State<TableDeck> {
                       key: ValueKey('deck-bar-${deck[i].s('label')}'),
                       table: deck[i],
                       colors: TableDeck.colors[i % TableDeck.colors.length],
-                      status: status(deck[i]),
+                      status: _status(deck[i]),
                       onTap: () => _pick(i),
                       toggleIcon: i == front ? LucideIcons.chevronsDown : null,
                       onToggle: () => setState(() => _open = false),
@@ -105,7 +120,7 @@ class _TableDeckState extends State<TableDeck> {
                       key: ValueKey('deck-front-${deck[front].s('label')}'),
                       table: deck[front],
                       colors: TableDeck.colors[front % TableDeck.colors.length],
-                      status: status(deck[front]),
+                      status: _status(deck[front]),
                       onTap: () => widget.onOpen(deck[front]),
                       toggleIcon: deck.length > 1 ? LucideIcons.chevronsUp : null,
                       onToggle: () => setState(() => _open = true),

@@ -21,20 +21,35 @@ class ReviewLine {
 
 /// Shows [lines] for [title] ("Table T3", "Takeaway"); true when Send to kitchen is tapped, false or null to go back and edit.
 Future<bool> showOrderReview(BuildContext context, {required String title, required List<ReviewLine> lines}) async =>
-    await showModalBottomSheet<bool>(
+    await _sheet(context, _Review(title: title, lines: lines)) == 'send';
+
+/// What was tapped on a table's dishes not sent yet.
+enum PendingAction { send, hold, table }
+
+/// The dishes picked for a table and not sent yet (founder, 4 Nov 2026: "I want to see the selected items on the particular selected
+/// table before it goes to KOT"), opened from that table: Send to kitchen, Hold, or Table options (its usual sheet); null when closed.
+Future<PendingAction?> showPendingOrder(BuildContext context, {required String title, required List<ReviewLine> lines}) async =>
+    switch (await _sheet(context, _Review(title: title, lines: lines, pending: true))) {
+      'send' => PendingAction.send,
+      'hold' => PendingAction.hold,
+      'table' => PendingAction.table,
+      _ => null,
+    };
+
+Future<String?> _sheet(BuildContext context, Widget child) => showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       useRootNavigator: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (c) => _Review(title: title, lines: lines),
-    ) ==
-    true;
+      builder: (c) => child,
+    );
 
 class _Review extends StatelessWidget {
-  const _Review({required this.title, required this.lines});
+  const _Review({required this.title, required this.lines, this.pending = false});
   final String title;
   final List<ReviewLine> lines;
+  final bool pending; // opened from the table: Hold and Table options too
 
   @override
   Widget build(BuildContext context) {
@@ -48,9 +63,12 @@ class _Review extends StatelessWidget {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFD1D5DB), borderRadius: BorderRadius.circular(4)))),
             const SizedBox(height: 14),
-            Text('Check the order', key: const ValueKey('review-title'), style: inter(22, 800)),
+            Text(pending ? '$title · not sent yet' : 'Check the order', key: const ValueKey('review-title'), style: inter(22, 800)),
             const SizedBox(height: 2),
-            Text('$title · $units item${units == 1 ? '' : 's'}. Read it back to the guest before it goes to the kitchen.',
+            Text(
+                pending
+                    ? '$units item${units == 1 ? '' : 's'} picked for this table. They go to the kitchen when you send them.'
+                    : '$title · $units item${units == 1 ? '' : 's'}. Read it back to the guest before it goes to the kitchen.',
                 key: const ValueKey('review-for'), style: inter(13.5, 500, color: kMuted)),
             const SizedBox(height: 12),
             Flexible(
@@ -101,14 +119,22 @@ class _Review extends StatelessWidget {
             ),
             Row(children: [
               Expanded(
-                child: OutlineButtonT('Edit order', key: const ValueKey('review-edit'), icon: LucideIcons.pencil, height: 48, onPressed: () => Navigator.of(context).pop(false)),
+                child: pending
+                    ? OutlineButtonT('Hold', key: const ValueKey('review-hold'), icon: LucideIcons.pause, height: 48, onPressed: () => Navigator.of(context).pop('hold'))
+                    : OutlineButtonT('Edit order', key: const ValueKey('review-edit'), icon: LucideIcons.pencil, height: 48, onPressed: () => Navigator.of(context).pop('edit')),
               ),
               const SizedBox(width: 8),
               Expanded(
                 flex: 2,
-                child: LimeButton('Send to kitchen', key: const ValueKey('review-send'), icon: LucideIcons.send, height: 48, onPressed: () => Navigator.of(context).pop(true)),
+                child: LimeButton('Send to kitchen', key: const ValueKey('review-send'), icon: LucideIcons.send, height: 48, onPressed: () => Navigator.of(context).pop('send')),
               ),
             ]),
+            if (pending)
+              TextButton(
+                key: const ValueKey('review-table'),
+                onPressed: () => Navigator.of(context).pop('table'),
+                child: Text('Table options', style: inter(14, 600, color: kLink)),
+              ),
           ]),
         ),
       ),

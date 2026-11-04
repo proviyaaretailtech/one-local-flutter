@@ -325,12 +325,12 @@ class _FloorScreenState extends State<FloorScreen> {
   }
 
   /// Send to kitchen (a KOT) or Hold. Dine in: the same call as Add dishes, for the chosen table; Takeaway / Delivery: an order without a table.
-  Future<void> _sendCart(bool send) async {
+  Future<void> _sendCart(bool send, {bool reviewed = false}) async {
     final t = _orderTable;
     if (_cart.isEmpty || (_dineIn && t == null)) return;
     final onTable = _onTable;
     // the order read back to the guest first (founder, 4 Nov 2026); Edit order goes back with nothing sent
-    if (send && !await showOrderReview(context, title: _cartFor, lines: [for (final e in _cart.entries) _reviewLine(e.key, e.value, onTable)])) return;
+    if (send && !reviewed && !await showOrderReview(context, title: _cartFor, lines: [for (final e in _cart.entries) _reviewLine(e.key, e.value, onTable)])) return;
     if (!mounted) return;
     if (_mode == 'delivery') {
       final d = await _askDelivery();
@@ -428,6 +428,14 @@ class _FloorScreenState extends State<FloorScreen> {
       Navigator.of(context).pop(t);
       return;
     }
+    // the table being ordered for, with dishes picked and not sent yet: those dishes first, with Hold and Send to kitchen
+    if (_onTable && _cart.isNotEmpty && t.s('id') == _orderTable!.s('id')) {
+      final onTable = _onTable;
+      final a = await showPendingOrder(context, title: _cartFor, lines: [for (final e in _cart.entries) _reviewLine(e.key, e.value, onTable)]);
+      if (!mounted || a == null) return;
+      if (a != PendingAction.table) return _sendCart(a == PendingAction.send, reviewed: true);
+    }
+    if (!mounted) return;
     if (t.s('status') == 'occupied') {
       // A table with a running order opens that order straight away (founder, 2026-10-20): items, kitchen status,
       // Add Items, Send KOT, Change/Merge Table, Generate Bill. A free table opens the sheet with Start New Order.
@@ -462,7 +470,14 @@ class _FloorScreenState extends State<FloorScreen> {
           ? null
           : Column(mainAxisSize: MainAxisSize.min, children: [
               if (_showCart) _cartBar(),
-              if (tables.isNotEmpty) TableDeck(key: const ValueKey('table-deck'), tables: tables, onOpen: _tap),
+              if (tables.isNotEmpty) TableDeck(
+                  key: const ValueKey('table-deck'),
+                  tables: tables,
+                  onOpen: _tap,
+                  // the table being ordered for comes to the front and shows its dishes not sent yet (founder, 4 Nov 2026)
+                  focus: _onTable ? _orderTable!.s('id') : null,
+                  pending: {if (_onTable && _cart.isNotEmpty) _orderTable!.s('id'): '$_cartUnits item${_cartUnits == 1 ? '' : 's'} · not sent'},
+                ),
             ]),
       children: [
         if (widget.pickFor == null) ...[

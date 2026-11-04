@@ -532,6 +532,58 @@ void main() {
       expect(find.byType(SentToKitchenScreen), findsOneWidget);
     });
 
+    testWidgets('the chosen table shows its dishes not sent yet: its bar says so, tapping it lists them with Send to kitchen and Hold', (t) async {
+      final s = Fake();
+      await show(t, FloorScreen(env: TablesEnv(api: s.api)));
+      await openTablesSheet(t);
+      await tapKey(t, 'table-T2');
+      await tapKey(t, 'dish-square-Paneer Tikka');
+      await tapKey(t, 'dish-square-Butter Naan');
+      await tapKey(t, 'dish-square-Butter Naan');
+      // T2 comes to the front of the table bars, with its dishes instead of "Available"
+      final bar = find.byKey(const ValueKey('deck-front-T2'));
+      expect(bar, findsOneWidget);
+      expect(find.descendant(of: bar, matching: find.text('3 items · not sent')), findsOneWidget);
+
+      await tapKey(t, 'deck-front-T2');
+      expect(find.text('Table T2 · not sent yet'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('review-line-1')), matching: find.text('2×')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('review-line-1')), matching: find.text('Butter Naan')), findsOneWidget);
+      expect(find.text('Start New Order'), findsNothing, reason: 'the dishes first, not the free table sheet');
+      expect(s.calls('tbl_order_add'), isEmpty);
+
+      // Send to kitchen here sends straight away: this list was the check
+      await tapKey(t, 'review-send');
+      expect(find.text('Check the order'), findsNothing);
+      expect(argsOf(s.calls('tbl_order_add').single)['send'], true);
+      expect(find.byType(SentToKitchenScreen), findsOneWidget);
+    });
+
+    testWidgets('a chosen table with dishes not sent: Table options opens the table as before', (t) async {
+      final s = Fake();
+      await show(t, FloorScreen(env: TablesEnv(api: s.api)));
+      await openTablesSheet(t);
+      await tapKey(t, 'table-T4');
+      await tapKey(t, 'dish-square-Dal Makhani');
+      await tapKey(t, 'deck-front-T4');
+      await tapKey(t, 'review-table');
+      expect(find.text('Table T4 · not sent yet'), findsNothing);
+      expect(find.text('Start New Order'), findsOneWidget, reason: 'the free table\'s own sheet');
+      expect(s.calls('tbl_order_add'), isEmpty, reason: 'Table options sends nothing');
+    });
+
+    testWidgets('a chosen table with dishes not sent: Hold there saves them on the table', (t) async {
+      final s = Fake();
+      await show(t, FloorScreen(env: TablesEnv(api: s.api)));
+      await openTablesSheet(t);
+      await tapKey(t, 'table-T2');
+      await tapKey(t, 'dish-square-Dal Makhani');
+      await tapKey(t, 'deck-front-T2');
+      await tapKey(t, 'review-hold');
+      expect(argsOf(s.calls('tbl_order_add').single)['send'], false);
+      expect(find.byKey(const ValueKey('bill-cart')), findsNothing);
+    });
+
     testWidgets('Hold saves the dishes on the table without sending them', (t) async {
       final s = Fake();
       await show(t, FloorScreen(env: TablesEnv(api: s.api)));
