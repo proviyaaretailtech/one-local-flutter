@@ -133,6 +133,8 @@ void main() {
       expect(find.byKey(ValueKey('qty-$naan-Large')), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('send-to-kitchen')));
       await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('review-send')));
+      await t.pumpAndSettle();
       expect(argsOf(f.calls('tbl_order_add').single)['lines'], [{'menu_item_id': naan, 'qty': 2, 'variant_id': 'v-l'}]);
     });
 
@@ -176,6 +178,8 @@ void main() {
       expect(t.widget<Text>(find.byKey(const ValueKey('total-so-far'))).data, '₹634');
       await t.tap(find.byKey(const ValueKey('send-to-kitchen')));
       await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('review-send')));
+      await t.pumpAndSettle();
       final line = (argsOf(f.calls('tbl_order_add').single)['lines'] as List).single as Map;
       expect(line['menu_item_id'], naan);
       expect(line['qty'], 1);
@@ -189,6 +193,8 @@ void main() {
       await t.tap(find.byKey(const ValueKey('plus-$naan')));
       await t.pump();
       await t.tap(find.byKey(const ValueKey('send-to-kitchen')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('review-send')));
       await t.pumpAndSettle();
       final r = f.calls('tbl_order_add').single;
       expect(argsOf(r)['table_id'], table4);
@@ -217,7 +223,11 @@ void main() {
       await t.pump();
       await t.tap(find.byKey(const ValueKey('send-to-kitchen')));
       await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('review-send')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('send-to-kitchen')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('review-send')));
       await t.pumpAndSettle();
       final keys = f.calls('tbl_order_add').map((r) => r.headers['Idempotency-Key'] ?? r.headers['idempotency-key']).toList();
       expect(keys, hasLength(2));
@@ -240,6 +250,7 @@ void main() {
       await show(t, AddDishesScreen(env: freeTable().env, tableId: table4, tableLabel: 'Table 4'));
       await t.tap(find.byKey(const ValueKey('send-to-kitchen')));
       await t.pumpAndSettle();
+      expect(find.text('Check the order'), findsNothing, reason: 'nothing to check');
       expect(find.text('KOT #1 sent'), findsNothing);
     });
   });

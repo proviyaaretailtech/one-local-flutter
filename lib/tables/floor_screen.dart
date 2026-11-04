@@ -9,6 +9,7 @@ import '../ui/mobile_input.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'dish_options_sheet.dart';
+import 'order_review_sheet.dart';
 import 'guest_orders.dart';
 import 'reservations_screen.dart';
 import 'reserve_screen.dart';
@@ -328,6 +329,9 @@ class _FloorScreenState extends State<FloorScreen> {
     final t = _orderTable;
     if (_cart.isEmpty || (_dineIn && t == null)) return;
     final onTable = _onTable;
+    // the order read back to the guest first (founder, 4 Nov 2026); Edit order goes back with nothing sent
+    if (send && !await showOrderReview(context, title: _cartFor, lines: [for (final e in _cart.entries) _reviewLine(e.key, e.value, onTable)])) return;
+    if (!mounted) return;
     if (_mode == 'delivery') {
       final d = await _askDelivery();
       if (d == null || !mounted) return;
@@ -373,6 +377,19 @@ class _FloorScreenState extends State<FloorScreen> {
         showToast(context, sayError(e));
       }
     }
+  }
+
+  ReviewLine _reviewLine(String k, int qty, bool onTable) {
+    final item = _menuItem(_dishOf(k));
+    final size = _sizeOf(k);
+    return ReviewLine(
+      name: item?.s('name') ?? 'Dish',
+      qty: qty,
+      price: _priceOf(k),
+      size: size == null ? null : item?.l('variants').where((v) => v.s('id') == size).firstOrNull?.s('name'),
+      extras: _extras[k]?.summary ?? '',
+      takeaway: onTable && k.endsWith(_ta),
+    );
   }
 
   Future<void> _load() async {

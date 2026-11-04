@@ -486,6 +486,7 @@ void main() {
       await tapKey(t, 'dish-square-Paneer Tikka');
       await tapKey(t, 'dish-square-Butter Naan');
       await tapKey(t, 'bill-send');
+      await tapKey(t, 'review-send');
       final q = s.calls('tbl_order_add').single;
       final a = argsOf(q);
       expect(a['table_id'], 't2');
@@ -495,6 +496,39 @@ void main() {
         {'menu_item_id': '47a00000-0000-0000-0000-000000000003', 'qty': 1},
       ]);
       expect(q.headers['Idempotency-Key'], isNotEmpty);
+      expect(find.byType(SentToKitchenScreen), findsOneWidget);
+    });
+
+    testWidgets('Send to kitchen first reads the order back: each dish, how many, the total; Edit order sends nothing', (t) async {
+      final s = Fake();
+      await show(t, FloorScreen(env: TablesEnv(api: s.api)));
+      await openTablesSheet(t);
+      await tapKey(t, 'table-T2');
+      await tapKey(t, 'dish-square-Paneer Tikka');
+      await tapKey(t, 'dish-square-Butter Naan');
+      await tapKey(t, 'dish-square-Butter Naan');
+      await tapKey(t, 'bill-send');
+      expect(find.text('Check the order'), findsOneWidget);
+      expect(find.textContaining('Table T2 · 3 items. Read it back to the guest'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('review-line-0')), matching: find.text('1×')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('review-line-0')), matching: find.text('Paneer Tikka')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('review-line-1')), matching: find.text('2×')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('review-line-1')), matching: find.text('Butter Naan')), findsOneWidget);
+      expect(find.byKey(const ValueKey('review-total')), findsOneWidget);
+      expect(s.calls('tbl_order_add'), isEmpty, reason: 'nothing is sent while the order is being checked');
+
+      await tapKey(t, 'review-edit');
+      expect(find.text('Check the order'), findsNothing);
+      expect(s.calls('tbl_order_add'), isEmpty);
+      expect(find.text('Table T2 · 3 items'), findsOneWidget, reason: 'the cart is kept to change');
+
+      await tapKey(t, 'dish-minus-Butter Naan');
+      await tapKey(t, 'bill-send');
+      await tapKey(t, 'review-send');
+      expect(argsOf(s.calls('tbl_order_add').single)['lines'], [
+        {'menu_item_id': '47a00000-0000-0000-0000-000000000001', 'qty': 1},
+        {'menu_item_id': '47a00000-0000-0000-0000-000000000003', 'qty': 1},
+      ]);
       expect(find.byType(SentToKitchenScreen), findsOneWidget);
     });
 
@@ -567,6 +601,7 @@ void main() {
       expect(find.text('Table T2 · 4 items · 3 takeaway'), findsOneWidget);
       expect(find.descendant(of: find.byKey(const ValueKey('dish-qty-Paneer Tikka')), matching: find.text('2')), findsOneWidget);
       await tapKey(t, 'bill-send');
+      await tapKey(t, 'review-send');
       expect(s.calls('pos_counter_order'), isEmpty, reason: 'not a separate takeaway order');
       final a = argsOf(s.calls('tbl_order_add').single);
       expect(a['table_id'], 't2');
@@ -587,6 +622,7 @@ void main() {
       expect(find.text('Takeaway · 1 item'), findsOneWidget);
       expect(find.byKey(const ValueKey('table-deck')), findsOneWidget, reason: 'the floating table bars stay');
       await tapKey(t, 'bill-send');
+      await tapKey(t, 'review-send');
       final q = s.calls('pos_counter_order').single;
       final a = argsOf(q);
       expect(a['service_type'], 'pickup');
@@ -616,6 +652,7 @@ void main() {
       expect(find.text('Takeaway · 1 item'), findsOneWidget);
       expect(find.textContaining(rupees((naan['price'] as num) + 50)), findsWidgets, reason: 'the cart total includes the add-on');
       await tapKey(t, 'bill-send');
+      await tapKey(t, 'review-send');
       final a = argsOf(s.calls('pos_counter_order').single);
       expect(a['lines'], [{'menu_item_id': '47a00000-0000-0000-0000-000000000003', 'qty': 1, 'addons': ['a-cheese']}]);
     });
@@ -685,6 +722,7 @@ void main() {
       await tapKey(t, 'mode-pickup');
       await tapKey(t, 'dish-square-Butter Naan');
       await tapKey(t, 'bill-send');
+      await tapKey(t, 'review-send');
       await tapKey(t, 'back-to-tables');
       expect(said('Butter Naan', '199 can be made'), findsOneWidget);
     });
@@ -761,6 +799,7 @@ void main() {
       expect(t.widget<Text>(find.byKey(const ValueKey('bill-cart-total'))).data, '₹500', reason: 'Large ₹280 + Small ₹220');
       expect(find.descendant(of: find.byKey(const ValueKey('dish-qty-Dal Makhani')), matching: find.text('2')), findsOneWidget);
       await tapKey(t, 'bill-send');
+      await tapKey(t, 'review-send');
       expect(argsOf(s.calls('tbl_order_add').single)['lines'], [
         {'menu_item_id': '47a00000-0000-0000-0000-000000000002', 'qty': 1, 'variant_id': 'v-l'},
         {'menu_item_id': '47a00000-0000-0000-0000-000000000002', 'qty': 1, 'variant_id': 'v-s'},
