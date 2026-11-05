@@ -16,13 +16,16 @@ class StorePrinter {
   String get id => _s('id');
   String get name => _s('name');
 
-  /// receipt, label (barcode labels) or kot (kitchen).
-  String get type => _s('printer_type');
+  /// receipt, label (barcode labels) or kot (kitchen). `pos_print_targets` (0658) names it `type`.
+  String get type => _s('printer_type').isNotEmpty ? _s('printer_type') : _s('type');
 
   /// lan (network, prints directly), bluetooth, usb, or system (the phone's print service).
   String get connection => _s('connection');
   String get address => _s('address');
   int get paperMm => (raw['paper_mm'] as num?)?.toInt() ?? 80;
+
+  /// How many times each job prints (1 to 5).
+  int get copies => ((raw['copies'] as num?)?.toInt() ?? 1).clamp(1, 5);
   String get labelSize => _s('label_size');
   bool get autoCut => raw['auto_cut'] != false;
   bool get isDefault => raw['is_default'] == true;
@@ -33,8 +36,28 @@ class StorePrinter {
 
   /// Network printers print straight to port 9100, no print dialog.
   bool get direct => connection == 'lan';
-  String get host => address.split(':').first;
+  String get host => address.trim().split(':').first;
   int get port => int.tryParse(address.contains(':') ? address.split(':').last : '') ?? 9100;
+
+  /// Where a network printer is, as the person typed it: "192.168.1.50", or with its port when that is not 9100.
+  String get where => port == 9100 ? host : '$host:$port';
+}
+
+/// Why a network printer's address cannot be used, or null when it can: an IPv4 address (each part 0-255) or a host name, with an
+/// optional port (1-65535), for example 192.168.1.50 or 192.168.1.50:9100.
+String? lanAddressError(String address) {
+  final a = address.trim();
+  if (a.isEmpty) return "Enter the printer's IP address, like 192.168.1.50.";
+  final m = RegExp(r'^([^:\s]+)(?::([0-9]{1,5}))?$').firstMatch(a);
+  final port = m?.group(2) == null ? 9100 : int.parse(m!.group(2)!);
+  final host = m?.group(1) ?? '';
+  final ipv4 = RegExp(r'^[0-9]{1,3}(\.[0-9]{1,3}){3}$').hasMatch(host) && host.split('.').every((o) => int.parse(o) <= 255);
+  final name = !RegExp(r'^[0-9.]+$').hasMatch(host) &&
+      host.length <= 253 &&
+      host.split('.').every((l) => RegExp(r'^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$').hasMatch(l));
+  if (m == null || !(ipv4 || name)) return 'The IP address looks wrong. It is four numbers with dots, like 192.168.1.50.';
+  if (port < 1 || port > 65535) return 'The port after ":" must be between 1 and 65535 (most printers use 9100).';
+  return null;
 }
 
 class DevicesApi {
@@ -57,15 +80,18 @@ class DevicesApi {
       StorePrinter(await _rpc.callMap('dev_printer_tested', {'id': id, 'ok': ok, if (note.isNotEmpty) 'note': note}));
 }
 
+/// How long a network printer has to take the connection and the job.
+const printerTimeout = Duration(seconds: 5);
+
 /// Sends raw ESC/POS bytes to a network printer's port (9100). Not on the web (a browser cannot open the socket). Tests replace it.
 Future<void> Function(String host, int port, List<int> bytes) sendRawToPrinter = (host, port, bytes) async {
   if (kIsWeb) throw UnsupportedError('A browser cannot reach the printer directly. Print from the phone app, or use the print dialog.');
-  final s = await Socket.connect(host, port, timeout: const Duration(seconds: 4));
+  final s = await Socket.connect(host, port, timeout: printerTimeout);
   try {
     s.add(bytes);
-    await s.flush();
+    await s.flush().timeout(printerTimeout);
   } finally {
-    await s.close();
+    await s.close().timeout(printerTimeout, onTimeout: () => s.destroy());
   }
 };
 

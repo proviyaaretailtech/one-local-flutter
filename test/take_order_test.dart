@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:vinii_pos/devices/devices_api.dart' show sendRawToPrinter;
 import 'package:vinii_pos/tables/table_order_screen.dart';
 import 'package:vinii_pos/tables/table_widgets.dart';
 import 'package:vinii_pos/tables/tables_api.dart';
@@ -72,6 +73,42 @@ Future<void> showPushed(WidgetTester t, Widget screen) async {
   await t.tap(find.text('tables'));
   await t.pumpAndSettle();
 }
+
+/// The print functions (0658): [printers] as set up in Devices (one network kitchen printer unless a test says otherwise), and the
+/// KOT the database names for the order (`pos_kot_print`; it says REPRINT whenever a ticket id is given).
+http.Response? printing(http.Request r, {List<Map<String, dynamic>>? printers}) => switch (fnOf(r)) {
+      'pos_print_targets' => ok({
+          'printers': printers ??
+              [
+                {'id': 'p-k', 'name': 'Kitchen printer', 'type': 'kot', 'connection': 'lan', 'address': '192.168.1.50', 'paper_mm': 80, 'copies': 1, 'auto_cut': true, 'is_default': true},
+              ],
+          'stations': [],
+          'business': {'name': 'Dosa House'},
+        }),
+      'pos_kot_print' => ok({
+          'ticket_id': argsOf(r)['ticket_id'] ?? 'k-latest', 'kot_no': 2, 'order_id': argsOf(r)['order_id'], 'display_no': 'P-00001', 'channel': 'dine_in',
+          'table_label': 'Table 4', 'sent_at': '2026-10-19T20:36:23Z', 'note': null, 'reprint': argsOf(r)['ticket_id'] != null,
+          'groups': [
+            {'printer_id': printers == null ? 'p-k' : null, 'station': 'Main Kitchen', 'items': [{'name': 'Butter Naan', 'qty': 2, 'takeaway': false, 'cancelled': false}]},
+          ],
+        }),
+      'pos_print_log' => ok({'logged': true}),
+      _ => null,
+    };
+
+/// Replaces the network printer for one test: what reached it, by address ([error]: it refuses).
+List<(String, String)> lanPrinter({Object? error}) {
+  final got = <(String, String)>[];
+  final before = sendRawToPrinter;
+  sendRawToPrinter = (host, port, bytes) async {
+    if (error != null) throw error;
+    got.add(('$host:$port', String.fromCharCodes(bytes)));
+  };
+  addTearDown(() => sendRawToPrinter = before);
+  return got;
+}
+
+String printResult(WidgetTester t) => t.widget<Text>(find.byKey(const ValueKey('kot-print-result'))).data!;
 
 const naan = '47a00000-0000-0000-0000-000000000003';
 const dal = '47a00000-0000-0000-0000-000000000002';
@@ -259,6 +296,77 @@ void main() {
       await t.tap(find.text('Add Items'));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('send-to-kitchen')), findsOneWidget);
+    });
+  });
+
+  // founder, 4 Nov 2026: kitchen tickets never printed. Send KOT prints the new KOT; Print KOT prints the latest one again.
+  group('printing the KOT', () {
+    testWidgets('Send KOT sends the held dishes, then prints that KOT on the kitchen printer (never marked REPRINT) and says so', (t) async {
+      final raw = lanPrinter();
+      final f = Fake(printing);
+      await show(t, TableOrderScreen(env: f.env, tableId: table4));
+      await t.tap(find.text('Send KOT'));
+      await t.pumpAndSettle();
+      expect(find.text('KOT #2 sent'), findsOneWidget);
+      final send = fx['send_held'] as Map;
+      expect(argsOf(f.calls('pos_kot_print').single), {'order_id': send['order_id'], 'ticket_id': (send['kot'] as Map)['ticket_id']});
+      expect(raw.single.$1, '192.168.1.50:9100');
+      expect(raw.single.$2, allOf(contains('KOT #2'), contains('TABLE 4'), contains('2 x Butter Naan'), isNot(contains('REPRINT'))));
+      expect(printResult(t), 'KOT #2 printed on Kitchen printer.');
+      expect(argsOf(f.calls('pos_print_log').single), containsPair('outcome', 'printed'));
+    });
+
+    testWidgets('Send KOT with the kitchen printer off: the KOT is still sent; the print line says why', (t) async {
+      lanPrinter(error: const SocketException('Connection failed', osError: OSError('Connection refused', 61)));
+      final f = Fake(printing);
+      await show(t, TableOrderScreen(env: f.env, tableId: table4));
+      await t.tap(find.text('Send KOT'));
+      await t.pumpAndSettle();
+      expect(find.text('KOT #2 sent'), findsOneWidget, reason: 'the send stands');
+      expect(f.calls('tbl_kot_send'), hasLength(1));
+      expect(printResult(t), 'KOT #2 not printed: Kitchen printer at 192.168.1.50 did not answer (connection refused).');
+      expect(argsOf(f.calls('pos_print_log').single), allOf(containsPair('outcome', 'failed'), containsPair('detail', '192.168.1.50 did not answer (connection refused)')));
+    });
+
+    testWidgets('Send to kitchen from Add dishes prints the new KOT too', (t) async {
+      final raw = lanPrinter();
+      final f = freeTable(printing);
+      await showPushed(t, AddDishesScreen(env: f.env, tableId: table4, tableLabel: 'Table 4'));
+      await t.tap(find.byKey(const ValueKey('plus-$naan')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('send-to-kitchen')));
+      await t.pumpAndSettle();
+      expect(find.text('KOT #1 sent'), findsOneWidget);
+      expect(argsOf(f.calls('pos_kot_print').single)['ticket_id'], ((fx['add_send'] as Map)['kot'] as Map)['ticket_id']);
+      expect(raw, hasLength(1));
+      expect(printResult(t), 'KOT #2 printed on Kitchen printer.');
+    });
+
+    testWidgets('Print KOT prints the table\'s latest KOT on the kitchen printer and says so', (t) async {
+      final raw = lanPrinter();
+      final view = jsonDecode(jsonEncode(fx['order_view_held'])) as Map<String, dynamic>;
+      (view['can'] as Map)['print_kot'] = true;
+      final f = Fake((r) => fnOf(r) == 'tbl_order_view' ? ok(view) : printing(r));
+      await show(t, TableOrderScreen(env: f.env, tableId: table4));
+      await t.tap(find.text('Print KOT'));
+      await t.pumpAndSettle();
+      expect(argsOf(f.calls('pos_kot_print').single), {'order_id': ((view['orders'] as List).single as Map)['id']}, reason: 'the latest ticket');
+      expect(raw.single.$2, contains('KOT #2'));
+      expect(toast('KOT #2 printed on Kitchen printer.'), findsOneWidget);
+      expect(f.calls('tbl_kot_send'), isEmpty);
+    });
+
+    testWidgets('Print KOT with no kitchen printer set up: says so, prints nothing', (t) async {
+      final raw = lanPrinter();
+      final view = jsonDecode(jsonEncode(fx['order_view_held'])) as Map<String, dynamic>;
+      (view['can'] as Map)['print_kot'] = true;
+      final f = Fake((r) => fnOf(r) == 'tbl_order_view' ? ok(view) : printing(r, printers: []));
+      await show(t, TableOrderScreen(env: f.env, tableId: table4));
+      await t.tap(find.text('Print KOT'));
+      await t.pumpAndSettle();
+      expect(toast('No kitchen printer set up. Add one in Settings → Devices.'), findsOneWidget);
+      expect(raw, isEmpty);
+      expect(argsOf(f.calls('pos_print_log').single), containsPair('outcome', 'no_printer'));
     });
   });
 

@@ -11,7 +11,8 @@ import 'devices_api.dart';
 // The customer's printed bill (founder, 1 Nov 2026, after a ticket-style mock-up): the shop's name, "Thank you!", the bill number and
 // amount, date and time, the customer (name, number) with how they paid, the items, the totals (rounded to the rupee by the store's
 // bill settings, the round off shown), and "OneLocal Partner store" at the foot.
-// The same bill as a PDF roll (print dialog) and as ESC/POS (a network receipt printer).
+// The same bill as a PDF roll (print dialog) and as ESC/POS (a network receipt printer). The shop's address, phone and GSTIN print under
+// its name when they are known (`pos_print_targets`, 4 Nov 2026).
 
 /// One bill, as the receipt prints it. Every figure is the server's.
 class BillReceipt {
@@ -36,9 +37,15 @@ class BillReceipt {
     this.tendered,
     this.change = 0,
     this.refunded = 0,
+    this.address = '',
+    this.storePhone = '',
+    this.gstin = '',
   });
 
   final String store, billNo, when, customer, phone, payment;
+
+  /// The shop's address, phone and GSTIN for the header (empty: left out).
+  final String address, storePhone, gstin;
   final String? branch, coupon;
   final List<({String name, num qty, num amount})> lines;
   final num subtotal, gst, gstPct, serviceCharge, discount, roundOff, total, paid, change, refunded;
@@ -50,7 +57,8 @@ class BillReceipt {
   ];
 
   /// The bill the till just took payment for. [customer] and [phone] from the cart win over the order's.
-  factory BillReceipt.fromOrder(OrderView v, {required String store, String? branch, String? customer, String? phone}) {
+  factory BillReceipt.fromOrder(OrderView v,
+      {required String store, String? branch, String? customer, String? phone, String address = '', String storePhone = '', String gstin = ''}) {
     final b = v.bill, p = v.payment;
     final name = (customer ?? '').trim().isNotEmpty ? customer!.trim() : v.customer;
     final method = '${p['method'] ?? ''}';
@@ -74,6 +82,9 @@ class BillReceipt {
       paid: _n(p['settled']) > 0 ? _n(p['settled']) : _n(b['total']),
       tendered: method.toLowerCase().contains('cash') && _n(p['tendered']) > 0 ? _n(p['tendered']) : null,
       change: _n(p['change']),
+      address: address,
+      storePhone: storePhone,
+      gstin: gstin,
     );
   }
 
@@ -193,6 +204,8 @@ Future<Uint8List> billReceiptPdf(BillReceipt r, {int paperMm = 80}) async {
               textAlign: pw.TextAlign.center,
               style: t(7.5, color: _muted),
             ),
+          for (final h in [r.address, if (r.storePhone.isNotEmpty) 'Ph: ${r.storePhone}', if (r.gstin.isNotEmpty) 'GSTIN: ${r.gstin}'])
+            if (h.isNotEmpty) pw.Text(h, textAlign: pw.TextAlign.center, style: t(7, color: _muted)),
           pw.SizedBox(height: 8),
           pw.Text(r.isPaid ? 'Thank you!' : 'Your bill', textAlign: pw.TextAlign.center, style: t(11, strong: true)),
           pw.Text(
@@ -383,6 +396,13 @@ List<int> billEscPos(BillReceipt r, {required StorePrinter printer}) {
   big(false);
   bold(false);
   if (r.branch != null && r.branch!.isNotEmpty) line(r.branch!);
+  if (r.address.isNotEmpty) {
+    for (var a = r.address; a.isNotEmpty; a = a.length > cols ? a.substring(cols) : '') {
+      line(a.length > cols ? a.substring(0, cols) : a);
+    }
+  }
+  if (r.storePhone.isNotEmpty) line('Ph: ${r.storePhone}');
+  if (r.gstin.isNotEmpty) line('GSTIN: ${r.gstin}');
   line();
   bold(true);
   line(r.isPaid ? 'Thank you!' : 'Your bill');

@@ -16,6 +16,9 @@ class TablesApi {
 
   final RpcClient _rpc;
 
+  /// The server door, for printing through it (lib/devices/printer_router.dart).
+  RpcClient get rpc => _rpc;
+
   /// The store the screens look at; null lets the database pick the person's main store.
   String? locationId;
 

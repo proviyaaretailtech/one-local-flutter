@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../devices/printer_router.dart' show PrintResult, printSentKot;
 import '../inventory/inventory_api.dart';
 import '../ui/theme.dart';
 import 'dish_options_sheet.dart';
@@ -257,7 +258,7 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Builder(builder: (_) {
                     final size = _sizeOf(k) == null ? null : i.l('variants').where((v) => v.s('id') == _sizeOf(k)).firstOrNull?.s('name');
-                    final what = [if (size != null) size, if ((_extras[k]?.summary ?? '').isNotEmpty) _extras[k]!.summary].join(' · ');
+                    final what = [?size, if ((_extras[k]?.summary ?? '').isNotEmpty) _extras[k]!.summary].join(' · ');
                     return Text(what.isEmpty ? 'Plain' : what, key: ValueKey('line-$k'), style: inter(13, 600));
                   }),
                   Text('${rupees(_priceOf(k))} each', style: inter(12, 500, color: kMuted)),
@@ -403,7 +404,9 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
       if (!mounted) return;
       final kot = r.mo('kot');
       if (send && kot != null) {
-        await Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => SentToKitchenScreen(env: widget.env, tableLabel: widget.tableLabel, kot: kot)));
+        final printing = printSentKot(widget.env.api.rpc, r.raw);
+        await Navigator.of(context)
+            .pushReplacement(MaterialPageRoute(builder: (_) => SentToKitchenScreen(env: widget.env, tableLabel: widget.tableLabel, kot: kot, printing: printing)));
       } else {
         Navigator.of(context).pop(true);
         showToast(context, 'Saved on ${widget.tableLabel}. Send to the kitchen when ready.');
@@ -539,7 +542,7 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
               const SizedBox(height: 2),
               Text(q == 0 ? rupees(i.n('price')) : rupees(i.n('price') * q), style: inter(14, 700, color: kInk)),
               if (q > 0) ...[
-                Text(['Quantity $q', if (note != null) note].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11.5, 500, color: kMuted)),
+                Text(['Quantity $q', ?note].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11.5, 500, color: kMuted)),
                 Row(mainAxisSize: MainAxisSize.min, children: [
                   const Icon(LucideIcons.pencilLine, size: 12, color: kLink),
                   const SizedBox(width: 4),
@@ -572,12 +575,14 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
   }
 }
 
-/// Figma "Sent to kitchen": KOT #N sent, how many dishes, station and time, Back to tables.
+/// Figma "Sent to kitchen": KOT #N sent, how many dishes, station and time, Back to tables; then what the kitchen printer did with it
+/// ([printing], 4 Nov 2026): printed, or why not, in its own line (the KOT is in the kitchen either way).
 class SentToKitchenScreen extends StatelessWidget {
-  const SentToKitchenScreen({super.key, required this.env, required this.tableLabel, required this.kot});
+  const SentToKitchenScreen({super.key, required this.env, required this.tableLabel, required this.kot, this.printing});
   final TablesEnv env;
   final String tableLabel;
   final Facts kot;
+  final Future<PrintResult>? printing;
   @override
   Widget build(BuildContext context) {
     final n = kot.n('dishes').toInt();
@@ -612,6 +617,29 @@ class SentToKitchenScreen extends StatelessWidget {
             _kv('Time', at == null ? '—' : clock12Padded(at)),
           ]),
         ),
+        if (printing != null)
+          FutureBuilder<PrintResult>(
+            future: printing,
+            builder: (context, s) {
+              final r = s.data;
+              final ok = r?.printed ?? false;
+              final color = r == null ? kMuted : (ok ? _kGreen : r.ok ? kInk : kError);
+              return Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(r == null || r.ok ? LucideIcons.printer : LucideIcons.triangleAlert, size: 18, color: color),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      r?.message ?? (s.hasError ? 'The KOT could not be printed.' : 'Printing KOT #${kot.n('kot_no').toInt()}…'),
+                      key: const ValueKey('kot-print-result'),
+                      style: inter(14, 600, color: color),
+                    ),
+                  ),
+                ]),
+              );
+            },
+          ),
         const SizedBox(height: 22),
         DarkButton('Back to tables', key: const ValueKey('back-to-tables'), onPressed: () => Navigator.of(context).pop(true)),
       ],
@@ -646,10 +674,12 @@ class _ReadyToServeScreenState extends State<ReadyToServeScreen> {
   Future<void> _load() async {
     try {
       final d = await widget.env.api.readyList();
-      if (mounted) setState(() {
-        _d = d;
-        _error = null;
-      });
+      if (mounted) {
+        setState(() {
+          _d = d;
+          _error = null;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _error = sayError(e));
     }

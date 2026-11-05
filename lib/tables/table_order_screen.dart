@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../devices/printer_router.dart';
 import '../inventory/inventory_api.dart';
 import '../ui/theme.dart';
 import 'actions_screen.dart';
@@ -18,7 +19,8 @@ import 'take_order_screens.dart';
 
 /// Figma "Table T12 Order" (screen-order-detail), reworked 28 Oct 2026: the open order of a table drawn as its printed bill, with the order's actions under it:
 /// Add Items, Send KOT, Print KOT, Change Table, Merge Table, Generate Bill. Which buttons work comes from the server (`can`); the ones it
-/// switches off say why. Add Items opens Add dishes and Send KOT sends the held dishes (0485); Generate Bill uses the order status move.
+/// switches off say why. Add Items opens Add dishes and Send KOT sends the held dishes (0485) and prints the new KOT; Print KOT prints the
+/// table's latest KOT again on the kitchen printers (0658); Generate Bill uses the order status move.
 /// switches off say why. Send KOT and Generate Bill use the existing order status move; the database checks the transition.
 /// Generate Bill then opens the restaurant Checkout ("Bill and pay", 0550); once a bill is generated the button reads Take Payment.
 class TableOrderScreen extends StatefulWidget {
@@ -125,12 +127,26 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
     try {
       final r = await widget.env.api.sendHeld(widget.tableId, key: _sendKey ??= TablesApi.newKey());
       _sendKey = null;
-      if (mounted) await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SentToKitchenScreen(env: widget.env, tableLabel: label, kot: r.m('kot'))));
+      final printing = printSentKot(widget.env.api.rpc, r.raw); // the KOT is sent; its print is said on the next screen
+      if (mounted) {
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SentToKitchenScreen(env: widget.env, tableLabel: label, kot: r.m('kot'), printing: printing)));
+      }
     } catch (e) {
       if (mounted) showToast(context, sayError(e));
     }
     if (mounted) setState(() => _busy = false);
     await _load();
+  }
+
+  // Print KOT: the table's latest KOT (the order of the highest KOT number) on the printer of each station on it.
+  Future<void> _printKot() async {
+    final d = _d!;
+    final sent = d.l('items').where((i) => i.b('sent') && (i.so('order_id') ?? '').isNotEmpty).toList()..sort((a, b) => a.n('kot_no').compareTo(b.n('kot_no')));
+    final orderId = sent.lastOrNull?.s('order_id') ?? d.l('orders').lastOrNull?.so('id');
+    if (orderId == null) return _off('print_kot');
+    setState(() => _busy = true);
+    await printAndSay(context, PrinterRouter.of(widget.env.api.rpc).printKot(orderId));
+    if (mounted) setState(() => _busy = false);
   }
 
   void _off(String key) => showToast(context, _d?.m('unavailable').so(key) ?? 'Not available right now.');
@@ -198,7 +214,7 @@ class _TableOrderScreenState extends State<TableOrderScreen> {
                 if (mounted) _load();
               }),
               tile('Send KOT', 'send_kot', LucideIcons.send, const Color(0xFFEA580C), _sendHeld),
-              tile('Print KOT', 'print_kot', LucideIcons.printer, const Color(0xFF2563EB), () {}),
+              tile('Print KOT', 'print_kot', LucideIcons.printer, const Color(0xFF2563EB), _printKot),
               tile('Change Table', 'change_table', LucideIcons.arrowLeftRight, const Color(0xFF7C3AED), () => runTransfer(context, widget.env, from: t!, bill: d.no('subtotal'), then: _load)),
               tile('Merge Table', 'merge_table', LucideIcons.merge, const Color(0xFF0D9488), () async {
                 await Navigator.of(context).push(MaterialPageRoute(builder: (_) => MergeScreen(env: widget.env, startTableId: widget.tableId)));

@@ -17,6 +17,9 @@ class BillApi {
   final RpcClient _rpc;
   String? locationId;
 
+  /// The server door, for printing through it (lib/devices/printer_router.dart).
+  RpcClient get rpc => _rpc;
+
   static final _rand = Random.secure();
   static String newKey() => 'rst-${List.generate(16, (_) => _rand.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
 

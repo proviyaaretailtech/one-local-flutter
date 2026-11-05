@@ -4,6 +4,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/net_guard.dart';
+import '../devices/bill_receipt.dart';
+import '../devices/printer_router.dart' show PrinterRouter, printAndSay;
+import '../inventory/inventory_api.dart' show Facts;
 import '../home/home_nav.dart';
 import '../tables/admin_pin.dart' show withAdminPin;
 import '../tables/bill_adjust.dart' show BillMoneyScreen;
@@ -89,6 +92,31 @@ class _OrderScreenState extends State<OrderScreen> {
   Future<void> _act(String action, {List<Map<String, dynamic>>? lines, Map<String, String>? delivery, String? note, String? reason}) =>
       _run(() => _api.act(_v!.id, action, version: _v!.version, lines: lines, delivery: delivery, note: note, reason: reason));
 
+  /// Print (4 Nov 2026): the bill on the receipt printer set up in Devices (ESC/POS on a network printer, else the print dialog), with
+  /// the business's name, outlet, address, phone and GSTIN at the top; the screen says what happened.
+  Future<void> _print(OrderView v) async {
+    BillReceipt bill(Facts b) => BillReceipt.fromOrder(
+          v,
+          store: (b.so('name') ?? '').isNotEmpty ? b.s('name') : HomeNav.storeName ?? 'OneLocal',
+          branch: b.so('outlet'),
+          address: b.s('address'),
+          storePhone: b.s('phone'),
+          gstin: b.s('gstin'),
+        );
+    final paid = (num.tryParse('${v.payment['settled'] ?? ''}') ?? 0) > 0;
+    await printAndSay(
+      context,
+      PrinterRouter.of(_api.rpc).printReceipt(
+        kind: paid ? 'receipt' : 'bill',
+        what: 'bill',
+        title: 'Bill ${v.displayNo}',
+        orderId: v.id,
+        escPos: (p, b) => billEscPos(bill(b), printer: p),
+        pdf: (p, b) => billReceiptPdf(bill(b), paperMm: p?.paperMm ?? 80),
+      ),
+    );
+  }
+
   Future<void> _onAction(String id) async {
     final v = _v!;
     switch (id) {
@@ -121,7 +149,7 @@ class _OrderScreenState extends State<OrderScreen> {
         final reason = await _textSheet('Reject order', 'Why can this order not be made?', 'Reject order');
         if (reason != null) await _act('online_reject', reason: reason);
       case 'print':
-        showToast(context, 'No receipt printer is connected to this device yet.');
+        await _print(v);
       case 'whatsapp':
         final uri = whatsAppLink('', v.receiptText);
         if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) showToast(context, 'WhatsApp could not be opened.');

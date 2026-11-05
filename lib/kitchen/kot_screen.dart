@@ -5,6 +5,7 @@ import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
+import '../devices/printer_router.dart' show PrinterRouter, printAndSay;
 import '../inventory/inventory_api.dart' show Facts;
 import '../orders/order_screen.dart';
 import '../orders/orders_api.dart' show rupees;
@@ -114,9 +115,10 @@ class _KotScreenState extends State<KotScreen> {
         if (mounted) showToast(context, '#${o.s('display_no')} served.');
       });
 
+  /// Print latest KOT (0658): the order's latest KOT on the printer of each station on it; the screen says what happened.
   Future<void> _print(Facts o) => _run(o, () async {
-        await widget.env.api.act(o.s('latest_ticket'), 'print');
-        if (mounted) showToast(context, 'Latest KOT of #${o.s('display_no')} sent to the printer.');
+        final r = await printAndSay(context, PrinterRouter.of(widget.env.api.rpc).printKot(o.s('id')));
+        if (r.ok && o.so('latest_ticket') != null) await widget.env.api.noteReprint(o.s('latest_ticket'));
       });
 
   /// Cancel item (0640): dishes already on this order's KOTs, how many and why; the kitchen is told at once (a manager approves a dish

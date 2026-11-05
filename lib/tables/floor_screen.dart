@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../devices/printer_router.dart' show printSentKot;
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../menu/menu_widgets.dart' show CanMakeLabel, FoodTypeMark;
@@ -327,7 +328,8 @@ class _FloorScreenState extends State<FloorScreen> {
       final no = r.mo('order')?.so('display_no');
       final shown = onTable || no == null ? label : '$label $no';
       if (send && kot != null) {
-        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SentToKitchenScreen(env: env, tableLabel: shown, kot: kot)));
+        final printing = printSentKot(env.api.rpc, r.raw); // the KOT is sent; its print is said on the next screen
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SentToKitchenScreen(env: env, tableLabel: shown, kot: kot, printing: printing)));
       } else {
         showToast(context, onTable ? 'Saved on $label. Send to the kitchen when ready.' : '$shown held. Send it to the kitchen from Orders → ${_mode == 'delivery' ? 'On call delivery' : 'Takeaway'}.');
       }

@@ -5,6 +5,7 @@ import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
+import '../devices/printer_router.dart' show PrinterRouter, printAndSay;
 import '../inventory/inventory_api.dart' show Facts;
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -154,13 +155,13 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
   List<Facts> get _shown => _filter == 'all' ? _cards : [for (final c in _cards) if (_status(c) == _filter) c];
 
   Future<void> _act(Facts card, String action, {String? itemId}) async {
+    if (action == 'print') return _print(card);
     final id = card.s('card_id');
     if (_busy.contains(id)) return;
     setState(() => _busy.add(id));
     _rev.value++;
     try {
       await env.api.act(card.s('id'), action, station: card.s('station'), itemId: itemId, version: card.s('version'));
-      if (action == 'print' && mounted) showToast(context, 'KOT ${card.raw['kot_no']} sent to the printer.');
     } on KitchenApiException catch (e) {
       if (mounted) showToast(context, e.stale ? 'This ticket changed on another screen. Showing the latest.' : e.message);
     } catch (_) {
@@ -169,6 +170,19 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
     if (mounted) setState(() => _busy.remove(id));
     _rev.value++;
     await _load();
+  }
+
+  /// Print KOT (0658): this card's dishes on its station's kitchen printer, and the board says what happened; a real print is then noted
+  /// as a reprint on the order.
+  Future<void> _print(Facts card) async {
+    final id = card.s('card_id');
+    if (_busy.contains(id)) return;
+    setState(() => _busy.add(id));
+    _rev.value++;
+    final r = await printAndSay(context, PrinterRouter.of(env.api.rpc).printKot(card.s('order_id'), ticketId: card.s('id'), stationName: card.so('station_name')));
+    if (r.ok) await env.api.noteReprint(card.s('id'), station: card.s('station'), version: card.s('version'));
+    if (mounted) setState(() => _busy.remove(id));
+    _rev.value++;
   }
 
   /// Hand over: the card is made ready (when it is not yet) and served, one after the other.

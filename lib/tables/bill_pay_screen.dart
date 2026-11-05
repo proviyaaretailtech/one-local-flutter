@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../devices/printer_router.dart' show PrinterRouter, printAndSay;
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart' show qty;
 import '../ui/mobile_input.dart';
@@ -232,11 +233,14 @@ class _BillPayScreenState extends State<BillPayScreen> {
     if (!await _open(uri) && mounted) showToast(context, channel == 'whatsapp' ? 'WhatsApp could not be opened.' : 'The SMS app could not be opened.');
   }
 
-  /// Sends the bill to the printer as the 80 mm slip.
+  /// Prints the bill on the receipt printer set up in Devices (or the print dialog) and says what happened. One print per tap.
+  bool _printing = false;
   Future<void> _printBill() async {
     final o = _order;
-    if (o == null) return;
-    if (!await printBillSlip(view: _v!, order: o) && mounted) showToast(context, 'Could not open the printer. Try again.');
+    if (o == null || _printing) return;
+    _printing = true;
+    await printAndSay(context, printBillSlip(PrinterRouter.of(_api.rpc), view: _v!, order: o));
+    _printing = false;
   }
 
   @override

@@ -21,3 +21,13 @@ export const Save = z.object({
 }).strict();
 export const Remove = z.object({ id }).strict();
 export const Tested = z.object({ id, ok: z.boolean(), note: z.string().trim().max(120).optional() }).strict();
+
+// ---- printing (0658)
+const uid = z.string({ message: 'Not a valid id.' }).regex(/^[0-9a-f-]{36}$/i, 'Not a valid id.');
+export const PrintTargets = z.object({ location_id: uid.nullish() }).loose();
+export const KotPrint = z.object({ order_id: uid, ticket_id: uid.nullish() }).loose();
+export const PrintLog = z.object({
+  kind: z.enum(['kot', 'bill', 'receipt', 'test'], { message: 'Unknown print kind.' }),
+  outcome: z.enum(['printed', 'failed', 'no_printer', 'dialog'], { message: 'Unknown print outcome.' }),
+  order_id: uid.nullish(), ticket_id: uid.nullish(), printer_id: uid.nullish(), detail: z.string().max(200).nullish(),
+}).loose();

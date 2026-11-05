@@ -19,8 +19,18 @@ FakeServer server({int status = 200, String? refusal}) => FakeServer((r) {
       if (p.endsWith('/rpc/rst_channel_orders')) return ok(sources());
       if (p.endsWith('/rpc/pos_orders_board')) return ok(board());
       if (p.endsWith('/rpc/rst_hold_send')) {
-        return refusal != null ? err(status, refusal) : ok({'order_id': 'x', 'display_no': 'P-00001', 'kot': {'kot_no': 7, 'dishes': 2}, 'status': 'sent_to_kitchen', 'replayed': false});
+        return refusal != null
+            ? err(status, refusal)
+            : ok({'order_id': 'x', 'display_no': 'P-00001', 'kot': {'ticket_id': 'k7', 'kot_no': 7, 'dishes': 2}, 'status': 'sent_to_kitchen', 'replayed': false});
       }
+      // 0658: the KOT just sent prints on the kitchen printer (none set up here)
+      if (p.endsWith('/rpc/pos_print_targets')) return ok({'printers': [], 'stations': [], 'business': {}});
+      if (p.endsWith('/rpc/pos_kot_print')) {
+        return ok({'ticket_id': 'k7', 'kot_no': 7, 'order_id': 'x', 'display_no': 'P-00001', 'channel': 'pickup', 'reprint': false, 'groups': [
+          {'printer_id': null, 'station': 'Main Kitchen', 'items': [{'name': 'Masala Dosa', 'qty': 2}]},
+        ]});
+      }
+      if (p.endsWith('/rpc/pos_print_log')) return ok({'logged': true});
       return err(404, 'not in this fake: $p');
     });
 
@@ -40,7 +50,9 @@ void main() {
     final sent = s.where('POST', '/rpc/rst_hold_send').single;
     expect(jsonDecode(sent.body), containsPair('order_id', (sources()['orders'] as List).firstWhere((o) => o['display_no'] == 'P-00001')['id']));
     expect(jsonDecode(sent.body)['idempotency_key'], isNotEmpty);
-    expect(toast('#P-00001 sent to the kitchen · KOT 7.'), findsOneWidget);
+    expect(toast('#P-00001 sent to the kitchen · KOT 7. No kitchen printer set up. Add one in Settings → Devices.'), findsOneWidget,
+        reason: 'the send, then what the kitchen printer did with it');
+    expect(jsonDecode(s.where('POST', '/rpc/pos_kot_print').single.body), {'order_id': 'x', 'ticket_id': 'k7'});
   });
 
   testWidgets('a held delivery under On call delivery also offers Send to kitchen, not Accept', (t) async {
