@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
 import '../customers/customer_picker.dart';
+import '../devices/printer_router.dart' show printSentKot;
 import '../customers/customers_api.dart';
 import '../home/home_nav.dart';
 import '../tables/bill_api.dart' show BillApi;
@@ -258,10 +259,15 @@ class _CartScreenState extends State<CartScreen> {
         await _syncHeld('$key:lines');
       }
       final id = _heldId!;
-      await _api.sendHeld(id, key: '$key:send');
+      final sent = await _api.sendHeld(id, key: '$key:send');
+      final printing = printSentKot(_api.rpc, sent); // the KOT on the kitchen printers; what happened shows over the Checkout
       await _linkCustomer(id);
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => BillPayScreen(env: TablesEnv(), tableId: '', orderId: id, bill: widget.bill)));
+      final nav = Navigator.of(context);
+      nav.pushReplacement(MaterialPageRoute(builder: (_) => BillPayScreen(env: TablesEnv(), tableId: '', orderId: id, bill: widget.bill)));
+      printing?.then((p) {
+        if (nav.mounted) showToast(nav.context, p.message);
+      });
     } catch (e) {
       if (mounted) showToast(context, errorSentence(e));
     } finally {

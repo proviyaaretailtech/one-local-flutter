@@ -8,8 +8,13 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../api/rpc_client.dart';
+import '../devices/devices_api.dart' show StorePrinter, escPosTestSlip, lanAddressError;
+import '../devices/print_service.dart' show forgetPrinters, tsplLabels;
+import '../devices/printer_router.dart';
+import '../devices/usb_printer.dart' show usbPrintingOn;
+import '../home/home_nav.dart';
 import '../inventory/inventory_api.dart' show Facts;
-import '../tables/rst_print_direct.dart' show printsDirect, sendToPrinter, escPosTestSlip, DirectPrintException;
+import '../stock/label_pdf.dart' show LabelData;
 import '../tables/table_widgets.dart' show sayError, kLimeBtn;
 import '../ui/app_header.dart';
 import '../ui/i18n.dart';
@@ -21,6 +26,9 @@ class RstDevicesApi {
   RstDevicesApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc})
       : _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken);
   final RpcClient _rpc;
+
+  /// The server door, for printing through it (lib/devices/printer_router.dart).
+  RpcClient get rpc => _rpc;
   Future<Facts> _call(String fn, Map<String, Object?> args) async => Facts(await _rpc.callMap(fn, {...args}..removeWhere((_, v) => v == null)));
 
   Future<Facts> list() => _call('rst_devices_list', {});
@@ -34,11 +42,15 @@ const _kinds = [('receipt', 'Receipts', 'Bills for customers', LucideIcons.recei
 const _sections = {'receipt': 'Receipt printers', 'kot': 'Kitchen printers (KOT)', 'label': 'Barcode label printers'};
 const _connections = [('lan', 'Network (Wi-Fi / LAN)'), ('bluetooth', 'Bluetooth'), ('usb', 'USB'), ('system', "Phone's print service")];
 const _labelSizes = ['38x25', '50x25', '50x30', '75x50', '100x50'];
+bool _cannotPrint(String c) => c == 'bluetooth' || (c == 'usb' && !usbPrintingOn());
 String _connName(String c) => _connections.firstWhere((x) => x.$1 == c, orElse: () => (c, c)).$2;
 
 /// Settings → Devices for a restaurant (founder, 1 Nov 2026, like the store's): the printers for receipts, kitchen tickets (KOT) and
-/// barcode labels, how each connects, its paper or label size, copies, and which is the default for its job. Test print sends a test
-/// page through the phone's print system and marks the printer tested; a kitchen printer added here can be chosen for a kitchen station.
+/// barcode labels, how each connects, its paper or label size, copies, and which is the default for its job; a kitchen printer added
+/// here can be chosen for a kitchen station. These are the printers the app prints on (4 Nov 2026, lib/devices/printer_router.dart).
+/// Test print: a network or USB printer gets a test slip straight away and is marked tested when the slip went out (the screen says
+/// exactly why when it did not); the phone's print service opens the print dialog, then asks whether it printed; Bluetooth printers
+/// are not supported by this build (nor USB outside the restaurant's Android app), and it says so. Every test is recorded (`pos_print_log`).
 /// Sends a test page to the print dialog; true when it was printed (or sent), false when the dialog was cancelled. Tests replace it.
 Future<bool> Function(Uint8List pdf, String name) printTestPagePdf = (pdf, name) => Printing.layoutPdf(onLayout: (_) async => pdf, name: name);
 
@@ -53,7 +65,7 @@ class RstDevicesScreen extends StatefulWidget {
 class _RstDevicesScreenState extends State<RstDevicesScreen> {
   late final RstDevicesApi _api = widget.api ?? RstDevicesApi();
   Facts? _d;
-  String? _error;
+  String? _error, _testing;
 
   @override
   void initState() {
@@ -62,6 +74,7 @@ class _RstDevicesScreenState extends State<RstDevicesScreen> {
   }
 
   Future<void> _load() async {
+    forgetPrinters(); // printing picks up a change at once
     try {
       final d = await _api.list();
       if (mounted) {
@@ -83,16 +96,21 @@ class _RstDevicesScreenState extends State<RstDevicesScreen> {
   /// Test print (founder, 3 Nov 2026: it marked a printer tested even when the print dialog was cancelled): a cancelled dialog marks
   /// nothing, and the printer is marked tested only when the person says the test page came out (a browser cannot tell).
   Future<void> _test(Facts p) async {
+    final printer = StorePrinter(p.raw), router = PrinterRouter.of(_api.rpc);
+    final conn = p.s('connection');
+    if (_cannotPrint(conn)) {
+      showToast(context, notSupported(conn));
+      return router.log('test', PrintResult('failed', '', printerId: p.s('id'), detail: '$conn printers are not supported yet'));
+    }
+    if (conn == 'lan' || conn == 'usb') return _testDirect(printer, router);
     try {
-      // 4 Nov 2026: a USB or network receipt/kitchen printer gets the slip straight away (Android's print screen cannot find them)
-      if (p.s('type') != 'label' && printsDirect(p)) {
-        await sendToPrinter(p, escPosTestSlip(p));
-      } else {
-        final sent = await printTestPagePdf(await printerTestPage(p), 'Test ${p.s('name')}.pdf');
-        if (!mounted) return;
-        if (!sent) return showToast(context, tr('Not printed. The printer is not marked as tested.'));
-      }
+      final sent = await printTestPagePdf(await printerTestPage(p), 'Test ${p.s('name')}.pdf');
       if (!mounted) return;
+      if (!sent) {
+        await router.log('test', PrintResult('failed', '', printerId: p.s('id'), detail: 'the print dialog was closed'));
+        if (mounted) showToast(context, tr('Not printed. The printer is not marked as tested.'));
+        return;
+      }
       final yes = await showOlDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
@@ -105,13 +123,38 @@ class _RstDevicesScreenState extends State<RstDevicesScreen> {
         ),
       );
       if (!mounted) return;
-      if (yes != true) return showToast(context, tr('Not marked as tested. Check the printer and its connection, then try again.'));
+      if (yes != true) {
+        await router.log('test', PrintResult('failed', '', printerId: p.s('id'), detail: 'sent to the print dialog; nothing came out'));
+        if (mounted) showToast(context, tr('Not marked as tested. Check the printer and its connection, then try again.'));
+        return;
+      }
       await _api.tested(p.s('id'));
+      await router.log('test', PrintResult('printed', '', printerId: p.s('id')));
       if (mounted) showToast(context, tr('Marked as tested.'));
       _load();
     } catch (e) {
-      if (mounted) showToast(context, e is DirectPrintException ? tr(e.message) : sayError(e));
+      if (mounted) showToast(context, sayError(e));
     }
+  }
+
+  /// A network or USB printer's test: the ESC/POS test slip (a label printer: one TSPL test label) straight to it. Marked tested only when
+  /// it was written to the printer.
+  Future<void> _testDirect(StorePrinter p, PrinterRouter router) async {
+    if (p.connection == 'lan' && printingInBrowser) return showToast(context, tr('A browser cannot reach a network printer. Test it from the phone or tablet app on the shop\'s Wi-Fi.'));
+    setState(() => _testing = p.id);
+    List<int> slip() => p.type == 'label'
+        ? tsplLabels([(const LabelData(name: 'OneLocal test label', priceMinor: 0, code: '000000000000', systemCode: 'TEST'), 1)], printer: p)
+        : escPosTestSlip(store: HomeNav.storeName ?? '', printer: p);
+    final r = await router.send(p, what: 'Test page', escPos: slip, pdf: () async => Uint8List(0), title: 'Test ${p.name}');
+    await router.log('test', r);
+    try {
+      if (r.printed) await _api.tested(p.id);
+      if (mounted) showToast(context, r.printed ? '${r.message} ${tr('Marked as tested.')}' : '${r.message} ${tr('Not marked as tested.')}');
+    } catch (e) {
+      if (mounted) showToast(context, '${r.message} ${sayError(e)}');
+    }
+    if (mounted) setState(() => _testing = null);
+    _load();
   }
 
   @override
@@ -159,7 +202,7 @@ class _RstDevicesScreenState extends State<RstDevicesScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                          tr("USB and network (Wi-Fi / LAN) printers print straight from the app: plug the USB printer in (an OTG adapter on a phone) and allow access when Android asks. Bluetooth printers print through the phone's print service, which needs the printer maker's print app. A kitchen printer added here can be picked for a kitchen station in Kitchen setup."),
+                          tr("Network (Wi-Fi / LAN) printers print straight from this phone or tablet on the shop's Wi-Fi: kitchen tickets, bills and test pages. \"Phone's print service\" prints through the print dialog. USB printers print straight from the Android app: plug the printer in (an OTG adapter on a phone) and allow access when Android asks. Bluetooth does not print from this app yet. A kitchen printer added here can be picked for a kitchen station in Kitchen setup."),
                           style: inter(13, 500, color: const Color(0xFF2F6B0E), height: 1.4)),
                     ),
                   ]),
@@ -229,7 +272,9 @@ class _RstDevicesScreenState extends State<RstDevicesScreen> {
           style: inter(12.5, 500, color: p.so('tested_at') == null ? kMuted : const Color(0xFF15803D)),
         ),
         isThreeLine: true,
-        trailing: TextButton(key: ValueKey('printer-test-${p.s('id')}'), onPressed: () => _test(p), child: Text(tr('Test print'), style: inter(13.5, 800, color: kInk))),
+        trailing: _testing == p.s('id')
+            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: kInk))
+            : TextButton(key: ValueKey('printer-test-${p.s('id')}'), onPressed: _testing != null ? null : () => _test(p), child: Text(tr('Test print'), style: inter(13.5, 800, color: kInk))),
         ),
       ),
     );
@@ -277,7 +322,7 @@ class RstPrinterFormScreen extends StatefulWidget {
 class _RstPrinterFormScreenState extends State<RstPrinterFormScreen> {
   late final Facts? _p = widget.printer;
   late String _type = _p?.s('type') ?? widget.kind ?? 'receipt';
-  late String _conn = _p?.s('connection') ?? 'bluetooth';
+  late String _conn = _p?.s('connection') ?? 'lan';
   late int _paper = (_p?.n('paper_mm') ?? 80).toInt();
   late String _label = (_p?.so('label_size') ?? '50x25');
   late int _copies = (_p?.n('copies') ?? 1).toInt();
@@ -298,7 +343,8 @@ class _RstPrinterFormScreenState extends State<RstPrinterFormScreen> {
 
   Future<void> _save() async {
     if (_name.text.trim().isEmpty) return setState(() => _error = tr('Give the printer a name.'));
-    if (_conn == 'lan' && _address.text.trim().isEmpty) return setState(() => _error = tr("Enter the printer's IP address, like 192.168.1.50."));
+    final bad = _conn == 'lan' ? lanAddressError(_address.text) : null;
+    if (bad != null) return setState(() => _error = tr(bad));
     setState(() {
       _busy = true;
       _error = null;
@@ -310,7 +356,9 @@ class _RstPrinterFormScreenState extends State<RstPrinterFormScreen> {
         'paper_mm': _type == 'label' ? null : _paper, 'label_size': _type == 'label' ? _label : null, 'copies': _copies,
         'auto_cut': _type == 'label' ? null : _cut, 'is_default': _default,
       });
-      if (mounted) Navigator.of(context).pop(true);
+      if (!mounted) return;
+      if (_cannotPrint(_conn)) showToast(context, '${tr('Saved.')} ${notSupported(_conn)}');
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -388,10 +436,19 @@ class _RstPrinterFormScreenState extends State<RstPrinterFormScreen> {
                 key: const ValueKey('printer-address'),
                 controller: _address,
                 keyboardType: TextInputType.url,
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.:]'))],
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z.:-]'))],
                 decoration: _field('For example 192.168.1.50'),
               ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(tr('The phone or tablet must be on the same Wi-Fi. Add :port only if the printer does not use 9100.'), style: inter(12.5, 500, color: kMuted)),
+              ),
             ],
+            if (_cannotPrint(_conn))
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(notSupported(_conn), key: const ValueKey('printer-conn-unsupported'), style: inter(13.5, 600, color: kError)),
+              ),
             if (_conn == 'bluetooth') ...[
               _label0("Printer's Bluetooth name (optional)"),
               TextField(key: const ValueKey('printer-address'), controller: _address, decoration: _field('For example RPP02N')),

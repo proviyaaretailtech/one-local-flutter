@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api/net_guard.dart';
+import '../devices/printer_router.dart' show printSentKot;
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import '../ui/mobile_input.dart';
@@ -191,14 +192,21 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
     if (!_accepting.add(o.id)) return;
     if (mounted) setState(() {});
     try {
-      await _api.acceptOrder(o.id, auto: auto);
-      if (mounted) showToast(context, '${auto ? 'Auto-accepted' : 'Accepted'} #${o.displayNo} · ${o.customer}. Sent to the kitchen.');
+      final r = await _api.acceptOrder(o.id, auto: auto);
+      final said = '${auto ? 'Auto-accepted' : 'Accepted'} #${o.displayNo} · ${o.customer}. Sent to the kitchen.';
+      if (mounted) showToast(context, said);
+      _printSent(r, said); // only the screen that fired the KOT prints it (an order accepted elsewhere answers no KOT)
     } catch (e) {
       if (mounted && !auto) showToast(context, errorSentence(e));
     }
     _accepting.remove(o.id);
     await _loadSources();
   }
+
+  /// The KOT a send or an accept just fired, on the kitchen printers; the toast then says both: what was sent ([said]) and the print.
+  void _printSent(Map<String, dynamic> answer, String said) => printSentKot(_api.rpc, answer)?.then((p) {
+        if (mounted) showToast(context, '$said ${p.message}');
+      });
 
   /// Send to kitchen (0643): a takeaway or delivery order held on the floor gets its KOT. One key per order, kept for a retry.
   final _sendKeys = <String, String>{};
@@ -209,7 +217,9 @@ class _OrdersBoardScreenState extends State<OrdersBoardScreen> {
       final r = await _api.sendHeld(o.id, key: _sendKeys[o.id] ??= OrdersApi.newKey());
       _sendKeys.remove(o.id);
       final kot = (r['kot'] as Map?)?['kot_no'];
-      if (mounted) showToast(context, '#${o.displayNo} sent to the kitchen${kot == null ? '' : ' · KOT $kot'}.');
+      final said = '#${o.displayNo} sent to the kitchen${kot == null ? '' : ' · KOT $kot'}.';
+      if (mounted) showToast(context, said);
+      _printSent(r, said);
     } catch (e) {
       if (mounted) showToast(context, errorSentence(e));
     }

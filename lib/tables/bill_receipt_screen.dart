@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../devices/printer_router.dart' show PrinterRouter, printAndSay;
 import '../inventory/inventory_api.dart';
 import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
@@ -14,9 +15,8 @@ import '../ui/motion.dart';
 
 /// Figma Journey 5 "Send receipt" (node 18:811), step 5: Print (the store's counter receipt printer), WhatsApp, SMS, Email, Back to tables.
 /// The receipt is the paid bill as the database keeps it (`rst_receipt_view`); each print or send is recorded on the order with the number or
-/// address masked (`rst_receipt_log`). WhatsApp, SMS and email open the phone's own app with the receipt text; Print sends the slip to the
-/// receipt printer (founder, 5 Nov 2026: the test print came but the bill did not, because Print here only copied the text). A print that
-/// fails says why and is not recorded as sent.
+/// address masked (`rst_receipt_log`). WhatsApp, SMS and email open the phone's own app with the receipt text. Print (4 Nov 2026) prints the
+/// receipt on the receipt printer set up in Devices (or the print dialog) and says what happened; only a print that went out is recorded.
 class BillReceiptScreen extends StatefulWidget {
   const BillReceiptScreen({super.key, required this.env, required this.orderId, this.bill, this.openUrl});
   final TablesEnv env;
@@ -81,12 +81,11 @@ class _BillReceiptScreenState extends State<BillReceiptScreen> {
   Future<void> _send(String channel) async {
     final r = _r;
     if (r == null || _busy) return;
+    if (channel == 'print') return _print(r);
     String? to;
     Uri? uri;
     final text = _text;
     switch (channel) {
-      case 'print':
-        to = r.so('receipt_printer') ?? 'counter printer';
       case 'whatsapp' || 'sms':
         to = await _ask(channel == 'whatsapp' ? 'Send on WhatsApp' : 'Send by SMS', 'Mobile number', TextInputType.phone, localMobile(r.s('customer_phone')));
         if (to == null || to.isEmpty) return;
@@ -100,22 +99,28 @@ class _BillReceiptScreenState extends State<BillReceiptScreen> {
     }
     setState(() => _busy = true);
     try {
-      if (channel == 'print') {
-        final why = await printBillSlip(view: Facts({'location': r.raw['location'], 'table': {'label': r.so('table_label')}}), order: r);
-        if (why != null) {
-          if (mounted) {
-            showToast(context, why);
-            setState(() => _busy = false);
-          }
-          return;
-        }
-      }
       await _api.logReceipt(widget.orderId, channel, to: to); // the database checks the number / address and keeps it masked
       if (!mounted) return;
       if (uri != null && !await _open(uri) && mounted) showToast(context, 'Could not open the app on this phone.');
       await _load();
     } catch (e) {
       if (mounted) showToast(context, sayError(e));
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  /// Print: the paid receipt on the receipt printer; a print that went out (or to the print dialog) is recorded with the printer's name.
+  Future<void> _print(Facts r) async {
+    setState(() => _busy = true);
+    final view = Facts({'location': r.raw['location'], 'table': {'label': r.raw['table_label']}});
+    final p = await printAndSay(context, printBillSlip(PrinterRouter.of(_api.rpc), view: view, order: r, receipt: true));
+    if (p.ok) {
+      try {
+        await _api.logReceipt(widget.orderId, 'print', to: p.printer ?? 'print dialog');
+        await _load();
+      } catch (e) {
+        if (mounted) showToast(context, '${p.message} ${sayError(e)}');
+      }
     }
     if (mounted) setState(() => _busy = false);
   }

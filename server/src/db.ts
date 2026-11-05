@@ -34,7 +34,7 @@ export function userClient(request: Request): SupabaseClient {
 
 // Database functions raise errors like "OL_STALE: this order was already changed on another phone": a family prefix (OL, POS, INV,
 // GRN, SVC, PS, TBL, PUR, MONEY, TEAM, SF, OUTLET, CUST, WALLET, ACCT, GUEST), a reason, then the sentence the app shows. The reason decides the HTTP status; an unknown reason is a plain 400.
-const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC', 'PS', 'TBL', 'PUR', 'MONEY', 'TEAM', 'SF', 'OUTLET', 'CUST', 'WALLET', 'ACCT', 'GUEST'];
+const FAMILIES = ['OL', 'POS', 'INV', 'GRN', 'SVC', 'PS', 'TBL', 'PUR', 'MONEY', 'TEAM', 'SF', 'OUTLET', 'CUST', 'WALLET', 'ACCT', 'GUEST', 'GX'];
 // GRN, SVC, PS, TBL, PUR), a reason, then the sentence the app shows. The reason decides the HTTP status; an unknown reason is a plain 400.
 const STATUS: Record<string, number> = {
   BAD_REQUEST: 400, BAD_QTY: 400, EMPTY: 400, BAD_TABLE: 400, FORBIDDEN: 403, NOT_FOUND: 404, NOT_ONE_LOCAL: 404,

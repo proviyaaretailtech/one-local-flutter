@@ -18,9 +18,10 @@ const get = (path: string) => dispatch(new Request(`http://x${path}`));
 const code = 'a'.repeat(64), session = 'b'.repeat(64);
 const line = { menu_item_id: '56000000-0000-0000-0000-0000000000f1', qty: 2 };
 
-test('guest door: seven names only, none of them reachable through /rpc', () => {
-  assert.deepEqual(GUEST_DOOR.map(e => e.alias), ['open', 'menu', 'send', 'status', 'bill', 'feedback', 'card']);
-  assert.deepEqual(guestFunctions(), ['guest_qr_open', 'guest_menu', 'guest_order_send', 'guest_order_status', 'guest_bill', 'guest_feedback', 'guest_menu_by_slug']);
+test('guest door: eleven names only, none of them reachable through /rpc', () => {
+  assert.deepEqual(GUEST_DOOR.map(e => e.alias), ['open', 'menu', 'send', 'status', 'bill', 'feedback', 'card', 'slots', 'preorder', 'pretrack', 'feed']);
+  assert.deepEqual(guestFunctions(), ['guest_qr_open', 'guest_menu', 'guest_order_send', 'guest_order_status', 'guest_bill', 'guest_feedback', 'guest_menu_by_slug',
+    'gx_preorder_slots', 'gx_preorder_place', 'gx_preorder_status', 'gx_live_feed']);
   for (const fn of guestFunctions()) assert.equal(lookup(fn), undefined, fn);
   assert.equal(lookup('tbl_qr_list')?.kind, 'db');
 });
@@ -31,6 +32,19 @@ test('feedback: a rating of 1 to 5 and nothing else, checked before the database
   assert.equal((await post('/guest/feedback', JSON.stringify({ session, rating: '5' }), peer)).status, 400);
   assert.equal((await post('/guest/feedback', JSON.stringify({ session, rating: 5, table: 'x' }), peer)).status, 400, 'extra keys are refused');
   assert.equal((await post('/guest/bill', JSON.stringify({ session: 'nope' }), peer)).status, 400);
+});
+
+test('live feed: the address name only, strict, 30 a minute per address', async () => {
+  const feed = GUEST_DOOR.find(e => e.alias === 'feed');
+  assert.equal(feed?.fn, 'gx_live_feed');
+  assert.equal(feed?.perMinute, 30);
+  assert.equal(feed?.subject, 'slug');
+  assert.equal(feed?.subjectPerMinute, 600, 'every guest of one restaurant reads the same page: limited per address, not once per restaurant');
+  assert.ok(gst.Feed.safeParse({ slug: 'niks-cafe' }).success);
+  assert.ok(!gst.Feed.safeParse({ slug: 'niks-cafe', since: 1 }).success, 'extra keys are refused');
+  assert.ok(!gst.Feed.safeParse({ slug: '../etc' }).success);
+  assert.equal((await post('/guest/feed', JSON.stringify({ slug: '../etc' }), { 'x-ol-peer': '10.0.0.5' })).status, 400);
+  assert.equal((await post('/guest/feed', JSON.stringify({ slug: 'niks-cafe', table: 'T1' }), { 'x-ol-peer': '10.0.0.5' })).status, 400, 'extra keys are refused');
 });
 
 test('public menu link: a bad name or an extra key is 400 before the database; /m/<slug> is a page address', async () => {

@@ -12,9 +12,12 @@ import type { z } from 'zod';
 import { db, mapDbError } from './db.ts';
 import { clientIp, HttpError, json, limit, readBody, sha256 } from './http.ts';
 import { parse } from './validate.ts';
+import { withStorefrontLinks } from './modules/secure/storefront.ts';
 import * as gst from './schemas/guest.ts';
 
-export type GuestEntry = { alias: string; fn: string; args: z.ZodTypeAny; perMinute: number; subject: 'code' | 'session' | 'slug' };
+// perMinute: per network address (and per subject unless subjectPerMinute says otherwise: a page every guest of a restaurant reads, like
+// the live feed, is limited per address, not once for the whole restaurant)
+export type GuestEntry = { alias: string; fn: string; args: z.ZodTypeAny; perMinute: number; subject: 'code' | 'session' | 'slug' | 'phone' | 'track'; subjectPerMinute?: number };
 
 export const GUEST_DOOR: GuestEntry[] = [
   { alias: 'open', fn: 'guest_qr_open', args: gst.Open, perMinute: 30, subject: 'code' },
@@ -26,7 +29,15 @@ export const GUEST_DOOR: GuestEntry[] = [
   { alias: 'feedback', fn: 'guest_feedback', args: gst.Feedback, perMinute: 6, subject: 'session' },
   // the public menu link (0571): read-only menu of a live business by its address name, no table and no session
   { alias: 'card', fn: 'guest_menu_by_slug', args: gst.Card, perMinute: 60, subject: 'slug' },
+  // the brand page's pre-order (0656): slots of a live business, a pre-order (limited per phone), its tracking by the link it returns
+  { alias: 'slots', fn: 'gx_preorder_slots', args: gst.Slots, perMinute: 60, subject: 'slug' },
+  { alias: 'preorder', fn: 'gx_preorder_place', args: gst.Preorder, perMinute: 6, subject: 'phone' },
+  { alias: 'pretrack', fn: 'gx_preorder_status', args: gst.PreorderTrack, perMinute: 120, subject: 'track' },
+  // the page's live order feed (0662): the restaurant's dishes of the last 20 minutes with the table label; no people, phones or money
+  { alias: 'feed', fn: 'gx_live_feed', args: gst.Feed, perMinute: 30, subject: 'slug', subjectPerMinute: 600 },
 ];
+// answers that carry the restaurant's guest page: its welcome picture is a storage path, turned into a short-lived link here
+const WITH_PICTURES = new Set(['open', 'menu', 'card']);
 const byAlias = new Map(GUEST_DOOR.map(e => [e.alias, e]));
 export const guestFunctions = (): string[] => GUEST_DOOR.map(e => e.fn);
 
@@ -41,8 +52,9 @@ export async function guestCall(request: Request, params: Record<string, string>
   limit(ip, `guest:${entry.alias}`, entry.perMinute, 60_000);
   const args = parse(entry.args, await readBody(request, 16 * 1024)) as Record<string, unknown>;
   const subject = String(args[entry.subject]);
-  limit(await sha256(subject), `guest:${entry.alias}:subject`, entry.perMinute, 60_000);
-  const p = entry.alias === 'open' ? { ...args, client: ip === 'direct' ? null : (await sha256(`guest-client:${ip}`)).slice(0, 32) } : args;
+  limit(await sha256(subject), `guest:${entry.alias}:subject`, entry.subjectPerMinute ?? entry.perMinute, 60_000);
+  // a scan and a pre-order carry a hash of the address (never the address): the database limits one phone / browser with it
+  const p = entry.alias === 'open' || entry.alias === 'preorder' ? { ...args, client: ip === 'direct' ? null : (await sha256(`guest-client:${ip}`)).slice(0, 32) } : args;
   const { data, error } = await db().rpc(entry.fn, { p });
   if (error) {
     try { mapDbError(error); } catch (e) {
@@ -51,5 +63,5 @@ export async function guestCall(request: Request, params: Record<string, string>
       throw e;
     }
   }
-  return json(data ?? null);
+  return json(WITH_PICTURES.has(entry.alias) && data ? await withStorefrontLinks(data) : data ?? null);
 }

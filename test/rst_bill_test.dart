@@ -1,19 +1,19 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:vinii_pos/devices/devices_api.dart' show sendRawToPrinter;
+import 'package:vinii_pos/devices/printer_router.dart' show printPdfDialog;
+import 'package:vinii_pos/devices/usb_printer.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart';
 import 'package:vinii_pos/tables/bill_api.dart';
 import 'package:vinii_pos/tables/bill_paid_screen.dart';
 import 'package:vinii_pos/tables/bill_pay_screen.dart';
-import 'package:vinii_pos/tables/bill_receipt_popup.dart';
 import 'package:vinii_pos/tables/bill_receipt_screen.dart';
 import 'package:vinii_pos/tables/bill_split_screen.dart';
-import 'package:vinii_pos/tables/rst_print_direct.dart';
 import 'package:vinii_pos/tables/table_order_screen.dart';
 import 'package:vinii_pos/tables/table_widgets.dart';
 import 'package:vinii_pos/tables/tables_api.dart';
@@ -65,9 +65,20 @@ class Fake {
         return ok(orderView);
       case 'pos_set_order_status':
         return ok({'id': o1});
+      case 'pos_print_targets':
+        return ok({'printers': printers, 'stations': [], 'business': business});
+      case 'pos_print_log':
+        return ok({'logged': true});
     }
     return err(404, 'not found: ${fnOf(r)}');
   });
+
+  /// The printers set up in Devices (`pos_print_targets`, 0660): none until a test adds one.
+  List<Map<String, dynamic>> printers = [];
+  Map<String, dynamic> business = {'name': 'Dosa House 550', 'outlet': 'Indiranagar', 'gstin': '29ABCDE1234F1Z5', 'address': '12 CMH Road, Bengaluru', 'phone': '080 4000 5500'};
+  void counterPrinter() => printers = [
+        {'id': 'p-c1', 'name': 'Counter printer 1', 'type': 'receipt', 'connection': 'lan', 'address': '192.168.1.60', 'paper_mm': 80, 'copies': 1, 'auto_cut': true, 'is_default': true},
+      ];
 
   Map<String, dynamic> orderView = {
     'table': {'id': t1, 'label': 'T1', 'seats': 4, 'area_name': 'Ground Floor', 'main_table_id': t1},
@@ -135,6 +146,46 @@ Future<void> sendBill(WidgetTester t, String button, String phone) async {
   await tapKey(t, button);
   await t.enterText(find.byKey(const ValueKey('send-to')), phone);
   await tapKey(t, 'send-go');
+}
+
+/// Replaces the print dialog for one test: the names it was given, and whether the PDF had pages.
+List<String> dialogs() {
+  final got = <String>[];
+  final before = printPdfDialog;
+  printPdfDialog = (pdf, name) async {
+    got.add('$name ${pdf.isNotEmpty}');
+    return true;
+  };
+  addTearDown(() => printPdfDialog = before);
+  return got;
+}
+
+/// Replaces the USB printer for one test, on the restaurant's Android app: what went down the cable ([error]: it fails).
+List<String> usbPrinter({Object? error}) {
+  final got = <String>[];
+  final (beforeOn, beforeSend) = (usbPrintingOn, sendUsbPrinter);
+  usbPrintingOn = () => true;
+  sendUsbPrinter = (bytes) async {
+    if (error != null) throw error;
+    got.add(String.fromCharCodes(bytes));
+  };
+  addTearDown(() {
+    usbPrintingOn = beforeOn;
+    sendUsbPrinter = beforeSend;
+  });
+  return got;
+}
+
+/// Replaces the network printer for one test: what reached it, by address ([error]: it refuses).
+List<(String, String)> lanPrinter({Object? error}) {
+  final got = <(String, String)>[];
+  final before = sendRawToPrinter;
+  sendRawToPrinter = (host, port, bytes) async {
+    if (error != null) throw error;
+    got.add(('$host:$port', String.fromCharCodes(bytes)));
+  };
+  addTearDown(() => sendRawToPrinter = before);
+  return got;
 }
 
 void main() {
@@ -416,62 +467,75 @@ void main() {
       expect(u.query, startsWith('body=Bill%20R5501'), reason: 'spaces as %20 so the SMS app shows them');
     });
 
-    testWidgets('the print button sends the bill slip to the printer', (t) async {
+    testWidgets('Print bill with no receipt printer set up: the slip opens in the print dialog, and it says why', (t) async {
       final s = Fake();
-      final printed = <String>[];
-      final before = printReceiptPdf;
-      printReceiptPdf = (pdf, name) async => printed.add('$name ${pdf.isNotEmpty}');
-      final beforeP = rstPrinterFor;
-      rstPrinterFor = (_) async => null;
-      addTearDown(() {
-        printReceiptPdf = before;
-        rstPrinterFor = beforeP;
-      });
+      final printed = dialogs();
       await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
       await tapKey(t, 'bill-print');
       expect(printed, ['Bill R5501.pdf true']);
+      expect(find.text('No receipt printer set up, so the bill opened in the print dialog. Add a receipt printer in Settings → Devices.'), findsOneWidget);
+      expect(argsOf(s.calls('pos_print_log').single), {'kind': 'bill', 'outcome': 'dialog', 'order_id': o1, 'detail': 'No receipt printer set up'});
     });
 
-    // founder, 4 Nov 2026: a USB printer was never reached through Android's print screen; it gets ESC/POS down the cable
-    testWidgets('a USB receipt printer gets the bill straight away (ESC/POS, its copies), not the print screen', (t) async {
-      final s = Fake();
-      final pdfs = <String>[], usb = <List<int>>[];
-      final (beforePdf, beforeP, beforeUsb) = (printReceiptPdf, rstPrinterFor, sendUsbPrinter);
-      printReceiptPdf = (pdf, name) async => pdfs.add(name);
-      rstPrinterFor = (type) async => Facts({'id': 'p1', 'name': 'Counter USB', 'type': type, 'connection': 'usb', 'paper_mm': 58, 'copies': 2, 'auto_cut': true});
-      sendUsbPrinter = (bytes) async => usb.add(bytes);
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      addTearDown(() {
-        printReceiptPdf = beforePdf;
-        rstPrinterFor = beforeP;
-        sendUsbPrinter = beforeUsb;
-      });
+    testWidgets('Print bill on a network receipt printer: the slip in ESC/POS with the business, its GSTIN, TAX INVOICE and the total', (t) async {
+      final s = Fake()..counterPrinter();
+      final raw = lanPrinter();
+      final printed = dialogs();
       await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
       await tapKey(t, 'bill-print');
-      debugDefaultTargetPlatformOverride = null;
-      expect(pdfs, isEmpty);
-      final text = String.fromCharCodes(usb.single);
-      expect(RegExp('Bill No: R5501').allMatches(text).length, 2, reason: 'two copies');
-      expect(text, contains('TOTAL'));
-      // the printed words of each line (ESC/POS codes taken out): 32 characters a line on 58 mm paper
-      final words = text.replaceAll(RegExp(r'\x1B[@-~][\x00-\x02\x30-\x31]?|\x1D[!V][\x00-\x7f]{1,2}|\x1B[ad][\x00-\x7f]'), '');
-      expect(words.split('\n').where((l) => l.length > 32).toList(), isEmpty, reason: '58 mm: 32 characters a line');
+      expect(raw.single.$1, '192.168.1.60:9100');
+      expect(raw.single.$2, allOf([
+        contains('DOSA HOUSE 550'), contains('Indiranagar'), contains('12 CMH Road, Bengaluru'), contains('Ph: 080 4000 5500'), contains('GSTIN: 29ABCDE1234F1Z5'),
+        contains('TAX INVOICE'), contains('Bill No: R5501'), contains('Rs 1050.00'), isNot(contains('₹')),
+      ]));
+      expect(printed, isEmpty, reason: 'no print dialog for a network printer');
+      expect(find.text('Bill printed on Counter printer 1.'), findsOneWidget);
+      expect(argsOf(s.calls('pos_print_log').single), {'kind': 'bill', 'outcome': 'printed', 'order_id': o1, 'printer_id': 'p-c1'});
     });
 
-    testWidgets('no USB printer plugged in: the cashier is told what to check', (t) async {
-      final s = Fake();
-      final (beforeP, beforeUsb) = (rstPrinterFor, sendUsbPrinter);
-      rstPrinterFor = (type) async => Facts({'id': 'p1', 'name': 'Counter USB', 'type': type, 'connection': 'usb', 'paper_mm': 80, 'copies': 1});
-      sendUsbPrinter = (bytes) async => throw DirectPrintException('No USB printer found. Check the cable (an OTG adapter on a phone) and that the printer is on.');
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      addTearDown(() {
-        rstPrinterFor = beforeP;
-        sendUsbPrinter = beforeUsb;
-      });
+    // founder, 4-5 Nov 2026: a USB printer is never reached through Android's print screen
+    Map<String, dynamic> usbOne(String type, {int copies = 1}) =>
+        {'id': 'p-u1', 'name': 'Counter USB', 'type': type, 'connection': 'usb', 'paper_mm': 58, 'copies': copies, 'auto_cut': true, 'is_default': true};
+
+    testWidgets('Print bill on a USB receipt printer: ESC/POS down the cable, its copies, no print dialog, 32 characters a line on 58 mm', (t) async {
+      final s = Fake()..printers = [usbOne('receipt', copies: 2)];
+      final usb = usbPrinter();
+      final printed = dialogs();
       await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
       await tapKey(t, 'bill-print');
-      debugDefaultTargetPlatformOverride = null;
-      expect(find.textContaining('No USB printer found'), findsOneWidget);
+      expect(printed, isEmpty);
+      expect(RegExp('Bill No: R5501').allMatches(usb.single).length, 2, reason: 'two copies');
+      expect(usb.single.split('\n').every((l) => l.replaceAll(RegExp(r'\x1b[@aEd].?|\x1d[!V]B?.?'), '').length <= 32), isTrue);
+      expect(find.text('Bill printed on Counter USB (2 copies).'), findsOneWidget);
+      expect(argsOf(s.calls('pos_print_log').single), {'kind': 'bill', 'outcome': 'printed', 'order_id': o1, 'printer_id': 'p-u1'});
+    });
+
+    testWidgets('a single USB printer saved under Kitchen still prints the bill', (t) async {
+      final s = Fake()..printers = [usbOne('kot')];
+      final usb = usbPrinter();
+      final printed = dialogs();
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      await tapKey(t, 'bill-print');
+      expect(printed, isEmpty);
+      expect(usb.single, contains('Bill No: R5501'));
+    });
+
+    testWidgets('Print bill with the USB printer unplugged: says what to check, logged as failed', (t) async {
+      final s = Fake()..printers = [usbOne('receipt')];
+      usbPrinter(error: UsbPrintException('no USB printer found. Check the cable (an OTG adapter on a phone) and that the printer is on'));
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      await tapKey(t, 'bill-print');
+      expect(find.text('Bill not printed: no USB printer found. Check the cable (an OTG adapter on a phone) and that the printer is on.'), findsOneWidget);
+      expect(argsOf(s.calls('pos_print_log').single), containsPair('outcome', 'failed'));
+    });
+
+    testWidgets('Print after payment (founder, 5 Nov 2026: the test print came but the bill did not): the receipt goes down the cable and is recorded', (t) async {
+      final s = Fake()..printers = [usbOne('receipt')];
+      final usb = usbPrinter();
+      await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
+      await tapKey(t, 'receipt-print');
+      expect(usb.single, allOf(contains('Bill No: R5501'), contains('PAID')));
+      expect(argsOf(s.calls('rst_receipt_log').single), {'order_id': o1, 'channel': 'print', 'to': 'Counter USB'});
     });
 
     testWidgets('a split bill sends the cashier to the split instead of taking it in one go', (t) async {
@@ -625,15 +689,9 @@ void main() {
       expect(find.byKey(const ValueKey('bill-customer-save')), findsOneWidget, reason: 'the sheet stays open');
     });
 
-    testWidgets('Email asks for the address and opens the mail app; Print is logged with the printer', (t) async {
-      final s = Fake();
-      final (beforePdf, beforeP) = (printReceiptPdf, rstPrinterFor);
-      printReceiptPdf = (pdf, name) async {};
-      rstPrinterFor = (_) async => null;
-      addTearDown(() {
-        printReceiptPdf = beforePdf;
-        rstPrinterFor = beforeP;
-      });
+    testWidgets('Email asks for the address and opens the mail app; Print prints the receipt on the receipt printer and is logged with it', (t) async {
+      final s = Fake()..counterPrinter();
+      final raw = lanPrinter();
       await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
       await tapKey(t, 'receipt-email');
       await t.enterText(find.byKey(const ValueKey('receipt-to')), 'asha@example.com');
@@ -641,59 +699,24 @@ void main() {
       expect(s.opened.single.scheme, 'mailto');
       expect(s.opened.single.path, 'asha@example.com');
       await tapKey(t, 'receipt-print');
+      expect(raw.single.$1, '192.168.1.60:9100');
+      expect(raw.single.$2, allOf(contains('DOSA HOUSE 550'), contains('Bill No: R5501'), contains('Table: T1'), contains('PAID')));
+      expect(find.text('Receipt printed on Counter printer 1.'), findsOneWidget);
+      expect(find.textContaining('later release'), findsNothing);
       final logs = s.calls('rst_receipt_log').map(argsOf).toList();
       expect(logs.map((a) => a['channel']), ['email', 'print']);
       expect(logs.last['to'], 'Counter printer 1');
+      expect(argsOf(s.calls('pos_print_log').single), {'kind': 'receipt', 'outcome': 'printed', 'order_id': o1, 'printer_id': 'p-c1'});
     });
 
-    // founder, 5 Nov 2026: "The test print came but bill is not printing": Print on this screen only copied the text
-    testWidgets('Print after payment: the paid receipt goes down the USB cable and is recorded', (t) async {
-      final s = Fake();
-      final usb = <List<int>>[];
-      final (beforeP, beforeUsb) = (rstPrinterFor, sendUsbPrinter);
-      rstPrinterFor = (type) async => Facts({'id': 'p1', 'name': 'Counter USB', 'type': type, 'connection': 'usb', 'paper_mm': 58, 'copies': 1, 'auto_cut': true});
-      sendUsbPrinter = (bytes) async => usb.add(bytes);
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      addTearDown(() {
-        rstPrinterFor = beforeP;
-        sendUsbPrinter = beforeUsb;
-      });
+    testWidgets('receipt Print when the printer does not answer: says why, and nothing is recorded as printed', (t) async {
+      final s = Fake()..counterPrinter();
+      lanPrinter(error: const SocketException('Connection failed', osError: OSError('Connection refused', 61)));
       await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
       await tapKey(t, 'receipt-print');
-      debugDefaultTargetPlatformOverride = null;
-      final text = String.fromCharCodes(usb.single);
-      expect(text, contains('Bill No: R5501'));
-      expect(text, contains('TOTAL'));
-      expect(text, contains('PAID'));
-      expect(s.calls('rst_receipt_log').map(argsOf).single['channel'], 'print');
-    });
-
-    testWidgets('Print after payment with the printer unplugged: says what to check and is not recorded as sent', (t) async {
-      final s = Fake();
-      final (beforeP, beforeUsb) = (rstPrinterFor, sendUsbPrinter);
-      rstPrinterFor = (type) async => Facts({'id': 'p1', 'name': 'Counter USB', 'type': type, 'connection': 'usb', 'paper_mm': 80, 'copies': 1});
-      sendUsbPrinter = (bytes) async => throw DirectPrintException('No USB printer found. Check the cable (an OTG adapter on a phone) and that the printer is on.');
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      addTearDown(() {
-        rstPrinterFor = beforeP;
-        sendUsbPrinter = beforeUsb;
-      });
-      await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
-      await tapKey(t, 'receipt-print');
-      debugDefaultTargetPlatformOverride = null;
-      expect(find.textContaining('No USB printer found'), findsOneWidget);
+      expect(find.text('Receipt not printed: Counter printer 1 at 192.168.1.60 did not answer (connection refused).'), findsOneWidget);
       expect(s.calls('rst_receipt_log'), isEmpty);
-    });
-
-    test('which printer takes the bill: the default for the job, else the first, else a USB printer saved under another job, never a label printer', () {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      Facts p(String id, String type, {String conn = 'usb', bool dflt = false}) => Facts({'id': id, 'type': type, 'connection': conn, 'is_default': dflt});
-      expect(pickPrinter([p('a', 'receipt'), p('b', 'receipt', dflt: true)], 'receipt')?.s('id'), 'b');
-      expect(pickPrinter([p('k', 'kot'), p('a', 'receipt')], 'receipt')?.s('id'), 'a');
-      expect(pickPrinter([p('k', 'kot')], 'receipt')?.s('id'), 'k');
-      expect(pickPrinter([p('l', 'label')], 'receipt'), isNull);
-      expect(pickPrinter([p('k', 'kot', conn: 'bluetooth')], 'receipt'), isNull);
-      debugDefaultTargetPlatformOverride = null;
+      expect(argsOf(s.calls('pos_print_log').single)['outcome'], 'failed');
     });
 
     testWidgets('a refused send says why and opens nothing', (t) async {

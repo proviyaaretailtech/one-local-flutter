@@ -16,6 +16,9 @@ class KitchenApi {
   final RpcClient _rpc;
   static final _rand = Random.secure();
 
+  /// The server door, for printing through it (lib/devices/printer_router.dart).
+  RpcClient get rpc => _rpc;
+
   /// A fresh key for one intent (one tap). Keep it and send it again when retrying that same tap.
   static String newKey() => 'kit-${List.generate(16, (_) => _rand.nextInt(256).toRadixString(16).padLeft(2, '0')).join()}';
 
@@ -55,6 +58,14 @@ class KitchenApi {
 
   /// Serve the ready dishes of an order (the floor's `tbl_mark_served`); safe to repeat.
   Future<Facts> serve(List<String> itemIds) async => Facts(await _call('tbl_mark_served', {'item_ids': itemIds}));
+
+  /// After a ticket really printed again (lib/devices/printer_router.dart): the order notes "KOT 3 printed again", which the audit report
+  /// counts as a reprint (`kds_ticket_act` print). The paper already came out, so a refusal here changes nothing the person is told.
+  Future<void> noteReprint(String ticketId, {String? station, String? version}) async {
+    try {
+      await act(ticketId, 'print', station: station, version: version);
+    } catch (_) {}
+  }
 
   /// start / item_done / item_undo / ready / serve / print on ONE card: [station] is the card's station key (a ticket with items for several stations
   /// is acted on one station at a time) and [version] the card's `version` the person saw. Answers the card as it is now.

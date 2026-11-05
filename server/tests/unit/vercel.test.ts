@@ -9,7 +9,8 @@ test('vercel entry: same router; health shows version and db state without secre
   assert.equal(j.ok, true);
   assert.match(String(j.version), /^0\.1\.0/);
   assert.ok(j.db === 'reachable' || j.db === 'unreachable');
-  assert.deepEqual(Object.keys(j).sort(), ['db', 'ok', 'version']);
+  assert.ok(['ok', 'wrong_key', 'unreachable', 'not_configured'].includes(String(j.master)));
+  assert.deepEqual(Object.keys(j).sort(), ['db', 'master', 'ok', 'version']);
   assert.equal(r.headers.get('cache-control'), 'no-store');
 });
 

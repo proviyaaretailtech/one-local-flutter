@@ -377,7 +377,7 @@ class OrdersApi {
   Future<ChannelOrders> channelOrders({String? locationId}) async => ChannelOrders(await _rpc('rst_channel_orders', {'location_id': ?locationId}));
 
   /// Accept one new delivery order (0610): a held order goes to the kitchen; a OneLocal app order is accepted. [auto] when auto-accept did it.
-  Future<void> acceptOrder(String orderId, {bool auto = false}) async => _rpc('rst_channel_accept', {'order_id': orderId, if (auto) 'auto': true});
+  Future<Map<String, dynamic>> acceptOrder(String orderId, {bool auto = false}) async => _rpc('rst_channel_accept', {'order_id': orderId, if (auto) 'auto': true});
 
   /// Sends a held takeaway or delivery order's dishes to the kitchen (0643): a KOT; answers {kot: {kot_no, dishes}, display_no}.
   Future<Map<String, dynamic>> sendHeld(String orderId, {required String key}) => _rpc('rst_hold_send', {'order_id': orderId, 'idempotency_key': key}, key: key);
@@ -439,6 +439,9 @@ class OrdersApi {
       OrderView(await _send('POST', '/$id/cancel', body: {'reason': reason, 'version': version, ...?admin}));
 
   late final RpcClient _rpcClient = RpcClient(client: _http, baseUrl: _base, accessToken: _token);
+
+  /// The server door, for printing through it (lib/devices/printer_router.dart).
+  RpcClient get rpc => _rpcClient;
 
   /// Sends the photo of the packed bag to a signed slot under the order's folder, then records it. {id, has_photo, at}
   Future<Map<String, dynamic>> savePackedPhoto(String orderId, PickedDocument photo) async {

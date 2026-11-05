@@ -14,6 +14,14 @@
       "destination": "/t/index.html"
     },
     {
+      "source": "/r/:slug([a-z0-9][a-z0-9-]{0,62})",
+      "destination": "/t/index.html"
+    },
+    {
+      "source": "/:slug((?!(?:privacy|terms|delete-account|join|auth|api|m|t|b|r|guest|rpc|health|admin|partner|partners|app|static|assets|www|help|support|about|login|signup|signin|onelocal|source|ol-api|webhooks|download|blog|careers|contact|master|rider|riders|store|stores)$)[a-z0-9][a-z0-9-]{0,62})",
+      "destination": "/t/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api/index"
     }

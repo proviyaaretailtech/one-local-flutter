@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:vinii_pos/devices/devices_api.dart' show sendRawToPrinter;
 import 'package:vinii_pos/kitchen/add_station_screen.dart';
 import 'package:vinii_pos/kitchen/kds_board_screen.dart';
 import 'package:vinii_pos/kitchen/kds_screen.dart';
@@ -28,6 +29,39 @@ http.Response err(int status, String detail, [String? code]) =>
 String fnOf(http.Request r) => r.url.path.split('/').last;
 Map<String, dynamic> argsOf(http.Request r) => jsonDecode(r.body) as Map<String, dynamic>;
 Map<String, dynamic> copy(Object o) => jsonDecode(jsonEncode(o)) as Map<String, dynamic>;
+
+/// The print functions (0660) as the database answers them: one LAN kitchen printer, a KOT of one station. [refused] makes the printer
+/// refuse the connection. Captures what reached the printer in [printed].
+http.Response? printing(http.Request r, {String station = 'Main Kitchen', bool reprint = true}) => switch (fnOf(r)) {
+      'pos_print_targets' => ok({
+          'printers': [
+            {'id': 'p-hot', 'name': 'Hot kitchen', 'type': 'kot', 'connection': 'lan', 'address': '192.168.1.50', 'paper_mm': 80, 'copies': 1, 'auto_cut': true, 'is_default': true},
+          ],
+          'stations': [],
+          'business': {'name': 'Dosa House'},
+        }),
+      'pos_kot_print' => ok({
+          'ticket_id': argsOf(r)['ticket_id'] ?? 'k2', 'kot_no': 2, 'order_id': argsOf(r)['order_id'], 'display_no': 'P-00002', 'channel': 'pickup', 'table_label': null,
+          'sent_at': '2026-10-17T14:50:23Z', 'note': 'extra spicy', 'reprint': reprint,
+          'groups': [
+            {'printer_id': 'p-hot', 'station': station, 'items': [{'name': 'Veg Manchow Soup', 'qty': 2, 'variant': null, 'add_ons': null, 'notes': null, 'takeaway': false, 'cancelled': false}]},
+          ],
+        }),
+      'pos_print_log' => ok({'logged': true}),
+      _ => null,
+    };
+
+/// Replaces the network printer for one test; what reached it, by address.
+List<(String, String)> fakePrinter({Object? error}) {
+  final got = <(String, String)>[];
+  final before = sendRawToPrinter;
+  sendRawToPrinter = (host, port, bytes) async {
+    if (error != null) throw error;
+    got.add(('$host:$port', String.fromCharCodes(bytes)));
+  };
+  addTearDown(() => sendRawToPrinter = before);
+  return got;
+}
 
 /// The signed-in person can configure (the fixture was captured as a kitchen cook, who cannot).
 Map<String, dynamic> owner(Map<String, dynamic> cfg) => copy(cfg)..['can'] = {'configure': true};
@@ -439,15 +473,32 @@ void main() {
       expect(f.of('kds_ticket_act').map((r) => argsOf(r)['action']).toList(), ['ready', 'serve']);
     });
 
-    testWidgets('Print ticket sends print and says so', (t) async {
-      final f = Fake();
+    // founder, 4 Nov 2026: "Ticket sent to the printer." while nothing printed
+    testWidgets('Print ticket prints the card\'s dishes on its station\'s kitchen printer, says where, then notes the reprint', (t) async {
+      final printed = fakePrinter();
+      final f = Fake(printing);
       await show(t, KdsScreen(env: f.env()));
       final tk = (fx['queue'] as Map)['tickets'][1];
       await t.tap(find.byKey(ValueKey('print-${tk['card_id']}')));
-      await t.pump();
-      await t.pump();
-      expect(argsOf(f.of('kds_ticket_act').single)['action'], 'print');
-      expect(find.text('Ticket sent to the printer.'), findsOneWidget);
+      await t.pumpAndSettle();
+      expect(argsOf(f.of('pos_kot_print').single), {'order_id': tk['order_id'], 'ticket_id': tk['id']});
+      expect(printed.single.$1, '192.168.1.50:9100');
+      expect(printed.single.$2, allOf(contains('KOT #2'), contains('REPRINT'), contains('2 x Veg Manchow Soup'), contains('Station: Main Kitchen')));
+      expect(find.text('KOT #2 printed on Hot kitchen.'), findsOneWidget);
+      expect(argsOf(f.of('pos_print_log').single), {'kind': 'kot', 'outcome': 'printed', 'order_id': tk['order_id'], 'ticket_id': tk['id'], 'printer_id': 'p-hot'});
+      expect(argsOf(f.of('kds_ticket_act').single)['action'], 'print', reason: 'the reprint the audit report counts, only once it printed');
+    });
+
+    testWidgets('Print ticket when the kitchen printer does not answer: says why, and no reprint is noted', (t) async {
+      fakePrinter(error: const SocketException('Connection failed', osError: OSError('Connection refused', 61)));
+      final f = Fake(printing);
+      await show(t, KdsScreen(env: f.env()));
+      await t.tap(find.byKey(ValueKey('print-${(fx['queue'] as Map)['tickets'][1]['card_id']}')));
+      await t.pumpAndSettle();
+      expect(find.text('KOT #2 not printed: Hot kitchen at 192.168.1.50 did not answer (connection refused).'), findsOneWidget);
+      expect(find.textContaining('sent to the printer'), findsNothing);
+      expect(argsOf(f.of('pos_print_log').single)['outcome'], 'failed');
+      expect(f.of('kds_ticket_act'), isEmpty);
     });
 
     testWidgets('a stale ticket: the server sentence is replaced by a plain one and the screen reloads', (t) async {
@@ -722,6 +773,19 @@ void main() {
       expect([for (final r in f.of('kds_ticket_act').skip(1)) argsOf(r)['action']], ['ready', 'serve']);
     });
 
+    testWidgets('the printer on a ticket prints it on its station\'s kitchen printer and says so (not "sent to the printer")', (t) async {
+      final printed = fakePrinter();
+      final f = Fake(printing);
+      await show(t, KdsBoardScreen(env: f.env()));
+      final c = first();
+      await t.tap(find.byKey(ValueKey('kds-list-print-${c['card_id']}')));
+      await t.pumpAndSettle();
+      expect(argsOf(f.of('pos_kot_print').single), {'order_id': c['order_id'], 'ticket_id': c['id']});
+      expect(printed.single.$2, contains('KOT #2'));
+      expect(find.text('KOT #2 printed on Hot kitchen.'), findsOneWidget);
+      expect(argsOf(f.of('kds_ticket_act').single), containsPair('action', 'print'));
+    });
+
     testWidgets('List / Grid switch: Grid shows the compact cards that pop up; the choice stays for the session', (t) async {
       final f = Fake();
       await show(t, KdsBoardScreen(env: f.env()));
@@ -850,6 +914,17 @@ void main() {
             },
           ],
         };
+
+    testWidgets('Print latest KOT prints the order\'s latest KOT on the kitchen printer and says so', (t) async {
+      final printed = fakePrinter();
+      final f = Fake((r) => fnOf(r) == 'rst_kot_orders' ? ok(kotOrders()) : printing(r, reprint: false));
+      await show(t, KotScreen(env: f.env(), openOrder: (_, _) {}));
+      await t.tap(find.byKey(const ValueKey('kot-print-P-00042')));
+      await t.pumpAndSettle();
+      expect(argsOf(f.of('pos_kot_print').single), {'order_id': 'o1'}, reason: 'the latest ticket; the database says whether it is a reprint');
+      expect(printed.single.$2, allOf(contains('KOT #2'), isNot(contains('REPRINT'))));
+      expect(find.text('KOT #2 printed on Hot kitchen.'), findsOneWidget);
+    });
 
     testWidgets('status, number, total, table and dishes, tags, the KOT chain, ready count and stations', (t) async {
       final f = Fake((r) => switch (fnOf(r)) { 'rst_kot_orders' => ok(kotOrders()), 'tbl_mark_served' => ok({'served': 2}), _ => null });
