@@ -26,7 +26,7 @@ do $$
 declare v_src text := pg_get_functiondef('public.pos_place_order'::regproc);
   v_old text := $r$  if v_loc is null then select id into v_loc from public.locations where organization_id = v_org order by (code = 'MAIN') desc, created_at limit 1; end if;$r$;
 begin
-  if v_src not like '%0658: an order without a table may name its outlet%' then
+  if v_src not like '%an order without a table may name its outlet%' then
     if position(v_old in v_src) = 0 then raise exception '0658: pos_place_order has changed shape; patch it by hand'; end if;
     v_src := replace(v_src, v_old, $r$  -- 0658: an order without a table may name its outlet (an accepted pre-order stays in the outlet that took it)
   if v_loc is null and nullif(p->>'location_id', '') is not null then

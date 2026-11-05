@@ -62,7 +62,7 @@ create or replace view public.delivery_orders_needing_rider as
 do $$
 declare v_src text := pg_get_functiondef('public.ol_create_restaurant_order(jsonb)'::regprocedure); v_n int := 0;
 begin
-  if v_src like '%0662: a web order%' then return; end if;
+  if v_src like '%: a web order%' then return; end if;
   -- 1 the discount a web order's code takes off
   if strpos(v_src, $r$  v_loc        uuid;
 begin$r$) > 0 then v_n := v_n + 1; end if;
@@ -132,7 +132,7 @@ begin$r$);
   -- 7 the answer says the discount too
   if strpos(v_src, $r$'subtotal', v_subtotal, 'gst', v_gst,$r$) > 0 then v_n := v_n + 1; end if;
   v_src := replace(v_src, $r$'subtotal', v_subtotal, 'gst', v_gst,$r$, $r$'subtotal', v_subtotal, 'discount', v_disc, 'gst', v_gst,$r$);
-  if v_n <> 7 or v_src not like '%0662: a web order%' then
+  if v_n <> 7 or v_src not like '%: a web order%' then
     raise exception '0662: ol_create_restaurant_order has changed shape (% of 7 parts found); patch it by hand', v_n;
   end if;
   execute v_src;
@@ -489,7 +489,7 @@ end $$;
 do $$
 declare v_src text := pg_get_functiondef('public.rst_channel_orders(jsonb)'::regprocedure); v_n int := 0;
 begin
-  if v_src like '%0662: a web order%' then return; end if;
+  if v_src like '%: a web order%' then return; end if;
   if strpos(v_src, $r$o.external_ref, o.customer_phone,$r$) > 0 then v_n := v_n + 1; end if;
   v_src := replace(v_src, $r$o.external_ref, o.customer_phone,$r$, $r$o.external_ref, o.customer_phone, x.order_mode as web_mode, x.table_label, x.pickup_at,$r$);
   if strpos(v_src, $r$case when x.id is not null or o.channel = 'online' then 'onelocal'$r$) > 0 then v_n := v_n + 1; end if;
@@ -511,7 +511,7 @@ begin
           -- 0662: a web order from the restaurant's own page: dine-in at a table, or a pickup time
           'mode', o.web_mode, 'table_label', o.table_label, 'pickup_at', o.pickup_at
         ) order by$r$);
-  if v_n <> 5 or v_src not like '%0662: a web order%' then raise exception '0662: rst_channel_orders has changed shape (% of 5 parts found); patch it by hand', v_n; end if;
+  if v_n <> 5 or v_src not like '%: a web order%' then raise exception '0662: rst_channel_orders has changed shape (% of 5 parts found); patch it by hand', v_n; end if;
   execute v_src;
 end $$;
 

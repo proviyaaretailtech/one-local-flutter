@@ -117,7 +117,7 @@ do $$
 declare v_src text := pg_get_functiondef('public.rst_printer_save'::regproc);
   v_old text := $r$  if v_conn = 'lan' and v_addr !~ '^[0-9]{1,3}(\.[0-9]{1,3}){3}(:[0-9]{2,5})?$' then raise exception 'POS_BAD_REQUEST: the IP address looks wrong; it is like 192.168.1.50'; end if;$r$;
 begin
-  if v_src like '%0660: host name%' then return; end if;
+  if v_src like '%host name or IPv4 address%' then return; end if;
   if position(v_old in v_src) = 0 then raise exception '0660: rst_printer_save has changed shape; patch it by hand'; end if;
   v_src := replace(v_src, v_old, $r$  -- 0660: host name or IPv4 address, optional port
   if v_conn = 'lan' and not (v_addr ~ '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])(:[0-9]{2,5})?$'
