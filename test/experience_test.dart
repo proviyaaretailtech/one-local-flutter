@@ -32,7 +32,7 @@ Map<String, dynamic> argsOf(http.Request r) => r.body.isEmpty ? {} : jsonDecode(
 
 Map<String, dynamic> block(String type, Map<String, dynamic> props, {bool enabled = true}) => {'id': type, 'type': type, 'enabled': enabled, 'props': props};
 
-/// Shaped like gx__default('bistro_dark') after gx__clean (migration 0654).
+/// Shaped like gx__default('bistro_dark') after gx__clean (migration 0656).
 Map<String, dynamic> draftJson() => {
       'look': 'bistro_dark',
       'theme': {...gxLooks['bistro_dark']!},

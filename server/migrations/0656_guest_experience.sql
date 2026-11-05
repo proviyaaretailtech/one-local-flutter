@@ -1,4 +1,4 @@
--- 0654 Guest experience builder: a restaurant's branded guest mini-app (onelocal.co/<store link> and the table QR), edited in the
+-- 0656 Guest experience builder: a restaurant's branded guest mini-app (onelocal.co/<store link> and the table QR), edited in the
 -- partner app, published through a tiered gate (rules -> AI wording check -> OneLocal human review for money, compliance and
 -- security), with version history, rollback, and pre-orders that land in the POS guest inbox.
 -- Spec: specs/guest-experience-builder/spec.md (workspace root). Local dev DB 2026-11-04.
@@ -606,7 +606,7 @@ begin
   if v_src not like '%''experience'', public.gx__public_def%' then
     v_src := replace(v_src, $r$'items', v_items);$r$, $r$'items', v_items,
     'experience', public.gx__public_def(p_org));$r$);
-    if v_src not like '%''experience'', public.gx__public_def%' then raise exception '0654: guest__menu has changed shape; patch it by hand'; end if;
+    if v_src not like '%''experience'', public.gx__public_def%' then raise exception '0656: guest__menu has changed shape; patch it by hand'; end if;
     execute v_src;
   end if;
 end $$;
@@ -741,7 +741,7 @@ begin
   end if;
   select * into t from public.dining_tables where id = r.table_id;
   if not t.is_active then raise exception 'TBL_NOT_FOUND: this table is no longer in use'; end if;$r$);
-    if v_src not like '%r.kind = ''preorder''%' then raise exception '0654: guest_request_decide has changed shape; patch it by hand'; end if;
+    if v_src not like '%r.kind = ''preorder''%' then raise exception '0656: guest_request_decide has changed shape; patch it by hand'; end if;
     execute v_src;
   end if;
 end $$;
@@ -759,7 +759,7 @@ revoke all on function public.gx__clean(uuid, jsonb), public.gx__live(uuid), pub
   public.gx__submit(uuid, jsonb, text, int), public.gx__preorder_block(uuid), public.gx__version_json(public.guest_experience_versions, boolean) from public, anon, authenticated;
 
 insert into public.schema_migrations_ledger (filename, note)
-values ('partner/0654_guest_experience.sql', 'Guest experience builder: experience draft/versions, tiered publish gate (rules, AI, OneLocal review), rollback, pre-orders into the guest inbox (local dev DB 2026-11-04)')
+values ('partner/0656_guest_experience.sql', 'Guest experience builder: experience draft/versions, tiered publish gate (rules, AI, OneLocal review), rollback, pre-orders into the guest inbox (local dev DB 2026-11-04)')
 on conflict do nothing;
 
 commit;

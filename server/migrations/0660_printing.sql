@@ -1,4 +1,4 @@
--- 0658 Printing that really prints (founder's finding, 2026-11-04): kitchen tickets never printed while the app said "sent to the
+-- 0660 Printing that really prints (founder's finding, 2026-11-04): kitchen tickets never printed while the app said "sent to the
 -- printer"; Print KOT and receipt Print did nothing; the printers saved in Devices were never used. Local dev DB 2026-11-04.
 -- The phone / tablet on the restaurant's Wi-Fi prints: an online server cannot reach a printer on the shop's network. The database
 -- only answers WHAT to print and WHERE (one source of truth: pos_printers + pos_kitchen_stations.printer_id from Devices / Kitchen
@@ -117,9 +117,9 @@ do $$
 declare v_src text := pg_get_functiondef('public.rst_printer_save'::regproc);
   v_old text := $r$  if v_conn = 'lan' and v_addr !~ '^[0-9]{1,3}(\.[0-9]{1,3}){3}(:[0-9]{2,5})?$' then raise exception 'POS_BAD_REQUEST: the IP address looks wrong; it is like 192.168.1.50'; end if;$r$;
 begin
-  if v_src like '%0658: host name%' then return; end if;
-  if position(v_old in v_src) = 0 then raise exception '0658: rst_printer_save has changed shape; patch it by hand'; end if;
-  v_src := replace(v_src, v_old, $r$  -- 0658: host name or IPv4 address, optional port
+  if v_src like '%0660: host name%' then return; end if;
+  if position(v_old in v_src) = 0 then raise exception '0660: rst_printer_save has changed shape; patch it by hand'; end if;
+  v_src := replace(v_src, v_old, $r$  -- 0660: host name or IPv4 address, optional port
   if v_conn = 'lan' and not (v_addr ~ '^((25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])(:[0-9]{2,5})?$'
                              or v_addr ~* '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*(:[0-9]{2,5})?$') then
     raise exception 'POS_BAD_REQUEST: the printer address looks wrong; it is like 192.168.1.50 or kitchen-printer.local'; end if;$r$);
@@ -131,7 +131,7 @@ do $$
 declare v_src text := pg_get_functiondef('public.rst_activity_log'::regproc);
 begin
   if v_src like '%''kot_printed''%' then return; end if;
-  if position($r$'kot_fired', 'kot_reprinted',$r$ in v_src) = 0 then raise exception '0658: rst_activity_log has changed shape; patch it by hand'; end if;
+  if position($r$'kot_fired', 'kot_reprinted',$r$ in v_src) = 0 then raise exception '0660: rst_activity_log has changed shape; patch it by hand'; end if;
   execute replace(v_src, $r$'kot_fired', 'kot_reprinted',$r$, $r$'kot_fired', 'kot_reprinted', 'kot_printed', 'bill_printed', 'receipt_printed', 'print_failed',$r$);
 end $$;
 
@@ -140,6 +140,6 @@ revoke all on function public.pos_print_targets(jsonb), public.pos_kot_print(jso
 grant execute on function public.pos_print_targets(jsonb), public.pos_kot_print(jsonb), public.pos_print_log(jsonb) to authenticated, service_role;
 
 insert into public.schema_migrations_ledger (filename, note)
-values ('partner/0658_printing.sql', 'Printing: print targets for any staff, KOT print data routed by station printer, print log, Print KOT offered (local dev DB 2026-11-04)')
+values ('partner/0660_printing.sql', 'Printing: print targets for any staff, KOT print data routed by station printer, print log, Print KOT offered (local dev DB 2026-11-04)')
 on conflict do nothing;
 commit;

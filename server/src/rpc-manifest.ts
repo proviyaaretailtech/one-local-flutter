@@ -320,7 +320,7 @@ export const MANIFEST: Entry[] = [
   db('rst_bill_pay', { args: rst.BillPay, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
   db('rst_bill_coupon', { args: rst.BillCoupon, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
   db('rst_bill_discount', { args: rst.BillDiscount, map: P, rate: 'write', roles: 'staff allowed to take payment (above the limit: managers)' }),
-  // ---- printing (0658): the phone prints to the printers saved in Devices; the database says what and where, and keeps the record
+  // ---- printing (0660): the phone prints to the printers saved in Devices; the database says what and where, and keeps the record
   db('pos_print_targets', { args: dev.PrintTargets, map: P, rate: 'read', roles: 'any staff of the business (the function checks)' }),
   db('pos_kot_print', { args: dev.KotPrint, map: P, rate: 'read', roles: 'any staff of the outlet (the function checks)' }),
   db('pos_print_log', { args: dev.PrintLog, map: P, rate: 'write', roles: 'any staff of the business (the function checks)' }),
@@ -476,7 +476,7 @@ export const MANIFEST: Entry[] = [
   // ---- storefront, section M (0450-0451). Body = the function's `p` object; the database validates it and checks organisation and role
   //      (owner / admin / manager / marketing roles edit; storefront:publish publishes). Results carry storage paths: post turns them into short links.
   //      Pictures go through the two secure handlers below (signed slot, then confirm); the app never holds a storage key.
-  // ---- guest experience builder (0654): the restaurant's branded guest page (onelocal.co/<store link> and the table QR). Publishing goes
+  // ---- guest experience builder (0656): the restaurant's branded guest page (onelocal.co/<store link> and the table QR). Publishing goes
   // through the gate: rules in the database, the AI wording check on this server, OneLocal review for money / compliance / security.
   db('gx_builder_get', { args: gx.None, map: P, rate: 'read', roles: STOREFRONT }),
   db('gx_draft_save', { args: gx.Save, map: P, rate: 'write', roles: STOREFRONT, maxBytes: 64 * 1024 }),

@@ -65,6 +65,6 @@ add('POST', `${O}/:id/pay`, async (r, p) => { await requireSignedIn(r, 'pos-orde
 add('POST', `${O}/:id/cancel`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await orders.cancel(r, p.id)); });
 add('POST', `${O}/:id/act`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await orders.actOn(r, p.id)); });
 
-// ---- the restaurant's brand page (0654): onelocal.co/<store link>. Registered LAST: every fixed path above wins over a store link.
+// ---- the restaurant's brand page (0656): onelocal.co/<store link>. Registered LAST: every fixed path above wins over a store link.
 add('GET', '/r/:slug', brandPage);
 add('GET', '/:slug', brandPage);

@@ -1,4 +1,4 @@
--- Checks for 0654 (guest experience builder). Local dev DB only; runs inside one transaction and rolls back.
+-- Checks for 0656 (guest experience builder). Local dev DB only; runs inside one transaction and rolls back.
 --   docker exec -i supabase_db_onelocal-dev psql -U postgres -d postgres -v ON_ERROR_STOP=1 < server/tests/sql/guest_experience_checks.sql
 -- Uses the local Niks Cafe (agent/demo/niks_cafe_local.sql). Prints "PASS <n>" lines; any failure stops with an error.
 \set org 'bd4d8ee9-5885-41e4-b6a1-ba2b9cb873dd'

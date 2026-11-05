@@ -23,7 +23,7 @@ FakeServer server({int status = 200, String? refusal}) => FakeServer((r) {
             ? err(status, refusal)
             : ok({'order_id': 'x', 'display_no': 'P-00001', 'kot': {'ticket_id': 'k7', 'kot_no': 7, 'dishes': 2}, 'status': 'sent_to_kitchen', 'replayed': false});
       }
-      // 0658: the KOT just sent prints on the kitchen printer (none set up here)
+      // 0660: the KOT just sent prints on the kitchen printer (none set up here)
       if (p.endsWith('/rpc/pos_print_targets')) return ok({'printers': [], 'stations': [], 'business': {}});
       if (p.endsWith('/rpc/pos_kot_print')) {
         return ok({'ticket_id': 'k7', 'kot_no': 7, 'order_id': 'x', 'display_no': 'P-00001', 'channel': 'pickup', 'reprint': false, 'groups': [

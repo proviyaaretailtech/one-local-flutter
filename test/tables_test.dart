@@ -1083,7 +1083,7 @@ void main() {
       await tapText(t, 'Add Items');
       expect(find.text('Adding items to an open order is not in this release.'), findsOneWidget);
       await tapText(t, 'Print KOT');
-      expect(find.text('Send the order to the kitchen first.'), findsOneWidget, reason: 'the server\'s reason (0658: Print KOT is on once the table has a KOT)');
+      expect(find.text('Send the order to the kitchen first.'), findsOneWidget, reason: 'the server\'s reason (0660: Print KOT is on once the table has a KOT)');
       await tapText(t, 'Send KOT');
       expect(find.text('Not available right now.'), findsOneWidget);
       expect(s.calls('pos_set_order_status'), isEmpty);

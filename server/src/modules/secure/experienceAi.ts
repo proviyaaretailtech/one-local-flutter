@@ -1,4 +1,4 @@
-// Secure: the AI step of the guest page publish gate (database 0654, spec specs/guest-experience-builder §4).
+// Secure: the AI step of the guest page publish gate (database 0656, spec specs/guest-experience-builder §4).
 //   1. gx_publish (as the caller) classifies the change with rules. Wording that the rules did not already hold back waits as `pending_ai`.
 //   2. This module sends ONLY the changed wording (label, before, after, business name) to the AI reviewer and reports the verdict with the
 //      service-only gx_ai_verdict. "ok" publishes; "flag" sends it to a OneLocal person with the AI's note. The AI can only add risk:
@@ -164,14 +164,14 @@ export async function groqJson(o: { key: string; model: string; system: string; 
 export const COLOURS = ['background', 'surface', 'text', 'muted', 'accent', 'accent_text'] as const;
 type Colour = (typeof COLOURS)[number];
 type Theme = Record<Colour, string> & { font: string };
-/** The two ready-made looks, as gx__look_theme (0654) has them. */
+/** The two ready-made looks, as gx__look_theme (0656) has them. */
 export const LOOKS: Record<'bistro_dark' | 'bakery_warm', Theme> = {
   bistro_dark: { background: '#0E0E0E', surface: '#1C1C1C', text: '#FFFFFF', muted: '#A3A3A3', accent: '#F5B83D', accent_text: '#111111', font: 'sans' },
   bakery_warm: { background: '#F6F1EA', surface: '#FFFFFF', text: '#2B1D14', muted: '#8A7766', accent: '#2B1D14', accent_text: '#FFFFFF', font: 'serif' },
 };
 const MAX_DISHES = 120;
 
-// What a guest page may never say: the rules of gx__text_risk (0654) plus social handles. Such a line is dropped, not saved.
+// What a guest page may never say: the rules of gx__text_risk (0656) plus social handles. Such a line is dropped, not saved.
 const RISKY = [
   /(₹|\brs\.?\s?[0-9]|%|\boff\b|\bfree\b|discount|\boffers?\b|\bsale\b|cash ?back|\bdeals?\b|buy\s*[0-9]|[0-9]+\s*\+\s*[0-9]+|\bflat\s+[0-9])/i,
   /\+?[0-9][0-9 -]{8,}[0-9]/,

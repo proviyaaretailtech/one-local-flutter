@@ -1,4 +1,4 @@
--- Checks for 0660 (web orders through the customer server). Local dev DB only; runs inside one transaction and rolls back.
+-- Checks for 0662 (web orders through the customer server). Local dev DB only; runs inside one transaction and rolls back.
 --   docker exec -i supabase_db_onelocal-dev psql -U postgres -d postgres -v ON_ERROR_STOP=1 < server/tests/sql/web_orders_checks.sql
 -- Uses the local Niks Cafe (agent/demo/niks_cafe_local.sql) linked to One Local (agent/demo/niks_cafe_one_local_link.sql).
 -- Prints "PASS <n>" lines; any failure stops with an error. Opening hours are opened for the run (rolled back), so it passes at night too.

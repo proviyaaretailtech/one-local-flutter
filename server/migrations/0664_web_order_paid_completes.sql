@@ -1,4 +1,4 @@
--- 0662 A web order (placed on the restaurant's own page, ol_orders.source = 'web') is served and paid at the restaurant: when its POS
+-- 0664 A web order (placed on the restaurant's own page, ol_orders.source = 'web') is served and paid at the restaurant: when its POS
 -- order is paid, the customer order is complete (delivered). Before this it stayed "packed" for ever (2026-11-05 end-to-end run).
 -- The move goes through the status gate with its own event, so the legality guard and the event spine see it like any other.
 begin;
@@ -34,5 +34,5 @@ begin
 end $$;
 
 insert into public.schema_migrations_ledger (filename, note)
-values ('partner/0662_web_order_paid_completes.sql', 'Paid web order completes its customer order (status gate event paid_at_restaurant) (local dev DB 2026-11-05)') on conflict do nothing;
+values ('partner/0664_web_order_paid_completes.sql', 'Paid web order completes its customer order (status gate event paid_at_restaurant) (local dev DB 2026-11-05)') on conflict do nothing;
 commit;

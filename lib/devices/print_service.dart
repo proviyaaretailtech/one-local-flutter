@@ -20,7 +20,7 @@ import 'printer_router.dart' show PrinterRouter, printTargetsEpoch;
 // USB or "phone's print service" printer gets it through the print dialog at its paper or label size; with no printer set up, the
 // print dialog as before.
 
-/// The default printer for a job (receipt, label, kot), or null. The printers come from `pos_print_targets` (0658; `dev_printers` was
+/// The default printer for a job (receipt, label, kot), or null. The printers come from `pos_print_targets` (0660; `dev_printers` was
 /// never in the database, so every print fell back to the dialog), kept for two minutes; tests replace it.
 Future<StorePrinter?> Function(String job) defaultPrinterFor = _defaultPrinterFor;
 

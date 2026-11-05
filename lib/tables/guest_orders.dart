@@ -11,7 +11,7 @@ import '../ui/motion.dart';
 
 /// Guest orders sent from a table's QR code wait here until a member of staff accepts or declines them (spec D2). Accepting places the real
 /// order as the signed-in person (`guest_request_decide` -> `pos_place_order`, placed by guest), so it then shows in Orders and the kitchen
-/// like any other order. Declining needs a reason: the guest reads it on their phone. Pre-orders from the guest page (0654, `kind`
+/// like any other order. Declining needs a reason: the guest reads it on their phone. Pre-orders from the guest page (0656, `kind`
 /// 'preorder', no table) wait in the same list with their pickup time; accepting one places a pickup order the same way.
 class GuestOrdersPanel extends StatefulWidget {
   const GuestOrdersPanel({super.key, required this.env, this.tableId, this.onChanged, this.showEmpty = false});

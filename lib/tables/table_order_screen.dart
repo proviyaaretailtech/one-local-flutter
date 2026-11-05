@@ -20,7 +20,7 @@ import 'take_order_screens.dart';
 /// Figma "Table T12 Order" (screen-order-detail), reworked 28 Oct 2026: the open order of a table drawn as its printed bill, with the order's actions under it:
 /// Add Items, Send KOT, Print KOT, Change Table, Merge Table, Generate Bill. Which buttons work comes from the server (`can`); the ones it
 /// switches off say why. Add Items opens Add dishes and Send KOT sends the held dishes (0485) and prints the new KOT; Print KOT prints the
-/// table's latest KOT again on the kitchen printers (0658); Generate Bill uses the order status move.
+/// table's latest KOT again on the kitchen printers (0660); Generate Bill uses the order status move.
 /// switches off say why. Send KOT and Generate Bill use the existing order status move; the database checks the transition.
 /// Generate Bill then opens the restaurant Checkout ("Bill and pay", 0550); once a bill is generated the button reads Take Payment.
 class TableOrderScreen extends StatefulWidget {

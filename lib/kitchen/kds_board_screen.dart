@@ -172,7 +172,7 @@ class _KdsBoardScreenState extends State<KdsBoardScreen> {
     await _load();
   }
 
-  /// Print KOT (0658): this card's dishes on its station's kitchen printer, and the board says what happened; a real print is then noted
+  /// Print KOT (0660): this card's dishes on its station's kitchen printer, and the board says what happened; a real print is then noted
   /// as a reprint on the order.
   Future<void> _print(Facts card) async {
     final id = card.s('card_id');

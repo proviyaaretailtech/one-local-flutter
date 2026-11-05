@@ -72,7 +72,7 @@ class Fake {
     return err(404, 'not found: ${fnOf(r)}');
   });
 
-  /// The printers set up in Devices (`pos_print_targets`, 0658): none until a test adds one.
+  /// The printers set up in Devices (`pos_print_targets`, 0660): none until a test adds one.
   List<Map<String, dynamic>> printers = [];
   Map<String, dynamic> business = {'name': 'Dosa House 550', 'outlet': 'Indiranagar', 'gstin': '29ABCDE1234F1Z5', 'address': '12 CMH Road, Bengaluru', 'phone': '080 4000 5500'};
   void counterPrinter() => printers = [

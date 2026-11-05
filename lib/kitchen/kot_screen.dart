@@ -115,7 +115,7 @@ class _KotScreenState extends State<KotScreen> {
         if (mounted) showToast(context, '#${o.s('display_no')} served.');
       });
 
-  /// Print latest KOT (0658): the order's latest KOT on the printer of each station on it; the screen says what happened.
+  /// Print latest KOT (0660): the order's latest KOT on the printer of each station on it; the screen says what happened.
   Future<void> _print(Facts o) => _run(o, () async {
         final r = await printAndSay(context, PrinterRouter.of(widget.env.api.rpc).printKot(o.s('id')));
         if (r.ok && o.so('latest_ticket') != null) await widget.env.api.noteReprint(o.s('latest_ticket'));

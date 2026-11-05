@@ -29,11 +29,11 @@ export const GUEST_DOOR: GuestEntry[] = [
   { alias: 'feedback', fn: 'guest_feedback', args: gst.Feedback, perMinute: 6, subject: 'session' },
   // the public menu link (0571): read-only menu of a live business by its address name, no table and no session
   { alias: 'card', fn: 'guest_menu_by_slug', args: gst.Card, perMinute: 60, subject: 'slug' },
-  // the brand page's pre-order (0654): slots of a live business, a pre-order (limited per phone), its tracking by the link it returns
+  // the brand page's pre-order (0656): slots of a live business, a pre-order (limited per phone), its tracking by the link it returns
   { alias: 'slots', fn: 'gx_preorder_slots', args: gst.Slots, perMinute: 60, subject: 'slug' },
   { alias: 'preorder', fn: 'gx_preorder_place', args: gst.Preorder, perMinute: 6, subject: 'phone' },
   { alias: 'pretrack', fn: 'gx_preorder_status', args: gst.PreorderTrack, perMinute: 120, subject: 'track' },
-  // the page's live order feed (0660): the restaurant's dishes of the last 20 minutes with the table label; no people, phones or money
+  // the page's live order feed (0662): the restaurant's dishes of the last 20 minutes with the table label; no people, phones or money
   { alias: 'feed', fn: 'gx_live_feed', args: gst.Feed, perMinute: 30, subject: 'slug', subjectPerMinute: 600 },
 ];
 // answers that carry the restaurant's guest page: its welcome picture is a storage path, turned into a short-lived link here

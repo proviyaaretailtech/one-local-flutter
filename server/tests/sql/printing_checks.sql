@@ -1,4 +1,4 @@
--- Checks for 0658 (printing). Local dev DB only; one transaction, rolled back.
+-- Checks for 0660 (printing). Local dev DB only; one transaction, rolled back.
 --   docker exec -i supabase_db_onelocal-dev psql -U postgres -d postgres -v ON_ERROR_STOP=1 < server/tests/sql/printing_checks.sql
 \set org 'bd4d8ee9-5885-41e4-b6a1-ba2b9cb873dd'
 begin;
@@ -33,7 +33,7 @@ grant select on _ctx, _st to authenticated;
 -- an order with a drink and a dish, sent to the kitchen
 select pg_temp.who((select owner from _ctx));
 create temp table _o as select (pos_place_order(jsonb_build_object('organization_id', :'org', 'service_type', 'dine_in', 'table_id', (select t2 from _ctx),
-  'idempotency_key', 'chk-0658-' || gen_random_uuid(), 'lines', jsonb_build_array(
+  'idempotency_key', 'chk-0660-' || gen_random_uuid(), 'lines', jsonb_build_array(
     jsonb_build_object('menu_item_id', (select id from menu_items where organization_id = :'org' and name = 'Cappuccino'), 'qty', 2, 'notes', 'less sugar'),
     jsonb_build_object('menu_item_id', (select id from menu_items where organization_id = :'org' and name = 'Peri Peri Fries'), 'qty', 1)))) ->> 'id')::uuid id;
 grant select on _o to authenticated;

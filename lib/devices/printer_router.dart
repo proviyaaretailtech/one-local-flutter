@@ -17,7 +17,7 @@ import 'print_service.dart' show receiptPdf;
 // Printing that prints (founder, 4 Nov 2026: kitchen tickets never printed while the app said "sent to the printer"; Print KOT and the
 // receipt's Print did nothing; the printers saved in Devices were never used). The phone or tablet on the shop's Wi-Fi prints: a server
 // online cannot reach a printer on the shop's network. The database says WHAT to print and WHERE (`pos_print_targets`, `pos_kot_print`,
-// migration 0658, from Devices and Kitchen setup) and keeps what happened (`pos_print_log`, on the order's events).
+// migration 0660, from Devices and Kitchen setup) and keeps what happened (`pos_print_log`, on the order's events).
 //   Network (LAN)          ESC/POS bytes on the printer's port (9100 unless the address names another), its copies, cut when auto cut is on
 //   Phone's print service  the phone's print dialog
 //   Bluetooth / USB        not in this build: said plainly, nothing pretends to print

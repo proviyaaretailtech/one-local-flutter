@@ -1,4 +1,4 @@
-// Pre-orders from the guest page (database 0654) wait in the same Guest orders inbox as table orders: no table, a pickup time, the
+// Pre-orders from the guest page (database 0656) wait in the same Guest orders inbox as table orders: no table, a pickup time, the
 // guest's name and phone. Accept and Decline are the same guest_request_decide.
 import 'dart:convert';
 
@@ -18,7 +18,7 @@ import 'helpers.dart';
 http.Response ok(Object? body) => http.Response(jsonEncode(body), 200, headers: {'content-type': 'application/json; charset=utf-8'});
 
 void main() {
-  /// Shaped like guest__staff_request_json (0654): a pre-order has kind 'preorder', a null table, pickup_at and guest_phone.
+  /// Shaped like guest__staff_request_json (0656): a pre-order has kind 'preorder', a null table, pickup_at and guest_phone.
   Map<String, dynamic> listJson() => {
         'can_decide': true,
         'waiting': 3,

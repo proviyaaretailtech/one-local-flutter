@@ -1,4 +1,4 @@
--- 0660 Web orders through the customer server: a guest on a restaurant's own page (table QR or brand page) orders, the order becomes a
+-- 0662 Web orders through the customer server: a guest on a restaurant's own page (table QR or brand page) orders, the order becomes a
 -- One Local customer order (ol_orders, source 'web') and, in the same transaction, a normal POS order (channel online, external_ref
 -- onelocal:<id>, the table for dine-in) so the existing Orders board, accept, KOT, bill and Master views work unchanged.
 -- Spec: specs/guest-experience-builder/spec-part2-live-orders.md (contracts A and B). Local dev DB 2026-11-05.
@@ -41,8 +41,8 @@ do $$ begin
                          and (order_mode <> 'dine_in' or table_label is not null) and (order_mode <> 'pickup' or pickup_at is not null)));
   end if;
 end $$;
-comment on column public.ol_orders.source is '0660: app = the One Local app; web = a restaurant''s own guest page (table QR or brand page) through the customer server';
-comment on column public.ol_orders.track_hash is '0660: sha256 of the guest''s tracking link (18 random bytes, hex); the link itself is never stored';
+comment on column public.ol_orders.source is '0662: app = the One Local app; web = a restaurant''s own guest page (table QR or brand page) through the customer server';
+comment on column public.ol_orders.track_hash is '0662: sha256 of the guest''s tracking link (18 random bytes, hex); the link itself is never stored';
 
 -- a web order is served at the table or picked up: it never asks for a rider
 create or replace view public.delivery_orders_needing_rider as
@@ -62,13 +62,13 @@ create or replace view public.delivery_orders_needing_rider as
 do $$
 declare v_src text := pg_get_functiondef('public.ol_create_restaurant_order(jsonb)'::regprocedure); v_n int := 0;
 begin
-  if v_src like '%0660: a web order%' then return; end if;
+  if v_src like '%0662: a web order%' then return; end if;
   -- 1 the discount a web order's code takes off
   if strpos(v_src, $r$  v_loc        uuid;
 begin$r$) > 0 then v_n := v_n + 1; end if;
   v_src := replace(v_src, $r$  v_loc        uuid;
 begin$r$, $r$  v_loc        uuid;
-  v_disc       numeric(10,2) := 0;   -- 0660: a web order's discount code
+  v_disc       numeric(10,2) := 0;   -- 0662: a web order's discount code
 begin$r$);
   -- 2 a dish note travels with the dish
   if strpos(v_src, $r$'qty', v_qty, 'station', v_item.station, 'course', v_item.course);$r$) > 0 then v_n := v_n + 1; end if;
@@ -100,7 +100,7 @@ begin$r$);
          coalesce(l->>'station', 'main'), coalesce(l->>'course', 'eat'), nullif(l->>'notes', '')
   from jsonb_array_elements(v_lines) l;
 
-  -- 0660: a web order (the restaurant's own page) is the restaurant's bill: its GST, service charge, round off and discount code
+  -- 0662: a web order (the restaurant's own page) is the restaurant's bill: its GST, service charge, round off and discount code
   -- (tbl_order_reprice, the one restaurant pricing), so the customer order below carries the same money as the POS order
   if p->>'source' = 'web' then
     perform public.tbl_order_reprice(v_pos_id);
@@ -132,8 +132,8 @@ begin$r$);
   -- 7 the answer says the discount too
   if strpos(v_src, $r$'subtotal', v_subtotal, 'gst', v_gst,$r$) > 0 then v_n := v_n + 1; end if;
   v_src := replace(v_src, $r$'subtotal', v_subtotal, 'gst', v_gst,$r$, $r$'subtotal', v_subtotal, 'discount', v_disc, 'gst', v_gst,$r$);
-  if v_n <> 7 or v_src not like '%0660: a web order%' then
-    raise exception '0660: ol_create_restaurant_order has changed shape (% of 7 parts found); patch it by hand', v_n;
+  if v_n <> 7 or v_src not like '%0662: a web order%' then
+    raise exception '0662: ol_create_restaurant_order has changed shape (% of 7 parts found); patch it by hand', v_n;
   end if;
   execute v_src;
 end $$;
@@ -144,8 +144,8 @@ declare v_src text := pg_get_functiondef('public.commission_quote(uuid)'::regpro
 begin
   if v_src not like '%ol.source = ''app''%' then
     v_src := replace(v_src, $r$if not exists (select 1 from public.ol_orders ol where ol.pos_order_id = o.id) then return; end if;$r$,
-      $r$if not exists (select 1 from public.ol_orders ol where ol.pos_order_id = o.id and ol.source = 'app') then return; end if;   -- 0660: not on a web order (the restaurant's own page)$r$);
-    if v_src not like '%ol.source = ''app''%' then raise exception '0660: commission_quote has changed shape; patch it by hand'; end if;
+      $r$if not exists (select 1 from public.ol_orders ol where ol.pos_order_id = o.id and ol.source = 'app') then return; end if;   -- 0662: not on a web order (the restaurant's own page)$r$);
+    if v_src not like '%ol.source = ''app''%' then raise exception '0662: commission_quote has changed shape; patch it by hand'; end if;
     execute v_src;
   end if;
 end $$;
@@ -154,8 +154,8 @@ declare v_src text := pg_get_functiondef('public.order_money_accrue(uuid)'::regp
 begin
   if v_src not like '%and source = ''app'' order by created_at limit 1%' then
     v_src := replace(v_src, $r$select * into v_ol from public.ol_orders where pos_order_id = o.id order by created_at limit 1;$r$,
-      $r$select * into v_ol from public.ol_orders where pos_order_id = o.id and source = 'app' order by created_at limit 1;   -- 0660: a web order is the restaurant's own sale$r$);
-    if v_src not like '%and source = ''app'' order by created_at limit 1%' then raise exception '0660: order_money_accrue has changed shape; patch it by hand'; end if;
+      $r$select * into v_ol from public.ol_orders where pos_order_id = o.id and source = 'app' order by created_at limit 1;   -- 0662: a web order is the restaurant's own sale$r$);
+    if v_src not like '%and source = ''app'' order by created_at limit 1%' then raise exception '0662: order_money_accrue has changed shape; patch it by hand'; end if;
     execute v_src;
   end if;
 end $$;
@@ -446,7 +446,7 @@ begin
   if v_src not like '%''offers'', public.gx__offers(p_org)%' then
     v_src := replace(v_src, $r$'experience', public.gx__public_def(p_org));$r$, $r$'experience', public.gx__public_def(p_org),
     'offers', public.gx__offers(p_org));$r$);
-    if v_src not like '%''offers'', public.gx__offers(p_org)%' then raise exception '0660: guest__menu has changed shape; patch it by hand'; end if;
+    if v_src not like '%''offers'', public.gx__offers(p_org)%' then raise exception '0662: guest__menu has changed shape; patch it by hand'; end if;
     execute v_src;
   end if;
 end $$;
@@ -489,7 +489,7 @@ end $$;
 do $$
 declare v_src text := pg_get_functiondef('public.rst_channel_orders(jsonb)'::regprocedure); v_n int := 0;
 begin
-  if v_src like '%0660: a web order%' then return; end if;
+  if v_src like '%0662: a web order%' then return; end if;
   if strpos(v_src, $r$o.external_ref, o.customer_phone,$r$) > 0 then v_n := v_n + 1; end if;
   v_src := replace(v_src, $r$o.external_ref, o.customer_phone,$r$, $r$o.external_ref, o.customer_phone, x.order_mode as web_mode, x.table_label, x.pickup_at,$r$);
   if strpos(v_src, $r$case when x.id is not null or o.channel = 'online' then 'onelocal'$r$) > 0 then v_n := v_n + 1; end if;
@@ -497,7 +497,7 @@ begin
     $r$case when x.source = 'web' then 'web' when x.id is not null or o.channel = 'online' then 'onelocal'$r$);
   if strpos(v_src, $r$               when x.id is not null then case x.status when 'placed' then 'new'$r$) > 0 then v_n := v_n + 1; end if;
   v_src := replace(v_src, $r$               when x.id is not null then case x.status when 'placed' then 'new'$r$,
-    $r$               -- 0660: a web order (dine-in or pickup) follows its POS order once accepted: kitchen, ready, bill, paid
+    $r$               -- 0662: a web order (dine-in or pickup) follows its POS order once accepted: kitchen, ready, bill, paid
                when x.source = 'web' then case when x.status = 'placed' then 'new' else case o.status when 'new' then 'new' when 'in_billing' then 'new'
                  when 'sent_to_kitchen' then 'preparing' when 'ready' then 'ready' when 'awaiting_payment' then 'ready' else 'delivered' end end
                when x.id is not null then case x.status when 'placed' then 'new'$r$);
@@ -508,10 +508,10 @@ begin
         ) order by$r$) > 0 then v_n := v_n + 1; end if;
   v_src := replace(v_src, $r$          'held', o.held
         ) order by$r$, $r$          'held', o.held,
-          -- 0660: a web order from the restaurant's own page: dine-in at a table, or a pickup time
+          -- 0662: a web order from the restaurant's own page: dine-in at a table, or a pickup time
           'mode', o.web_mode, 'table_label', o.table_label, 'pickup_at', o.pickup_at
         ) order by$r$);
-  if v_n <> 5 or v_src not like '%0660: a web order%' then raise exception '0660: rst_channel_orders has changed shape (% of 5 parts found); patch it by hand', v_n; end if;
+  if v_n <> 5 or v_src not like '%0662: a web order%' then raise exception '0662: rst_channel_orders has changed shape (% of 5 parts found); patch it by hand', v_n; end if;
   execute v_src;
 end $$;
 
@@ -524,7 +524,7 @@ revoke all on function public.ol__web_find(jsonb, boolean), public.ol__web_order
   from public, anon, authenticated;
 
 insert into public.schema_migrations_ledger (filename, note)
-values ('partner/0660_web_orders.sql', 'Web orders through the customer server: ol_orders source/mode/table/pickup/track, ol_web_order_place/status/bill, Web on the Orders board, offers in the guest menu, gx_live_feed; web orders accrue no marketplace money and never ask for a rider (local dev DB 2026-11-05)')
+values ('partner/0662_web_orders.sql', 'Web orders through the customer server: ol_orders source/mode/table/pickup/track, ol_web_order_place/status/bill, Web on the Orders board, offers in the guest menu, gx_live_feed; web orders accrue no marketplace money and never ask for a rider (local dev DB 2026-11-05)')
 on conflict do nothing;
 
 commit;

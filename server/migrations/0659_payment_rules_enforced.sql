@@ -1,4 +1,4 @@
--- 0657 Payment and order rules hold for every caller (founder's finding, 2026-11-04): a signed-in cashier could call the database's
+-- 0659 Payment and order rules hold for every caller (founder's finding, 2026-11-04): a signed-in cashier could call the database's
 -- order writer and payment writer directly, skip the server and the bill step, record a payment as "other", and do it for an outlet
 -- that is not theirs. The hosted copy (31 Oct) has the same grants. Local dev DB 2026-11-04.
 --   1. The internal writers are no longer callable by signed-in users: pos_record_payment, pos_place_order, pos_adjust_bill,
@@ -32,19 +32,19 @@ declare v_src text := pg_get_functiondef('public.pos_record_payment'::regproc);
   v_meth text := $r$  if v_method not in ('cash','upi','card','wallet','other') then raise exception 'POS_BAD_REQUEST: unknown payment method'; end if;$r$;
   v_state text := $r$  if v_o.status in ('paid','cancelled') then raise exception 'POS_WRONG_STATE: this order is already %', v_o.status; end if;$r$;
 begin
-  if v_src like '%0657:%' then return; end if;
+  if v_src like '%0659:%' then return; end if;
   if position(v_role in v_src) = 0 or position(v_meth in v_src) = 0 or position(v_state in v_src) = 0 then
-    raise exception '0657: pos_record_payment has changed shape; patch it by hand'; end if;
+    raise exception '0659: pos_record_payment has changed shape; patch it by hand'; end if;
   v_src := replace(v_src, v_role, v_role || $r$
-  -- 0657: the same rules for every caller (a direct call cannot skip them)
+  -- 0659: the same rules for every caller (a direct call cannot skip them)
   perform public.require_via_master('pos_capture');
   if not public.location_is_allowed(v_o.organization_id, v_o.location_id) then raise exception 'POS_FORBIDDEN: this order belongs to an outlet you do not work in'; end if;$r$);
   v_src := replace(v_src, v_meth, $r$  if v_method not in ('cash','upi','card','other') then raise exception 'POS_BAD_REQUEST: choose cash, card or UPI'; end if;
-  -- 0657: "other" is only a delivery partner's or a prepaid app's settlement on a pickup / delivery order, named in the reference
+  -- 0659: "other" is only a delivery partner's or a prepaid app's settlement on a pickup / delivery order, named in the reference
   if v_method = 'other' and not (v_o.channel::text in ('pickup', 'delivery') and btrim(coalesce(p->>'reference', '')) in ('Swiggy', 'Zomato', 'OneLocal app')) then
     raise exception 'POS_BAD_REQUEST: choose cash, card or UPI'; end if;$r$);
   v_src := replace(v_src, v_state, v_state || $r$
-  -- 0657: a restaurant table order is paid only after its bill is generated
+  -- 0659: a restaurant table order is paid only after its bill is generated
   if v_o.table_id is not null and v_o.status <> 'awaiting_payment' and public.pos_org_is_restaurant(v_o.organization_id) then
     raise exception 'POS_WRONG_STATE: generate the bill first'; end if;$r$);
   execute v_src;
@@ -55,15 +55,15 @@ do $$
 declare v_src text := pg_get_functiondef('public.pos_place_order'::regproc);
   v_old text := $r$  if v_loc is null then select id into v_loc from public.locations where organization_id = v_org order by (code = 'MAIN') desc, created_at limit 1; end if;$r$;
 begin
-  if v_src like '%0657:%' then return; end if;
-  if position(v_old in v_src) = 0 then raise exception '0657: pos_place_order has changed shape; patch it by hand'; end if;
+  if v_src like '%0659:%' then return; end if;
+  if position(v_old in v_src) = 0 then raise exception '0659: pos_place_order has changed shape; patch it by hand'; end if;
   v_src := replace(v_src, v_old, v_old || $r$
-  -- 0657: an order is placed only in an outlet the caller may work in
+  -- 0659: an order is placed only in an outlet the caller may work in
   if not public.location_is_allowed(v_org, v_loc) then raise exception 'POS_FORBIDDEN: this outlet is not one you work in'; end if;$r$);
   execute v_src;
 end $$;
 
 insert into public.schema_migrations_ledger (filename, note)
-values ('partner/0657_payment_rules_enforced.sql', 'Order and payment writers not callable directly by signed-in users; payment writer checks Master pause, outlet, method and generated bill for every caller; order writer checks outlet (local dev DB 2026-11-04)')
+values ('partner/0659_payment_rules_enforced.sql', 'Order and payment writers not callable directly by signed-in users; payment writer checks Master pause, outlet, method and generated bill for every caller; order writer checks outlet (local dev DB 2026-11-04)')
 on conflict do nothing;
 commit;

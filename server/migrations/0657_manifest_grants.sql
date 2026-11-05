@@ -1,4 +1,4 @@
--- 0655 Signed-in users can call every function the POS gateway manifest allows (src/rpc-manifest.ts `db(...)` entries), as
+-- 0657 Signed-in users can call every function the POS gateway manifest allows (src/rpc-manifest.ts `db(...)` entries), as
 -- scripts/manifest-audit.mjs requires. The local dev DB had drifted: 187 of them were service-role only after an earlier blanket
 -- lockdown re-ran, so the partner app got "permission denied" on this machine. Generated from the manifest on 2026-11-04; idempotent,
 -- harmless where the grants already exist. Never grants to anon or PUBLIC.
@@ -14,5 +14,5 @@ begin
   end loop;
 end $$;
 insert into public.schema_migrations_ledger (filename, note)
-values ('partner/0655_manifest_grants.sql', 'Authenticated can execute every POS gateway manifest function (local drift repair, 2026-11-04)') on conflict do nothing;
+values ('partner/0657_manifest_grants.sql', 'Authenticated can execute every POS gateway manifest function (local drift repair, 2026-11-04)') on conflict do nothing;
 commit;

@@ -13,7 +13,7 @@ import 'package:vinii_pos/ui/theme.dart';
 import 'helpers.dart';
 
 // The restaurant's own guest page (specs/guest-experience-builder): its look and blocks, the brand page (onelocal.co/<store link>) with
-// dine-in and pre-order, and the pre-order's tracking. Shapes as the database answers them (0654: gx__public_def, gx_preorder_*).
+// dine-in and pre-order, and the pre-order's tracking. Shapes as the database answers them (0656: gx__public_def, gx_preorder_*).
 
 const _bakery = {
   'background': '#F6F1EA',

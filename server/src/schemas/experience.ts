@@ -1,4 +1,4 @@
-// Request shapes for the guest experience builder (database 0654; spec specs/guest-experience-builder). A friendly first check only:
+// Request shapes for the guest experience builder (database 0656; spec specs/guest-experience-builder). A friendly first check only:
 // the database cleans the whole page again (gx__clean) and decides what is allowed, so the page itself passes through as an object.
 import { z } from 'zod';
 

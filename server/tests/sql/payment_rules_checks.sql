@@ -1,4 +1,4 @@
--- Checks for 0657 (payment and order rules for every caller). Local dev DB only; one transaction, rolled back.
+-- Checks for 0659 (payment and order rules for every caller). Local dev DB only; one transaction, rolled back.
 --   docker exec -i supabase_db_onelocal-dev psql -U postgres -d postgres -v ON_ERROR_STOP=1 < server/tests/sql/payment_rules_checks.sql
 -- Reproduces the founder's finding on the local Niks Cafe: a cashier (biller) calling the writers directly, paying a table order
 -- whose bill was never generated, paying with "other", and paying an order of an outlet that is not theirs.
@@ -31,7 +31,7 @@ grant select on _ctx to authenticated;
 -- a table order at the main outlet, sent to the kitchen, bill NOT generated (made by the owner through the order writer)
 select pg_temp.who((select owner from _ctx));
 create temp table _o as select (pos_place_order(jsonb_build_object('organization_id', :'org', 'service_type', 'dine_in', 'table_id', (select t1 from _ctx),
-  'idempotency_key', 'chk-0657-' || gen_random_uuid(), 'lines', jsonb_build_array(jsonb_build_object('menu_item_id', (select dish from _ctx), 'qty', 1)))) ->> 'id')::uuid id;
+  'idempotency_key', 'chk-0659-' || gen_random_uuid(), 'lines', jsonb_build_array(jsonb_build_object('menu_item_id', (select dish from _ctx), 'qty', 1)))) ->> 'id')::uuid id;
 grant select on _o to authenticated;
 
 -- 1-2 the cashier cannot reach the writers directly
@@ -61,10 +61,10 @@ select pg_temp.ok(6, (select status from orders where id = (select id from _o)) 
 -- 7 Master pause stops the restaurant payment path
 select pg_temp.who((select owner from _ctx));
 create temp table _o2 as select (pos_place_order(jsonb_build_object('organization_id', :'org', 'service_type', 'dine_in', 'table_id', (select t1 from _ctx),
-  'idempotency_key', 'chk-0657b-' || gen_random_uuid(), 'lines', jsonb_build_array(jsonb_build_object('menu_item_id', (select dish from _ctx), 'qty', 1)))) ->> 'id')::uuid id;
+  'idempotency_key', 'chk-0659b-' || gen_random_uuid(), 'lines', jsonb_build_array(jsonb_build_object('menu_item_id', (select dish from _ctx), 'qty', 1)))) ->> 'id')::uuid id;
 grant select on _o2 to authenticated;
 select pos_set_order_status(jsonb_build_object('order_id', (select id from _o2), 'to', 'awaiting_payment'));
-set local app.migration = '0657probe';
+set local app.migration = '0659probe';
 update master_runtime_state set payments_paused = true;
 set local role authenticated;
 select pg_temp.ok(7, pg_temp.refused(format($q$select rst_bill_pay('{"order_id":"%s","method":"cash","tendered":500,"idempotency_key":"chk-pay-4"}')$q$, (select id from _o2)), 'PAUSED'),

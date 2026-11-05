@@ -42,7 +42,7 @@ export async function guestWeb(request: Request): Promise<Response> {
   return new Response(new Uint8Array(page), { status: 200, headers: headers('text/html; charset=utf-8') });
 }
 
-// The brand page of a restaurant (0654): onelocal.co/<store link> (and /r/<store link>) answers the same guest page, which reads the store
+// The brand page of a restaurant (0656): onelocal.co/<store link> (and /r/<store link>) answers the same guest page, which reads the store
 // link from its own address. Names OneLocal itself uses can never be a store link (the database refuses them too: gx__reserved_slug).
 export const RESERVED_SLUGS = new Set(['privacy', 'terms', 'delete-account', 'join', 'auth', 'api', 'm', 't', 'b', 'r', 'guest', 'rpc', 'health',
   'admin', 'partner', 'partners', 'app', 'static', 'assets', 'www', 'help', 'support', 'about', 'login', 'signup', 'signin', 'onelocal',

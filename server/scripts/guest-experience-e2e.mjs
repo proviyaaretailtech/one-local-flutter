@@ -1,4 +1,4 @@
-// E2E: the guest experience builder (0654) over HTTP against the standalone POS server, as the local Niks Cafe owner and an anonymous
+// E2E: the guest experience builder (0656) over HTTP against the standalone POS server, as the local Niks Cafe owner and an anonymous
 // guest. LOCAL ONLY. Covers: builder, colour change live by rules, new wording through the real AI step (Groq, if GROQ_API_KEY is set on
 // the server), a discount claim held for OneLocal review and approved (as the Master server would), the public brand page and menu,
 // pre-order slots -> pre-order -> staff accept -> pickup order -> guest tracking, rollback, strangers refused.

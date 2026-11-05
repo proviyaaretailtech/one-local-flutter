@@ -5,7 +5,7 @@ import '../auth/partner_api.dart';
 import '../inventory/inventory_api.dart' show Facts;
 import '../storefront/menu_link_screen.dart' show MenuLinkApi;
 
-/// The guest experience builder (database 0654, spec specs/guest-experience-builder) through the one generic door, `POST /rpc/<gx_function>`
+/// The guest experience builder (database 0656, spec specs/guest-experience-builder) through the one generic door, `POST /rpc/<gx_function>`
 /// ([RpcClient]). The database cleans every draft (`gx__clean`), decides how risky a publish is and whether it goes live now, after the AI
 /// reads the wording, or after a OneLocal person looks. This app only edits the draft and shows the answer.
 class ExperienceApi {

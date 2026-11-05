@@ -16,7 +16,7 @@ class StorePrinter {
   String get id => _s('id');
   String get name => _s('name');
 
-  /// receipt, label (barcode labels) or kot (kitchen). `pos_print_targets` (0658) names it `type`.
+  /// receipt, label (barcode labels) or kot (kitchen). `pos_print_targets` (0660) names it `type`.
   String get type => _s('printer_type').isNotEmpty ? _s('printer_type') : _s('type');
 
   /// lan (network, prints directly), bluetooth, usb, or system (the phone's print service).

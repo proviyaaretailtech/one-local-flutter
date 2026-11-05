@@ -51,7 +51,7 @@ export const secureHandlers = {
   maps_search: ctx => mapsSearch(ctx),
   maps_place: ctx => mapsPlace(ctx),
   maps_reverse: ctx => mapsReverse(ctx),
-  // guest page publish: rules in the database, then the AI wording check (GROQ_API_KEY) for what the rules let through (0654)
+  // guest page publish: rules in the database, then the AI wording check (GROQ_API_KEY) for what the rules let through (0656)
   gx_publish: experienceAi.publish,
   // Create with AI (fills the draft through the caller's gx_draft_save) and Import menu (a proposal only), both GROQ_API_KEY; spec part 2 D
   gx_ai_create: ctx => experienceAi.aiCreate(ctx),

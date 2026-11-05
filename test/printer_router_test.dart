@@ -24,7 +24,7 @@ Map<String, dynamic> dish(String name, {num qty = 1, String? variant, List<Objec
       'name': name, 'qty': qty, 'variant': variant, 'add_ons': addOns, 'notes': notes, 'takeaway': takeaway, 'cancelled': cancelled,
     };
 
-/// `pos_kot_print` as the database answers it (0658).
+/// `pos_kot_print` as the database answers it (0660).
 Map<String, dynamic> kotAnswer({bool reprint = false, List<Map<String, dynamic>>? groups}) => {
       'ticket_id': 'k-12', 'kot_no': 12, 'order_id': 'o-1', 'display_no': 'P-00012', 'channel': 'dine_in', 'table_label': 'T4',
       'sent_at': '2026-11-04T14:15:00Z', 'note': 'No onions at all', 'reprint': reprint,

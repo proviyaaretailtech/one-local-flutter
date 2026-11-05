@@ -24,7 +24,7 @@ class GuestItem {
   List<String> get tags => f.ls('tags');
 }
 
-/// The menu of the guest's outlet with the restaurant's own name and colour from its published storefront, and its guest page (0654).
+/// The menu of the guest's outlet with the restaurant's own name and colour from its published storefront, and its guest page (0656).
 class GuestMenu {
   GuestMenu(Facts f)
       : brandName = f.m('brand').s('name'),
@@ -60,7 +60,7 @@ class GuestMenu {
   }
 }
 
-/// The restaurant's guest page as it published it (0654 `experience`, specs/guest-experience-builder): a look, its colours and font, and the
+/// The restaurant's guest page as it published it (0656 `experience`, specs/guest-experience-builder): a look, its colours and font, and the
 /// blocks a guest walks through in the restaurant's order. Only switched-on blocks count; dishes and prices always come from the menu.
 class GuestExperience {
   GuestExperience(Facts f)
@@ -376,7 +376,7 @@ class MenuCardGateway implements GuestGateway {
   Future<void> feedback(int rating, {String? comment}) async {}
 }
 
-/// The pickup times a brand page offers (0654 `gx_preorder_slots`): each day (the restaurant's date) that still has a time, and its times
+/// The pickup times a brand page offers (0656 `gx_preorder_slots`): each day (the restaurant's date) that still has a time, and its times
 /// exactly as the database wrote them, because a pre-order sends one back unchanged.
 class PreorderSlots {
   PreorderSlots(Facts f)
@@ -402,7 +402,7 @@ DateTime guestWallTime(String iso, [String? timezone]) {
   return t.toUtc().add(offset);
 }
 
-/// The brand page's pre-order door (0654): the pickup times, the pre-order itself (a name, a 10-digit mobile number and one of the offered
+/// The brand page's pre-order door (0656): the pickup times, the pre-order itself (a name, a 10-digit mobile number and one of the offered
 /// times; limited per phone and per address), and its tracking by the token the pre-order answered with. Nobody signs in.
 abstract class PreorderDoor {
   Future<PreorderSlots> slots();

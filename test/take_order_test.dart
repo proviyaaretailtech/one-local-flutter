@@ -74,7 +74,7 @@ Future<void> showPushed(WidgetTester t, Widget screen) async {
   await t.pumpAndSettle();
 }
 
-/// The print functions (0658): [printers] as set up in Devices (one network kitchen printer unless a test says otherwise), and the
+/// The print functions (0660): [printers] as set up in Devices (one network kitchen printer unless a test says otherwise), and the
 /// KOT the database names for the order (`pos_kot_print`; it says REPRINT whenever a ticket id is given).
 http.Response? printing(http.Request r, {List<Map<String, dynamic>>? printers}) => switch (fnOf(r)) {
       'pos_print_targets' => ok({
@@ -346,6 +346,8 @@ void main() {
       await t.tap(find.byKey(const ValueKey('plus-$naan')));
       await t.pump();
       await t.tap(find.byKey(const ValueKey('send-to-kitchen')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('review-send')));   // "Check the order" with the guest first (main, 0d9bd0a)
       await t.pumpAndSettle();
       expect(find.text('KOT #1 sent'), findsOneWidget);
       expect(argsOf(f.calls('pos_kot_print').single)['ticket_id'], ((fx['add_send'] as Map)['kot'] as Map)['ticket_id']);

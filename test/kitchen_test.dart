@@ -30,7 +30,7 @@ String fnOf(http.Request r) => r.url.path.split('/').last;
 Map<String, dynamic> argsOf(http.Request r) => jsonDecode(r.body) as Map<String, dynamic>;
 Map<String, dynamic> copy(Object o) => jsonDecode(jsonEncode(o)) as Map<String, dynamic>;
 
-/// The print functions (0658) as the database answers them: one LAN kitchen printer, a KOT of one station. [refused] makes the printer
+/// The print functions (0660) as the database answers them: one LAN kitchen printer, a KOT of one station. [refused] makes the printer
 /// refuse the connection. Captures what reached the printer in [printed].
 http.Response? printing(http.Request r, {String station = 'Main Kitchen', bool reprint = true}) => switch (fnOf(r)) {
       'pos_print_targets' => ok({
