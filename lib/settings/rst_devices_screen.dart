@@ -9,6 +9,7 @@ import 'package:printing/printing.dart';
 
 import '../api/rpc_client.dart';
 import '../inventory/inventory_api.dart' show Facts;
+import '../tables/rst_print_direct.dart' show printsDirect, sendToPrinter, escPosTestSlip, DirectPrintException;
 import '../tables/table_widgets.dart' show sayError, kLimeBtn;
 import '../ui/app_header.dart';
 import '../ui/i18n.dart';
@@ -83,9 +84,15 @@ class _RstDevicesScreenState extends State<RstDevicesScreen> {
   /// nothing, and the printer is marked tested only when the person says the test page came out (a browser cannot tell).
   Future<void> _test(Facts p) async {
     try {
-      final sent = await printTestPagePdf(await printerTestPage(p), 'Test ${p.s('name')}.pdf');
+      // 4 Nov 2026: a USB or network receipt/kitchen printer gets the slip straight away (Android's print screen cannot find them)
+      if (p.s('type') != 'label' && printsDirect(p)) {
+        await sendToPrinter(p, escPosTestSlip(p));
+      } else {
+        final sent = await printTestPagePdf(await printerTestPage(p), 'Test ${p.s('name')}.pdf');
+        if (!mounted) return;
+        if (!sent) return showToast(context, tr('Not printed. The printer is not marked as tested.'));
+      }
       if (!mounted) return;
-      if (!sent) return showToast(context, tr('Not printed. The printer is not marked as tested.'));
       final yes = await showOlDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
@@ -103,7 +110,7 @@ class _RstDevicesScreenState extends State<RstDevicesScreen> {
       if (mounted) showToast(context, tr('Marked as tested.'));
       _load();
     } catch (e) {
-      if (mounted) showToast(context, sayError(e));
+      if (mounted) showToast(context, e is DirectPrintException ? tr(e.message) : sayError(e));
     }
   }
 
@@ -152,7 +159,7 @@ class _RstDevicesScreenState extends State<RstDevicesScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                          tr("Bills and test pages print through the phone's print service: install the printer maker's print app once (Wi-Fi, Bluetooth or USB). A kitchen printer added here can be picked for a kitchen station in Kitchen setup."),
+                          tr("USB and network (Wi-Fi / LAN) printers print straight from the app: plug the USB printer in (an OTG adapter on a phone) and allow access when Android asks. Bluetooth printers print through the phone's print service, which needs the printer maker's print app. A kitchen printer added here can be picked for a kitchen station in Kitchen setup."),
                           style: inter(13, 500, color: const Color(0xFF2F6B0E), height: 1.4)),
                     ),
                   ]),

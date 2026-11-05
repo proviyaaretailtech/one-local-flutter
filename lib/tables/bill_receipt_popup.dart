@@ -8,6 +8,7 @@ import 'package:printing/printing.dart';
 import '../inventory/inventory_api.dart' show Facts;
 import '../ui/theme.dart';
 import 'bill_api.dart' show billItems, billAddOns;
+import 'rst_print_direct.dart' show EscPos, printsDirect, rstPrinterFor, sendToPrinter, DirectPrintException;
 
 // The bill as the machine prints it (founder, 28 Oct 2026): a paper slip with torn edges, in a till font. It shows the outlet, table,
 // bill number and time, every dish with its quantity, rate and amount (takeaway dishes marked), subtotal, discount, CGST and SGST
@@ -17,14 +18,61 @@ import 'bill_api.dart' show billItems, billAddOns;
 /// Prints the receipt PDF (tests replace it).
 Future<void> Function(Uint8List pdf, String name) printReceiptPdf = (pdf, name) => Printing.layoutPdf(onLayout: (_) async => pdf, name: name);
 
-/// Sends the bill straight to the printer as the 80 mm slip (the Checkout's Print button). False when the printer could not be opened.
-Future<bool> printBillSlip({required Facts view, required Facts order}) async {
+/// Sends the bill to the printer (the Checkout's Print button): straight to a USB or network receipt printer as ESC/POS (4 Nov 2026),
+/// otherwise as the 80 mm slip through the print screen. Null when it printed, else why not.
+Future<String?> printBillSlip({required Facts view, required Facts order}) async {
+  final l = _Lines(view, order);
   try {
-    await printReceiptPdf(await _pdf(_Lines(view, order)), 'Bill ${order.s('display_no')}.pdf');
-    return true;
+    final p = await rstPrinterFor('receipt');
+    if (p != null && printsDirect(p)) {
+      await sendToPrinter(p, _billEscPos(l, p));
+      return null;
+    }
+    await printReceiptPdf(await _pdf(l), 'Bill ${order.s('display_no')}.pdf');
+    return null;
+  } on DirectPrintException catch (e) {
+    return e.message;
   } catch (_) {
-    return false;
+    return 'Could not open the printer. Try again.';
   }
+}
+
+/// The slip as ESC/POS for a receipt printer: the same lines as on screen, in the printer's width.
+List<int> _billEscPos(_Lines l, Facts printer) {
+  final o = l.o;
+  final e = EscPos(printer)
+    ..line(l.outlet.isEmpty ? 'BILL' : l.outlet.toUpperCase(), bold: true, centre: true)
+    ..line('TAX INVOICE', centre: true)
+    ..dashes()
+    ..row('Bill No: ${o.s('display_no')}', l.table == null ? '' : 'Table: ${l.table}')
+    ..row(l.when, l.seats > 0 ? '${l.seats} Pax' : '')
+    ..dashes()
+    ..row('Item', 'Amount', bold: true);
+  final items = billItems(o);
+  for (final i in items) {
+    e.line('${i.s('name')}${(i.so('variant') ?? '').isEmpty ? '' : ' (${i.s('variant')})'}${i.b('takeaway') ? '  [TAKEAWAY]' : ''}', bold: true);
+    for (final (what, price) in billAddOns(i)) {
+      e.row('  $what', '@${_amt(price)}');
+    }
+    e.row('  ${i.n('qty').toInt()} x ${_amt(i.n('unit_price'))}', _amt(i.n('line_total')));
+  }
+  e.dashes();
+  for (final (k, v) in l.sums) {
+    e.row(k, _amt(v));
+  }
+  e
+    ..dashes()
+    ..row('TOTAL', 'Rs ${_amt(o.n('total'))}', bold: true);
+  if (o.n('paid') > 0 && !l.paid) {
+    e
+      ..row('Paid', _amt(o.n('paid')))
+      ..row('Due', _amt(o.n('due')), bold: true);
+  }
+  e
+    ..dashes()
+    ..line(l.paid ? 'PAID' : 'UNPAID', bold: true, centre: true)
+    ..line('${items.fold<int>(0, (a, i) => a + i.n('qty').toInt())} items - Thank you! Visit again', centre: true);
+  return e.done();
 }
 
 /// The slip's lines, shared by the screen and the printout.

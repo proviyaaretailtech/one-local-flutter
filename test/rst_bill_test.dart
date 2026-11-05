@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -12,6 +13,7 @@ import 'package:vinii_pos/tables/bill_pay_screen.dart';
 import 'package:vinii_pos/tables/bill_receipt_popup.dart';
 import 'package:vinii_pos/tables/bill_receipt_screen.dart';
 import 'package:vinii_pos/tables/bill_split_screen.dart';
+import 'package:vinii_pos/tables/rst_print_direct.dart';
 import 'package:vinii_pos/tables/table_order_screen.dart';
 import 'package:vinii_pos/tables/table_widgets.dart';
 import 'package:vinii_pos/tables/tables_api.dart';
@@ -419,10 +421,57 @@ void main() {
       final printed = <String>[];
       final before = printReceiptPdf;
       printReceiptPdf = (pdf, name) async => printed.add('$name ${pdf.isNotEmpty}');
-      addTearDown(() => printReceiptPdf = before);
+      final beforeP = rstPrinterFor;
+      rstPrinterFor = (_) async => null;
+      addTearDown(() {
+        printReceiptPdf = before;
+        rstPrinterFor = beforeP;
+      });
       await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
       await tapKey(t, 'bill-print');
       expect(printed, ['Bill R5501.pdf true']);
+    });
+
+    // founder, 4 Nov 2026: a USB printer was never reached through Android's print screen; it gets ESC/POS down the cable
+    testWidgets('a USB receipt printer gets the bill straight away (ESC/POS, its copies), not the print screen', (t) async {
+      final s = Fake();
+      final pdfs = <String>[], usb = <List<int>>[];
+      final (beforePdf, beforeP, beforeUsb) = (printReceiptPdf, rstPrinterFor, sendUsbPrinter);
+      printReceiptPdf = (pdf, name) async => pdfs.add(name);
+      rstPrinterFor = (type) async => Facts({'id': 'p1', 'name': 'Counter USB', 'type': type, 'connection': 'usb', 'paper_mm': 58, 'copies': 2, 'auto_cut': true});
+      sendUsbPrinter = (bytes) async => usb.add(bytes);
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() {
+        printReceiptPdf = beforePdf;
+        rstPrinterFor = beforeP;
+        sendUsbPrinter = beforeUsb;
+      });
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      await tapKey(t, 'bill-print');
+      debugDefaultTargetPlatformOverride = null;
+      expect(pdfs, isEmpty);
+      final text = String.fromCharCodes(usb.single);
+      expect(RegExp('Bill No: R5501').allMatches(text).length, 2, reason: 'two copies');
+      expect(text, contains('TOTAL'));
+      // the printed words of each line (ESC/POS codes taken out): 32 characters a line on 58 mm paper
+      final words = text.replaceAll(RegExp(r'\x1B[@-~][\x00-\x02\x30-\x31]?|\x1D[!V][\x00-\x7f]{1,2}|\x1B[ad][\x00-\x7f]'), '');
+      expect(words.split('\n').where((l) => l.length > 32).toList(), isEmpty, reason: '58 mm: 32 characters a line');
+    });
+
+    testWidgets('no USB printer plugged in: the cashier is told what to check', (t) async {
+      final s = Fake();
+      final (beforeP, beforeUsb) = (rstPrinterFor, sendUsbPrinter);
+      rstPrinterFor = (type) async => Facts({'id': 'p1', 'name': 'Counter USB', 'type': type, 'connection': 'usb', 'paper_mm': 80, 'copies': 1});
+      sendUsbPrinter = (bytes) async => throw DirectPrintException('No USB printer found. Check the cable (an OTG adapter on a phone) and that the printer is on.');
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() {
+        rstPrinterFor = beforeP;
+        sendUsbPrinter = beforeUsb;
+      });
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      await tapKey(t, 'bill-print');
+      debugDefaultTargetPlatformOverride = null;
+      expect(find.textContaining('No USB printer found'), findsOneWidget);
     });
 
     testWidgets('a split bill sends the cashier to the split instead of taking it in one go', (t) async {
@@ -578,6 +627,13 @@ void main() {
 
     testWidgets('Email asks for the address and opens the mail app; Print is logged with the printer', (t) async {
       final s = Fake();
+      final (beforePdf, beforeP) = (printReceiptPdf, rstPrinterFor);
+      printReceiptPdf = (pdf, name) async {};
+      rstPrinterFor = (_) async => null;
+      addTearDown(() {
+        printReceiptPdf = beforePdf;
+        rstPrinterFor = beforeP;
+      });
       await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
       await tapKey(t, 'receipt-email');
       await t.enterText(find.byKey(const ValueKey('receipt-to')), 'asha@example.com');
@@ -588,6 +644,56 @@ void main() {
       final logs = s.calls('rst_receipt_log').map(argsOf).toList();
       expect(logs.map((a) => a['channel']), ['email', 'print']);
       expect(logs.last['to'], 'Counter printer 1');
+    });
+
+    // founder, 5 Nov 2026: "The test print came but bill is not printing": Print on this screen only copied the text
+    testWidgets('Print after payment: the paid receipt goes down the USB cable and is recorded', (t) async {
+      final s = Fake();
+      final usb = <List<int>>[];
+      final (beforeP, beforeUsb) = (rstPrinterFor, sendUsbPrinter);
+      rstPrinterFor = (type) async => Facts({'id': 'p1', 'name': 'Counter USB', 'type': type, 'connection': 'usb', 'paper_mm': 58, 'copies': 1, 'auto_cut': true});
+      sendUsbPrinter = (bytes) async => usb.add(bytes);
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() {
+        rstPrinterFor = beforeP;
+        sendUsbPrinter = beforeUsb;
+      });
+      await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
+      await tapKey(t, 'receipt-print');
+      debugDefaultTargetPlatformOverride = null;
+      final text = String.fromCharCodes(usb.single);
+      expect(text, contains('Bill No: R5501'));
+      expect(text, contains('TOTAL'));
+      expect(text, contains('PAID'));
+      expect(s.calls('rst_receipt_log').map(argsOf).single['channel'], 'print');
+    });
+
+    testWidgets('Print after payment with the printer unplugged: says what to check and is not recorded as sent', (t) async {
+      final s = Fake();
+      final (beforeP, beforeUsb) = (rstPrinterFor, sendUsbPrinter);
+      rstPrinterFor = (type) async => Facts({'id': 'p1', 'name': 'Counter USB', 'type': type, 'connection': 'usb', 'paper_mm': 80, 'copies': 1});
+      sendUsbPrinter = (bytes) async => throw DirectPrintException('No USB printer found. Check the cable (an OTG adapter on a phone) and that the printer is on.');
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() {
+        rstPrinterFor = beforeP;
+        sendUsbPrinter = beforeUsb;
+      });
+      await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
+      await tapKey(t, 'receipt-print');
+      debugDefaultTargetPlatformOverride = null;
+      expect(find.textContaining('No USB printer found'), findsOneWidget);
+      expect(s.calls('rst_receipt_log'), isEmpty);
+    });
+
+    test('which printer takes the bill: the default for the job, else the first, else a USB printer saved under another job, never a label printer', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      Facts p(String id, String type, {String conn = 'usb', bool dflt = false}) => Facts({'id': id, 'type': type, 'connection': conn, 'is_default': dflt});
+      expect(pickPrinter([p('a', 'receipt'), p('b', 'receipt', dflt: true)], 'receipt')?.s('id'), 'b');
+      expect(pickPrinter([p('k', 'kot'), p('a', 'receipt')], 'receipt')?.s('id'), 'a');
+      expect(pickPrinter([p('k', 'kot')], 'receipt')?.s('id'), 'k');
+      expect(pickPrinter([p('l', 'label')], 'receipt'), isNull);
+      expect(pickPrinter([p('k', 'kot', conn: 'bluetooth')], 'receipt'), isNull);
+      debugDefaultTargetPlatformOverride = null;
     });
 
     testWidgets('a refused send says why and opens nothing', (t) async {

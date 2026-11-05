@@ -236,7 +236,8 @@ class _BillPayScreenState extends State<BillPayScreen> {
   Future<void> _printBill() async {
     final o = _order;
     if (o == null) return;
-    if (!await printBillSlip(view: _v!, order: o) && mounted) showToast(context, 'Could not open the printer. Try again.');
+    final why = await printBillSlip(view: _v!, order: o);
+    if (why != null && mounted) showToast(context, why);
   }
 
   @override

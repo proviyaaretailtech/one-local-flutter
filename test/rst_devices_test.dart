@@ -1,13 +1,14 @@
 // Settings → Devices for a restaurant (0638): the printers for receipts, kitchen tickets (KOT) and barcode labels; add, change, default,
 // test print and delete. The database checks every rule again; these tests check what the screens send and show.
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:flutter/foundation.dart';
 import 'package:vinii_pos/settings/rst_devices_screen.dart';
+import 'package:vinii_pos/tables/rst_print_direct.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
 Map<String, dynamic> _printer(String id, String name, String type, {String conn = 'bluetooth', bool dflt = false, String? tested, List<String> stations = const []}) => {
@@ -189,5 +190,54 @@ void main() {
     final (f, _) = await testPrint(t, printed: true, answer: 'no');
     expect(f.calls.where((c) => c.$1 == 'rst_printer_tested'), isEmpty);
     expect(find.text('Not marked as tested. Check the printer and its connection, then try again.'), findsOneWidget);
+  });
+
+  // founder, 4 Nov 2026: "whenever i try to print the test print it is not connecting to any printer" (a USB printer): Android's
+  // print screen cannot reach it, so the test slip goes down the USB cable
+  Future<(Fake, List<String>, List<List<int>>)> usbTest(WidgetTester t, {Object? fails}) async {
+    final f = Fake(printers: [_printer('p1', 'Counter USB', 'receipt', conn: 'usb', dflt: true)]);
+    final pdfs = <String>[], usb = <List<int>>[];
+    final (beforePdf, beforeUsb) = (printTestPagePdf, sendUsbPrinter);
+    printTestPagePdf = (Uint8List pdf, String name) async {
+      pdfs.add(name);
+      return true;
+    };
+    sendUsbPrinter = (bytes) async => fails == null ? usb.add(bytes) : throw fails;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() {
+      printTestPagePdf = beforePdf;
+      sendUsbPrinter = beforeUsb;
+    });
+    await show(t, RstDevicesScreen(api: f.api));
+    await t.runAsync(() async {
+      await t.tap(find.byKey(const ValueKey('printer-test-p1')));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await t.pumpAndSettle();
+    return (f, pdfs, usb);
+  }
+
+  testWidgets('Test print on a USB printer: the slip goes down the cable (no print screen), then it asks and marks it tested', (t) async {
+    final (f, pdfs, usb) = await usbTest(t);
+    expect(pdfs, isEmpty);
+    final text = String.fromCharCodes(usb.single);
+    expect(text, contains('TEST PRINT'));
+    expect(text, contains('Counter USB'));
+    expect(usb.single.sublist(usb.single.length - 4), [0x1D, 0x56, 0x42, 0x00], reason: 'auto cut');
+    await t.runAsync(() async {
+      await t.tap(find.byKey(const ValueKey('test-printed-yes')));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await t.pumpAndSettle();
+    expect(f.last('rst_printer_tested'), {'id': 'p1'});
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('Test print on a USB printer that is not plugged in: says what to check, does not ask or mark it', (t) async {
+    final (f, _, _) = await usbTest(t, fails: DirectPrintException('No USB printer found. Check the cable (an OTG adapter on a phone) and that the printer is on.'));
+    expect(find.text('Did the test page print?'), findsNothing);
+    expect(find.textContaining('No USB printer found'), findsOneWidget);
+    expect(f.calls.where((c) => c.$1 == 'rst_printer_tested'), isEmpty);
+    debugDefaultTargetPlatformOverride = null;
   });
 }
