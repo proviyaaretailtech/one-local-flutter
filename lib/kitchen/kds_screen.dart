@@ -5,6 +5,7 @@ import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
+import '../devices/printer_router.dart' show PrinterRouter, printAndSay;
 import '../inventory/inventory_api.dart' show Facts;
 import '../inventory/inventory_widgets.dart';
 import '../ui/theme.dart';
@@ -66,12 +67,12 @@ class _KdsScreenState extends State<KdsScreen> {
   }
 
   Future<void> _act(Facts t, String action, {String? itemId}) async {
+    if (action == 'print') return _print(t);
     final id = t.s('card_id');
     if (_busy.contains(id)) return;
     setState(() => _busy.add(id));
     try {
       await env.api.act(t.s('id'), action, station: t.s('station'), itemId: itemId, version: t.s('version'));
-      if (action == 'print' && mounted) showToast(context, 'Ticket sent to the printer.');
     } on KitchenApiException catch (e) {
       if (mounted) showToast(context, e.stale ? 'This ticket changed on another screen. Showing the latest.' : e.message);
     } catch (_) {
@@ -79,6 +80,17 @@ class _KdsScreenState extends State<KdsScreen> {
     }
     if (mounted) setState(() => _busy.remove(id));
     await _load();
+  }
+
+  /// Print ticket (0660): this card's dishes on its station's kitchen printer, and the screen says what happened; a real print is then
+  /// noted as a reprint on the order.
+  Future<void> _print(Facts t) async {
+    final id = t.s('card_id');
+    if (_busy.contains(id)) return;
+    setState(() => _busy.add(id));
+    final r = await printAndSay(context, PrinterRouter.of(env.api.rpc).printKot(t.s('order_id'), ticketId: t.s('id'), stationName: t.so('station_name')));
+    if (r.ok) await env.api.noteReprint(t.s('id'), station: t.s('station'), version: t.s('version'));
+    if (mounted) setState(() => _busy.remove(id));
   }
 
   @override

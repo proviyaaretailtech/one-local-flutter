@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,9 @@ import 'package:vinii_pos/home/control_centre_screen.dart';
 import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/outlets/outlet_scope.dart';
 import 'package:vinii_pos/restaurant/restaurant_api.dart';
+import 'package:vinii_pos/settings/activity_log_screen.dart';
+import 'package:vinii_pos/settings/settings_api.dart';
+import 'package:vinii_pos/ui/theme.dart';
 
 import 'home_test.dart' show FakeHome, summaryJson, showTall;
 
@@ -252,10 +256,11 @@ void main() {
       final nav = find.byKey(const ValueKey('side-nav'));
       expect(nav, findsOneWidget);
       expect(t.getRect(nav).left, 0, reason: 'slides in from the left, like the store');
-      for (final l in ['All Orders', 'Money', 'Customer', 'Business profile', 'Reports', 'Team', 'Settings', 'One Local Wallet', 'Help & support', 'Subscription plans', 'Sign out']) {
+      for (final l in ['All Orders', 'Money', 'Customer', 'Reports', 'Team', 'Settings', 'One Local Wallet', 'Help & support', 'Subscription plans', 'Sign out']) {
         expect(find.descendant(of: nav, matching: find.text(l)), findsOneWidget, reason: l);
       }
       expect(find.descendant(of: nav, matching: find.text('Kitchen display')), findsNothing, reason: 'the old restaurant links are gone');
+      expect(find.descendant(of: nav, matching: find.text('Business profile')), findsNothing, reason: 'Business profile is in Settings only');
       await t.enterText(find.byKey(const ValueKey('side-nav-search')), 'team');
       await t.pump();
       expect(find.descendant(of: nav, matching: find.text('Team')), findsOneWidget);
@@ -289,5 +294,43 @@ void main() {
       await t.pumpAndSettle();
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('goldens/restaurant_dashboard_feed.png'));
     }, tags: ['golden']);
+  });
+
+  // 0652 (founder, 3 Nov 2026): kitchen and captain logins saw sales and refund reasons. The answers are the database's for a captain
+  // (server/scripts/rst-channels-staff-money-e2e.mjs with FIXTURES=…).
+  group('a kitchen or captain login', () {
+    final Map<String, dynamic> fx = jsonDecode(File('test/fixtures/rst_staff_money_server.json').readAsStringSync()) as Map<String, dynamic>;
+    Map<String, dynamic> copy(String k) => jsonDecode(jsonEncode(fx[k])) as Map<String, dynamic>;
+
+    testWidgets('Home: no Sales tab, no Sales today, insights without amounts; the orders and kitchen stay', (t) async {
+      await showRst(t, rpc: FakeRst((_) => ok(copy('dashboard_captain')), others: {'rst_home_insights': copy('insights_captain')}));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('rst-tab-Sales')), findsNothing);
+      expect(find.byKey(const ValueKey('rst-sales-today')), findsNothing);
+      expect(find.text('Sales today'), findsNothing);
+      expect(find.text('Live orders'), findsWidgets);
+      expect(find.byKey(const ValueKey('rst-served')), findsOneWidget);
+      expect(find.textContaining('average bill'), findsNothing);
+      expect(find.byKey(const ValueKey('rst-top')), findsOneWidget);
+      expect(find.textContaining('₹'), findsNothing, reason: "not one amount on the captain's Home");
+    });
+
+    testWidgets("the owner's Home keeps Sales and the amounts", (t) async {
+      await showRst(t, rpc: FakeRst((_) => ok(copy('dashboard_owner')), others: {'rst_home_insights': copy('insights_owner')}));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('rst-tab-Sales')), findsOneWidget);
+      expect(find.byKey(const ValueKey('rst-sales-today')), findsOneWidget);
+      expect(find.textContaining('average bill'), findsOneWidget);
+    });
+
+    testWidgets('Activity log: the kitchen and floor only, and it says why', (t) async {
+      final api = SettingsApi(baseUrl: 'http://pos.test', accessToken: () => 't', client: MockClient((r) async => ok(copy('activity_captain'))));
+      await t.pumpWidget(MaterialApp(theme: posTheme(), home: ActivityLogScreen(env: SettingsEnv(api: api))));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('activity-limited')), findsOneWidget);
+      expect(find.textContaining('paid'), findsNothing);
+      expect(find.textContaining('Regular guest'), findsNothing);
+      expect(find.textContaining('KOT'), findsWidgets);
+    });
   });
 }

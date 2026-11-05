@@ -44,3 +44,15 @@ export const Feedback = z.object({
   rating: z.number({ message: 'Choose how your visit was.' }).int('Choose how your visit was.').min(1, 'Choose how your visit was.').max(5, 'Choose how your visit was.'),
   comment: z.string().max(500, 'A comment can be up to 500 characters.').nullish(),
 }).strict();
+
+// ---- the brand page's pre-order (POST /guest/slots|preorder|pretrack, no sign-in; database 0656): a pickup time, a name and a phone
+export const Slots = Card;
+export const Preorder = z.object({
+  slug: Card.shape.slug, idempotency_key: key, lines, guest_name: z.string({ message: 'Enter your name.' }).trim().min(1, 'Enter your name.').max(40, 'A name can be up to 40 characters.'),
+  phone: z.string({ message: 'Enter a 10-digit mobile number.' }).trim().regex(/^(\+?91[ -]?)?[6-9][0-9]{4}[ -]?[0-9]{5}$/, 'Enter a 10-digit mobile number.'),
+  pickup_at: z.string({ message: 'Pick a pickup time.' }).min(10, 'Pick a pickup time.').max(40, 'Pick a pickup time.'), note,
+}).strict();
+export const PreorderTrack = z.object({ track: z.string({ message: 'This tracking link is not valid.' }).regex(/^[0-9a-f]{36}$/, 'This tracking link is not valid.') }).strict();
+
+// ---- the page's live order feed (POST /guest/feed, no sign-in; database 0662): the business's address name only
+export const Feed = Card;

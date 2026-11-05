@@ -97,7 +97,7 @@ void main() {
     testWidgets('"how do I split a bills" gets the split-a-bill steps, and Take me there switches to Bill', (t) async {
       await open(t);
       await _ask(t, 'how do I split a bills');
-      expect(find.text('To split one bill across Cash, Card and UPI:'), findsOneWidget);
+      expect(find.text('To split a bill:'), findsOneWidget);
       expect(find.text('3. On Checkout tap Split Pay'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('ol-go-Bill')));
       await t.pumpAndSettle();

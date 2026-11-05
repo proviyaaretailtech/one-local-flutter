@@ -64,8 +64,7 @@ class RestaurantMoreScreen {
       // the restaurant's OneLocal page: readiness, ads and offers, profile, hours, delivery, link and reviews (founder, 29 Oct 2026)
       SideNavEntry(LucideIcons.layoutTemplate, 'Page Manager', back(() => Navigator.of(context).push(RstPageManagerScreen.route()))),
       SideNavEntry(LucideIcons.circleUser, 'Customer', open(HomeNav.customers)),
-      // the outlet's name, address and contact (Settings → Outlet info)
-      SideNavEntry(LucideIcons.store, 'Business profile', open(HomeNav.outletInfo ?? settings)),
+      // Business profile lives in Settings only (founder, 4 Nov 2026)
       SideNavEntry(LucideIcons.fileText, 'Reports', back(onReports)),
       SideNavEntry(LucideIcons.users, 'Team', open(HomeNav.team)),
       SideNavEntry(LucideIcons.settings, 'Settings', open(settings)),

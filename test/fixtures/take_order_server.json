@@ -307,7 +307,7 @@
             }
         ],
         "unavailable": {
-            "print_kot": "Printing a KOT is not in this release."
+            "print_kot": "Send the order to the kitchen first."
         }
     }
 }

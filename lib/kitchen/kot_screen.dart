@@ -5,6 +5,7 @@ import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
+import '../devices/printer_router.dart' show PrinterRouter, printAndSay;
 import '../inventory/inventory_api.dart' show Facts;
 import '../orders/order_screen.dart';
 import '../orders/orders_api.dart' show rupees;
@@ -114,9 +115,10 @@ class _KotScreenState extends State<KotScreen> {
         if (mounted) showToast(context, '#${o.s('display_no')} served.');
       });
 
+  /// Print latest KOT (0660): the order's latest KOT on the printer of each station on it; the screen says what happened.
   Future<void> _print(Facts o) => _run(o, () async {
-        await widget.env.api.act(o.s('latest_ticket'), 'print');
-        if (mounted) showToast(context, 'Latest KOT of #${o.s('display_no')} sent to the printer.');
+        final r = await printAndSay(context, PrinterRouter.of(widget.env.api.rpc).printKot(o.s('id')));
+        if (r.ok && o.so('latest_ticket') != null) await widget.env.api.noteReprint(o.s('latest_ticket'));
       });
 
   /// Cancel item (0640): dishes already on this order's KOTs, how many and why; the kitchen is told at once (a manager approves a dish
@@ -459,12 +461,13 @@ class _OrderKotCard extends StatelessWidget {
                       small(LucideIcons.circleX, 'kot-cancelitem-$no', 'Cancel item', onCancelItem!),
                     ],
                   ]),
-                  // the KOT history: dishes cancelled after the KOT went, how many and why (0640)
+                  // the KOT history: dishes cancelled, how many and why (0640); since 0654 also those cancelled before their KOT went
                   for (final (n, c) in o.l('item_cancels').indexed)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        '${c.b('recent') ? 'STOP · ' : ''}${c.n('qty').toInt()}× ${c.s('name')} cancelled${c.no('kot_no') != null ? ' (KOT ${c.s('kot_no')})' : ''}'
+                        '${c.b('recent') ? 'STOP · ' : ''}${c.n('qty').toInt()}× ${c.s('name')} cancelled'
+                        '${c.raw['sent'] == false ? ' before the kitchen' : c.no('kot_no') != null ? ' (KOT ${c.s('kot_no')})' : ''}'
                         '${(c.so('reason') ?? '').isEmpty ? '' : ' · “${c.s('reason')}”'}${(c.so('by') ?? '').isEmpty ? '' : ' · ${c.s('by')}'}',
                         key: ValueKey('kot-itemcancel-$no-$n'),
                         style: inter(11.5, 700, color: c.b('recent') ? const Color(0xFFD1213B) : kMuted),

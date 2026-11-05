@@ -6,6 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/home/home_nav.dart';
+import 'package:vinii_pos/devices/devices_api.dart' show sendRawToPrinter;
+import 'package:vinii_pos/devices/print_service.dart' show forgetPrinters;
+import 'package:vinii_pos/devices/printer_router.dart' show printPdfDialog;
 import 'package:vinii_pos/orders/cart_screen.dart';
 import 'package:vinii_pos/tables/bill_api.dart';
 import 'package:vinii_pos/orders/order_screen.dart';
@@ -450,12 +453,39 @@ void main() {
       expect(jsonDecode(s.where('POST', '/pay').single.body), {'method': 'upi', 'version': '2026-10-16T12:53:00.000Z'});
     });
 
-    testWidgets('print says honestly that no printer is connected', (t) async {
-      final s = FakeServer((_) => ok(view('completed')));
+    testWidgets('print goes to the receipt printer set up in Devices and says so; with none, the print dialog and why', (t) async {
+      final raw = <String>[];
+      final before = sendRawToPrinter, beforeDialog = printPdfDialog;
+      sendRawToPrinter = (host, port, bytes) async => raw.add('$host:$port ${String.fromCharCodes(bytes)}');
+      final dialogs = <String>[];
+      printPdfDialog = (pdf, name) async {
+        dialogs.add(name);
+        return true;
+      };
+      addTearDown(() {
+        sendRawToPrinter = before;
+        printPdfDialog = beforeDialog;
+      });
+      var printers = <Map<String, dynamic>>[
+        {'id': 'p-c', 'name': 'Counter printer', 'type': 'receipt', 'connection': 'lan', 'address': '192.168.1.60', 'paper_mm': 58, 'copies': 1, 'auto_cut': true, 'is_default': true},
+      ];
+      final s = FakeServer((r) => r.url.path.endsWith('/rpc/pos_print_targets')
+          ? ok({'printers': printers, 'stations': [], 'business': {'name': 'Sharma General Store', 'gstin': '27AAAPL1234C1Z5', 'phone': '02382 220011'}})
+          : r.url.path.endsWith('/rpc/pos_print_log')
+              ? ok({'logged': true})
+              : ok(view('completed')));
       await showTall(t, OrderScreen(api: s.api, orderId: orderId));
       await t.tap(find.text('Print receipt'));
-      await t.pump();
-      expect(toast('No receipt printer is connected to this device yet.'), findsOneWidget);
+      await t.pumpAndSettle();
+      expect(raw.single, allOf(startsWith('192.168.1.60:9100 '), contains('SHARMA GENERAL'), contains('GSTIN: 27AAAPL1234C1Z5'), contains('Ph: 02382 220011')));
+      expect(toast('Bill printed on Counter printer.'), findsOneWidget);
+      expect(find.textContaining('No receipt printer is connected'), findsNothing);
+      printers = [];
+      forgetPrinters();
+      await t.tap(find.text('Print receipt'));
+      await t.pumpAndSettle();
+      expect(dialogs, hasLength(1));
+      expect(toast('No receipt printer set up, so the bill opened in the print dialog. Add a receipt printer in Settings → Devices.'), findsOneWidget);
     });
 
     testWidgets('cancelled: create a new cart from the same items', (t) async {

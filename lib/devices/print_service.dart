@@ -13,34 +13,28 @@ import '../ui/i18n.dart';
 import '../ui/theme.dart' show showToast;
 import 'bill_receipt.dart';
 import 'devices_api.dart';
+import 'printer_router.dart' show PrinterRouter, printTargetsEpoch;
 
 // Printing through the Device manager (founder, 31 Oct 2026): a bill goes to the default receipt printer and labels to the default
 // label printer. A network, USB (OTG) or paired Bluetooth printer gets the job straight away (ESC/POS for receipts, TSPL for
 // labels: no print dialog); a "phone's print service" printer gets it through the print dialog at its paper or label size; with
 // no printer set up, the print dialog as before.
 
-/// The default printer for a job (receipt, label, kot), or null. Kept for two minutes; tests replace it.
+/// The default printer for a job (receipt, label, kot), or null. The printers come from `pos_print_targets` (0660; `dev_printers` was
+/// never in the database, so every print fell back to the dialog), kept for two minutes; tests replace it.
 Future<StorePrinter?> Function(String job) defaultPrinterFor = _defaultPrinterFor;
 
 /// Tests replace the print dialog for receipts.
 Future<void> Function(Uint8List pdf, String name) printReceiptDialog = (pdf, name) => Printing.layoutPdf(onLayout: (_) async => pdf, name: name);
 
-List<StorePrinter>? _cache;
-DateTime? _cachedAt;
-
-/// After a printer is added, changed or removed (the Device manager calls it).
-void forgetPrinters() => _cache = null;
+/// After a printer is added, changed or removed (the Device manager and Settings → Devices call it): every screen loads the printers again.
+void forgetPrinters() => printTargetsEpoch++;
 
 Future<StorePrinter?> _defaultPrinterFor(String job) async {
   try {
-    if (_cache == null || _cachedAt == null || DateTime.now().difference(_cachedAt!) > const Duration(minutes: 2)) {
-      _cache = (await DevicesApi().printers()).printers;
-      _cachedAt = DateTime.now();
-    }
-    final forJob = _cache!.where((p) => p.type == job).toList();
-    return forJob.where((p) => p.isDefault).firstOrNull ?? forJob.firstOrNull;
+    return (await PrinterRouter.shared.targets()).forJob(job);
   } catch (_) {
-    return null; // offline or no Device manager: the print dialog
+    return null; // offline or not signed in: the print dialog
   }
 }
 
@@ -74,7 +68,8 @@ Future<({PrintRoute route, String printer})> printBillReceipt(BillReceipt bill, 
   final p = await defaultPrinterFor('receipt');
   if (p != null && p.direct && !kIsWeb) {
     try {
-      await sendToPrinter(p, billEscPos(bill, printer: p));
+      final one = billEscPos(bill, printer: p);
+      await sendToPrinter(p, [for (var i = 0; i < p.copies; i++) ...one]);
       return (route: PrintRoute.direct, printer: p.name);
     } catch (_) {
       onFallback?.call('${p.name} did not answer${p.at}');
@@ -95,7 +90,8 @@ Future<({PrintRoute route, String printer})> printReceiptText(
   final p = await defaultPrinterFor('receipt');
   if (p != null && p.direct && !kIsWeb) {
     try {
-      await sendToPrinter(p, escPosReceipt(text, store: store, printer: p));
+      final one = escPosReceipt(text, store: store, printer: p);
+      await sendToPrinter(p, [for (var i = 0; i < p.copies; i++) ...one]);
       return (route: PrintRoute.direct, printer: p.name);
     } catch (_) {
       onFallback?.call('${p.name} did not answer${p.at}');

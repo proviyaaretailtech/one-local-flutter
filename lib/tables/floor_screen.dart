@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../api/live_sync.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../devices/printer_router.dart' show printSentKot;
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart';
 import '../menu/menu_widgets.dart' show CanMakeLabel, FoodTypeMark;
@@ -9,6 +10,7 @@ import '../ui/mobile_input.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
 import 'dish_options_sheet.dart';
+import 'order_review_sheet.dart';
 import 'guest_orders.dart';
 import 'reservations_screen.dart';
 import 'reserve_screen.dart';
@@ -56,6 +58,9 @@ class _FloorScreenState extends State<FloorScreen> {
   String? _menuCat;
   String _menuQuery = ''; // the search beside the Menu title: dish name, any part, any case
   Facts? _orderTable;
+  // the chosen table was picked or confirmed for the dishes being added now; after an order goes out the table stays, but the next first
+  // dish asks whether it is the same customer or a new one (founder, 4 Nov 2026)
+  bool _tableSure = false;
   final _cart = <String, int>{};
   String? _key; // one per intent: kept while the cart does not change, so a retried tap is the same request
   bool _sending = false;
@@ -144,6 +149,7 @@ class _FloorScreenState extends State<FloorScreen> {
     if (t == null || !mounted) return;
     setState(() {
       _orderTable = t;
+      _tableSure = true;
       _key = null;
     });
   }
@@ -166,7 +172,12 @@ class _FloorScreenState extends State<FloorScreen> {
       if (choose != true || !mounted) return;
       final t = await _chooseTable();
       if (t == null || !mounted) return;
-      setState(() => _orderTable = t);
+      setState(() {
+        _orderTable = t;
+        _tableSure = true;
+      });
+    } else if (_onTable && _cart.isEmpty && !_tableSure) {
+      if (!await _sameOrNewCustomer(item) || !mounted) return;
     }
     // a dish with add-ons or combos (0624): one pop-up with its size, add-ons and combos; a dish with only sizes (0611): Small / Medium / Large
     String? size;
@@ -188,6 +199,31 @@ class _FloorScreenState extends State<FloorScreen> {
       _key = null;
       _lastKey[item.s('id')] = k;
     });
+  }
+
+  /// A table still chosen from the last order and a first dish tapped: is it for that table's customer, or a new customer? A new customer
+  /// chooses their table. False when closed without an answer.
+  Future<bool> _sameOrNewCustomer(Facts item) async {
+    final label = _orderTable!.s('label');
+    final same = await showOlDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Same customer or new?'),
+        content: Text('Table $label is still chosen from the last order. Is ${item.s('name')} for the customer at Table $label, or for a new customer?'),
+        actions: [
+          TextButton(key: const ValueKey('customer-new'), onPressed: () => Navigator.pop(c, false), child: const Text('New customer')),
+          TextButton(key: const ValueKey('customer-same'), onPressed: () => Navigator.pop(c, true), child: Text('Table $label', style: inter(14, 700))),
+        ],
+      ),
+    );
+    if (same == null || !mounted) return false;
+    if (!same) {
+      final t = await _chooseTable();
+      if (t == null || !mounted) return false;
+      setState(() => _orderTable = t);
+    }
+    setState(() => _tableSure = true);
+    return true;
   }
 
   /// "Which size?": each size with its price, the default first-ticked. Null when closed.
@@ -290,10 +326,13 @@ class _FloorScreenState extends State<FloorScreen> {
   }
 
   /// Send to kitchen (a KOT) or Hold. Dine in: the same call as Add dishes, for the chosen table; Takeaway / Delivery: an order without a table.
-  Future<void> _sendCart(bool send) async {
+  Future<void> _sendCart(bool send, {bool reviewed = false}) async {
     final t = _orderTable;
     if (_cart.isEmpty || (_dineIn && t == null)) return;
     final onTable = _onTable;
+    // the order read back to the guest first (founder, 4 Nov 2026); Edit order goes back with nothing sent
+    if (send && !reviewed && !await showOrderReview(context, title: _cartFor, lines: [for (final e in _cart.entries) _reviewLine(e.key, e.value, onTable)])) return;
+    if (!mounted) return;
     if (_mode == 'delivery') {
       final d = await _askDelivery();
       if (d == null || !mounted) return;
@@ -321,13 +360,15 @@ class _FloorScreenState extends State<FloorScreen> {
         _extras.clear();
         _key = null;
         _sending = false;
+        _tableSure = false;
       });
       if (send) _loadMenu(); // the dishes sent took their ingredients off stock: "can be made" counts go down
       final kot = r.mo('kot');
       final no = r.mo('order')?.so('display_no');
       final shown = onTable || no == null ? label : '$label $no';
       if (send && kot != null) {
-        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SentToKitchenScreen(env: env, tableLabel: shown, kot: kot)));
+        final printing = printSentKot(env.api.rpc, r.raw); // the KOT is sent; its print is said on the next screen
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SentToKitchenScreen(env: env, tableLabel: shown, kot: kot, printing: printing)));
       } else {
         showToast(context, onTable ? 'Saved on $label. Send to the kitchen when ready.' : '$shown held. Send it to the kitchen from Orders → ${_mode == 'delivery' ? 'On call delivery' : 'Takeaway'}.');
       }
@@ -338,6 +379,19 @@ class _FloorScreenState extends State<FloorScreen> {
         showToast(context, sayError(e));
       }
     }
+  }
+
+  ReviewLine _reviewLine(String k, int qty, bool onTable) {
+    final item = _menuItem(_dishOf(k));
+    final size = _sizeOf(k);
+    return ReviewLine(
+      name: item?.s('name') ?? 'Dish',
+      qty: qty,
+      price: _priceOf(k),
+      size: size == null ? null : item?.l('variants').where((v) => v.s('id') == size).firstOrNull?.s('name'),
+      extras: _extras[k]?.summary ?? '',
+      takeaway: onTable && k.endsWith(_ta),
+    );
   }
 
   Future<void> _load() async {
@@ -376,6 +430,14 @@ class _FloorScreenState extends State<FloorScreen> {
       Navigator.of(context).pop(t);
       return;
     }
+    // the table being ordered for, with dishes picked and not sent yet: those dishes first, with Hold and Send to kitchen
+    if (_onTable && _cart.isNotEmpty && t.s('id') == _orderTable!.s('id')) {
+      final onTable = _onTable;
+      final a = await showPendingOrder(context, title: _cartFor, lines: [for (final e in _cart.entries) _reviewLine(e.key, e.value, onTable)]);
+      if (!mounted || a == null) return;
+      if (a != PendingAction.table) return _sendCart(a == PendingAction.send, reviewed: true);
+    }
+    if (!mounted) return;
     if (t.s('status') == 'occupied') {
       // A table with a running order opens that order straight away (founder, 2026-10-20): items, kitchen status,
       // Add Items, Send KOT, Change/Merge Table, Generate Bill. A free table opens the sheet with Start New Order.
@@ -410,7 +472,14 @@ class _FloorScreenState extends State<FloorScreen> {
           ? null
           : Column(mainAxisSize: MainAxisSize.min, children: [
               if (_showCart) _cartBar(),
-              if (tables.isNotEmpty) TableDeck(key: const ValueKey('table-deck'), tables: tables, onOpen: _tap),
+              if (tables.isNotEmpty) TableDeck(
+                  key: const ValueKey('table-deck'),
+                  tables: tables,
+                  onOpen: _tap,
+                  // the table being ordered for comes to the front and shows its dishes not sent yet (founder, 4 Nov 2026)
+                  focus: _onTable ? _orderTable!.s('id') : null,
+                  pending: {if (_onTable && _cart.isNotEmpty) _orderTable!.s('id'): '$_cartUnits item${_cartUnits == 1 ? '' : 's'} · not sent'},
+                ),
             ]),
       children: [
         if (widget.pickFor == null) ...[

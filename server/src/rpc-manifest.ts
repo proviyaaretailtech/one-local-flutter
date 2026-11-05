@@ -48,6 +48,7 @@ import * as ord from './schemas/orders.ts';
 import * as gst from './schemas/guest.ts';
 import * as mp from './schemas/maps.ts';
 import * as rep from './schemas/reports.ts';
+import * as gx from './schemas/experience.ts';
 
 export type Rate = 'read' | 'write' | 'money' | 'secure';
 type Common = { alias: string; rate: Rate; roles: string; maxBytes?: number };
@@ -282,6 +283,8 @@ export const MANIFEST: Entry[] = [
   db('rst_menu_item_save', { args: rst.MenuItemSave, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
   db('rst_menu_stock_set', { args: rst.MenuStockSet, map: P, rate: 'write', roles: 'menu editors (menu.update)' }),
   sec('menu_ai_describe', { args: rst.AiDescribe, rate: 'secure', roles: 'menu editors (menu.update; checked in the database)', maxBytes: 8 * 1024 }),
+  // Import menu (spec part 2 D): pasted text or CSV -> proposed dishes (GROQ_API_KEY). Nothing is saved; the app adds each dish with menu_item_quick_add
+  sec('menu_ai_import', { args: gx.MenuImport, rate: 'secure', roles: 'menu editors (menu.update; checked in the database)', maxBytes: 128 * 1024 }),
   // ---- Menu module: Menu · Recipe · Ingredients (migrations/0600). Ingredients are inventory items of type ingredient (purchasing and
   //      stock already use them); a recipe is menu_item_recipes (selling deducts it). Reads and writes check menu / inventory roles inside.
   db('ing_list', { args: mb.IngList, map: P, rate: 'read', roles: 'staff with inventory:read' }),
@@ -317,6 +320,10 @@ export const MANIFEST: Entry[] = [
   db('rst_bill_pay', { args: rst.BillPay, map: P, rate: 'money', idem: true, roles: 'staff allowed to take payment' }),
   db('rst_bill_coupon', { args: rst.BillCoupon, map: P, rate: 'write', roles: 'staff allowed to take payment' }),
   db('rst_bill_discount', { args: rst.BillDiscount, map: P, rate: 'write', roles: 'staff allowed to take payment (above the limit: managers)' }),
+  // ---- printing (0660): the phone prints to the printers saved in Devices; the database says what and where, and keeps the record
+  db('pos_print_targets', { args: dev.PrintTargets, map: P, rate: 'read', roles: 'any staff of the business (the function checks)' }),
+  db('pos_kot_print', { args: dev.KotPrint, map: P, rate: 'read', roles: 'any staff of the outlet (the function checks)' }),
+  db('pos_print_log', { args: dev.PrintLog, map: P, rate: 'write', roles: 'any staff of the business (the function checks)' }),
   db('rst_devices_list', { args: rst.DevicesList, map: P, rate: 'read', roles: 'owners, admins and managers (Settings)' }),
   db('rst_printer_save', { args: rst.PrinterSave, map: P, rate: 'write', roles: 'owners, admins and managers (Settings)' }),
   db('rst_printer_delete', { args: rst.PrinterId, map: P, rate: 'write', roles: 'owners, admins and managers (Settings)' }),
@@ -475,6 +482,14 @@ export const MANIFEST: Entry[] = [
   // ---- storefront, section M (0450-0451). Body = the function's `p` object; the database validates it and checks organisation and role
   //      (owner / admin / manager / marketing roles edit; storefront:publish publishes). Results carry storage paths: post turns them into short links.
   //      Pictures go through the two secure handlers below (signed slot, then confirm); the app never holds a storage key.
+  // ---- guest experience builder (0656): the restaurant's branded guest page (onelocal.co/<store link> and the table QR). Publishing goes
+  // through the gate: rules in the database, the AI wording check on this server, OneLocal review for money / compliance / security.
+  db('gx_builder_get', { args: gx.None, map: P, rate: 'read', roles: STOREFRONT }),
+  db('gx_draft_save', { args: gx.Save, map: P, rate: 'write', roles: STOREFRONT, maxBytes: 64 * 1024 }),
+  sec('gx_publish', { args: gx.Publish, rate: 'write', roles: 'roles with storefront:publish (the function checks)' }),
+  // Create with AI (spec part 2 D): reads the page, menu and profile as the caller, saves only the DRAFT through gx_draft_save; never publishes
+  sec('gx_ai_create', { args: gx.AiCreate, rate: 'secure', roles: STOREFRONT, maxBytes: 8 * 1024 }),
+  db('gx_rollback', { args: gx.Rollback, map: P, rate: 'write', roles: 'roles with storefront:publish (the function checks)' }),
   db('sf_options', { args: sf.None, map: P, rate: 'read', roles: STOREFRONT }),
   db('sf_builder_get', { args: sf.None, map: P, rate: 'read', roles: STOREFRONT }),
   db('sf_settings_get', { args: sf.None, map: P, rate: 'read', post: links2, roles: STOREFRONT }),

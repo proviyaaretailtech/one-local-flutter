@@ -5,22 +5,25 @@ import { requireSignedIn, requireStaff } from './staff.ts';
 import { userClient } from './db.ts';
 import { anonKey, supabaseUrl } from './config.ts';
 import { VERSION } from './version.ts';
+import { masterStatus } from './master-client.ts';
 import * as home from './modules/home.ts';
 import * as orders from './modules/orders.ts';
 import { rpcBatch, rpcOne } from './rpc.ts';
 import { webhookRoutes } from './modules/secure/index.ts';
 import { guestCall } from './guest-door.ts';
-import { guestWeb } from './guest-web.ts';
+import { brandPage, guestWeb } from './guest-web.ts';
 import { billPage } from './bill-page.ts';
 
-// Health probe: version and whether the database answers. Uses the public key only; nothing secret is read or shown.
+// Health probe: version, whether the database answers, and whether the Master server accepts our key (`master`: ok / wrong_key /
+// unreachable / not_configured, via GET /api/internal/whoami, remembered 30 s). Nothing secret is read back or shown.
 add('GET', '/health', async () => {
   const url = supabaseUrl(), key = anonKey();
-  let reachable = false;
-  if (url && key) {
-    try { reachable = (await fetch(`${url}/auth/v1/health`, { headers: { apikey: key }, signal: AbortSignal.timeout(3000) })).ok; } catch { /* unreachable */ }
-  }
-  return json({ ok: true, version: VERSION, db: reachable ? 'reachable' : 'unreachable' });
+  const db = (async () => {
+    if (!url || !key) return false;
+    try { return (await fetch(`${url}/auth/v1/health`, { headers: { apikey: key }, signal: AbortSignal.timeout(3000) })).ok; } catch { return false; }
+  })();
+  const [reachable, master] = await Promise.all([db, masterStatus()]);
+  return json({ ok: true, version: VERSION, db: reachable ? 'reachable' : 'unreachable', master });
 });
 
 // ---- the one generic endpoint (allowlist: src/rpc-manifest.ts). Everything below this block is the older per-feature routes.
@@ -61,3 +64,7 @@ add('GET', `${O}/:id`, async (r, p) => { await requireSignedIn(r, 'pos-orders');
 add('POST', `${O}/:id/pay`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await orders.pay(r, p.id)); });
 add('POST', `${O}/:id/cancel`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await orders.cancel(r, p.id)); });
 add('POST', `${O}/:id/act`, async (r, p) => { await requireSignedIn(r, 'pos-orders'); return json(await orders.actOn(r, p.id)); });
+
+// ---- the restaurant's brand page (0656): onelocal.co/<store link>. Registered LAST: every fixed path above wins over a store link.
+add('GET', '/r/:slug', brandPage);
+add('GET', '/:slug', brandPage);

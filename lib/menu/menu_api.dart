@@ -105,6 +105,10 @@ class DishDetail {
   List<Map<String, dynamic>> get ingredients => _list(raw['ingredients']);
   List<Map<String, dynamic>> get variants => _list(raw['variants']);
   List<ServingWindow> get availability => _list(raw['availability']).map(ServingWindow.fromJson).toList();
+
+  /// Apply to Channels (0652): sold to guests ordering from the table QR, and on the OneLocal app (on unless switched off).
+  bool get onTableQr => _map(raw['channels'])['qr'] != false;
+  bool get onOneLocal => _map(raw['channels'])['one_local'] != false;
 }
 
 class MenuApiException extends PartnerApiException {
@@ -136,13 +140,15 @@ class MenuApi {
   Future<DishDetail> dish(String id, {String? locationId}) async => DishDetail(await _call('rst_menu_item_view', {'id': id, 'location_id': ?locationId}));
 
   /// The dish screen's one save. Only the keys given are changed.
-  Future<DishDetail> save(String id, int version, {String? locationId, String? description, List<ServingWindow>? availability}) async =>
+  /// [channels] (0652): {'qr': bool, 'one_local': bool}.
+  Future<DishDetail> save(String id, int version, {String? locationId, String? description, List<ServingWindow>? availability, Map<String, bool>? channels}) async =>
       DishDetail(await _call('rst_menu_item_save', {
         'id': id,
         'version': version,
         'location_id': ?locationId,
         'description': ?description,
         if (availability != null) 'availability': availability.map((w) => w.toJson()).toList(),
+        'channels': ?channels,
       }));
 
   Future<void> setStock({String? dishId, String? categoryId, required bool inStock}) =>

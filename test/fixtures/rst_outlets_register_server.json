@@ -1,0 +1,42 @@
+{
+  "register_outlets": {
+    "day": "2026-11-03",
+    "outlets": [
+      {
+        "id": "550d7732-0ea8-43af-94eb-18f39128280e",
+        "name": "Golden ZZ FIVE b mw0t201x - Main",
+        "ended": false,
+        "open_bills": 0
+      },
+      {
+        "id": "4c86ca4a-d38d-46a9-8274-6aeea15dc4ec",
+        "name": "Golden ZZ FIVE b mw0t201x - Koregaon Park",
+        "ended": false,
+        "open_bills": 0
+      }
+    ],
+    "can_close": false,
+    "choose_outlet": true
+  },
+  "register_one": {
+    "day": "2026-11-03",
+    "closed": null,
+    "reopens": [],
+    "can_close": true,
+    "can_reopen": false,
+    "open_bills": {
+      "list": [],
+      "count": 0,
+      "tables": 0,
+      "due_minor": 0
+    },
+    "outlet_count": 2,
+    "location_name": "Golden ZZ FIVE b mw0t201x - Koregaon Park",
+    "opening_minor": 0,
+    "refunds_minor": 0,
+    "expected_minor": 30000,
+    "other_in_minor": 30000,
+    "paid_out_minor": 0,
+    "cash_sales_minor": 0
+  }
+}

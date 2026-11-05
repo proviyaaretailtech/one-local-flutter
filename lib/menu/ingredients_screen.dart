@@ -9,6 +9,7 @@ import '../ui/barcode_scanner.dart';
 import '../ui/theme.dart';
 import 'menu_api.dart' show MenuApiException;
 import 'menu_build_api.dart';
+import 'menu_sheets.dart';
 import 'menu_build_widgets.dart';
 import 'menu_widgets.dart' show MenuError;
 
@@ -152,6 +153,8 @@ class _IngredientsViewState extends State<IngredientsView> {
                   ),
                 ),
               ]),
+            const SizedBox(height: 10),
+            SheetButtons(kind: SheetKind.ingredients, api: widget.api, canImport: d.canEdit, onImported: () => _reload()),
             const SizedBox(height: 12),
             TextField(
               key: const ValueKey('ing-search'),

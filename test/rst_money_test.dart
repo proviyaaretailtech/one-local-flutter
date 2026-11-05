@@ -99,7 +99,7 @@ void main() {
     expect(find.text('Cash drawer ₹790'), findsOneWidget);
     expect(find.text('UPI ₹0'), findsOneWidget);
     expect(find.text('Bank ₹0'), findsOneWidget);
-    for (final l in ['Money in', 'Money out', 'Transfer', 'OneLocal wallet', 'Due to you', 'Ad credits', 'Discount credits', 'Cash register', 'Dues']) {
+    for (final l in ['Money in', 'Money out', 'Transfer', 'OneLocal wallet', 'Due to you', 'Ad credits', 'Cash register', 'Dues']) {
       expect(find.text(l), findsWidgets, reason: l);
     }
     expect(find.text('Cash drawer · 29 Oct'), findsOneWidget);
@@ -116,7 +116,8 @@ void main() {
     final card = find.byKey(const ValueKey('rm-ad-credits'));
     expect(find.descendant(of: card, matching: find.text('₹1,250')), findsOneWidget);
     expect(find.descendant(of: card, matching: find.text('Soon')), findsNothing);
-    expect(find.descendant(of: find.byKey(const ValueKey('rm-discount-credits')), matching: find.text('Soon')), findsOneWidget, reason: 'discount credits are not open yet');
+    expect(find.byKey(const ValueKey('rm-discount-credits')), findsNothing, reason: 'no dead Soon tile (founder, 3 Nov 2026)');
+    expect(find.text('Discount credits'), findsNothing);
     await tap(t, find.byKey(const ValueKey('rm-ad-credits-open')));
     expect(find.byType(AdsHomeScreen), findsOneWidget);
   });

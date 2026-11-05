@@ -84,12 +84,15 @@ class FakeGateway implements GuestGateway {
   Future<void> feedback(int rating, {String? comment}) async => feedbacks.add((rating, comment));
 }
 
-/// Welcome -> Start exploring -> budget (skipped, or [budget] set) -> "What are you in the mood for?" (All dishes) -> the deck.
-Future<void> startOrdering(WidgetTester t, {bool budget = false}) async {
+/// Welcome -> Start exploring -> budget (skipped, or [budget] set; none at all on the [staff] phone) -> "What are you in the mood for?" (All
+/// dishes) -> the deck.
+Future<void> startOrdering(WidgetTester t, {bool budget = false, bool staff = false}) async {
   await t.tap(find.byKey(const ValueKey('guest-start')));
   await t.pumpAndSettle();
-  await t.tap(find.byKey(ValueKey(budget ? 'budget-save' : 'budget-skip')));
-  await t.pumpAndSettle();
+  if (!staff) {
+    await t.tap(find.byKey(ValueKey(budget ? 'budget-save' : 'budget-skip')));
+    await t.pumpAndSettle();
+  }
   await t.tap(find.byKey(const ValueKey('mood-all')));
   await t.pumpAndSettle();
 }
@@ -405,7 +408,7 @@ void main() {
       var exited = 0;
       final g = FakeGateway(waits: false);
       await showGuest(t, g, onExit: () => exited++);
-      await startOrdering(t);
+      await startOrdering(t, staff: true);
       await t.tap(find.byKey(const ValueKey('deck-add')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('cart-bar')));

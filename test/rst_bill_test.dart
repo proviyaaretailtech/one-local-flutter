@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:vinii_pos/devices/devices_api.dart' show sendRawToPrinter;
+import 'package:vinii_pos/devices/printer_router.dart' show printPdfDialog;
 import 'package:vinii_pos/inventory/inventory_api.dart';
 import 'package:vinii_pos/tables/bill_api.dart';
 import 'package:vinii_pos/tables/bill_paid_screen.dart';
 import 'package:vinii_pos/tables/bill_pay_screen.dart';
-import 'package:vinii_pos/tables/bill_receipt_popup.dart';
 import 'package:vinii_pos/tables/bill_receipt_screen.dart';
 import 'package:vinii_pos/tables/bill_split_screen.dart';
 import 'package:vinii_pos/tables/table_order_screen.dart';
@@ -63,9 +64,20 @@ class Fake {
         return ok(orderView);
       case 'pos_set_order_status':
         return ok({'id': o1});
+      case 'pos_print_targets':
+        return ok({'printers': printers, 'stations': [], 'business': business});
+      case 'pos_print_log':
+        return ok({'logged': true});
     }
     return err(404, 'not found: ${fnOf(r)}');
   });
+
+  /// The printers set up in Devices (`pos_print_targets`, 0660): none until a test adds one.
+  List<Map<String, dynamic>> printers = [];
+  Map<String, dynamic> business = {'name': 'Dosa House 550', 'outlet': 'Indiranagar', 'gstin': '29ABCDE1234F1Z5', 'address': '12 CMH Road, Bengaluru', 'phone': '080 4000 5500'};
+  void counterPrinter() => printers = [
+        {'id': 'p-c1', 'name': 'Counter printer 1', 'type': 'receipt', 'connection': 'lan', 'address': '192.168.1.60', 'paper_mm': 80, 'copies': 1, 'auto_cut': true, 'is_default': true},
+      ];
 
   Map<String, dynamic> orderView = {
     'table': {'id': t1, 'label': 'T1', 'seats': 4, 'area_name': 'Ground Floor', 'main_table_id': t1},
@@ -133,6 +145,30 @@ Future<void> sendBill(WidgetTester t, String button, String phone) async {
   await tapKey(t, button);
   await t.enterText(find.byKey(const ValueKey('send-to')), phone);
   await tapKey(t, 'send-go');
+}
+
+/// Replaces the print dialog for one test: the names it was given, and whether the PDF had pages.
+List<String> dialogs() {
+  final got = <String>[];
+  final before = printPdfDialog;
+  printPdfDialog = (pdf, name) async {
+    got.add('$name ${pdf.isNotEmpty}');
+    return true;
+  };
+  addTearDown(() => printPdfDialog = before);
+  return got;
+}
+
+/// Replaces the network printer for one test: what reached it, by address ([error]: it refuses).
+List<(String, String)> lanPrinter({Object? error}) {
+  final got = <(String, String)>[];
+  final before = sendRawToPrinter;
+  sendRawToPrinter = (host, port, bytes) async {
+    if (error != null) throw error;
+    got.add(('$host:$port', String.fromCharCodes(bytes)));
+  };
+  addTearDown(() => sendRawToPrinter = before);
+  return got;
 }
 
 void main() {
@@ -414,15 +450,30 @@ void main() {
       expect(u.query, startsWith('body=Bill%20R5501'), reason: 'spaces as %20 so the SMS app shows them');
     });
 
-    testWidgets('the print button sends the bill slip to the printer', (t) async {
+    testWidgets('Print bill with no receipt printer set up: the slip opens in the print dialog, and it says why', (t) async {
       final s = Fake();
-      final printed = <String>[];
-      final before = printReceiptPdf;
-      printReceiptPdf = (pdf, name) async => printed.add('$name ${pdf.isNotEmpty}');
-      addTearDown(() => printReceiptPdf = before);
+      final printed = dialogs();
       await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
       await tapKey(t, 'bill-print');
       expect(printed, ['Bill R5501.pdf true']);
+      expect(find.text('No receipt printer set up, so the bill opened in the print dialog. Add a receipt printer in Settings → Devices.'), findsOneWidget);
+      expect(argsOf(s.calls('pos_print_log').single), {'kind': 'bill', 'outcome': 'dialog', 'order_id': o1, 'detail': 'No receipt printer set up'});
+    });
+
+    testWidgets('Print bill on a network receipt printer: the slip in ESC/POS with the business, its GSTIN, TAX INVOICE and the total', (t) async {
+      final s = Fake()..counterPrinter();
+      final raw = lanPrinter();
+      final printed = dialogs();
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      await tapKey(t, 'bill-print');
+      expect(raw.single.$1, '192.168.1.60:9100');
+      expect(raw.single.$2, allOf([
+        contains('DOSA HOUSE 550'), contains('Indiranagar'), contains('12 CMH Road, Bengaluru'), contains('Ph: 080 4000 5500'), contains('GSTIN: 29ABCDE1234F1Z5'),
+        contains('TAX INVOICE'), contains('Bill No: R5501'), contains('Rs 1050.00'), isNot(contains('₹')),
+      ]));
+      expect(printed, isEmpty, reason: 'no print dialog for a network printer');
+      expect(find.text('Bill printed on Counter printer 1.'), findsOneWidget);
+      expect(argsOf(s.calls('pos_print_log').single), {'kind': 'bill', 'outcome': 'printed', 'order_id': o1, 'printer_id': 'p-c1'});
     });
 
     testWidgets('a split bill sends the cashier to the split instead of taking it in one go', (t) async {
@@ -576,8 +627,9 @@ void main() {
       expect(find.byKey(const ValueKey('bill-customer-save')), findsOneWidget, reason: 'the sheet stays open');
     });
 
-    testWidgets('Email asks for the address and opens the mail app; Print is logged with the printer', (t) async {
-      final s = Fake();
+    testWidgets('Email asks for the address and opens the mail app; Print prints the receipt on the receipt printer and is logged with it', (t) async {
+      final s = Fake()..counterPrinter();
+      final raw = lanPrinter();
       await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
       await tapKey(t, 'receipt-email');
       await t.enterText(find.byKey(const ValueKey('receipt-to')), 'asha@example.com');
@@ -585,9 +637,24 @@ void main() {
       expect(s.opened.single.scheme, 'mailto');
       expect(s.opened.single.path, 'asha@example.com');
       await tapKey(t, 'receipt-print');
+      expect(raw.single.$1, '192.168.1.60:9100');
+      expect(raw.single.$2, allOf(contains('DOSA HOUSE 550'), contains('Bill No: R5501'), contains('Table: T1'), contains('PAID')));
+      expect(find.text('Receipt printed on Counter printer 1.'), findsOneWidget);
+      expect(find.textContaining('later release'), findsNothing);
       final logs = s.calls('rst_receipt_log').map(argsOf).toList();
       expect(logs.map((a) => a['channel']), ['email', 'print']);
       expect(logs.last['to'], 'Counter printer 1');
+      expect(argsOf(s.calls('pos_print_log').single), {'kind': 'receipt', 'outcome': 'printed', 'order_id': o1, 'printer_id': 'p-c1'});
+    });
+
+    testWidgets('receipt Print when the printer does not answer: says why, and nothing is recorded as printed', (t) async {
+      final s = Fake()..counterPrinter();
+      lanPrinter(error: const SocketException('Connection failed', osError: OSError('Connection refused', 61)));
+      await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
+      await tapKey(t, 'receipt-print');
+      expect(find.text('Receipt not printed: Counter printer 1 at 192.168.1.60 did not answer (connection refused).'), findsOneWidget);
+      expect(s.calls('rst_receipt_log'), isEmpty);
+      expect(argsOf(s.calls('pos_print_log').single)['outcome'], 'failed');
     });
 
     testWidgets('a refused send says why and opens nothing', (t) async {

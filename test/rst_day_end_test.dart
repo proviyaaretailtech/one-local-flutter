@@ -12,6 +12,7 @@ import 'package:http/testing.dart';
 import 'package:vinii_pos/api/rpc_client.dart';
 import 'package:vinii_pos/money/rst_money.dart';
 import 'package:vinii_pos/money/rst_money_api.dart';
+import 'package:vinii_pos/outlets/outlet_scope.dart';
 import 'package:vinii_pos/reports/rst_reports_api.dart';
 import 'package:vinii_pos/reports/rst_reports_screen.dart';
 import 'package:vinii_pos/restaurant/home_insights.dart';
@@ -168,5 +169,59 @@ void main() {
     expect(find.text('6 bills left unsettled at Day end · ₹1,470'), findsOneWidget);
     expect(find.text('Day reopened 1 time'), findsOneWidget);
     expect(find.text('No admin PIN changes'), findsOneWidget);
+  });
+
+  // 0655: an owner's own void needs no admin PIN; the card read "None today" after one. The leakage answer is the database's after the
+  // owner voided a paid ₹208 bill.
+  testWidgets('the dashboard Revenue leakage card: bills voided today, with their value and in the latest changes', (t) async {
+    final client = MockClient((r) async => ok({...copy('insights'), 'mix': {}, 'payments': [], 'top': [], 'menu': {}, 'ready': 0,
+          'leakage': {'latest': [{'at': '2026-11-04T11:18:04.328082+00:00', 'by': 'ZZ UI Owner', 'bill': 'P-00004', 'what': 'P-00004 voided, 208.00 refunded: test void', 'approved_by': 'Staff'}],
+                      'voided': 1, 'reopened': 0, 'unsettled': 0, 'voided_minor': 20800, 'admin_changes': 0, 'unsettled_due_minor': 0}}));
+    ignoreOverflow();
+    t.view.physicalSize = const Size(800, 2400);
+    t.view.devicePixelRatio = 2;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(theme: posTheme(), home: Scaffold(body: SingleChildScrollView(child: RestaurantInsights(api: RestaurantApi(baseUrl: 'http://t.test', accessToken: () => 't', client: client))))));
+    await t.pumpAndSettle();
+    expect(find.text('1 bill voided · ₹208'), findsOneWidget);
+    expect(find.text('No admin PIN changes'), findsOneWidget, reason: 'not "None today" once a bill is voided');
+    expect(find.text('#P-00004 · P-00004 voided, 208.00 refunded: test void · ZZ UI Owner'), findsOneWidget);
+  });
+
+  // 0653: Day end with several outlets booked everything into the first outlet. The answers are the database's for a business with two
+  // outlets (server/scripts/rst-five-fixes-e2e.mjs with FIXTURES=…).
+  group('several outlets', () {
+    final Map<String, dynamic> ox = jsonDecode(File('test/fixtures/rst_outlets_register_server.json').readAsStringSync()) as Map<String, dynamic>;
+    Map<String, dynamic> oc(String k) => jsonDecode(jsonEncode(ox[k])) as Map<String, dynamic>;
+    tearDown(OutletScope.reset);
+
+    testWidgets("none chosen: each outlet's day, no Day end button; a tap chooses the outlet and shows its drawer", (t) async {
+      final f = Fake(oc('register_outlets'));
+      await open(t, f);
+      expect(find.byKey(const ValueKey('rm-register-outlets')), findsOneWidget);
+      expect(find.byKey(const ValueKey('rm-close-day')), findsNothing, reason: 'Day end is per outlet');
+      expect(find.text('Day open'), findsNWidgets(2));
+      final second = (oc('register_outlets')['outlets'] as List)[1] as Map;
+      f.register = oc('register_one');
+      await tapKey(t, 'rm-outlet-${second['id']}');
+      expect(OutletScope.selected.value, second['id']);
+      expect(f.of('rmoney_register').last['location_id'], second['id'], reason: 'the drawer of the chosen outlet');
+      expect(find.byKey(const ValueKey('rm-close-day')), findsOneWidget);
+      expect(find.textContaining('Cash drawer · ${oc('register_one')['location_name']}'), findsOneWidget, reason: 'which outlet this drawer is');
+      f.register = oc('register_outlets');
+      await tapKey(t, 'rm-all-outlets');
+      expect(OutletScope.selected.value, isNull);
+      expect(find.byKey(const ValueKey('rm-register-outlets')), findsOneWidget, reason: 'back to the list');
+    });
+
+    testWidgets('an outlet chosen at the top: Day end is sent for it', (t) async {
+      OutletScope.selected.value = 'loc-2';
+      final f = Fake({...copy('register_open'), 'open_bills': {'count': 0, 'tables': 0, 'due_minor': 0, 'list': []}});
+      await open(t, f);
+      await tapKey(t, 'rm-close-day');
+      await t.enterText(find.byKey(const ValueKey('rm-counted')), '300');
+      await tapKey(t, 'rm-close-save');
+      expect(f.of('rmoney_close_day').single, {'location_id': 'loc-2', 'counted_minor': 30000});
+    });
   });
 }

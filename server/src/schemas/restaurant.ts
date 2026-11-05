@@ -24,6 +24,8 @@ export const MenuItemView = z.object({ id, location_id: id.nullish() }).strict()
 export const MenuItemSave = z.object({
   id, version: z.number().int().min(1), location_id: id.nullish(), description: z.string().max(500, 'A description is up to 500 characters.').nullish(),
   food_type: z.enum(['veg', 'non_veg', 'egg']).optional(), availability: z.array(Window).max(6, 'Up to 6 serving windows per dish.').optional(),
+  // 0652: Apply to Channels: Table QR and the OneLocal app, each on or off
+  channels: z.object({ qr: z.boolean().optional(), one_local: z.boolean().optional() }).strict().optional(),
 }).strict();
 export const MenuStockSet = z.object({ id: id.optional(), category_id: id.optional(), in_stock: z.boolean() }).strict()
   .refine(b => !!b.id !== !!b.category_id, { message: 'Choose one dish or one category.' });
