@@ -14,6 +14,7 @@ import 'categories_screen.dart';
 import 'dish_screen.dart';
 import 'menu_api.dart';
 import 'menu_build_api.dart';
+import 'menu_sheets.dart';
 import 'menu_build_screens.dart';
 import 'menu_build_widgets.dart' show kMbLime;
 import 'menu_widgets.dart';
@@ -248,6 +249,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 onQuickAdd: _quickAdd,
                 onCategories: _categories,
                 onRefresh: _reload,
+                sheets: SheetButtons(kind: SheetKind.menu, api: _build, canImport: m.canEdit, onImported: () => _reload()),
               );
             },
           ),
@@ -279,6 +281,7 @@ class _AllItems extends StatelessWidget {
     required this.onAiPicture,
     required this.onQuickAdd,
     this.onCategories,
+    this.sheets,
     required this.onRefresh,
   });
   final MenuData data;
@@ -300,6 +303,9 @@ class _AllItems extends StatelessWidget {
 
   /// Opens Menu → Categories (editors only).
   final VoidCallback? onCategories;
+
+  /// Import and Export (an Excel sheet of the dishes), under the search.
+  final Widget? sheets;
   final Future<void> Function() onRefresh;
 
   static String _key(MenuCategory c) => c.id ?? c.name;
@@ -377,6 +383,7 @@ class _AllItems extends StatelessWidget {
               ),
             ],
           ]),
+          if (sheets != null) ...[const SizedBox(height: 10), sheets!],
           const SizedBox(height: 14),
           // Category pills, as on the catalogue: All (lime when chosen), then each category.
           // the pills scroll; the Categories button stays in view at the end of the row (it was hidden past the last pill)

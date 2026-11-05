@@ -461,12 +461,13 @@ class _OrderKotCard extends StatelessWidget {
                       small(LucideIcons.circleX, 'kot-cancelitem-$no', 'Cancel item', onCancelItem!),
                     ],
                   ]),
-                  // the KOT history: dishes cancelled after the KOT went, how many and why (0640)
+                  // the KOT history: dishes cancelled, how many and why (0640); since 0654 also those cancelled before their KOT went
                   for (final (n, c) in o.l('item_cancels').indexed)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        '${c.b('recent') ? 'STOP · ' : ''}${c.n('qty').toInt()}× ${c.s('name')} cancelled${c.no('kot_no') != null ? ' (KOT ${c.s('kot_no')})' : ''}'
+                        '${c.b('recent') ? 'STOP · ' : ''}${c.n('qty').toInt()}× ${c.s('name')} cancelled'
+                        '${c.raw['sent'] == false ? ' before the kitchen' : c.no('kot_no') != null ? ' (KOT ${c.s('kot_no')})' : ''}'
                         '${(c.so('reason') ?? '').isEmpty ? '' : ' · “${c.s('reason')}”'}${(c.so('by') ?? '').isEmpty ? '' : ' · ${c.s('by')}'}',
                         key: ValueKey('kot-itemcancel-$no-$n'),
                         style: inter(11.5, 700, color: c.b('recent') ? const Color(0xFFD1213B) : kMuted),

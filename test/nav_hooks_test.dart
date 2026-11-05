@@ -157,10 +157,10 @@ void main() {
     testWidgets('the store\'s ten options, in the store\'s order, and nothing else', (t) async {
       fakeHooks();
       await showMore(t, onReports: () {});
-      const ten = ['All Orders', 'Money', 'Inventory', 'Customer', 'Business profile', 'Reports', 'Team', 'Settings', 'One Local Wallet', 'Help & support', 'Subscription plans'];
+      const ten = ['All Orders', 'Money', 'Inventory', 'Customer', 'Reports', 'Team', 'Settings', 'One Local Wallet', 'Help & support', 'Subscription plans'];
       final tops = [for (final l in ten) t.getRect(find.text(l)).top];
       expect(tops, [...tops]..sort(), reason: 'in this order');
-      for (final gone in ['Kitchen display', 'Purchase orders', 'Table QR codes', 'Menu link', 'Payout', 'Notifications', 'Outlet timings', 'Feedback', 'Taxes']) {
+      for (final gone in ['Kitchen display', 'Purchase orders', 'Table QR codes', 'Menu link', 'Payout', 'Notifications', 'Business profile', 'Outlet timings', 'Feedback', 'Taxes']) {
         expect(find.text(gone), findsNothing, reason: gone);
       }
     });
@@ -281,7 +281,6 @@ void main() {
         'All Orders': 'history',
         'Money': 'money',
         'Customer': 'customers',
-        'Business profile': 'outletInfo',
         'Reports': 'reports',
         'Team': 'team',
         'Settings': 'settings',

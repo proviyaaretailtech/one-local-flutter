@@ -171,6 +171,23 @@ void main() {
     expect(find.text('No admin PIN changes'), findsOneWidget);
   });
 
+  // 0655: an owner's own void needs no admin PIN; the card read "None today" after one. The leakage answer is the database's after the
+  // owner voided a paid ₹208 bill.
+  testWidgets('the dashboard Revenue leakage card: bills voided today, with their value and in the latest changes', (t) async {
+    final client = MockClient((r) async => ok({...copy('insights'), 'mix': {}, 'payments': [], 'top': [], 'menu': {}, 'ready': 0,
+          'leakage': {'latest': [{'at': '2026-11-04T11:18:04.328082+00:00', 'by': 'ZZ UI Owner', 'bill': 'P-00004', 'what': 'P-00004 voided, 208.00 refunded: test void', 'approved_by': 'Staff'}],
+                      'voided': 1, 'reopened': 0, 'unsettled': 0, 'voided_minor': 20800, 'admin_changes': 0, 'unsettled_due_minor': 0}}));
+    ignoreOverflow();
+    t.view.physicalSize = const Size(800, 2400);
+    t.view.devicePixelRatio = 2;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(theme: posTheme(), home: Scaffold(body: SingleChildScrollView(child: RestaurantInsights(api: RestaurantApi(baseUrl: 'http://t.test', accessToken: () => 't', client: client))))));
+    await t.pumpAndSettle();
+    expect(find.text('1 bill voided · ₹208'), findsOneWidget);
+    expect(find.text('No admin PIN changes'), findsOneWidget, reason: 'not "None today" once a bill is voided');
+    expect(find.text('#P-00004 · P-00004 voided, 208.00 refunded: test void · ZZ UI Owner'), findsOneWidget);
+  });
+
   // 0653: Day end with several outlets booked everything into the first outlet. The answers are the database's for a business with two
   // outlets (server/scripts/rst-five-fixes-e2e.mjs with FIXTURES=…).
   group('several outlets', () {

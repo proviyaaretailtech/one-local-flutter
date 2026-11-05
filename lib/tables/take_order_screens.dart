@@ -5,6 +5,7 @@ import '../devices/printer_router.dart' show PrintResult, printSentKot;
 import '../inventory/inventory_api.dart';
 import '../ui/theme.dart';
 import 'dish_options_sheet.dart';
+import 'order_review_sheet.dart';
 import 'table_order_screen.dart';
 import 'table_widgets.dart';
 import 'tables_api.dart';
@@ -385,6 +386,21 @@ class _AddDishesScreenState extends State<AddDishesScreen> {
 
   Future<void> _submit(bool send) async {
     if (_qty.isEmpty) return showToast(context, 'Choose at least one dish.');
+    // the order read back to the guest first (founder, 4 Nov 2026); Edit order goes back with nothing sent
+    if (send) {
+      final ok = await showOrderReview(context, title: widget.tableLabel, lines: [
+        for (final e in _qty.entries)
+          ReviewLine(
+            name: _item(_dishOf(e.key))?.s('name') ?? 'Dish',
+            qty: e.value,
+            price: _priceOf(e.key),
+            size: _sizeOf(e.key) == null ? null : _item(_dishOf(e.key))?.l('variants').where((v) => v.s('id') == _sizeOf(e.key)).firstOrNull?.s('name'),
+            extras: _extras[e.key]?.summary ?? '',
+            note: _note[e.key],
+          ),
+      ]);
+      if (!ok || !mounted) return;
+    }
     final key = _key ??= TablesApi.newKey();
     setState(() => _busy = true);
     try {

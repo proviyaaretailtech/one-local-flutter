@@ -286,13 +286,14 @@ void main() {
 
   group('KOT screen', () {
     Map<String, dynamic> kot() => {
-          'counts': {'all': 1, 'preparing': 1, 'ready': 0, 'completed': 0, 'cancelled': 0},
+          'counts': {'all': 1, 'preparing': 1, 'ready': 0, 'completed': 0, 'cancelled': 1},
           'orders': [
             {
               'id': openBill()['id'], 'display_no': 'Z9101', 'total': 1407, 'stage': 'preparing', 'channel': 'dine_in', 'table_id': 't1', 'table_label': 'R1',
               'captain': null, 'paid': false, 'created_at': '2026-11-02T13:00:00Z', 'minutes': 5, 'items': 5, 'ready': 0,
               'kots': [{'id': 'k1', 'kot_no': 9101, 'status': 'preparing', 'items': 5, 'ready': 0}], 'stations': [], 'ready_item_ids': [], 'latest_ticket': 'k1',
-              'item_cancels': [{'name': 'Naan', 'qty': 2, 'kot_no': '9101', 'reason': 'Guest wants only two', 'by': 'ZZ cap', 'recent': true, 'at': '2026-11-02T13:05:00Z'}],
+              'item_cancels': [{'name': 'Naan', 'qty': 2, 'kot_no': '9101', 'reason': 'Guest wants only two', 'by': 'ZZ cap', 'sent': true, 'recent': true, 'at': '2026-11-02T13:05:00Z'},
+                {'name': 'Lassi', 'qty': 1, 'kot_no': null, 'reason': 'Wrong order', 'by': 'ZZ cap', 'sent': false, 'recent': false, 'at': '2026-11-02T13:04:00Z'}],
             },
           ],
         };
@@ -303,6 +304,9 @@ void main() {
       await show(t, KotScreen(env: KitchenEnv(api: kitchen, refreshEvery: null), openOrder: (_, _) {}, bill: f.api));
       await t.pumpAndSettle();
       expect(find.textContaining('STOP · 2× Naan cancelled (KOT 9101) · “Guest wants only two”'), findsOneWidget);
+      // 0654: a dish cancelled before its KOT is listed too, without STOP; the order counts under Cancelled
+      expect(find.textContaining('1× Lassi cancelled before the kitchen · “Wrong order”'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('kot-status-cancelled')), matching: find.text('1')), findsOneWidget);
       await tapKey(t, 'kot-cancelitem-Z9101');
       expect(find.textContaining('Cancel KOT item'), findsOneWidget);
       expect(find.text('2× Paneer'), findsOneWidget);
