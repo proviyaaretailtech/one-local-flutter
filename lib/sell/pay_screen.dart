@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../money/store_money.dart' show StoreMoneyApi, reopenStoreDay;
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
 import '../ui/theme.dart';
@@ -156,6 +157,10 @@ class _PayScreenState extends State<PayScreen> {
       await job();
     } on OrdersApiException catch (e) {
       if (mounted) showToast(context, e.message);
+      if (mounted && e.code == 'day_ended') {
+        // the day was closed: reopen it, then the person presses Pay again and the sale is added to the day end
+        await reopenStoreDay(context, StoreMoneyApi());
+      }
       if (mounted && e.code == 'no_shift') {
         // the store takes no payment without an open cash shift (S5.1): open it, then the person presses Pay again
         await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => OpenShiftScreen(api: env.shift, storeLine: env.storeLine, initials: env.initials, required: true)));
