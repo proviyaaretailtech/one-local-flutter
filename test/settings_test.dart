@@ -205,6 +205,23 @@ void main() {
       expect(find.text('Orders & delivery'), findsOneWidget);
     });
 
+    testWidgets('a service business sees Business profile, without delivery, product returns or store hours', (t) async {
+      HomeNav.shell = _ServiceShell();
+      addTearDown(() => HomeNav.shell = null);
+      final f = Fake()..page = fx['full'] as Map<String, dynamic>;
+      await openSettings(t, f);
+      for (final p in ['Business profile', 'Team & access', 'Money & documents', 'Me & app']) {
+        expect(find.text(p), findsOneWidget, reason: p);
+      }
+      for (final p in ['Store', 'Orders & delivery', 'Returns & refunds']) {
+        expect(find.text(p), findsNothing, reason: p);
+      }
+      expect(find.textContaining('KOTs'), findsNothing);
+      await section(t, 'store');
+      expect(find.text('Opening & closing timings'), findsNothing, reason: 'a service sets its hours in Service management');
+      expect(find.text('Location'), findsOneWidget);
+    });
+
     testWidgets('a business with nothing set sees "Not set" / "Not added" and the switches off, all from the server', (t) async {
       final f = Fake();
       await openSettings(t, f);
@@ -797,6 +814,15 @@ class _Shell implements TabShell {
   String kind;
   @override
   void setKind(String k) => kind = k;
+  @override
+  bool show(String label) => false;
+}
+
+class _ServiceShell implements TabShell {
+  @override
+  String get kind => 'service';
+  @override
+  void setKind(String kind) {}
   @override
   bool show(String label) => false;
 }

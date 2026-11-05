@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
+import '../home/home_nav.dart';
 import '../home/home_widgets.dart' show kLime, rupees;
 import '../ui/theme.dart';
 import 'customer_widgets.dart';
@@ -286,7 +287,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   ]),
                   const SizedBox(height: 8),
                   Row(children: [
-                    _stat('Store wallet', rupees(c.walletBalance)),
+                    _stat(HomeNav.shell?.kind == 'service' ? 'Wallet' : 'Store wallet', rupees(c.walletBalance)),
                     const SizedBox(width: 8),
                     _stat('Loyalty points', '${c.loyaltyPoints}'),
                   ]),
@@ -299,7 +300,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                         CwaRow('Anniversary', c.anniversary ?? '—'),
                         CwaRow('Address', c.address.isEmpty ? '—' : c.address),
                       ],
-                      CwaRow('Prefers', switch (c.preferredDining) { 'takeaway' => 'Takeaway', 'delivery' => 'Delivery', _ => 'Dine-in' }),
+                      // dine-in, takeaway or delivery means nothing for a service business
+                      if (HomeNav.shell?.kind != 'service') CwaRow('Prefers', switch (c.preferredDining) { 'takeaway' => 'Takeaway', 'delivery' => 'Delivery', _ => 'Dine-in' }),
                       CwaRow('Added at', c.locationName.isEmpty ? '—' : c.locationName),
                       if (c.notes.isNotEmpty) CwaRow('Notes', c.notes),
                       if (!c.fullContact) Padding(
