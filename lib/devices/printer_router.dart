@@ -22,8 +22,9 @@ import 'usb_printer.dart';
 // migration 0660, from Devices and Kitchen setup) and keeps what happened (`pos_print_log`, on the order's events).
 //   Network (LAN)          ESC/POS bytes on the printer's port (9100 unless the address names another), its copies, cut when auto cut is on
 //   Phone's print service  the phone's print dialog
-//   USB                    the restaurant's Android app: ESC/POS down the cable (usb_printer.dart, 5 Nov 2026)
-//   Bluetooth              not in this build: said plainly, nothing pretends to print
+//   Bluetooth / USB        picked with Find printers in the store's Devices: ESC/POS straight to it from the Android app (LocalPrinters.kt).
+//   USB, not picked        the restaurant's Android app: ESC/POS down the cable (usb_printer.dart, 5 Nov 2026)
+//   Anything else          Bluetooth not picked, or in a browser: said plainly, nothing pretends to print
 //   a browser              cannot open a socket to a printer: the print dialog, and it says so
 // Every message says what happened; "printed" only once the bytes were written to the printer.
 
@@ -252,6 +253,15 @@ class PrinterRouter {
         return shown == null
             ? PrintResult('dialog', '$what sent to the print dialog for ${p.name}.', printerId: p.id, printer: p.name)
             : PrintResult('failed', '$what not printed: $shown.', printerId: p.id, printer: p.name, detail: shown);
+      case 'bluetooth' || 'usb' when p.direct && !printingInBrowser:
+        final one = escPos();
+        try {
+          await sendLocalPrinter(p.address, [for (var i = 0; i < p.copies; i++) ...one]);
+          return PrintResult('printed', '$what printed on ${p.name}${p.copies > 1 ? ' (${p.copies} copies)' : ''}.', printerId: p.id, printer: p.name);
+        } catch (e) {
+          final why = e is StateError ? e.message : '$e';
+          return PrintResult('failed', '$what not printed on ${p.name}: $why', printerId: p.id, printer: p.name, detail: why);
+        }
       case 'usb' when usbPrintingOn():
         final one = escPos();
         try {

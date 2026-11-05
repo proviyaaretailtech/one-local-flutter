@@ -198,24 +198,71 @@ void main() {
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('bill-name')), 'Test Cust');
     await t.enterText(find.byKey(const ValueKey('bill-phone')), '90000 00399');
+    await _tap(t, const ValueKey('bill-seg-2')); // a segment skips ahead: Discount
     await _tap(t, const ValueKey('disc-percent'));
-    await t.ensureVisible(find.text('Save bill'));
+    await _tap(t, const ValueKey('bill-seg-3'));
+    expect(find.text('Save bill'), findsOneWidget); // only on the last step
     await t.tap(find.text('Save bill'));
     await t.pumpAndSettle();
     expect(find.text('Add at least one service.'), findsOneWidget);
+    expect(find.text('Step 2 of 4'), findsOneWidget); // sent back to Services
     expect(f.of('svc_invoice_create'), isEmpty);
     await _tap(t, const ValueKey('more-ac'));
     await _tap(t, const ValueKey('more-ac'));
+    await _tap(t, const ValueKey('bill-seg-2'));
     await t.enterText(find.byKey(const ValueKey('bill-discount')), '10');
     await t.pumpAndSettle();
     expect(find.text('−₹160'), findsOneWidget);
     expect(find.text('₹1,440'), findsOneWidget);
-    await t.ensureVisible(find.text('Save bill'));
+    await _tap(t, const ValueKey('bill-seg-3'));
     await t.tap(find.text('Save bill'));
     await t.pumpAndSettle();
     final call = f.calls.singleWhere((c) => c.$1 == 'svc_invoice_create');
     expect(call.$2, {'customer_name': 'Test Cust', 'customer_phone': '9000000399', 'lines': [{'menu_item_id': 'ac', 'qty': 2}], 'discount_pct': 10});
     expect(call.$3, startsWith('svc-'));
     expect(made!.id, '9');
+  });
+
+  Future<void> openNew(WidgetTester t, _Fake f) async {
+    await show(t, Builder(builder: (c) => TextButton(onPressed: () => Navigator.of(c).push(MaterialPageRoute(builder: (_) => NewBillScreen(api: f.api))), child: const Text('open'))));
+    await t.pumpAndSettle();
+    await t.tap(find.text('open'));
+    await t.pumpAndSettle();
+  }
+
+  testWidgets('new bill in steps (4 Nov 2026): Step 1 of 4, Next checks the step and moves on, Back goes back', (t) async {
+    await openNew(t, _Fake());
+    expect(find.text('Step 1 of 4'), findsOneWidget);
+    expect(find.text('Save bill'), findsNothing);
+    await _tap(t, const ValueKey('bill-next'));
+    expect(find.text('Enter the customer\'s name.'), findsOneWidget);
+    expect(find.text('Step 1 of 4'), findsOneWidget);
+    await t.pump(const Duration(seconds: 4)); // the toast sits over Next until it goes
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('bill-name')), 'Test Cust');
+    await _tap(t, const ValueKey('bill-next'));
+    expect(find.text('Step 2 of 4'), findsOneWidget);
+    expect(find.byKey(const ValueKey('more-ac')), findsOneWidget);
+    await _tap(t, const ValueKey('bill-back'));
+    expect(find.text('Step 1 of 4'), findsOneWidget);
+    expect(find.byKey(const ValueKey('bill-name')), findsOneWidget);
+  });
+
+  testWidgets('new bill fits a 375x812 phone on every step', (t) async {
+    t.view.physicalSize = const Size(375, 812);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await openNew(t, _Fake());
+    expect(t.takeException(), isNull);
+    await t.enterText(find.byKey(const ValueKey('bill-name')), 'Test Cust');
+    await _tap(t, const ValueKey('bill-next'));
+    await _tap(t, const ValueKey('more-ac'));
+    for (var i = 1; i < 4; i++) {
+      expect(t.takeException(), isNull);
+      if (i < 3) await _tap(t, const ValueKey('bill-next'));
+    }
+    expect(find.text('Step 4 of 4'), findsOneWidget);
+    expect(find.text('Save bill'), findsOneWidget);
+    expect(t.takeException(), isNull);
   });
 }

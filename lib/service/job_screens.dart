@@ -6,6 +6,7 @@ import '../ui/theme.dart';
 import 'bills_screen.dart';
 import 'service_api.dart';
 import 'service_widgets.dart';
+import 'step_form.dart';
 
 // Jobs (New job, 2 Nov 2026), the same for every kind of service: work with several services, a team, a date and start / end time (or
 // "schedule later"), an arrival window and repeating visits. The job's bill is one ordinary bill in the Bill tab. Every amount, label and
@@ -46,7 +47,7 @@ class _NewJobScreenState extends State<NewJobScreen> {
   }();
   TimeOfDay _start = const TimeOfDay(hour: 10, minute: 0), _end = const TimeOfDay(hour: 11, minute: 0);
   bool _later = false, _percent = false, _remind = true, _busy = false;
-  int _window = 0, _count = 4;
+  int _window = 0, _count = 4, _step = 0; // _step: the step shown
   String _repeat = 'none';
   final _team = <String>{};
   final _qty = <String, int>{};
@@ -105,17 +106,26 @@ class _NewJobScreenState extends State<NewJobScreen> {
     });
   }
 
+  /// The steps (founder, 4 Nov 2026: every Service POS form in steps).
+  static const _steps = ['Customer', 'Services', 'Schedule', 'Team and billing'];
+
+  /// Back to the step with what is missing, then say what it is.
+  void _stop(int step, String message) {
+    setState(() => _step = step);
+    showToast(context, message);
+  }
+
   Future<void> _save() async {
     final name = _name.text.trim();
-    if (name.isEmpty) return showToast(context, 'Enter the customer\'s name.');
+    if (name.isEmpty) return _stop(0, 'Enter the customer\'s name.');
     final phone = _phone.text.replaceAll(RegExp(r'\D'), '');
-    if (phone.isNotEmpty && phone.length < 10) return showToast(context, 'Enter a 10-digit mobile number.');
+    if (phone.isNotEmpty && phone.length < 10) return _stop(0, 'Enter a 10-digit mobile number.');
     final lines = [for (final o in _services) if ((_qty[o.id] ?? 0) > 0) {'menu_item_id': o.id, 'qty': _qty[o.id]}];
-    if (lines.isEmpty) return showToast(context, 'Add at least one service.');
+    if (lines.isEmpty) return _stop(1, 'Add at least one service.');
     final d = num.tryParse(_discount.text.trim());
-    if (_discount.text.trim().isNotEmpty && (d == null || d < 0 || (_percent && d > 100))) return showToast(context, 'Check the discount.');
-    if (_off > _gross) return showToast(context, 'The discount is more than the bill.');
-    if (!_later && (_end.hour * 60 + _end.minute) <= (_start.hour * 60 + _start.minute)) return showToast(context, 'The end time must be after the start time.');
+    if (_discount.text.trim().isNotEmpty && (d == null || d < 0 || (_percent && d > 100))) return _stop(1, 'Check the discount.');
+    if (_off > _gross) return _stop(1, 'The discount is more than the bill.');
+    if (!_later && (_end.hour * 60 + _end.minute) <= (_start.hour * 60 + _start.minute)) return _stop(2, 'The end time must be after the start time.');
     setState(() => _busy = true);
     _key ??= ServiceApi.newKey();
     try {
@@ -156,6 +166,7 @@ class _NewJobScreenState extends State<NewJobScreen> {
           key: ValueKey(key),
           controller: c,
           keyboardType: keyboard,
+          inputFormatters: numberOnly(keyboard),
           minLines: lines,
           maxLines: lines,
           onChanged: (_) => setState(() {}),
@@ -195,82 +206,94 @@ class _NewJobScreenState extends State<NewJobScreen> {
   @override
   Widget build(BuildContext context) {
     final c = _catalogue;
-    return ServicePage(
+    // loading and a failed load keep the plain page; the steps start once the services are in (4 Nov 2026)
+    if (c == null) return ServicePage(title: 'New job', subtitle: 'Work with one or more services, a team and a time', error: _error, onRetry: _load);
+    return StepFormPage(
       title: 'New job',
-      subtitle: 'Work with one or more services, a team and a time',
-      error: _error,
-      onRetry: _load,
-      body: c == null
-          ? null
-          : [
-              SvcCard(title: 'Customer', children: [
-                _field('Customer name', _name, 'job-name'),
-                _field('Mobile number', _phone, 'job-phone', keyboard: TextInputType.phone),
-                _field('Address (where the work is)', _address, 'job-address', hint: 'Leave empty when the work is at your place'),
-              ]),
-              SvcCard(title: 'Job', children: [
-                _field('Job title (optional)', _title, 'job-title', hint: 'e.g. AC repair and service'),
-                _field('Instructions (optional)', _instructions, 'job-instructions', lines: 3, hint: 'e.g. Call before coming. Lift on the left.'),
-              ]),
-              SvcCard(title: 'Services', children: [
-                if (_services.isEmpty) Text('Add services in Catalogue first.', style: inter(14, 400, color: kMuted)),
-                for (final o in _services) _serviceRow(o),
-                const SizedBox(height: 10),
-                Wrap(spacing: 8, children: [
-                  ModeChip('₹ off', key: const ValueKey('job-disc-rupees'), selected: !_percent, onTap: () => setState(() => _percent = false)),
-                  ModeChip('% off', key: const ValueKey('job-disc-percent'), selected: _percent, onTap: () => setState(() => _percent = true)),
-                ]),
-                const SizedBox(height: 10),
-                _field(_percent ? 'Discount (%)' : 'Discount (₹)', _discount, 'job-discount', keyboard: TextInputType.number),
-                KeyValue('Services', svcRupees(_gross), size: 14),
-                if (_off > 0) KeyValue('Discount', '−${svcRupees(_off)}', size: 14, valueColor: kLink),
-                KeyValue('Before tax', svcRupees((_gross - _off).clamp(0, double.infinity)), size: 15),
-              ]),
-              SvcCard(title: 'Schedule', children: [
-                _switch('Schedule later', _later, (v) => setState(() => _later = v), 'job-later'),
-                if (!_later) ...[
-                  Row(children: [_box('Date', _day(_date), 'job-date', _pickDate, icon: LucideIcons.calendarDays)]),
-                  const SizedBox(height: 10),
-                  Row(children: [
-                    _box('Start time', _clock(_start), 'job-start', () => _pickTime(true), icon: LucideIcons.clock),
-                    const SizedBox(width: 10),
-                    _box('End time', _clock(_end), 'job-end', () => _pickTime(false)),
-                  ]),
-                  const SizedBox(height: 10),
-                  Text('Arrival window', style: inter(14, 600)),
-                  const SizedBox(height: 8),
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (final (m, l) in kArrivalWindows) ModeChip(l, key: ValueKey('window-$m'), selected: _window == m, onTap: () => setState(() => _window = m)),
-                  ]),
-                  const SizedBox(height: 10),
-                  Text('Repeating', style: inter(14, 600)),
-                  const SizedBox(height: 8),
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (final (v, l) in kRepeats) ModeChip(l, key: ValueKey('repeat-$v'), selected: _repeat == v, onTap: () => setState(() => _repeat = v)),
-                  ]),
-                  if (_repeat != 'none')
-                    Row(children: [
-                      Expanded(child: Text('Number of visits', style: inter(14, 500))),
-                      IconButton(key: const ValueKey('visits-less'), onPressed: _count <= 2 ? null : () => setState(() => _count--), icon: const Icon(LucideIcons.minus, size: 18)),
-                      Text('$_count', style: inter(15, 700)),
-                      IconButton(key: const ValueKey('visits-more'), onPressed: _count >= 12 ? null : () => setState(() => _count++), icon: const Icon(LucideIcons.plus, size: 18)),
-                    ]),
-                ],
-              ]),
-              SvcCard(title: 'Team', children: [
-                if (c.providers.isEmpty) Text('Add staff in Team management first.', style: inter(14, 400, color: kMuted)),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  for (final p in c.providers)
-                    ModeChip(p.name, key: ValueKey('team-${p.id}'), selected: _team.contains(p.id), onTap: () => setState(() => _team.contains(p.id) ? _team.remove(p.id) : _team.add(p.id))),
-                ]),
-              ]),
-              SvcCard(title: 'Billing', children: [
-                _switch('Remind me to bill when I close the job', _remind, (v) => setState(() => _remind = v), 'job-remind'),
-              ]),
-              DarkCta(label: 'Save job', busy: _busy, onPressed: _busy ? null : _save),
-            ],
+      keyPrefix: 'job',
+      steps: _steps,
+      step: _step,
+      onStep: (i) => setState(() => _step = i),
+      lastLine: 'Last step: save the job',
+      body: _stepBody(c),
+      finish: DarkCta(label: 'Save job', busy: _busy, onPressed: _busy ? null : _save),
     );
   }
+
+  List<Widget> _stepBody(Catalogue c) => switch (_step) {
+        0 => [
+            SvcCard(title: 'Customer', children: [
+              _field('Customer name', _name, 'job-name'),
+              _field('Mobile number', _phone, 'job-phone', keyboard: TextInputType.phone),
+              _field('Address (where the work is)', _address, 'job-address', hint: 'Leave empty when the work is at your place'),
+            ]),
+            SvcCard(title: 'Job', children: [
+              _field('Job title (optional)', _title, 'job-title', hint: 'e.g. AC repair and service'),
+              _field('Instructions (optional)', _instructions, 'job-instructions', lines: 3, hint: 'e.g. Call before coming. Lift on the left.'),
+            ]),
+          ],
+        1 => [
+            SvcCard(children: [
+              if (_services.isEmpty) Text('Add services in Catalogue first.', style: inter(14, 400, color: kMuted)),
+              for (final o in _services) _serviceRow(o),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, children: [
+                ModeChip('₹ off', key: const ValueKey('job-disc-rupees'), selected: !_percent, onTap: () => setState(() => _percent = false)),
+                ModeChip('% off', key: const ValueKey('job-disc-percent'), selected: _percent, onTap: () => setState(() => _percent = true)),
+              ]),
+              const SizedBox(height: 10),
+              _field(_percent ? 'Discount (%)' : 'Discount (₹)', _discount, 'job-discount', keyboard: TextInputType.number),
+              KeyValue('Services', svcRupees(_gross), size: 14),
+              if (_off > 0) KeyValue('Discount', '−${svcRupees(_off)}', size: 14, valueColor: kLink),
+              KeyValue('Before tax', svcRupees((_gross - _off).clamp(0, double.infinity)), size: 15),
+            ]),
+          ],
+        2 => [
+            SvcCard(children: [
+              _switch('Schedule later', _later, (v) => setState(() => _later = v), 'job-later'),
+              if (!_later) ...[
+                Row(children: [_box('Date', _day(_date), 'job-date', _pickDate, icon: LucideIcons.calendarDays)]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  _box('Start time', _clock(_start), 'job-start', () => _pickTime(true), icon: LucideIcons.clock),
+                  const SizedBox(width: 10),
+                  _box('End time', _clock(_end), 'job-end', () => _pickTime(false)),
+                ]),
+                const SizedBox(height: 10),
+                Text('Arrival window', style: inter(14, 600)),
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final (m, l) in kArrivalWindows) ModeChip(l, key: ValueKey('window-$m'), selected: _window == m, onTap: () => setState(() => _window = m)),
+                ]),
+                const SizedBox(height: 10),
+                Text('Repeating', style: inter(14, 600)),
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final (v, l) in kRepeats) ModeChip(l, key: ValueKey('repeat-$v'), selected: _repeat == v, onTap: () => setState(() => _repeat = v)),
+                ]),
+                if (_repeat != 'none')
+                  Row(children: [
+                    Expanded(child: Text('Number of visits', style: inter(14, 500))),
+                    IconButton(key: const ValueKey('visits-less'), onPressed: _count <= 2 ? null : () => setState(() => _count--), icon: const Icon(LucideIcons.minus, size: 18)),
+                    Text('$_count', style: inter(15, 700)),
+                    IconButton(key: const ValueKey('visits-more'), onPressed: _count >= 12 ? null : () => setState(() => _count++), icon: const Icon(LucideIcons.plus, size: 18)),
+                  ]),
+              ],
+            ]),
+          ],
+        _ => [
+            SvcCard(title: 'Team', children: [
+              if (c.providers.isEmpty) Text('Add staff in Team management first.', style: inter(14, 400, color: kMuted)),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final p in c.providers)
+                  ModeChip(p.name, key: ValueKey('team-${p.id}'), selected: _team.contains(p.id), onTap: () => setState(() => _team.contains(p.id) ? _team.remove(p.id) : _team.add(p.id))),
+              ]),
+            ]),
+            SvcCard(title: 'Billing', children: [
+              _switch('Remind me to bill when I close the job', _remind, (v) => setState(() => _remind = v), 'job-remind'),
+            ]),
+          ],
+      };
 
   Widget _serviceRow(ServiceOption o) {
     final q = _qty[o.id] ?? 0;

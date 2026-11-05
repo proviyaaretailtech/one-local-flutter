@@ -23,9 +23,11 @@ import io.flutter.plugin.common.MethodChannel
 // (asking Android's "Allow OneLocal Partner to access the USB device?" the first time). Errors: USB_NONE, USB_DENIED, USB_FAILED.
 class MainActivity : FlutterActivity() {
     private val permissionAction = "com.onelocal.vinii_pos.USB_PERMISSION"
+    private var localPrinters: LocalPrinters? = null // the printers picked in the store's Devices (Bluetooth, USB)
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        localPrinters = LocalPrinters(this, flutterEngine.dartExecutor.binaryMessenger)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "onelocal/usb_printer").setMethodCallHandler { call, result ->
             when (call.method) {
                 "list" -> result.success(printers().map { (d, _) -> mapOf("name" to (d.productName ?: d.deviceName), "maker" to (d.manufacturerName ?: ""), "id" to d.deviceName) })
@@ -37,6 +39,11 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        localPrinters?.onPermissionResult(requestCode, grantResults)
     }
 
     private val usb get() = getSystemService(Context.USB_SERVICE) as UsbManager

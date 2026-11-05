@@ -270,6 +270,18 @@ void main() {
           return err(404, 'not found');
         };
 
+    // the floating toast sits over Next / Confirm at the bottom: clear it before tapping there again
+    Future<void> clearToast(WidgetTester t) async {
+      ScaffoldMessenger.of(t.element(find.byType(ServiceBookingScreen))).removeCurrentSnackBar();
+      await t.pumpAndSettle();
+    }
+
+    Future<void> seg(WidgetTester t, int i) async {
+      await t.tap(find.byKey(ValueKey('book-seg-$i')));
+      await t.pumpAndSettle();
+    }
+
+    // the booking in steps (4 Nov 2026): Customer, Service, Time, Review and book; [fill] ends on the last step
     Future<void> fill(WidgetTester t, FakeServer s, {bool addon = false}) async {
       await showTall(t, ServiceBookingScreen(api: s.api, date: DateTime(2026, 10, 8), business: 'Sharma Services', location: 'Indiranagar Studio'));
       await t.tap(find.byKey(const ValueKey('field-customer')));
@@ -278,39 +290,33 @@ void main() {
       await t.enterText(find.byKey(const ValueKey('customer-phone')), '98765 43210');
       await t.tap(find.text('Done'));
       await t.pumpAndSettle();
+      await seg(t, 1);
       await t.tap(find.byKey(const ValueKey('field-service')));
       await t.pumpAndSettle();
       await t.tap(find.text('Precision haircut'));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('field-provider')));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Neha Rao').last);
       await t.pumpAndSettle();
       if (addon) {
         await t.tap(find.text('Hair spa · ₹200 · +20 min'));
         await t.pumpAndSettle();
       }
+      await seg(t, 2);
+      await t.tap(find.byKey(const ValueKey('field-provider')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Neha Rao').last);
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('field-time')));
       await t.pumpAndSettle();
       await t.tap(find.text('10:00 AM'));
       await t.pumpAndSettle();
+      await seg(t, 3);
     }
 
-    testWidgets('draws the form, the add-on, the server summary and the policy', (t) async {
+    testWidgets('draws each step, the add-on, the server summary and the policy', (t) async {
       final s = FakeServer(router());
       await fill(t, s, addon: true);
-      expect(find.text('Appointment Booking'), findsOneWidget);
-      expect(find.text('New appointment · Customer visits the studio'), findsOneWidget);
-      for (final w in ['Customer & service', 'Schedule & location', 'Customer', 'Service', 'Provider', 'Date', 'Time', 'Business location']) {
-        expect(find.text(w), findsWidgets, reason: w);
-      }
-      expect(find.text('Riya Sharma · +91 9876543210'), findsOneWidget);
-      expect(find.text('Precision haircut · ₹600 · 45 min'), findsOneWidget);
-      expect(find.text('Neha Rao · Senior stylist'), findsOneWidget);
-      expect(find.text('Thursday, 8 October 2026'), findsOneWidget);
-      expect(find.text('10:00 – 11:05 AM'), findsOneWidget);
-      expect(find.text('Hair spa · ₹200 · +20 min'), findsOneWidget);
-      expect(find.text('65 min + 15 min buffer'), findsOneWidget);
+      expect(find.text('New booking · Sharma Services'), findsOneWidget);
+      expect(find.text('Review and book'), findsOneWidget);
+      expect(find.text('Thursday, 8 October 2026 · 10:00 – 11:05 AM'), findsOneWidget);
       expect(find.text('Payment summary'), findsOneWidget);
       for (final w in ['₹800', 'GST · 18%', '₹144', 'Advance now', '₹200', 'Due at studio', '₹744', 'Total', '₹944']) {
         expect(find.text(w), findsWidgets, reason: w);
@@ -318,12 +324,97 @@ void main() {
       expect(find.text('Cancellation policy'), findsOneWidget);
       expect(find.text('Free until 12 hours before. Later cancellations forfeit the ₹200 deposit.'), findsOneWidget);
       expect(find.text('Confirm booking · ₹200 advance'), findsOneWidget);
+      await seg(t, 0);
+      expect(find.text('Confirm booking · ₹200 advance'), findsNothing, reason: 'the book button is on the last step only');
+      expect(find.text('New appointment · Customer visits the studio'), findsOneWidget);
+      expect(find.text('Riya Sharma · +91 9876543210'), findsOneWidget);
+      await seg(t, 1);
+      expect(find.text('Precision haircut · ₹600 · 45 min'), findsOneWidget);
+      expect(find.text('Hair spa · ₹200 · +20 min'), findsOneWidget);
+      expect(find.text('65 min + 15 min buffer'), findsOneWidget);
+      expect(find.byKey(const ValueKey('book-total')), findsOneWidget);
+      await seg(t, 2);
+      for (final w in ['Provider', 'Date', 'Time', 'Business location']) {
+        expect(find.text(w), findsWidgets, reason: w);
+      }
+      expect(find.text('Neha Rao · Senior stylist'), findsOneWidget);
+      expect(find.text('Thursday, 8 October 2026'), findsOneWidget);
+      expect(find.text('10:00 – 11:05 AM'), findsOneWidget);
+    });
+
+    testWidgets('the step bar: Step 1 of 4, Next waits for the customer, Back returns', (t) async {
+      final s = FakeServer(router());
+      await showTall(t, ServiceBookingScreen(api: s.api, date: DateTime(2026, 10, 8)));
+      expect(find.text('Step 1 of 4'), findsOneWidget);
+      expect(find.text('Next: Service'), findsWidgets);
+      await t.tap(find.byKey(const ValueKey('book-next')));
+      await t.pumpAndSettle();
+      expect(toast('Add the customer first.'), findsOneWidget);
+      expect(find.text('Step 1 of 4'), findsOneWidget);
+      await clearToast(t);
+      await t.tap(find.byKey(const ValueKey('field-customer')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('customer-name')), 'Riya Sharma');
+      await t.tap(find.text('Done'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('book-next')));
+      await t.pumpAndSettle();
+      expect(find.text('Step 2 of 4'), findsOneWidget);
+      expect(find.byKey(const ValueKey('field-service')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('book-back')));
+      await t.pumpAndSettle();
+      expect(find.text('Step 1 of 4'), findsOneWidget);
+      expect(find.byKey(const ValueKey('book-close')), findsOneWidget);
+    });
+
+    testWidgets('every step fits a 375 px phone', (t) async {
+      t.view.physicalSize = const Size(375, 812);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final s = FakeServer(router());
+      await t.pumpWidget(MaterialApp(theme: posTheme(), home: ServiceBookingScreen(api: s.api, date: DateTime(2026, 10, 8), business: 'Sharma Services', location: 'Indiranagar Studio')));
+      await t.pumpAndSettle();
+      expect(t.takeException(), isNull);
+      Future<void> next() async {
+        await t.tap(find.byKey(const ValueKey('book-next')));
+        await t.pumpAndSettle();
+        expect(t.takeException(), isNull);
+      }
+
+      await t.tap(find.byKey(const ValueKey('field-customer')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('customer-name')), 'Riya Sharma');
+      await t.enterText(find.byKey(const ValueKey('customer-phone')), '98765 43210');
+      await t.tap(find.text('Done'));
+      await t.pumpAndSettle();
+      await next();
+      expect(find.text('Step 2 of 4'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('field-service')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Precision haircut'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Hair spa · ₹200 · +20 min'));
+      await t.pumpAndSettle();
+      await next();
+      expect(find.text('Step 3 of 4'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('field-provider')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Neha Rao').last);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('field-time')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('10:00 AM'));
+      await t.pumpAndSettle();
+      await next();
+      expect(find.text('Step 4 of 4'), findsOneWidget);
+      expect(find.byKey(const ValueKey('book-confirm')), findsOneWidget);
+      expect(t.takeException(), isNull);
     });
 
     testWidgets('quote asks the server with choices only; the policy banner can be dismissed', (t) async {
       final s = FakeServer(router());
       await fill(t, s, addon: true);
-      expect(jsonDecode(s.where('POST', '/svc_quote').last.body), {'service_id': 'sv1', 'addon_ids': ['ad1'], 'staff_id': 's1'});
+      expect(jsonDecode(s.where('POST', '/svc_quote').last.body), {'service_id': 'sv1', 'addon_ids': ['ad1'], 'staff_id': 's1', 'starts_at': '2026-10-08T04:30:00+00:00'});
       await t.tap(find.byKey(const ValueKey('dismiss-policy')));
       await t.pumpAndSettle();
       expect(find.text('Cancellation policy'), findsNothing);
@@ -360,6 +451,7 @@ void main() {
       await t.pumpAndSettle();
       expect(toast('Network trouble.'), findsOneWidget);
       fail = false;
+      await clearToast(t);
       await t.tap(find.text('Confirm booking · ₹200 advance'));
       await t.pumpAndSettle();
       await t.tap(find.text('Collect the advance later'));
@@ -378,13 +470,14 @@ void main() {
       await t.tap(find.text('Collect the advance later'));
       await t.pumpAndSettle();
       expect(toast('That time was just booked on another device.'), findsOneWidget);
+      expect(find.text('Step 3 of 4'), findsOneWidget, reason: 'back on the Time step to choose again');
       expect(find.text('Choose a time'), findsOneWidget);
     });
 
-    testWidgets('confirm with the form incomplete says what is missing and sends nothing', (t) async {
+    testWidgets('Next with the form incomplete says what is missing and sends nothing', (t) async {
       final s = FakeServer(router());
       await showTall(t, ServiceBookingScreen(api: s.api));
-      await t.tap(find.text('Confirm booking'));
+      await t.tap(find.byKey(const ValueKey('book-next')));
       await t.pumpAndSettle();
       expect(toast('Add the customer first.'), findsOneWidget);
       expect(s.where('POST', '/svc_book'), isEmpty);
@@ -424,6 +517,99 @@ void main() {
       await t.pump();
       await t.pump(const Duration(milliseconds: 400));
       expect(find.byType(ServiceCalendarScreen), findsOneWidget);
+    });
+  });
+
+  // Who is coming (4 Nov 2026): a listing with rules asks for it; the server prices and refuses by it; the booking carries it.
+  group('Who is coming', () {
+    http.Response Function(http.Request) router() => (r) {
+          final p = r.url.path;
+          if (p.endsWith('/svc_catalogue')) return ok(catalogue());
+          if (p.endsWith('/svc_quote')) {
+            final party = jsonDecode(r.body)['party'] as Map?;
+            final guests = (party?['guests'] as List?) ?? const [];
+            final under8 = guests.any((g) => g['a'] == 'under_8');
+            return ok({
+              ...quote(),
+              'party_asks': true,
+              'people': guests.length,
+              'not_allowed': under8 ? 'Not allowed: Under 8' : null,
+              'subtotal': 600 * (guests.isEmpty ? 1 : guests.length),
+              'total': 708 * (guests.isEmpty ? 1 : guests.length),
+            });
+          }
+          if (p.endsWith('/svc_slots')) {
+            return ok({'providers': [{'staff_id': 's1', 'name': 'Neha Rao', 'slots': [{'starts_at': '2026-10-08T04:30:00+00:00', 'label': '10:00 AM', 'range_label': '10:00 – 11:05 AM'}]}]});
+          }
+          if (p.endsWith('/svc_book')) return ok(bookedView());
+          return err(404, 'not found');
+        };
+
+    Future<void> tap(WidgetTester t, String key) async {
+      await t.ensureVisible(find.byKey(ValueKey(key)));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(ValueKey(key)));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('asks who is coming, sends it to the quote, refuses an under-8 with the listing reason, and books with it', (t) async {
+      final s = FakeServer(router());
+      await showTall(t, ServiceBookingScreen(api: s.api, date: DateTime(2026, 10, 8)));
+      await tap(t, 'field-customer');
+      await t.enterText(find.byKey(const ValueKey('customer-name')), 'Riya Sharma');
+      await t.tap(find.text('Done'));
+      await t.pumpAndSettle();
+      await tap(t, 'book-seg-1');
+      await tap(t, 'field-service');
+      await t.tap(find.text('Precision haircut'));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('book-who')), findsOneWidget, reason: 'the listing prices or limits by who comes');
+      // Next waits until someone is added
+      await tap(t, 'book-next');
+      expect(find.text('Say who is coming.'), findsOneWidget);
+      ScaffoldMessenger.of(t.element(find.byType(ServiceBookingScreen))).removeCurrentSnackBar();
+      await t.pumpAndSettle();
+      await tap(t, 'who-women-more');
+      await tap(t, 'who-under8-more');
+      final sent = jsonDecode(s.where('POST', '/svc_quote').last.body) as Map;
+      expect(sent['party'], {
+        'guests': [
+          {'g': 'woman', 'a': '18_59'},
+          {'g': 'any', 'a': 'under_8'},
+        ]
+      });
+      expect(find.text('Not allowed: Under 8'), findsOneWidget);
+      await tap(t, 'book-next');
+      expect(find.text('Not allowed: Under 8'), findsWidgets, reason: 'Next is held with the listing reason');
+      expect(find.text('Step 2 of 4'), findsOneWidget);
+      ScaffoldMessenger.of(t.element(find.byType(ServiceBookingScreen))).removeCurrentSnackBar();
+      await t.pumpAndSettle();
+      // a child of 8 to 11 instead, and the group
+      await tap(t, 'who-under8-less');
+      await tap(t, 'who-kids-more');
+      await tap(t, 'who-group-Family');
+      expect(find.text('Not allowed: Under 8'), findsNothing);
+      expect((jsonDecode(s.where('POST', '/svc_quote').last.body) as Map)['party']['group'], 'Family');
+      await tap(t, 'book-seg-2');
+      await tap(t, 'field-provider');
+      await t.tap(find.text('Neha Rao').last);
+      await t.pumpAndSettle();
+      await tap(t, 'field-time');
+      await t.tap(find.text('10:00 AM'));
+      await t.pumpAndSettle();
+      expect((jsonDecode(s.where('POST', '/svc_quote').last.body) as Map)['starts_at'], '2026-10-08T04:30:00+00:00', reason: 'the time can change the price');
+      await tap(t, 'book-seg-3');
+      await tap(t, 'book-confirm');
+      final pay = find.text('Collect the advance later');
+      if (pay.evaluate().isNotEmpty) {
+        await t.tap(pay.first);
+        await t.pumpAndSettle();
+      }
+      final booked = jsonDecode(s.where('POST', '/svc_book').single.body) as Map;
+      expect((booked['party'] as Map)['guests'], [
+        {'g': 'woman', 'a': '18_59'},
+        {'g': 'any', 'a': '8_11'},
+      ]);
     });
   });
 }

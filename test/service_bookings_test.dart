@@ -113,7 +113,7 @@ void main() {
   testWidgets('opens on the planner (2 Nov 2026): one call for the month; no Day / Week / Month chips; today\'s bookings in the sheet', (t) async {
     final f = await _show(t);
     expect(f.calls.single, {'date': '2026-11-02', 'view': 'month', 'with_cancelled': true});
-    for (final s in ['Bookings', 'Calendar', 'List', 'Board', 'Map', 'All staff', '+ New booking', 'November 2026', 'Upcoming today', '5 bookings']) {
+    for (final s in ['Bookings', 'Calendar', 'Board', 'Map', 'All staff', '+ New booking', 'November 2026', 'Upcoming today', '5 bookings']) {
       expect(find.text(s), findsWidgets, reason: s);
     }
     for (final k in ['range-day', 'range-week', 'range-month', 'today']) {
@@ -192,35 +192,65 @@ void main() {
     }
   });
 
-  testWidgets('list: each booking with length, kind, customer and phone, staff, address and money', (t) async {
+  // List was removed (founder, 4 Nov 2026); on a phone the board shows one status at a time as full cards.
+  Future<bool> findOnBoard(WidgetTester t, Finder f) async {
+    for (final (name, _) in kBoardColumns) {
+      await _tap(t, ValueKey('board-tab-$name'));
+      if (f.evaluate().isNotEmpty) return true;
+    }
+    return false;
+  }
+
+  testWidgets('board on a phone: status pills with counts; each booking as a full card with length, kind, customer, staff, address and money', (t) async {
     await _show(t);
-    await _tap(t, const ValueKey('mode-list'));
+    await _tap(t, const ValueKey('mode-board'));
+    expect(find.byKey(const ValueKey('mode-list')), findsNothing, reason: 'List is gone');
     for (final s in ['10:15 AM – 11:00 AM · Haircut (women)', '45 min', 'At the shop', 'Riya Sharma · +91 90000 00301', '₹600 · paid',
-      '3:15 PM – 4:15 PM · AC service', 'At customer\'s place', 'Flat 12, Sunrise Society, Karve Nagar, Pune 411052', '₹800 · ₹200 paid', 'Advance due', 'Cancelled']) {
-      expect(find.text(s), findsWidgets, reason: s);
+      '3:15 PM – 4:15 PM · AC service', "At customer's place", 'Flat 12, Sunrise Society, Karve Nagar, Pune 411052', '₹800 · ₹200 paid', 'Advance due', 'Cancelled']) {
+      expect(await findOnBoard(t, find.text(s)), isTrue, reason: s);
+    }
+    Finder inCol(String col, String key) => find.descendant(of: find.byKey(ValueKey('column-$col')), matching: find.byKey(ValueKey(key)));
+    for (final (col, id) in [('Upcoming', 'a4'), ('Checked in', 'a3'), ('In progress', 'a2'), ('Done', 'a1'), ('Cancelled', 'a5')]) {
+      await _tap(t, ValueKey('board-tab-$col'));
+      expect(inCol(col, 'booking-$id'), findsOneWidget, reason: '$id in $col');
     }
   });
 
-  testWidgets('list: the week strip and arrows change the day', (t) async {
+  testWidgets('board: the week strip and arrows change the day', (t) async {
     final f = await _show(t);
-    await _tap(t, const ValueKey('mode-list'));
+    await _tap(t, const ValueKey('mode-board'));
     await _tap(t, const ValueKey('day-2026-11-03'));
     expect(f.calls.last, {'date': '2026-11-03', 'view': 'day', 'with_cancelled': true});
-    expect(find.byKey(const ValueKey('booking-b1')), findsOneWidget);
+    expect(await findOnBoard(t, find.byKey(const ValueKey('booking-b1'))), isTrue);
     await _tap(t, const ValueKey('week-next'));
     expect(f.calls.last['date'], '2026-11-10');
-    expect(find.text('No bookings on this day. Tap New booking to add one.'), findsOneWidget);
+    expect(find.text('Nothing here on this day.'), findsOneWidget);
   });
 
-  testWidgets('board: one column per state with its bookings', (t) async {
+  testWidgets('board on a 375 px phone fits: no overflow, no sideways scroll', (t) async {
+    final f = _Fake();
+    t.view.physicalSize = const Size(375, 812);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(home: BookingsScreen(api: f.api, now: () => _now, mode: 'board')));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull, reason: 'no overflow');
+    expect(find.byKey(const ValueKey('board-tab-Upcoming')), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.right), findsNothing);
+  });
+
+  testWidgets('board on a wide screen: the five columns side by side, filling the width', (t) async {
     await _show(t);
+    t.view.physicalSize = const Size(1800, 6000);
     await _tap(t, const ValueKey('mode-board'));
+    expect(t.takeException(), isNull);
     Finder inCol(String col, String key) => find.descendant(of: find.byKey(ValueKey('column-$col')), matching: find.byKey(ValueKey(key)));
     expect(inCol('Upcoming', 'block-a4'), findsOneWidget);
     expect(inCol('Checked in', 'block-a3'), findsOneWidget);
     expect(inCol('In progress', 'block-a2'), findsOneWidget);
     expect(inCol('Done', 'block-a1'), findsOneWidget);
     expect(inCol('Cancelled', 'block-a5'), findsOneWidget);
+    expect(t.getTopLeft(find.byKey(const ValueKey('column-Cancelled'))).dy, t.getTopLeft(find.byKey(const ValueKey('column-Upcoming'))).dy);
   });
 
   testWidgets('map: the day\'s jobs at a customer\'s place, each opens in Maps', (t) async {
@@ -249,8 +279,10 @@ void main() {
       expect(find.text(s), findsOneWidget, reason: s);
     }
     expect(find.text('Online'), findsWidgets, reason: 'the short tag on the online booking\'s block');
-    await _tap(t, const ValueKey('mode-list'));
+    await _tap(t, const ValueKey('mode-board'));
+    await _tap(t, const ValueKey('board-tab-Checked in'));
     expect(find.descendant(of: find.byKey(const ValueKey('booking-a3')), matching: find.text('Booked online')), findsOneWidget);
+    await _tap(t, const ValueKey('board-tab-Done'));
     expect(find.descendant(of: find.byKey(const ValueKey('booking-a1')), matching: find.text('Booked offline')), findsOneWidget);
     await _tap(t, const ValueKey('source-app'));
     expect(f.calls.last, {'date': '2026-11-02', 'view': 'day', 'with_cancelled': true, 'source': 'app'});

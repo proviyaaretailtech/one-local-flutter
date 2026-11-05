@@ -44,11 +44,9 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
     }
   }
 
-  Future<void> _pick(String title, List<(String, String)> options, String current, ValueChanged<String> set) async {
-    final v = await showOrderSheet<String>(context, title: title, body: (ctx) => Column(mainAxisSize: MainAxisSize.min, children: [
-          for (final (id, label) in options)
-            ListTile(contentPadding: EdgeInsets.zero, title: Text(label, style: inter(15, id == current ? 700 : 500)), onTap: () => Navigator.pop(ctx, id)),
-        ]));
+  /// A filter's choices, in the frosted box under its chip ([from]).
+  Future<void> _pick(BuildContext from, String title, List<(String, String)> options, ValueChanged<String> set) async {
+    final v = await showActionBox<String>(from, title: title, actions: [for (final (id, label) in options) (id, label, null)]);
     if (v == null) return;
     set(v);
     _load();
@@ -98,11 +96,11 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Wrap(spacing: 8, runSpacing: 8, children: [
-                  ModeChip(_period == 'this_month' ? 'This month' : 'All time', selected: true,
-                      onTap: () => _pick('Period', const [('this_month', 'This month'), ('all', 'All time')], _period, (v) => _period = v)),
-                  ModeChip(_statusOptions.firstWhere((s) => s.$1 == _status).$2, selected: _status != 'all', onTap: () => _pick('Status', _statusOptions, _status, (v) => _status = v)),
-                  ModeChip(staffName ?? 'All providers', selected: _staff != null,
-                      onTap: () => _pick('Provider', [('', 'All providers'), for (final p in d.providers) (p.s('staff_id'), p.s('name'))], _staff ?? '', (v) => _staff = v.isEmpty ? null : v)),
+                  Builder(builder: (from) => ModeChip(_period == 'this_month' ? 'This month' : 'All time', selected: true,
+                      onTap: () => _pick(from, 'Period', const [('this_month', 'This month'), ('all', 'All time')], (v) => _period = v))),
+                  Builder(builder: (from) => ModeChip(_statusOptions.firstWhere((s) => s.$1 == _status).$2, selected: _status != 'all', onTap: () => _pick(from, 'Status', _statusOptions, (v) => _status = v))),
+                  Builder(builder: (from) => ModeChip(staffName ?? 'All providers', selected: _staff != null,
+                      onTap: () => _pick(from, 'Provider', [('', 'All providers'), for (final p in d.providers) (p.s('staff_id'), p.s('name'))], (v) => _staff = v.isEmpty ? null : v))),
                 ]),
               ),
               SvcSectionHead('Recent activity', count: '${d.total} ${d.total == 1 ? 'record' : 'records'}'),

@@ -32,26 +32,37 @@ void main() {
     expect(serviceTabRoot('Item', home: home, onNavigate: (_) {}), isNull);
   });
 
-  testWidgets('side menu: profile on top, Service management, Money, Media, Company details, Team management, Support, Sign out; each row opens its page', (t) async {
+  testWidgets('side menu: the service rows, the five added from the store, Sign out; each row opens its page', (t) async {
     final opened = <String>[];
     HomeNav.outletInfo = (_) => opened.add('company');
     HomeNav.team = (_) => opened.add('team');
     HomeNav.support = (_) => opened.add('support');
+    HomeNav.customers = (_) => opened.add('customers');
+    HomeNav.businessProfile = (_) => opened.add('page');
+    HomeNav.settings = (_) => opened.add('settings');
+    HomeNav.plans = (_) => opened.add('plans');
     var signedOut = false;
     await show(t, Builder(builder: (c) => TextButton(
         onPressed: () => showServiceSideNav(c, name: 'Priya Kulkarni', email: 'owner@test.local', onSignOut: () => signedOut = true),
         child: const Text('menu'))));
     await t.tap(find.text('menu'));
     await t.pumpAndSettle();
-    for (final s in ['Priya Kulkarni', 'Service management', 'Money', 'Media', 'Company details', 'Team management', 'Support', 'Sign out']) {
+    for (final s in ['Priya Kulkarni', 'Service management', 'All bookings', 'Customers', 'Money', 'Reports', 'Media', 'Page Manager', 'Company details', 'Team management', 'Settings', 'Subscription plans', 'Support', 'Sign out']) {
       expect(find.text(s), findsWidgets, reason: s);
     }
-    for (final s in ['Barcodes', 'Media manager', 'Page Manager', 'One Local Wallet']) {
+    for (final s in ['Barcodes', 'Media manager', 'One Local Wallet']) {
       expect(find.text(s), findsNothing, reason: '$s is a store row');
     }
     await t.tap(find.text('Team management'));
     await t.pumpAndSettle();
     expect(opened, ['team']);
+    for (final (row, id) in [('Customers', 'customers'), ('Page Manager', 'page'), ('Settings', 'settings'), ('Subscription plans', 'plans')]) {
+      await t.tap(find.text('menu'));
+      await t.pumpAndSettle();
+      await t.tap(find.text(row));
+      await t.pumpAndSettle();
+      expect(opened.last, id, reason: row);
+    }
     await t.tap(find.text('menu'));
     await t.pumpAndSettle();
     await t.tap(find.text('Sign out'));

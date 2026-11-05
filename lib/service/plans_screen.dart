@@ -7,6 +7,7 @@ import '../ui/theme.dart';
 import 'service_api.dart';
 import 'service_menu.dart';
 import 'service_widgets.dart';
+import 'step_form.dart';
 
 /// Figma 85 "Packages" and 86 "Memberships": prepaid plans sold to one customer. A plan's price is a catalogue item; selling one is an
 /// ordinary paid order and gives that customer credits, which a booking spends. Every figure is the server's.
@@ -50,13 +51,12 @@ class _PlansScreenState extends State<PlansScreen> {
     if (saved != null && mounted) _load();
   }
 
-  Future<void> _tap(SvcData p) async {
+  Future<void> _tap(BuildContext from, SvcData p) async {
     final canSell = p.s('status') == 'active';
-    final pick = await showOrderSheet<String>(context, title: p.s('name'), body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          if (canSell) ...[DarkCta(label: 'Sell to a customer', onPressed: () => Navigator.pop(ctx, 'sell')), const SizedBox(height: 8)],
-          if (_d?.canEdit == true) LightCta(label: 'Edit ${_pkg ? 'package' : 'membership'}', onPressed: () => Navigator.pop(ctx, 'edit')),
-          if (!canSell) ...[const SizedBox(height: 8), Text('Make it active to sell it.', style: inter(13, 400, color: kMuted))],
-        ]));
+    final pick = await showActionBox<String>(from, over: true, title: p.s('name'), note: canSell ? null : 'Make it active to sell it.', actions: [
+      if (canSell) ('sell', 'Sell to a customer', null),
+      if (_d?.canEdit == true) ('edit', 'Edit ${_pkg ? 'package' : 'membership'}', null),
+    ]);
     if (!mounted || pick == null) return;
     if (pick == 'edit') return _edit(p);
     await _sell(p);
@@ -154,7 +154,9 @@ class _PlansScreenState extends State<PlansScreen> {
 
   Widget _chip(SvcData p) => Align(alignment: Alignment.centerLeft, child: svcStatus(p.s('status_label'), p.s('status') == 'active' ? 'good' : p.s('status') == 'paused' ? 'warn' : 'info'));
 
-  Widget _package(SvcData p) => SvcCard(title: p.s('name'), onTap: () => _tap(p), children: [
+  Widget _package(SvcData p) => Builder(builder: (from) => _packageCard(from, p));
+
+  Widget _packageCard(BuildContext from, SvcData p) => SvcCard(title: p.s('name'), onTap: () => _tap(from, p), children: [
         _chip(p),
         const SizedBox(height: 8),
         for (final it in p.l('items')) SvcLine(it.s('name'), qty: '${it.i('qty')}×', amount: svcRupees(it.n('amount'))),
@@ -167,10 +169,12 @@ class _PlansScreenState extends State<PlansScreen> {
         if (p.s('exclusions').isNotEmpty) SvcKV('Exclusions', p.s('exclusions'), labelWidth: 120),
       ]);
 
-  Widget _membership(SvcData p) {
+  Widget _membership(SvcData p) => Builder(builder: (from) => _membershipCard(from, p));
+
+  Widget _membershipCard(BuildContext from, SvcData p) {
     final per = p.s('period') == 'year' ? 'year' : 'month';
     final credits = p.l('items').map((it) => '${it.i('qty')} ${it.s('name').toLowerCase()}').join(' + ');
-    return SvcCard(title: '${p.s('name')} · ${svcRupees(p.n('price'))} / $per', onTap: () => _tap(p), children: [
+    return SvcCard(title: '${p.s('name')} · ${svcRupees(p.n('price'))} / $per', onTap: () => _tap(from, p), children: [
       _chip(p),
       const SizedBox(height: 8),
       SvcKV('Service credits', credits.isEmpty ? 'None' : '$credits / $per', labelWidth: 120),
@@ -212,10 +216,12 @@ class _PlanEditScreenState extends State<PlanEditScreen> {
   late final Map<String, int> _qty = {for (final it in p?.l('items') ?? <SvcData>[]) it.s('service_id'): it.i('qty')};
   String? _key;
   bool _busy = false;
+  int _step = 0;
 
   Future<void> _save() async {
     final price = num.tryParse(_price.text.trim());
     if (_name.text.trim().length < 2 || price == null) {
+      setState(() => _step = 0); // name and price are on the first step
       showToast(context, 'Enter the name and the price.');
       return;
     }
@@ -255,62 +261,85 @@ class _PlanEditScreenState extends State<PlanEditScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label, style: inter(13, 600, color: kMuted)),
           const SizedBox(height: 6),
-          TextField(key: ValueKey('plan-$label'), controller: c, keyboardType: keyboard, onChanged: (_) => _key = null),
+          TextField(key: ValueKey('plan-$label'), controller: c, keyboardType: keyboard, inputFormatters: numberOnly(keyboard), onChanged: (_) => _key = null),
         ]),
       );
 
+  bool get _pkg => widget.kind == 'package';
+  // in steps like every Service POS form (founder, 4 Nov 2026); a membership's benefits get a step of their own
+  List<String> get _steps => _pkg ? const ['Basics', 'Included services', 'Rules'] : const ['Basics', 'Included services', 'Benefits', 'Rules'];
+
   @override
-  Widget build(BuildContext context) {
-    final pkg = widget.kind == 'package';
-    return ServicePage(
-      title: '${p == null ? 'Create' : 'Edit'} ${pkg ? 'package' : 'membership'}',
-      subtitle: pkg ? 'Prepaid services for one customer' : 'A care plan for one customer',
-      business: widget.business,
-      body: [
-        SvcCard(children: [
-          _f('Name', _name),
-          _f('Price (₹, before GST)', _price, keyboard: TextInputType.number),
-          if (!pkg)
-            SvcChips(options: const [('month', 'Monthly'), ('year', 'Yearly')], selected: _period, onSelect: (v) => setState(() {
-                  _period = v;
-                  _validity.text = v == 'year' ? '365' : '30';
+  Widget build(BuildContext context) => StepFormPage(
+        title: '${p == null ? 'Create' : 'Edit'} ${_pkg ? 'package' : 'membership'}',
+        keyPrefix: 'plan',
+        steps: _steps,
+        step: _step,
+        onStep: (i) => setState(() => _step = i),
+        canAdvance: (st) {
+          if (st != 0 || (_name.text.trim().length >= 2 && num.tryParse(_price.text.trim()) != null)) return true;
+          showToast(context, 'Enter the name and the price.');
+          return false;
+        },
+        body: _stepBody(),
+        finish: DarkCta(key: const ValueKey('plan-save'), label: 'Save', busy: _busy, onPressed: _busy ? null : _save),
+      );
+
+  List<Widget> _stepBody() {
+    final pkg = _pkg;
+    return switch (_step) {
+      0 => [
+          Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(pkg ? 'Prepaid services for one customer' : 'A care plan for one customer', style: inter(13.5, 400, color: kMuted))),
+          SvcCard(children: [
+            _f('Name', _name),
+            _f('Price (₹, before GST)', _price, keyboard: TextInputType.number),
+            if (!pkg)
+              SvcChips(options: const [('month', 'Monthly'), ('year', 'Yearly')], selected: _period, onSelect: (v) => setState(() {
+                    _period = v;
+                    _validity.text = v == 'year' ? '365' : '30';
+                    _key = null;
+                  })),
+            _f('Validity (days)', _validity, keyboard: TextInputType.number),
+            SvcChips(options: const [('draft', 'Draft'), ('active', 'Active'), ('paused', 'Paused')], selected: _status, onSelect: (v) => setState(() {
+                  _status = v;
                   _key = null;
                 })),
-          _f('Validity (days)', _validity, keyboard: TextInputType.number),
-          SvcChips(options: const [('draft', 'Draft'), ('active', 'Active'), ('paused', 'Paused')], selected: _status, onSelect: (v) => setState(() {
-                _status = v;
-                _key = null;
-              })),
-        ]),
-        SvcCard(title: 'Included services', children: [
-          if (widget.services.isEmpty) Text('Add services to the catalogue first.', style: inter(14, 400, color: kMuted)),
-          for (final s in widget.services)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(children: [
-                Expanded(child: Text('${s.s('name')} · ${svcRupees(s.n('price'))}', style: inter(14.5, 500))),
-                QtyStepper(
-                  name: s.s('name'),
-                  qty: _qty[s.s('id')] ?? 0,
-                  onMinus: () => setState(() {
-                    _qty[s.s('id')] = ((_qty[s.s('id')] ?? 0) - 1).clamp(0, 50);
-                    _key = null;
-                  }),
-                  onPlus: () => setState(() {
-                    _qty[s.s('id')] = ((_qty[s.s('id')] ?? 0) + 1).clamp(0, 50);
-                    _key = null;
-                  }),
-                ),
-              ]),
-            ),
-        ]),
-        SvcCard(title: 'Rules shown to staff', children: [
-          if (pkg) ...[_f('Usage limit', _usage), _f('Exclusions', _excl)],
-          if (!pkg) ...[_f('Benefits', _benefits), _f('Discount % on other services', _discount, keyboard: TextInputType.number), _f('Discount applies to category', _discCat), _f('Renewal', _renewal)],
-          _f('Credit rules', _rules),
-        ]),
-        DarkCta(label: 'Save', busy: _busy, onPressed: _busy ? null : _save),
-      ],
-    );
+          ]),
+        ],
+      1 => [
+          SvcCard(title: 'Included services', children: [
+            if (widget.services.isEmpty) Text('Add services to the catalogue first.', style: inter(14, 400, color: kMuted)),
+            for (final s in widget.services)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(children: [
+                  Expanded(child: Text('${s.s('name')} · ${svcRupees(s.n('price'))}', maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(14.5, 500))),
+                  QtyStepper(
+                    name: s.s('name'),
+                    qty: _qty[s.s('id')] ?? 0,
+                    onMinus: () => setState(() {
+                      _qty[s.s('id')] = ((_qty[s.s('id')] ?? 0) - 1).clamp(0, 50);
+                      _key = null;
+                    }),
+                    onPlus: () => setState(() {
+                      _qty[s.s('id')] = ((_qty[s.s('id')] ?? 0) + 1).clamp(0, 50);
+                      _key = null;
+                    }),
+                  ),
+                ]),
+              ),
+          ]),
+        ],
+      2 when !pkg => [
+          SvcCard(title: 'Benefits', children: [_f('Benefits', _benefits), _f('Discount % on other services', _discount, keyboard: TextInputType.number), _f('Discount applies to category', _discCat)]),
+        ],
+      _ => [
+          SvcCard(title: 'Rules shown to staff', children: [
+            if (pkg) ...[_f('Usage limit', _usage), _f('Exclusions', _excl)],
+            if (!pkg) _f('Renewal', _renewal),
+            _f('Credit rules', _rules),
+          ]),
+        ],
+    };
   }
 }

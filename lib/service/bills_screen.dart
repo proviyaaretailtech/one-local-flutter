@@ -12,6 +12,7 @@ import '../ui/wallet.dart';
 import '../ui/whatsapp.dart';
 import 'service_api.dart';
 import 'service_widgets.dart';
+import 'step_form.dart';
 import 'job_screens.dart';
 import 'visit_receipt.dart' show visitNote;
 import 'visit_screens.dart';
@@ -461,6 +462,8 @@ class _NewBillScreenState extends State<NewBillScreen> {
   String? _error, _key;
   bool _busy = false;
   final _qty = <String, int>{}; // service id -> quantity
+  int _step = 0; // in steps, as every Service POS form (founder, 4 Nov 2026)
+  static const _steps = ['Billed to', 'Services', 'Discount', 'Message'];
 
   @override
   void initState() {
@@ -496,16 +499,37 @@ class _NewBillScreenState extends State<NewBillScreen> {
     return _percent ? (_gross * v / 100) : v;
   }
 
-  Future<void> _save() async {
-    final name = _name.text.trim();
-    if (name.isEmpty) return showToast(context, 'Enter the customer\'s name.');
+  /// What [step] is missing, or null. Next checks its own step; Save checks every step and goes back to the first one short (4 Nov 2026).
+  String? _missing(int step) {
     final phone = _phone.text.replaceAll(RegExp(r'\D'), '');
-    if (phone.isNotEmpty && phone.length < 10) return showToast(context, 'Enter a 10-digit mobile number.');
-    final lines = [for (final o in _services) if ((_qty[o.id] ?? 0) > 0) {'menu_item_id': o.id, 'qty': _qty[o.id]}];
-    if (lines.isEmpty) return showToast(context, 'Add at least one service.');
     final d = num.tryParse(_discount.text.trim());
-    if (_discount.text.trim().isNotEmpty && (d == null || d < 0 || (_percent && d > 100))) return showToast(context, 'Check the discount.');
-    if (_off > _gross) return showToast(context, 'The discount is more than the bill.');
+    return switch (step) {
+      0 when _name.text.trim().isEmpty => 'Enter the customer\'s name.',
+      0 when phone.isNotEmpty && phone.length < 10 => 'Enter a 10-digit mobile number.',
+      1 when !_services.any((o) => (_qty[o.id] ?? 0) > 0) => 'Add at least one service.',
+      2 when _discount.text.trim().isNotEmpty && (d == null || d < 0 || (_percent && d > 100)) => 'Check the discount.',
+      2 when _off > _gross => 'The discount is more than the bill.',
+      _ => null,
+    };
+  }
+
+  bool _canAdvance(int step) {
+    final m = _missing(step);
+    if (m != null) showToast(context, m);
+    return m == null;
+  }
+
+  Future<void> _save() async {
+    for (var i = 0; i < _steps.length; i++) {
+      final m = _missing(i);
+      if (m == null) continue;
+      if (i != _step) setState(() => _step = i);
+      return showToast(context, m);
+    }
+    final name = _name.text.trim();
+    final phone = _phone.text.replaceAll(RegExp(r'\D'), '');
+    final lines = [for (final o in _services) if ((_qty[o.id] ?? 0) > 0) {'menu_item_id': o.id, 'qty': _qty[o.id]}];
+    final d = num.tryParse(_discount.text.trim());
     setState(() => _busy = true);
     _key ??= ServiceApi.newKey();
     try {
@@ -537,6 +561,7 @@ class _NewBillScreenState extends State<NewBillScreen> {
           key: ValueKey(key),
           controller: c,
           keyboardType: keyboard,
+          inputFormatters: numberOnly(keyboard),
           minLines: lines,
           maxLines: lines,
           onChanged: (_) => setState(() {}),
@@ -546,44 +571,61 @@ class _NewBillScreenState extends State<NewBillScreen> {
       );
 
   @override
-  Widget build(BuildContext context) => ServicePage(
-        title: 'New bill',
-        subtitle: 'For work not booked in the calendar',
-        error: _error,
-        onRetry: _load,
-        body: _catalogue == null
-            ? null
-            : [
-                SvcCard(title: 'Billed to', children: [
-                  _field('Customer name', _name, 'bill-name'),
-                  _field('Mobile number', _phone, 'bill-phone', keyboard: TextInputType.phone),
-                  _field('Address (optional)', _address, 'bill-address'),
-                ]),
-                SvcCard(title: 'Services', children: [
-                  _field('Title (optional)', _title, 'bill-title', hint: 'For services done'),
-                  if (_services.isEmpty) Text('Add services in Catalogue first.', style: inter(14, 400, color: kMuted)),
-                  for (final o in _services) _serviceRow(o),
-                ]),
-                SvcCard(title: 'Discount', children: [
-                  Wrap(spacing: 8, children: [
-                    ModeChip('₹ off', key: const ValueKey('disc-rupees'), selected: !_percent, onTap: () => setState(() => _percent = false)),
-                    ModeChip('% off', key: const ValueKey('disc-percent'), selected: _percent, onTap: () => setState(() => _percent = true)),
-                  ]),
-                  const SizedBox(height: 10),
-                  _field(_percent ? 'Discount (%)' : 'Discount (₹)', _discount, 'bill-discount', keyboard: TextInputType.number),
-                ]),
-                SvcCard(title: 'Message to the customer', children: [_field('Message (optional)', _message, 'bill-message', lines: 3, hint: 'Thank you for your business.')]),
-                SvcCard(children: [
-                  KeyValue('Services', svcRupees(_gross), size: 14),
-                  if (_off > 0) KeyValue('Discount', '−${svcRupees(_off)}', size: 14, valueColor: kLink),
-                  const Divider(height: 20, color: kLine),
-                  Row(children: [Expanded(child: Text('Before tax', style: inter(16, 700))), Text(svcRupees((_gross - _off).clamp(0, double.infinity)), style: inter(22, 800))]),
-                  const SizedBox(height: 6),
-                  Text('Tax, if any, is added when the bill is saved.', style: inter(12.5, 400, color: kMuted)),
-                ]),
-                DarkCta(label: 'Save bill', busy: _busy, onPressed: _busy ? null : _save),
-              ],
-      );
+  Widget build(BuildContext context) {
+    // the catalogue loading or failed: the plain page with its spinner or Try again; then the bill in steps (4 Nov 2026)
+    if (_catalogue == null) return ServicePage(title: 'New bill', subtitle: 'For work not booked in the calendar', error: _error, onRetry: _load);
+    final last = _step == _steps.length - 1;
+    return StepFormPage(
+      title: 'New bill',
+      keyPrefix: 'bill',
+      steps: _steps,
+      step: _step,
+      onStep: (i) => setState(() => _step = i),
+      canAdvance: _canAdvance,
+      lastLine: 'Last step: save the bill',
+      body: _stepBody(),
+      // the running total above Next on every step, so a quantity or discount shows what it does at once
+      above: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_off > 0) ...[KeyValue('Services', svcRupees(_gross), size: 14), KeyValue('Discount', '−${svcRupees(_off)}', size: 14, valueColor: kLink)],
+        Row(children: [
+          Expanded(child: Text('Before tax', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(16, 700))),
+          Text(svcRupees((_gross - _off).clamp(0, double.infinity)), style: inter(22, 800)),
+        ]),
+        if (last) ...[const SizedBox(height: 4), Text('Tax, if any, is added when the bill is saved.', style: inter(12.5, 400, color: kMuted))],
+      ]),
+      finish: DarkCta(label: 'Save bill', busy: _busy, onPressed: _busy ? null : _save),
+    );
+  }
+
+  List<Widget> _stepBody() => switch (_step) {
+        0 => [
+            Text('For work not booked in the calendar', style: inter(13, 400, color: kMuted)),
+            const SizedBox(height: 10),
+            SvcCard(title: 'Billed to', children: [
+              _field('Customer name', _name, 'bill-name'),
+              _field('Mobile number', _phone, 'bill-phone', keyboard: TextInputType.phone),
+              _field('Address (optional)', _address, 'bill-address'),
+            ]),
+          ],
+        1 => [
+            SvcCard(title: 'Services', children: [
+              _field('Title (optional)', _title, 'bill-title', hint: 'For services done'),
+              if (_services.isEmpty) Text('Add services in Catalogue first.', style: inter(14, 400, color: kMuted)),
+              for (final o in _services) _serviceRow(o),
+            ]),
+          ],
+        2 => [
+            SvcCard(title: 'Discount', children: [
+              Wrap(spacing: 8, children: [
+                ModeChip('₹ off', key: const ValueKey('disc-rupees'), selected: !_percent, onTap: () => setState(() => _percent = false)),
+                ModeChip('% off', key: const ValueKey('disc-percent'), selected: _percent, onTap: () => setState(() => _percent = true)),
+              ]),
+              const SizedBox(height: 10),
+              _field(_percent ? 'Discount (%)' : 'Discount (₹)', _discount, 'bill-discount', keyboard: TextInputType.number),
+            ]),
+          ],
+        _ => [SvcCard(title: 'Message to the customer', children: [_field('Message (optional)', _message, 'bill-message', lines: 3, hint: 'Thank you for your business.')])],
+      };
 
   Widget _serviceRow(ServiceOption o) {
     final q = _qty[o.id] ?? 0;
