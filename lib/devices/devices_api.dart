@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io' show Socket;
+import 'dart:typed_data' show Uint8List;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart' show MethodChannel, PlatformException;
 import 'package:http/http.dart' as http;
 
 import '../api/rpc_client.dart';
@@ -31,8 +33,17 @@ class StorePrinter {
   bool? get lastTestOk => raw['last_test_ok'] as bool?;
   String get lastTestNote => _s('last_test_note');
 
-  /// Network printers print straight to port 9100, no print dialog.
-  bool get direct => connection == 'lan';
+  /// Prints straight to the printer, no print dialog: a network printer (port 9100), a USB printer picked from the phone
+  /// (`usb:<vendor>:<product>`) or a paired Bluetooth printer picked by its MAC. Older Bluetooth entries with only a name use the dialog.
+  bool get direct => switch (connection) {
+        'lan' => true,
+        'usb' => address.startsWith('usb:'),
+        'bluetooth' => RegExp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$').hasMatch(address),
+        _ => false,
+      };
+
+  /// " at 192.168.1.50:9100" for a network printer, for messages; nothing for one on the phone.
+  String get at => connection == 'lan' ? ' at $host:$port' : '';
   String get host => address.split(':').first;
   int get port => int.tryParse(address.contains(':') ? address.split(':').last : '') ?? 9100;
 }
@@ -68,6 +79,39 @@ Future<void> Function(String host, int port, List<int> bytes) sendRawToPrinter =
     await s.close();
   }
 };
+
+/// A printer the phone can see: plugged in by USB (OTG) or paired over Bluetooth.
+typedef LocalPrinter = ({String kind, String address, String name});
+
+const _channel = MethodChannel('onelocal/printers');
+
+/// USB and paired Bluetooth printers on this phone (Android app only; empty elsewhere). Tests replace it.
+Future<List<LocalPrinter>> Function() findLocalPrinters = () async {
+  if (kIsWeb) return const [];
+  try {
+    final r = await _channel.invokeListMethod<Map>('list') ?? const [];
+    return [for (final m in r) (kind: '${m['kind']}', address: '${m['address']}', name: '${m['name']}')];
+  } on PlatformException {
+    return const [];
+  } on Exception {
+    return const []; // not the Android app (no channel)
+  }
+};
+
+/// Sends raw bytes to a USB or Bluetooth printer through the phone. Tests replace it.
+Future<void> Function(String address, List<int> bytes) sendLocalPrinter = (address, bytes) async {
+  try {
+    await _channel.invokeMethod('write', {'address': address, 'bytes': Uint8List.fromList(bytes)});
+  } on PlatformException catch (e) {
+    throw StateError(e.message ?? 'The printer did not answer.');
+  }
+};
+
+/// Sends raw bytes (ESC/POS or TSPL) to a direct printer, whichever way it connects.
+Future<void> sendToPrinter(StorePrinter p, List<int> bytes) {
+  if (kIsWeb) throw UnsupportedError('A browser cannot reach the printer directly. Print from the phone app, or use the print dialog.');
+  return p.connection == 'lan' ? sendRawToPrinter(p.host, p.port, bytes) : sendLocalPrinter(p.address, bytes);
+}
 
 /// An ESC/POS test slip: the store, the printer, the paper width, a line ruler and (when on) a cut.
 List<int> escPosTestSlip({required String store, required StorePrinter printer}) {

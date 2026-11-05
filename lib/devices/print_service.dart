@@ -15,9 +15,9 @@ import 'bill_receipt.dart';
 import 'devices_api.dart';
 
 // Printing through the Device manager (founder, 31 Oct 2026): a bill goes to the default receipt printer and labels to the default
-// label printer. A network printer gets the job straight away (ESC/POS for receipts, TSPL for labels: no print dialog); a Bluetooth,
-// USB or "phone's print service" printer gets it through the print dialog at its paper or label size; with no printer set up, the
-// print dialog as before.
+// label printer. A network, USB (OTG) or paired Bluetooth printer gets the job straight away (ESC/POS for receipts, TSPL for
+// labels: no print dialog); a "phone's print service" printer gets it through the print dialog at its paper or label size; with
+// no printer set up, the print dialog as before.
 
 /// The default printer for a job (receipt, label, kot), or null. Kept for two minutes; tests replace it.
 Future<StorePrinter?> Function(String job) defaultPrinterFor = _defaultPrinterFor;
@@ -74,10 +74,10 @@ Future<({PrintRoute route, String printer})> printBillReceipt(BillReceipt bill, 
   final p = await defaultPrinterFor('receipt');
   if (p != null && p.direct && !kIsWeb) {
     try {
-      await sendRawToPrinter(p.host, p.port, billEscPos(bill, printer: p));
+      await sendToPrinter(p, billEscPos(bill, printer: p));
       return (route: PrintRoute.direct, printer: p.name);
     } catch (_) {
-      onFallback?.call('${p.name} did not answer at ${p.host}:${p.port}');
+      onFallback?.call('${p.name} did not answer${p.at}');
     }
   }
   await printReceiptDialog(await billReceiptPdf(bill, paperMm: p?.paperMm ?? 80), 'Receipt ${bill.billNo}');
@@ -95,10 +95,10 @@ Future<({PrintRoute route, String printer})> printReceiptText(
   final p = await defaultPrinterFor('receipt');
   if (p != null && p.direct && !kIsWeb) {
     try {
-      await sendRawToPrinter(p.host, p.port, escPosReceipt(text, store: store, printer: p));
+      await sendToPrinter(p, escPosReceipt(text, store: store, printer: p));
       return (route: PrintRoute.direct, printer: p.name);
     } catch (_) {
-      onFallback?.call('${p.name} did not answer at ${p.host}:${p.port}');
+      onFallback?.call('${p.name} did not answer${p.at}');
     }
   }
   await printReceiptDialog(await receiptPdf(text, store: store, paperMm: p?.paperMm ?? 80), title);
@@ -180,10 +180,10 @@ Future<bool> printLabelsDirect(List<(LabelData, int)> labels, {void Function(Str
   final p = await defaultPrinterFor('label');
   if (p == null || !p.direct || kIsWeb) return false;
   try {
-    await sendRawToPrinter(p.host, p.port, tsplLabels(labels, printer: p));
+    await sendToPrinter(p, tsplLabels(labels, printer: p));
     return true;
   } catch (_) {
-    onFallback?.call('${p.name} did not answer at ${p.host}:${p.port}');
+    onFallback?.call('${p.name} did not answer${p.at}');
     return false;
   }
 }
