@@ -4,7 +4,7 @@
 --   2. a declined or cancelled web order did not say why.
 begin;
 do $$
-declare v_src text := pg_get_functiondef('public.guest_qr_open'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.guest_qr_open'::regproc), E'\r', '');
   v_old text := $r$'business', jsonb_build_object('name', v_org.name)$r$;
 begin
   if v_src like '%''store_link'', (select store_slug%' then return; end if;
@@ -14,7 +14,7 @@ begin
 end $$;
 
 do $$
-declare v_src text := pg_get_functiondef('public.ol__web_order_json'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.ol__web_order_json'::regproc), E'\r', '');
   v_old text := $r$'order_id', x.id, 'display_no', o.display_no, 'status', x.status, 'stage', v_stage, 'stage_label', v_label,$r$;
 begin
   if v_src like '%''decline_reason''%' then return; end if;

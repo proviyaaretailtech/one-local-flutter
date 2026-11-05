@@ -27,7 +27,7 @@ end $$;
 
 -- 2 ---------------------------------------------------------------------------------------------------------------------------
 do $$
-declare v_src text := pg_get_functiondef('public.pos_record_payment'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.pos_record_payment'::regproc), E'\r', '');
   v_role text := $r$  if not public.has_org_role(array['org_owner','org_admin','manager','biller','business_manager','location_manager','finance_manager']) then raise exception 'POS_FORBIDDEN: your role cannot take payments'; end if;$r$;
   v_meth text := $r$  if v_method not in ('cash','upi','card','wallet','other') then raise exception 'POS_BAD_REQUEST: unknown payment method'; end if;$r$;
   v_state text := $r$  if v_o.status in ('paid','cancelled') then raise exception 'POS_WRONG_STATE: this order is already %', v_o.status; end if;$r$;
@@ -52,7 +52,7 @@ end $$;
 
 -- 3 ---------------------------------------------------------------------------------------------------------------------------
 do $$
-declare v_src text := pg_get_functiondef('public.pos_place_order'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.pos_place_order'::regproc), E'\r', '');
   v_old text := $r$  if v_loc is null then select id into v_loc from public.locations where organization_id = v_org order by (code = 'MAIN') desc, created_at limit 1; end if;$r$;
 begin
   if v_src like '%this outlet is not one you work in%' then return; end if;

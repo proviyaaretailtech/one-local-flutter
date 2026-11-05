@@ -100,7 +100,7 @@ end $$;
 
 -- Print KOT is offered once the table's order has a kitchen ticket
 do $$
-declare v_src text := pg_get_functiondef('public.tbl_order_view'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.tbl_order_view'::regproc), E'\r', '');
 begin
   if v_src like '%''print_kot'', false%' then
     v_src := replace(v_src, $r$'print_kot', false,$r$,
@@ -114,7 +114,7 @@ end $$;
 
 -- a LAN printer may be named by its IP address or by a host name on the shop's network, with an optional port (e.g. kitchen.local:9100)
 do $$
-declare v_src text := pg_get_functiondef('public.rst_printer_save'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.rst_printer_save'::regproc), E'\r', '');
   v_old text := $r$  if v_conn = 'lan' and v_addr !~ '^[0-9]{1,3}(\.[0-9]{1,3}){3}(:[0-9]{2,5})?$' then raise exception 'POS_BAD_REQUEST: the IP address looks wrong; it is like 192.168.1.50'; end if;$r$;
 begin
   if v_src like '%host name or IPv4 address%' then return; end if;
@@ -128,7 +128,7 @@ end $$;
 
 -- the order's activity and the audit report show prints and failed prints
 do $$
-declare v_src text := pg_get_functiondef('public.rst_activity_log'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.rst_activity_log'::regproc), E'\r', '');
 begin
   if v_src like '%''kot_printed''%' then return; end if;
   if position($r$'kot_fired', 'kot_reprinted',$r$ in v_src) = 0 then raise exception '0660: rst_activity_log has changed shape; patch it by hand'; end if;

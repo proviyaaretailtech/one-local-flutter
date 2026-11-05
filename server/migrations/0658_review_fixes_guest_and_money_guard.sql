@@ -23,7 +23,7 @@ end $$;
 
 -- ---------------------------------------------------------------------------------------------------------- CON-1
 do $$
-declare v_src text := pg_get_functiondef('public.pos_place_order'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.pos_place_order'::regproc), E'\r', '');
   v_old text := $r$  if v_loc is null then select id into v_loc from public.locations where organization_id = v_org order by (code = 'MAIN') desc, created_at limit 1; end if;$r$;
 begin
   if v_src not like '%an order without a table may name its outlet%' then
@@ -40,7 +40,7 @@ end $$;
 
 -- --------------------------------------------------------------------------------------------------------- SM-01
 do $$
-declare v_src text := pg_get_functiondef('public.guest_request_decide'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.guest_request_decide'::regproc), E'\r', '');
 begin
   if v_src not like '%''fire_kot'', false%' then
     v_src := replace(v_src,
@@ -56,7 +56,7 @@ alter table public.guest_order_requests add column if not exists client_hash tex
 create index if not exists guest_order_requests_preorder_client on public.guest_order_requests (organization_id, client_hash, created_at) where kind = 'preorder';
 
 do $$
-declare v_src text := pg_get_functiondef('public.gx_preorder_place'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.gx_preorder_place'::regproc), E'\r', '');
   v_anchor text := $r$  if (select count(*) from public.guest_order_requests q where q.organization_id = v_org and q.kind = 'preorder' and q.status = 'waiting') >= 30 then$r$;
 begin
   if v_src not like '%per client%' then
@@ -82,7 +82,7 @@ begin
   for r in select p.oid, p.proname from pg_proc p where p.pronamespace = 'public'::regnamespace
              and p.proname in ('rst_bill_pay', 'rst_bill_split', 'rst_bill_refund', 'rst_adj__refund_apply') loop
     v_kind := case when r.proname in ('rst_bill_pay', 'rst_bill_split') then 'pos_capture' else 'pos_refund' end;
-    v_src := pg_get_functiondef(r.oid);
+    v_src := replace(pg_get_functiondef(r.oid), E'\r', '');
     if v_src !~ 'require_via_master' then
       if position(E'\nbegin\n' in v_src) = 0 then raise exception '0658: % has no plain begin line; patch it by hand', r.proname; end if;
       v_src := regexp_replace(v_src, E'\nbegin\n', E'\nbegin\n  perform public.require_via_master(''' || v_kind || E''');   -- 0658: Master pause applies (canonical 0602)\n');

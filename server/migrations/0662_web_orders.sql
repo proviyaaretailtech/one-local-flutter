@@ -60,21 +60,32 @@ create or replace view public.delivery_orders_needing_rider as
 
 -- ------------------------------------------------------------------- ol_create_restaurant_order: the web fields (replace and assert)
 do $$
-declare v_src text := pg_get_functiondef('public.ol_create_restaurant_order(jsonb)'::regprocedure); v_n int := 0;
+declare v_src text := replace(pg_get_functiondef('public.ol_create_restaurant_order(jsonb)'::regprocedure), E'\r', ''); v_n int := 0;
 begin
   if v_src like '%: a web order%' then return; end if;
-  -- 1 the discount a web order's code takes off
-  if strpos(v_src, $r$  v_loc        uuid;
-begin$r$) > 0 then v_n := v_n + 1; end if;
-  v_src := replace(v_src, $r$  v_loc        uuid;
-begin$r$, $r$  v_loc        uuid;
-  v_disc       numeric(10,2) := 0;   -- 0662: a web order's discount code
-begin$r$);
+  -- 1 the discount a web order's code takes off (first line of the declarations; local and hosted differ further down)
+  if strpos(v_src, E'\ndeclare\n') > 0 then v_n := v_n + 1; end if;
+  v_src := regexp_replace(v_src, E'\ndeclare\n', E'\ndeclare\n  v_disc       numeric(10,2) := 0;   -- 0662: a web order''s discount code\n');
   -- 2 a dish note travels with the dish
   if strpos(v_src, $r$'qty', v_qty, 'station', v_item.station, 'course', v_item.course);$r$) > 0 then v_n := v_n + 1; end if;
   v_src := replace(v_src, $r$'qty', v_qty, 'station', v_item.station, 'course', v_item.course);$r$,
     $r$'qty', v_qty, 'station', v_item.station, 'course', v_item.course,
       'notes', nullif(left(btrim(regexp_replace(coalesce(v_line->>'notes', ''), '[[:cntrl:]]', ' ', 'g')), 140), ''));$r$);
+  -- 3 (hosted shape: the POS order has no outlet column in this insert)
+  if strpos(v_src, $r$                             subtotal, gst_pct, gst_amount, total, placed_by, notes, external_ref)
+  values (v_org, v_order_no, v_display, 'online', 'new', nullif(p->>'customer_name', ''), nullif(p->>'customer_phone', ''),
+          v_subtotal, v_gst_pct, v_gst, v_total, 'integration', nullif(p->>'notes', ''), 'onelocal:' || v_ol_id)$r$) > 0 then v_n := v_n + 1; end if;
+  v_src := replace(v_src, $r$                             subtotal, gst_pct, gst_amount, total, placed_by, notes, external_ref)
+  values (v_org, v_order_no, v_display, 'online', 'new', nullif(p->>'customer_name', ''), nullif(p->>'customer_phone', ''),
+          v_subtotal, v_gst_pct, v_gst, v_total, 'integration', nullif(p->>'notes', ''), 'onelocal:' || v_ol_id)$r$,
+    $r$                             subtotal, gst_pct, gst_amount, total, placed_by, notes, external_ref, table_id, coupon_code, discount_pct, discount,
+                             location_id)
+  values (v_org, v_order_no, v_display, 'online', 'new', nullif(p->>'customer_name', ''), nullif(p->>'customer_phone', ''),
+          v_subtotal, v_gst_pct, v_gst, v_total, 'integration', nullif(p->>'notes', ''), 'onelocal:' || v_ol_id,
+          nullif(p->>'table_id', '')::uuid, nullif(p->>'coupon_code', ''), nullif(p->>'discount_pct', '')::numeric,
+          least(greatest(coalesce(nullif(p->>'discount', '')::numeric, 0), 0), v_subtotal),
+          coalesce((select dt.location_id from public.dining_tables dt where dt.id = nullif(p->>'table_id', '')::uuid and dt.organization_id = v_org),
+                   (select l.id from public.locations l where l.organization_id = v_org order by (l.code = 'MAIN') desc, l.created_at limit 1)))$r$);
   -- 3 the POS order: the table (dine-in) and the discount code
   if strpos(v_src, $r$                             subtotal, gst_pct, gst_amount, total, placed_by, notes, external_ref)
   values (v_org, v_loc, v_order_no, v_display, 'online', 'new', nullif(p->>'customer_name', ''), nullif(p->>'customer_phone', ''),
@@ -140,7 +151,7 @@ end $$;
 
 -- ------------------------------------------------- money: a web order is the restaurant's own sale (replace and assert)
 do $$
-declare v_src text := pg_get_functiondef('public.commission_quote(uuid)'::regprocedure);
+declare v_src text := replace(pg_get_functiondef('public.commission_quote(uuid)'::regprocedure), E'\r', '');
 begin
   if v_src not like '%ol.source = ''app''%' then
     v_src := replace(v_src, $r$if not exists (select 1 from public.ol_orders ol where ol.pos_order_id = o.id) then return; end if;$r$,
@@ -150,7 +161,7 @@ begin
   end if;
 end $$;
 do $$
-declare v_src text := pg_get_functiondef('public.order_money_accrue(uuid)'::regprocedure);
+declare v_src text := replace(pg_get_functiondef('public.order_money_accrue(uuid)'::regprocedure), E'\r', '');
 begin
   if v_src not like '%and source = ''app'' order by created_at limit 1%' then
     v_src := replace(v_src, $r$select * into v_ol from public.ol_orders where pos_order_id = o.id order by created_at limit 1;$r$,
@@ -441,7 +452,7 @@ language sql stable security definer set search_path = public, pg_temp as $$
 $$;
 
 do $$
-declare v_src text := pg_get_functiondef('public.guest__menu'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.guest__menu'::regproc), E'\r', '');
 begin
   if v_src not like '%''offers'', public.gx__offers(p_org)%' then
     v_src := replace(v_src, $r$'experience', public.gx__public_def(p_org));$r$, $r$'experience', public.gx__public_def(p_org),
@@ -487,7 +498,7 @@ end $$;
 
 -- ------------------------------------------------------------------- rst_channel_orders: web orders (replace and assert)
 do $$
-declare v_src text := pg_get_functiondef('public.rst_channel_orders(jsonb)'::regprocedure); v_n int := 0;
+declare v_src text := replace(pg_get_functiondef('public.rst_channel_orders(jsonb)'::regprocedure), E'\r', ''); v_n int := 0;
 begin
   if v_src like '%: a web order%' then return; end if;
   if strpos(v_src, $r$o.external_ref, o.customer_phone,$r$) > 0 then v_n := v_n + 1; end if;
