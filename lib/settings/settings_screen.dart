@@ -272,16 +272,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     const go = [Icon(LucideIcons.chevronRight, size: 18, color: kMuted)];
     final bank = s.bankStatus;
     String onOff(bool v) => v ? 'on' : 'off';
+    // a service business: no delivery, pickup or product returns, and its working hours are in Service management (they decide what can be booked)
+    final service = HomeNav.shell?.kind == 'service';
     return [
       _Part(
         'store',
         // a restaurant reaches this as Business profile (the side menu), not as a store
-        HomeNav.shell?.kind == 'restaurant' ? 'Business profile' : 'Store',
+        HomeNav.shell?.kind == 'restaurant' || service ? 'Business profile' : 'Store',
         LucideIcons.store,
-        '${clock12(s.opensAt)} – ${clock12(s.closesAt)} · ${s.address == null ? 'location not added' : 'location set'}',
+        service ? (s.address == null ? 'Location not added' : 'Location set') : '${clock12(s.opensAt)} – ${clock12(s.closesAt)} · ${s.address == null ? 'location not added' : 'location set'}',
         [
           SettingRow(icon: LucideIcons.mapPin, title: tr('Location'), subtitle: s.address ?? 'Not added', actions: [editBtn(openLocationSheet)]),
-          SettingRow(
+          if (!service) SettingRow(
             icon: LucideIcons.clock,
             title: tr('Opening & closing timings'),
             subtitle: 'Opening: ${clock12(s.opensAt)} · Closing: ${clock12(s.closesAt)}',
@@ -290,12 +292,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SettingRow(
             icon: LucideIcons.qrCode,
             title: tr('Payment QR'),
-            subtitle: s.qrUploaded ? 'QR uploaded' : (HomeNav.shell?.kind == 'restaurant' ? 'Upload or manage your payment QR code' : 'Upload or manage your store QR code'),
+            subtitle: s.qrUploaded ? 'QR uploaded' : (HomeNav.shell?.kind == 'restaurant' || service ? 'Upload or manage your payment QR code' : 'Upload or manage your store QR code'),
             actions: [RowAction(tr('Edit'), onTap: () => _sheet(openQrSheet))],
           ),
         ],
       ),
-      _Part(
+      if (!service) _Part(
         'orders',
         'Orders & delivery',
         LucideIcons.truck,
@@ -346,7 +348,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Users, roles and invites belong to the Team section (L). This row only points there.
           SettingRow(
             icon: LucideIcons.userPlus,
-            title: tr('Manage store access'),
+            title: tr(service ? 'Manage team access' : 'Manage store access'),
             subtitle: s.activeUsers == 1 ? '1 user' : '${s.activeUsers} users',
             actions: [LimePill(tr('Add users'), onTap: () => HomeNav.go(context, HomeNav.team, 'Team'))],
           ),
@@ -394,7 +396,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SettingRow(
             icon: LucideIcons.files,
             title: tr('Documents'),
-            subtitle: s.documentCount == 0 ? 'Manage store documents' : '${s.documentCount} ${s.documentCount == 1 ? 'document' : 'documents'}',
+            subtitle: s.documentCount == 0 ? (service ? 'Manage business documents' : 'Manage store documents') : '${s.documentCount} ${s.documentCount == 1 ? 'document' : 'documents'}',
             actions: [
               RowAction(
                 'Edit',
@@ -453,10 +455,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _Part('devices', 'Devices', LucideIcons.printer, 'Receipt and barcode label printers', const [],
             open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeviceManagerScreen(store: HomeNav.storeName ?? '')))),
       // every order's timeline (0614): one tap opens its own page
-      _Part('activity', 'Activity log', LucideIcons.history, 'Every order’s timeline: placed, KOTs, ready, billed, paid', const [],
+      _Part('activity', 'Activity log', LucideIcons.history, service ? 'Every booking and bill: booked, started, paid, refunded' : 'Every order’s timeline: placed, KOTs, ready, billed, paid', const [],
           open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ActivityLogScreen(env: widget.env)))),
       // Returns, refunds & replacements (founder's spec, 29 Oct 2026): one tap opens its own page
-      _Part('returns', 'Returns & refunds', LucideIcons.packageCheck, 'Policy for each category · always-covered claims', const [],
+      if (!service) _Part('returns', 'Returns & refunds', LucideIcons.packageCheck, 'Policy for each category · always-covered claims', const [],
           open: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReturnsHomeScreen(api: widget.env.returns)))),
       _Part('me', 'Me & app', LucideIcons.settings2, '${kLanguages[s.language] ?? s.language} · help · feedback', [
         // one step (founder, 26 Oct 2026): the three languages right on the row; a tap saves it, no sheet

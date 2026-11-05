@@ -16,8 +16,10 @@ import 'print_service.dart' show forgetPrinters;
 
 // Settings → Devices (founder, 31 Oct 2026): a simple phone version of the restaurant panel's System · Devices. The store's printers
 // by job — receipts, barcode labels, the kitchen (restaurants) — each with how it connects, its paper or label size, auto-cut,
-// the default for its job, and its last test. A network printer prints straight to its port 9100; Bluetooth and USB printers print
-// through the phone's print service (the printer maker's app), so their test opens the print dialog and asks whether it came out.
+// the default for its job, and its last test. A network printer prints straight to its port 9100. A USB printer (OTG cable) or a
+// paired Bluetooth printer is picked from the ones the phone can see and also prints straight to it (4 Nov 2026: no printer maker's
+// app). "Phone's print service" printers, and Bluetooth ones saved before with only a name, print through the print dialog, so
+// their test asks whether it came out.
 
 /// Tests replace the print dialog.
 Future<void> Function(Uint8List pdf, String name) printDevicePdf = (pdf, name) => Printing.layoutPdf(onLayout: (_) async => pdf, name: name);
@@ -106,7 +108,7 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
     }
   }
 
-  /// Test print: a network printer gets a slip straight to its port; any other opens the print dialog and asks whether it printed.
+  /// Test print: a network, USB or Bluetooth printer gets a slip straight away; any other opens the print dialog and asks whether it printed.
   Future<void> _test(StorePrinter p) async {
     if (_testing != null) return;
     setState(() => _testing = p.id);
@@ -115,11 +117,15 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
     try {
       if (p.direct) {
         try {
-          await sendRawToPrinter(p.host, p.port, escPosTestSlip(store: widget.store, printer: p));
+          await sendToPrinter(p, escPosTestSlip(store: widget.store, printer: p));
           ok = true;
-          note = 'Printed over the network';
+          note = switch (p.connection) { 'usb' => 'Printed over USB', 'bluetooth' => 'Printed over Bluetooth', _ => 'Printed over the network' };
         } catch (e) {
-          note = e is UnsupportedError ? '${e.message}' : 'No answer from ${p.host}:${p.port}. Check it is on and on the same Wi-Fi.';
+          note = switch (e) {
+            UnsupportedError(:final message) => '$message',
+            StateError(:final message) => message,
+            _ => 'No answer from ${p.host}:${p.port}. Check it is on and on the same Wi-Fi.',
+          };
         }
       } else {
         await printDevicePdf(await _testPdf(p), 'Test print · ${p.name}');
@@ -129,7 +135,7 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
           context: context,
           builder: (c) => AlertDialog(
             title: Text(tr('Did the test page print?'), style: inter(17, 700)),
-            content: Text(tr('Choose this printer in the print dialog. Bluetooth and USB printers need the printer maker’s print app on this phone.'), style: inter(14, 400)),
+            content: Text(tr('Choose this printer in the print dialog.'), style: inter(14, 400)),
             actions: [
               TextButton(key: const ValueKey('printer-test-no'), onPressed: () => Navigator.pop(c, false), child: Text(tr('No'), style: inter(14, 700, color: _red))),
               TextButton(key: const ValueKey('printer-test-yes'), onPressed: () => Navigator.pop(c, true), child: Text(tr('Yes, it printed'), style: inter(14, 700, color: _green))),
@@ -263,7 +269,7 @@ class _DeviceManagerScreenState extends State<DeviceManagerScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            tr('Network printers print straight away, no dialog. Bluetooth and USB printers print through the phone’s print service: install the printer maker’s print app once. A barcode scanner needs no setup: it types into any search box, and the camera scans too.'),
+                            tr('Network, USB and Bluetooth printers print straight away, no dialog and no extra app. Plug a USB printer in with an OTG cable, or pair a Bluetooth printer in the phone’s Bluetooth settings, then add it here. A barcode scanner needs no setup: it types into any search box, and the camera scans too.'),
                             style: inter(12.5, 500, color: const Color(0xFF2F6B0B), height: 1.4),
                           ),
                         ),
@@ -328,8 +334,86 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
   late String _label = (_p?.labelSize.isNotEmpty ?? false) ? _p!.labelSize : '50x25';
   late bool _cut = _p?.autoCut ?? true;
   late bool _default = _p?.isDefault ?? false;
-  bool _busy = false;
+  bool _busy = false, _finding = false;
   String? _error;
+  List<LocalPrinter>? _found;
+
+  /// The USB or paired Bluetooth printers this phone can see, to pick one.
+  Future<void> _find() async {
+    setState(() => _finding = true);
+    final all = await findLocalPrinters();
+    if (!mounted) return;
+    setState(() {
+      _finding = false;
+      _found = all.where((x) => x.kind == _connection).toList();
+    });
+  }
+
+  void _pick(LocalPrinter x) => setState(() {
+        final short = x.name.length > 40 ? x.name.substring(0, 40) : x.name;
+        _address.text = x.address;
+        if (_name.text.trim().isEmpty) _name.text = short;
+        if (_model.text.trim().isEmpty) _model.text = short;
+        _found = null;
+      });
+
+  Widget _picker() {
+    final usb = _connection == 'usb';
+    final picked = _address.text.trim();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _label_(usb ? 'USB printer' : 'Bluetooth printer'),
+      Text(
+        tr(usb
+            ? 'Plug the printer into the phone with an OTG cable and switch it on, then tap Find printers.'
+            : 'Switch the printer on and pair it in the phone’s Bluetooth settings first (the PIN is often 0000 or 1234), then tap Find printers.'),
+        style: inter(12.5, 500, color: kMuted, height: 1.4),
+      ),
+      const SizedBox(height: 8),
+      if (picked.isNotEmpty)
+        Container(
+          key: const ValueKey('printer-picked'),
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(color: const Color(0xFFEFF7E6), borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            const Icon(LucideIcons.circleCheck, size: 17, color: _green),
+            const SizedBox(width: 8),
+            Expanded(child: Text('${tr('Picked')}: $picked', style: inter(13, 600))),
+          ]),
+        ),
+      OutlinedButton.icon(
+        key: const ValueKey('printer-find'),
+        onPressed: _finding ? null : _find,
+        icon: _finding
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+            : Icon(usb ? LucideIcons.usb : LucideIcons.bluetooth, size: 17),
+        label: Text(tr(picked.isEmpty ? 'Find printers' : 'Pick another printer'), style: inter(13.5, 700)),
+        style: OutlinedButton.styleFrom(foregroundColor: kInk, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+      ),
+      if (_found != null) ...[
+        const SizedBox(height: 8),
+        if (_found!.isEmpty)
+          Text(
+            tr(usb
+                ? 'No USB printer found. Check the OTG cable, that the printer is on, and that this phone supports OTG.'
+                : 'No paired printer found. Turn on Bluetooth and pair the printer in the phone’s settings, then try again.'),
+            key: const ValueKey('printer-none-found'),
+            style: inter(12.5, 600, color: _amber),
+          )
+        else
+          for (final x in _found!)
+            ListTile(
+              key: ValueKey('printer-found-${x.address}'),
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(usb ? LucideIcons.usb : LucideIcons.bluetooth, size: 20),
+              title: Text(x.name, style: inter(14, 700)),
+              subtitle: Text(x.address, style: inter(12, 500, color: kMuted)),
+              trailing: Text(tr('Use'), style: inter(13, 800, color: _green)),
+              onTap: () => _pick(x),
+            ),
+      ],
+    ]);
+  }
 
   @override
   void dispose() {
@@ -408,17 +492,24 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
               _label_('What it prints'),
               _chips([('receipt', 'Receipts'), ('label', 'Barcode labels'), if (widget.restaurant || _type == 'kot') ('kot', 'Kitchen (KOT)')], _type, (v) => _type = v, 'printer-type'),
               _label_('How it connects'),
-              _chips([for (final e in _conn.entries) (e.key, e.value)], _connection, (v) => _connection = v, 'printer-conn'),
-              if (_connection == 'lan' || _connection == 'bluetooth') ...[
-                _label_(_connection == 'lan' ? 'IP address' : 'Printer’s Bluetooth name (optional)'),
+              _chips([for (final e in _conn.entries) (e.key, e.value)], _connection, (v) {
+                if (v != _connection) {
+                  _address.clear(); // an IP, a USB id and a Bluetooth address do not carry over
+                  _found = null;
+                }
+                _connection = v;
+              }, 'printer-conn'),
+              if (_connection == 'lan') ...[
+                _label_('IP address'),
                 TextField(
                   key: const ValueKey('printer-address'),
                   controller: _address,
-                  keyboardType: _connection == 'lan' ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   style: inter(15, 600),
-                  decoration: _dec(_connection == 'lan' ? '192.168.1.50' : 'For example RPP02N'),
+                  decoration: _dec('192.168.1.50'),
                 ),
               ],
+              if (_connection == 'usb' || _connection == 'bluetooth') _picker(),
               _label_('Model (optional)'),
               TextField(key: const ValueKey('printer-model'), controller: _model, maxLength: 40, style: inter(15, 600), decoration: _dec('For example Epson TM-T82, TSC TE244')),
               if (_type == 'label') ...[

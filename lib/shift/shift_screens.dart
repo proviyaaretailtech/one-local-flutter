@@ -345,10 +345,12 @@ class _ShiftScreenState extends State<ShiftScreen> {
         if (s.cashRefunds > 0) KeyValue('Cash refunds', '−${rupees(s.cashRefunds)}', size: 14, valueColor: kBadText),
         const Divider(height: 22, color: kLine),
         Row(children: [
-          Text('Expected in drawer', style: inter(16, 800)),
+          Text('Expected for this shift', style: inter(16, 800)),
           const Spacer(),
           Text(rupees(s.expectedCash), key: const ValueKey('expected-cash'), style: inter(24, 800, color: kGreenText)),
         ]),
+        const SizedBox(height: 6),
+        Text('A handover for this shift only. Money shows the whole drawer and closes the day.', key: const ValueKey('shift-handover-note'), style: inter(12, 400, color: kKicker)),
         if (methods.keys.any((m) => m != 'cash')) ...[
           const SizedBox(height: 10),
           Wrap(spacing: 6, runSpacing: 6, children: [

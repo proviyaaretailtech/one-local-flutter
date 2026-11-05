@@ -27,12 +27,17 @@ export const Calendar = obj({
   date: day.nullish(), view: z.enum(['day', 'week', 'month']).optional(), location_id: id.nullish(), staff_id: id.nullish(), with_cancelled: z.boolean().optional(),
   source: z.enum(['pos', 'app']).nullish(), // offline (logged in the POS) or online (booked in the customer app), 2 Nov 2026
 });
-export const Quote = obj({ service_id: id, addon_ids: ids.optional(), staff_id: id.nullish() });
+// who is coming (4 Nov 2026): checked against the listing's rules and limits, and priced by them
+const party = obj({
+  group: z.enum(['Single', 'Couple', 'Family', 'Group'], { message: 'Choose single, couple, family or group.' }).nullish(),
+  guests: z.array(obj({ g: z.enum(['woman', 'man', 'any']), a: z.enum(['under_8', '8_11', '12_17', '18_59', '60_plus']) })).min(1, 'Add who is coming.').max(200, 'At most 200 people in one booking.'),
+});
+export const Quote = obj({ service_id: id, addon_ids: ids.optional(), staff_id: id.nullish(), party: party.nullish(), starts_at: when.nullish() });
 export const Slots = obj({ date: day, service_id: id, addon_ids: ids.optional(), staff_id: id.nullish(), location_id: id.nullish() });
 export const Book = obj({
   customer_name: text(80), customer_phone: text(20).nullish(), service_id: id, addon_ids: ids.optional(), staff_id: id, resource_id: id.nullish(),
   starts_at: when, notes: text(300).nullish(), service_address: text(300).nullish(), access_note: text(200).nullish(), entitlement_id: id.nullish(),
-  deposit: obj({ method, tendered: money.nullish(), reference: text(60).nullish() }).nullish(), ...key,
+  deposit: obj({ method, tendered: money.nullish(), reference: text(60).nullish() }).nullish(), party: party.nullish(), ...key,
 });
 export const View = obj({ id });
 export const Act = obj({
@@ -79,6 +84,28 @@ export const InventoryMove = obj({ id, action: z.enum(['out', 'back', 'add', 'us
 export const CareSave = obj({
   id: id.nullish(), item: text(80).optional(), customer_name: text(80).optional(), customer_phone: text(20).nullish(), note: text(200).nullish(), promised_on: day.nullish(),
   status: z.enum(['with_you', 'in_work', 'ready', 'returned'], { message: 'Unknown status.' }).optional(), ...key,
+});
+// Listing forms (founder's design canvas, 3 Nov 2026): one form per category; the answers are kept with the service
+// no Dining in the Service POS (founder, 4 Nov 2026)
+const listingCategory = z.enum(['events', 'activities', 'play', 'service', 'stay'], { message: 'Choose Events, Activities, Play, Service or Stay.' });
+export const ListingView = obj({ service_id: id.nullish() });
+export const ListingSave = obj({
+  service_id: id, category: listingCategory,
+  listing: z.record(z.string(), z.unknown()).refine(v => JSON.stringify(v).length <= 30000, 'The listing is too long.'), ...key,
+});
+// Templates (founder, 3 Nov 2026: "like a restaurant's recipe master"): what a service needs and its rules, saved under a name
+const templateFields = {
+  name: text(60), category: listingCategory.nullish(), subcategory: text(60).nullish(), duration_min: z.number().int().min(5).max(600).nullish(),
+  requirements: z.array(z.record(z.string(), z.unknown())).max(50).optional(), rules: z.array(z.record(z.string(), z.unknown())).max(50).optional(),
+  notes: text(500).nullish(),
+};
+export const TemplateList = obj({ q: text(100).optional() });
+export const TemplateSave = obj({ id: id.nullish(), ...templateFields, name: text(60).optional(), archived: z.boolean().optional(), ...key });
+export const TemplateImport = obj({ templates: z.array(obj(templateFields)).min(1, 'The file has no templates.').max(200, 'Import up to 200 templates at a time.'), ...key });
+// Reports (founder, 4 Nov 2026): the restaurant's Reports, for a service business
+export const Report = obj({
+  kind: z.enum(['sales', 'services', 'categories', 'bookings', 'staff', 'payments', 'dues', 'discounts', 'cancellations'], { message: 'Unknown report.' }),
+  from: day.nullish(), to: day.nullish(),
 });
 export const Schedule = obj({ location_id: id.nullish() });
 // Service management's slot table (2 Nov 2026): one weekday, 1 = Monday

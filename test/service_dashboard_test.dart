@@ -83,7 +83,7 @@ void main() {
       await open('tile-visits');
       expect(find.text('Bookings'), findsWidgets);
       expect(rpc.of('svc_calendar').last.$2['view'], 'day');
-      expect(find.text('No bookings on this day. Tap New booking to add one.'), findsOneWidget, reason: 'the List view');
+      expect(find.text('Nothing here on this day.'), findsOneWidget, reason: 'the Board view');
       await t.pageBack();
       await t.pumpAndSettle();
 

@@ -66,6 +66,26 @@ void main() {
     expect(raw, isEmpty);
   });
 
+  test('a USB printer on an OTG cable, or a paired Bluetooth one: straight to it, no dialog; one that fails: the dialog, and why', () async {
+    final local = <String>[];
+    final realLocal = sendLocalPrinter;
+    addTearDown(() => sendLocalPrinter = realLocal);
+    sendLocalPrinter = (address, bytes) async => local.add(address);
+    StorePrinter on(String conn, String address) => StorePrinter({...printer('receipt', conn).raw, 'address': address});
+    defaultPrinterFor = (job) async => on('usb', 'usb:04b8:0e28');
+    expect((await printReceiptText('Total ₹10', store: 'S')).route, PrintRoute.direct);
+    defaultPrinterFor = (job) async => on('bluetooth', '66:22:B1:0A:7C:01');
+    expect((await printReceiptText('Total ₹10', store: 'S')).route, PrintRoute.direct);
+    expect(local, ['usb:04b8:0e28', '66:22:B1:0A:7C:01']);
+    expect(dialogs, isEmpty);
+
+    sendLocalPrinter = (address, bytes) async => throw StateError('unplugged');
+    String? why;
+    expect((await printReceiptText('x', title: 'C', onFallback: (w) => why = w)).route, PrintRoute.dialog);
+    expect(why, 'Counter printer did not answer');
+    expect(dialogs, ['C']);
+  });
+
   test('a bill the server did not round: 50 paise and up go to the next rupee, below that down', () {
     BillReceipt at(num total) => BillReceipt(store: 'S', billNo: 'P-1', when: '', lines: const [], subtotal: total, total: total);
     expect([at(142.5).roundedTotal, at(142.49).roundedTotal, at(142.75).roundedTotal, at(30).roundedTotal], [143, 142, 143, 30]);

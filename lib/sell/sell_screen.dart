@@ -374,7 +374,6 @@ class _SellScreenState extends State<SellScreen> {
                 ('returns', LucideIcons.undo2, 'Returns'),
                 ('receipts', LucideIcons.receiptText, 'Invoices'),
                 ('shift', LucideIcons.wallet, 'Cash shift'),
-                ('daily', LucideIcons.calendarClock, 'Daily operations'),
               ])
                 _Shortcut(icon: icon, label: label, onTap: () => env.open(context, id)),
             ]),

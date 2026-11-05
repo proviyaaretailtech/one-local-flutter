@@ -52,6 +52,7 @@ const STATUS: Record<string, number> = {
   NO_AUDIENCE: 422,                                         // notices (section N)
   NOT_VERIFIED: 409, NOT_LISTED: 409, INCOMPLETE: 422,                                                                          // outlets (0520-0522)
   SHIFT_OPEN: 409, NO_SHIFT: 409, PAYMENT_PENDING: 409, NOT_ENOUGH_CASH: 422, REASON_REQUIRED: 422, RETURN_WINDOW: 422,       // store shift, payment pending, refunds (0500-0502)
+  DAY_ENDED: 409,                                                                                                            // a store's closed day: reopen it in Money (0665)
   OPEN_BILLS: 409,                                                                                                           // Day end with bills still open (0650)
   ADMIN_PIN: 403,                                                                                                            // a generated bill or a cancel after the KOT needs an admin PIN (0645)
 };

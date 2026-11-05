@@ -187,6 +187,25 @@ void main() {
       expect(s.of('pos_print_log').single, allOf(containsPair('outcome', 'failed'), containsPair('printer_id', 'p-kit')));
     });
 
+    test('a USB or Bluetooth printer picked on the phone: straight to it; one that fails says why', () async {
+      final sent = <String>[];
+      final real = sendLocalPrinter;
+      addTearDown(() => sendLocalPrinter = real);
+      sendLocalPrinter = (address, bytes) async => sent.add(address);
+      final usb = Server(printers: [printerRow('p-kit', 'Kitchen printer', conn: 'usb', address: 'usb:04b8:0e28')]);
+      expect((await usb.router.printKot('o-1')).outcome, 'printed');
+      final bt = Server(printers: [printerRow('p-kit', 'Kitchen printer', conn: 'bluetooth', address: '66:22:B1:0A:7C:01')]);
+      expect((await bt.router.printKot('o-1')).outcome, 'printed');
+      expect(sent, ['usb:04b8:0e28', '66:22:B1:0A:7C:01']);
+      expect(raw, isEmpty);
+
+      sendLocalPrinter = (address, bytes) async => throw StateError('The USB printer is not plugged in.');
+      final gone = Server(printers: [printerRow('p-kit', 'Kitchen printer', conn: 'usb', address: 'usb:04b8:0e28')]);
+      final r = await gone.router.printKot('o-1');
+      expect(r.outcome, 'failed');
+      expect(r.message, contains('The USB printer is not plugged in.'));
+    });
+
     test("the phone's print service gets the print dialog; a browser cannot reach a network printer and says so", () async {
       final s = Server(printers: [printerRow('p-kit', 'Kitchen printer', conn: 'system', address: '')]);
       expect((await s.router.printKot('o-1')).message, "KOT #12 sent to the print dialog for Kitchen printer.");

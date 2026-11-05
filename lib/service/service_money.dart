@@ -5,7 +5,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../money/money_flow.dart' show MoneyFlowScreen;
 import '../money/money_style.dart';
 import '../money/money_transfer.dart' show MoneyTransferScreen;
-import '../money/store_money.dart' show StoreMoneyApi, rs, dayMonth, kAccountIcons, kMoneyGreen, kMoneyRed;
+import '../account/wallet_api.dart';
+import '../account/wallet_screen.dart';
+import '../ads/ads_api.dart';
+import '../ads/ads_screens.dart' show AdsHomeScreen, CoinMark, creditPlain;
+import '../money/store_money.dart' show AdsCommissionScreen, StoreMoneyApi, rs, dayMonth, kAccountIcons, kMoneyGreen, kMoneyRed;
 import '../orders/order_widgets.dart' show OrderCardBox;
 import '../ui/motion.dart' show showOlDialog;
 import '../ui/theme.dart';
@@ -19,9 +23,11 @@ import 'service_widgets.dart';
 /// service-only: money from services split by bookings, jobs, bills made here and packages, offline / online and how it was paid
 /// (`svc_money_split`); the cash drawer, where cash from services goes; and the customers who still owe on a bill.
 class ServiceMoneyScreen extends StatefulWidget {
-  const ServiceMoneyScreen({super.key, this.api, this.moneyApi, this.onNavigate});
+  const ServiceMoneyScreen({super.key, this.api, this.moneyApi, this.walletApi, this.adsApi, this.onNavigate});
   final ServiceApi? api;
   final StoreMoneyApi? moneyApi;
+  final WalletApi? walletApi;
+  final AdsApi? adsApi;
   final ValueChanged<String>? onNavigate;
   @override
   State<ServiceMoneyScreen> createState() => _ServiceMoneyScreenState();
@@ -35,12 +41,32 @@ class _ServiceMoneyScreenState extends State<ServiceMoneyScreen> {
   BillListData? _dues;
   String? _error;
   String _period = 'today';
+  num? _onelocalWallet; // what OneLocal owes the business from online bookings (rupees)
+  int? _adCoins; // ad coins (1 coin = ₹10)
   String _part = 'cash';
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadOnelocal();
+  }
+
+  /// The OneLocal wallet and the ad coins, as on the store's Money (founder, 4 Nov 2026: the credits and commission section). A card that
+  /// cannot load shows a dash; its own screen says why.
+  Future<void> _loadOnelocal() async {
+    try {
+      final w = await (widget.walletApi ?? WalletApi()).overview();
+      if (mounted) setState(() => _onelocalWallet = w.unsettledDue + w.onTheWay);
+    } catch (_) {}
+    await _loadCoins();
+  }
+
+  Future<void> _loadCoins() async {
+    try {
+      final h = await (widget.adsApi ?? AdsApi()).home();
+      if (mounted) setState(() => _adCoins = (h['coins'] as num?)?.round());
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -85,6 +111,8 @@ class _ServiceMoneyScreenState extends State<ServiceMoneyScreen> {
           : [
               _wallet(h),
               const SizedBox(height: 12),
+              _onelocalCards(),
+              const SizedBox(height: 12),
               _fromServices(s),
               const SizedBox(height: 16),
               MoneyPills(
@@ -97,6 +125,126 @@ class _ServiceMoneyScreenState extends State<ServiceMoneyScreen> {
               if (_part == 'dues') _duesPart(d) else _cashPart(r, h['can_record'] == true),
             ],
     );
+  }
+
+  // ------------------------------------------------------------------------------------------------ OneLocal wallet and credits
+  /// As the store's: the OneLocal wallet (lime strip, dark body: what OneLocal owes you from online bookings), then Ad credits (coins, to
+  /// promote your business) and Discount credits (against OneLocal's commission).
+  Widget _onelocalCards() {
+    Future<void> open(String key) async {
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => key == 'ad-credits' ? AdsHomeScreen(api: widget.adsApi) : const AdsCommissionScreen()));
+      if (mounted) _loadCoins();
+    }
+
+    Widget credit(String key, String title, String sub, IconData icon, {required bool dark}) {
+      final bg = dark ? kMoneyDeep : kMoneyLime, fg = dark ? Colors.white : kMoneyDeep, soft = dark ? const Color(0xFFB8BCC4) : const Color(0xFF3F4A12);
+      return Expanded(
+        child: Material(
+          color: bg,
+          borderRadius: BorderRadius.circular(kMoneyCardRadius),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: ValueKey(key),
+            onTap: () => open(key),
+            child: Stack(children: [
+              if (dark) const Positioned.fill(child: MoneyRings(opacity: 0.06)),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 14, 14),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(color: dark ? kMoneyDeepSoft : kMoneyDeep, borderRadius: BorderRadius.circular(11)),
+                      child: Icon(icon, size: 17, color: kMoneyLime),
+                    ),
+                    const Spacer(),
+                    Icon(LucideIcons.arrowUpRight, size: 18, color: fg),
+                  ]),
+                  const SizedBox(height: 12),
+                  Text(title, style: inter(13, 700, color: soft)),
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: key == 'ad-credits'
+                        ? Row(mainAxisSize: MainAxisSize.min, children: [
+                            const CoinMark(size: 22),
+                            const SizedBox(width: 6),
+                            Text(_adCoins == null ? '—' : creditPlain(_adCoins), key: const ValueKey('ad-credits-coins'), style: inter(26, 800, color: fg)),
+                          ])
+                        : Text(rs(0), style: inter(26, 800, color: fg)),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(sub, style: inter(11.5, 500, color: soft)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
+    }
+
+    return Column(children: [
+      Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const ValueKey('onelocal-wallet'),
+          borderRadius: BorderRadius.circular(kMoneyCardRadius),
+          onTap: () => Navigator.of(context).push(WalletScreen.route(api: widget.walletApi)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(kMoneyCardRadius),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Container(
+                color: kMoneyLime,
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+                child: Row(children: [
+                  const Icon(LucideIcons.store, size: 16, color: kMoneyDeep),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('OneLocal wallet', style: inter(13.5, 800, color: kMoneyDeep))),
+                  Text('From your online bookings', style: inter(11.5, 600, color: kMoneyDeep)),
+                ]),
+              ),
+              Container(
+                color: kMoneyDeep,
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+                child: Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Due to you', style: inter(12, 500, color: const Color(0xFFB8BCC4))),
+                      const SizedBox(height: 2),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(_onelocalWallet == null ? '—' : rs(_onelocalWallet! * 100), key: const ValueKey('onelocal-wallet-amount'),
+                            style: inter(26, 800, color: Colors.white)),
+                      ),
+                    ]),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(color: kMoneyDeepSoft, borderRadius: BorderRadius.circular(40)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text('View', style: inter(12.5, 700, color: kMoneyLime)),
+                      const SizedBox(width: 4),
+                      const Icon(LucideIcons.arrowUpRight, size: 14, color: kMoneyLime),
+                    ]),
+                  ),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+      IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          credit('ad-credits', 'Ad credits', 'To promote your business', LucideIcons.megaphone, dark: false),
+          const SizedBox(width: 12),
+          credit('discount-credits', 'Discount credits', 'Discount against commission', LucideIcons.badgePercent, dark: true),
+        ]),
+      ),
+    ]);
   }
 
   // ------------------------------------------------------------------------------------------------ the wallet (as the store's)

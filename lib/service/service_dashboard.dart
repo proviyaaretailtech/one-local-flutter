@@ -177,7 +177,7 @@ class _ServiceHomeBodyState extends State<ServiceHomeBody> {
               child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 // offline (logged in the POS) and online (booked in the customer app), founder 2 Nov 2026
                 Expanded(child: _tile('Visits today', t.i('visits'), '${d.todayOffline} offline · ${d.todayOnline} online', key: 'tile-visits',
-                    icon: LucideIcons.calendarCheck, tint: (kChipGreen, kGreenText), open: () => BookingsScreen(api: widget.api, mode: 'list'))),
+                    icon: LucideIcons.calendarCheck, tint: (kChipGreen, kGreenText), open: () => BookingsScreen(api: widget.api, mode: 'board'))),
                 const SizedBox(width: 8),
                 Expanded(child: _tile('Money today', d.money.n('today'), format: svcRupees, '${svcRupees(d.money.n('month'))} this month', key: 'tile-money',
                     icon: LucideIcons.indianRupee, tint: (const Color(0xFFE6EEFF), const Color(0xFF1D4ED8)), open: () => BillsScreen(api: widget.api, filter: 'today'))),

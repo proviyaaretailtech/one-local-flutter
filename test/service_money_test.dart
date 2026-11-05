@@ -108,6 +108,10 @@ void main() {
     expect(f.of('smoney_home'), hasLength(1));
     expect(f.of('svc_money_split'), hasLength(1));
     expect(f.of('svc_bill_list').single, {'filter': 'due'});
+    // the store's OneLocal wallet and credits (founder, 4 Nov 2026)
+    for (final s in ['OneLocal wallet', 'From your online bookings', 'Due to you', 'Ad credits', 'To promote your business', 'Discount credits', 'Discount against commission']) {
+      expect(find.text(s), findsWidgets, reason: s);
+    }
     for (final s in ['Money', 'Your wallet balance', '₹16,938', 'Cash drawer ₹2,588', 'UPI ₹12,450', 'Bank ₹1,900', 'Money in', 'Money out', 'Transfer',
       'From your services', '₹6,138', 'taken today', 'Bookings', '₹4,338', 'Jobs', 'Bills made here', '₹1,800', 'Packages & memberships',
       'Offline (in the POS)', '₹4,938', 'Online (customer app)', '₹1,200']) {
@@ -122,6 +126,9 @@ void main() {
   testWidgets('Money: the cash drawer (cash from services, close the day) and the customers who still owe', (t) async {
     final f = _Fake();
     await show(t, ServiceMoneyScreen(api: f.api, moneyApi: f.money));
+    await t.pumpAndSettle();
+    await t.scrollUntilVisible(find.text('Should be in the drawer'), 200,
+        scrollable: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down).first);
     await t.pumpAndSettle();
     for (final s in ['Cash drawer · 02 Nov', 'Opening cash', 'Cash from services', '+ ₹1,188', 'Should be in the drawer', '₹2,588']) {
       expect(find.text(s), findsWidgets, reason: s);

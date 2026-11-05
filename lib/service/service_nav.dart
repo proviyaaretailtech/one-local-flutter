@@ -8,9 +8,11 @@ import 'manage_screen.dart';
 import 'bookings_screen.dart';
 import 'catalogue_screen.dart';
 import 'bills_screen.dart';
+import 'history_screen.dart';
 import 'service_api.dart';
 import 'service_media.dart';
 import 'service_money.dart';
+import 'service_reports.dart';
 
 // The Service POS frame (founder's sketch, 2 Nov 2026), common to every kind of service: the bottom bar and the side menu. It looks like
 // the store POS (same floating bar and side nav); only the tabs and rows are the service's own.
@@ -45,8 +47,9 @@ String? serviceTabFor(String id) => switch (id) {
       _ => null,
     };
 
-/// The service side menu (founder's sketch): Profile & manage account (the top of the menu), Service management, Money, Media, Company
-/// details, Team management, Support, Sign out. Same look as the store's side nav.
+/// The service side menu (founder's sketch; five rows added 5 Nov 2026): Profile & manage account (the top of the menu), Service management, All
+/// bookings, Customers, Money, Reports, Media, Page Manager, Company details, Team management, Settings, Subscription plans, Support, Sign out.
+/// Same look as the store's side nav.
 Future<void> showServiceSideNav(BuildContext context, {required String name, String? email, required VoidCallback onSignOut}) {
   VoidCallback? hook(HomeRoute? r) => r == null ? null : () => r(context);
   return showSideNav(
@@ -56,12 +59,20 @@ Future<void> showServiceSideNav(BuildContext context, {required String name, Str
     entries: [
       // Service management (founder, 3 Nov 2026): off the bottom bar, where Ol now sits; hours, slots and who works when
       SideNavEntry(LucideIcons.slidersHorizontal, 'Service management', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ManageScreen(api: ServiceApi())))),
+      // every booking, past ones too; the Bookings tab is the day's work
+      SideNavEntry(LucideIcons.history, 'All bookings', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ServiceHistoryScreen(api: ServiceApi())))),
+      SideNavEntry(LucideIcons.circleUser, 'Customers', hook(HomeNav.customers)),
       // Money, as in the store's side nav (founder, 2 Nov 2026): the service's own wallet, money from services, cash drawer and dues
       SideNavEntry(LucideIcons.wallet, 'Money', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ServiceMoneyScreen()))),
+      // Reports (founder, 4 Nov 2026): the restaurant's Reports, counted and worded for a service business
+      SideNavEntry(LucideIcons.chartColumn, 'Reports', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ServiceReportsScreen()))),
       // Media, as the store's Media manager (2 Nov 2026): the business's service photos and standard media
       SideNavEntry(LucideIcons.images, 'Media', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ServiceMediaScreen()))),
+      SideNavEntry(LucideIcons.layoutDashboard, 'Page Manager', hook(HomeNav.businessProfile ?? HomeNav.storefront)),
       SideNavEntry(LucideIcons.building2, 'Company details', hook(HomeNav.outletInfo)),
       SideNavEntry(LucideIcons.users, 'Team management', hook(HomeNav.team)),
+      SideNavEntry(LucideIcons.settings, 'Settings', hook(HomeNav.settings ?? HomeNav.setup)),
+      SideNavEntry(LucideIcons.crown, 'Subscription plans', hook(HomeNav.plans)),
       SideNavEntry(LucideIcons.circleQuestionMark, 'Support', hook(HomeNav.support)),
     ],
     onSignOut: onSignOut,

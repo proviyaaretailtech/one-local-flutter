@@ -1,4 +1,8 @@
+import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
@@ -45,32 +49,175 @@ class ApptStatusChip extends StatelessWidget {
 }
 
 /// Rounded filter chip (Day / Week / All providers).
-class ModeChip extends StatelessWidget {
+/// What a box with [keyboard] lets through: a number keyboard means digits only (and one decimal point when it allows decimals), so
+/// nothing but a number can be typed, on a phone or a computer (founder, 4 Nov 2026). Null for any other box.
+List<TextInputFormatter>? numberOnly(TextInputType? keyboard) => keyboard == null || keyboard.index != TextInputType.number.index
+    ? null
+    : keyboard.decimal == true
+        ? [FilteringTextInputFormatter.allow(RegExp(r'^\d{0,9}(\.\d{0,2})?'))]
+        : [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(9)];
+
+/// A few actions in a small frosted, see-through box beside what was tapped ([from]), not a sheet from the bottom (founder, 5 Nov 2026).
+/// It opens under [from], or above it when there is no room below, and stays on the screen; with [over] (a whole card was tapped, so under
+/// it could be far from the finger) it opens centred over [from]. [note] is a quiet line under the actions. Returns the action tapped.
+Future<T?> showActionBox<T>(BuildContext from, {required String title, required List<(T value, String label, Key? key)> actions, bool over = false, String? note}) {
+  final at = from.findRenderObject() as RenderBox;
+  final anchor = at.localToGlobal(Offset.zero) & at.size;
+  return showGeneralDialog<T>(
+    context: from,
+    barrierDismissible: true,
+    barrierLabel: 'Close',
+    barrierColor: const Color(0x14000000),
+    transitionDuration: const Duration(milliseconds: 160),
+    transitionBuilder: (_, a, _, child) => FadeTransition(
+      opacity: a,
+      child: ScaleTransition(scale: Tween(begin: 0.96, end: 1.0).animate(CurvedAnimation(parent: a, curve: Curves.easeOut)), child: child),
+    ),
+    pageBuilder: (ctx, _, _) {
+      final mq = MediaQuery.of(ctx);
+      final width = math.min(240.0, mq.size.width - 32);
+      final height = 50.0 + 46 * actions.length + (note == null ? 0 : 40);
+      final maxLeft = math.max(16.0, mq.size.width - width - 16), minTop = mq.padding.top + 8, maxTop = math.max(minTop, mq.size.height - mq.padding.bottom - height - 8);
+      final left = (over ? anchor.center.dx - width / 2 : anchor.right - width).clamp(16.0, maxLeft).toDouble();
+      final below = anchor.bottom + 4, above = anchor.top - height - 4;
+      final y = over ? (anchor.center.dy - height / 2).clamp(minTop, maxTop).toDouble() : (below <= maxTop ? below : math.max(minTop, above));
+      return Stack(children: [
+        Positioned(
+          left: left,
+          top: y,
+          width: width,
+          child: Material(
+            type: MaterialType.transparency,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: Container(
+                  key: const ValueKey('action-box'),
+                  padding: const EdgeInsets.fromLTRB(6, 10, 6, 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
+                    boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 24, offset: Offset(0, 8))],
+                  ),
+                  child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+                      child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13, 700, color: kMuted)),
+                    ),
+                    for (final (value, label, key) in actions)
+                      InkWell(
+                        key: key,
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => Navigator.of(ctx).pop(value),
+                        child: Padding(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12), child: Text(label, style: inter(14.5, 600))),
+                      ),
+                    if (note != null) Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 6), child: Text(note, style: inter(13, 400, color: kMuted))),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ]);
+    },
+  );
+}
+
+class ModeChip extends StatefulWidget {
   const ModeChip(this.label, {super.key, required this.selected, required this.onTap});
   final String label;
   final bool selected;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => Semantics(
-        button: true,
-        selected: selected,
-        label: label,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: onTap,
-          child: Container(
+  State<ModeChip> createState() => _ModeChipState();
+}
+
+/// Tapped (founder, 4 Nov 2026: "sliding animations after you click"): the chip dips while pressed and springs back, its colour fades in
+/// and a small tick slides in before the label.
+class _ModeChipState extends State<ModeChip> {
+  bool _down = false;
+
+  void _press(bool down) {
+    if (_down != down) setState(() => _down = down);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final on = widget.selected;
+    const ease = Curves.easeOutCubic;
+    return Semantics(
+      button: true,
+      selected: on,
+      label: widget.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _press(true),
+        onTapUp: (_) => _press(false),
+        onTapCancel: () => _press(false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _down ? 0.92 : 1,
+          duration: Duration(milliseconds: _down ? 90 : 260),
+          curve: _down ? Curves.easeOut : Curves.elasticOut,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
+            curve: ease,
             height: 34,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: selected ? kChipGreen : Colors.white,
+              color: on ? kChipGreen : Colors.white,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: selected ? kLink : kLine),
+              border: Border.all(color: on ? kLink : kLine),
             ),
             // sized to the label, also inside a Wrap (an aligned Container would stretch to the full width)
-            child: Center(widthFactor: 1, child: ExcludeSemantics(child: Text(label, style: inter(13, selected ? 600 : 400, color: selected ? kInk : kMuted)))),
+            child: Center(
+              widthFactor: 1,
+              child: ExcludeSemantics(
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 240),
+                    curve: ease,
+                    child: on
+                        ? const Padding(padding: EdgeInsets.only(right: 4), child: Icon(LucideIcons.check, size: 14, color: kGreenText))
+                        : const SizedBox(height: 14),
+                  ),
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    style: inter(13, on ? 600 : 400, color: on ? kInk : kMuted),
+                    child: Text(widget.label),
+                  ),
+                ]),
+              ),
+            ),
           ),
         ),
-      );
+      ),
+    );
+  }
+}
+
+/// Slides [child] in from the side (dir 1: from the right, -1: from the left) and fades it in, [index] a little after the one before;
+/// a new [key] plays it again. Still when the phone asks for less motion.
+class SlideIn extends StatelessWidget {
+  const SlideIn({super.key, required this.dir, required this.index, required this.child});
+  final int dir, index;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    if (dir == 0 || reduceMotion(context)) return child;
+    final delay = (index.clamp(0, 6)) * 0.08;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 380 + (delay * 1000).round()),
+      builder: (_, t, c) {
+        final v = Curves.easeOutCubic.transform(((t - delay / (1 + delay)) * (1 + delay)).clamp(0, 1));
+        return Opacity(opacity: v, child: FractionalTranslation(translation: Offset(dir * 0.35 * (1 - v), 0), child: c));
+      },
+      child: child,
+    );
+  }
 }
 
 /// Body of every section I screen: the top bar, a scrolling page with the frame's title and subtitle, and the bottom bar (Bill active).
@@ -289,7 +436,12 @@ Future<(String, num?)?> pickPayment(BuildContext context, {required String title
   if (method != 'cash') return (method, null);
   final c = TextEditingController(text: amount.toStringAsFixed(0));
   final got = await showOrderSheet<num>(context, title: 'Cash received', body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        TextField(key: const ValueKey('cash-received'), controller: c, keyboardType: TextInputType.number, decoration: const InputDecoration(prefixText: '₹ ')),
+        TextField(
+            key: const ValueKey('cash-received'),
+            controller: c,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: numberOnly(const TextInputType.numberWithOptions(decimal: true)),
+            decoration: const InputDecoration(prefixText: '₹ ')),
         const SizedBox(height: 14),
         DarkCta(label: 'Done', onPressed: () => Navigator.pop(ctx, num.tryParse(c.text.trim()))),
       ]));
@@ -300,7 +452,7 @@ Future<(String, num?)?> pickPayment(BuildContext context, {required String title
 Future<String?> askText(BuildContext context, String title, {String initial = '', String hint = '', String action = 'Save', TextInputType keyboard = TextInputType.text, int lines = 1}) {
   final c = TextEditingController(text: initial);
   return showOrderSheet<String>(context, title: title, body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        TextField(key: const ValueKey('ask-text'), controller: c, keyboardType: keyboard, minLines: lines, maxLines: lines == 1 ? 1 : lines + 2, decoration: InputDecoration(hintText: hint)),
+        TextField(key: const ValueKey('ask-text'), controller: c, keyboardType: keyboard, inputFormatters: numberOnly(keyboard), minLines: lines, maxLines: lines == 1 ? 1 : lines + 2, decoration: InputDecoration(hintText: hint)),
         const SizedBox(height: 14),
         DarkCta(label: action, onPressed: () => Navigator.pop(ctx, c.text.trim())),
       ]));

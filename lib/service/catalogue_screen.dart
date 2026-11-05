@@ -12,6 +12,9 @@ import 'service_menu.dart';
 import 'service_media.dart';
 import 'service_widgets.dart';
 import 'inventory_pane.dart';
+import 'service_form.dart';
+import 'service_parts.dart' show listingCategories;
+import 'templates_pane.dart';
 
 const _typeChips = [
   ('', 'All types'),
@@ -54,14 +57,14 @@ String fulfilmentLabel(String f) => switch (f) {
       _ => 'Appointment · Customer visits us',
     };
 
-/// What can be added, each opening its own form (founder's catalogue design, 3 Nov 2026: "What are you adding?").
-const _addKinds = [
-  ('appointment', 'Appointment', 'The customer visits you'),
-  ('event', 'Event', 'A group session at your place'),
-  ('on_location', 'On-location', 'You go to the customer'),
-  ('on_demand', 'On-demand', 'Starts right away'),
-  ('package', 'Package', 'A bundle of services at one price'),
-  ('membership', 'Membership', 'A monthly or yearly plan'),
+/// What can be added: a service (the one form, founder 3 Nov 2026: "just one form, one common form"; a template can fill it), then
+/// packages and memberships.
+/// (founder, 4 Nov 2026: "keep it as it was" — the categories — "and only add one tab, add existing templates")
+final _addKinds = [
+  for (final c in listingCategories) (c.key, c.name, 'Books: ${c.books[0].toLowerCase()}${c.books.substring(1)}', c.icon),
+  ('templates', 'Add from existing templates', 'Pick a template you saved; it fills the form', LucideIcons.clipboardList),
+  ('package', 'Package', 'A bundle of services at one price', serviceTypeIcon('package')),
+  ('membership', 'Membership', 'A monthly or yearly plan', serviceTypeIcon('membership')),
 ];
 
 /// The service catalogue (founder's design, 3 Nov 2026): two tabs, Services and Inventory. Services has + Add service, search, a Filter
@@ -79,8 +82,11 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
   ServiceListData? _d;
   int? _alerts; // things to do in Inventory, told by the pane
   final _pane = GlobalKey<InventoryPaneState>();
+  final _templates = GlobalKey<TemplatesPaneState>();
   String? _error;
   String _q = '', _cat = '', _type = '', _status = '';
+  // which way the list slides in after a chip or tab is tapped (1: from the right), and a count that replays it (founder, 4 Nov 2026)
+  int _slide = 0, _slides = 0, _chipAt = 0, _paneDir = 1;
   String _tab = 'services';
   int _seq = 0;
 
@@ -94,15 +100,38 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
     final mine = ++_seq;
     try {
       final d = await widget.api.serviceList(q: _q, category: _cat.isEmpty ? null : _cat, type: _type.isEmpty ? null : _type, status: _status.isEmpty ? null : _status);
-      if (mounted && mine == _seq) setState(() { _d = d; _error = null; });
+      if (mounted && mine == _seq) {
+        setState(() {
+          _d = d;
+          _error = null;
+          if (_slide != 0) _slides++;
+        });
+      }
     } catch (e) {
       if (mounted && mine == _seq) setState(() => _error = e.toString());
     }
   }
 
-  Future<void> _refresh() async => _tab == 'services' ? _load() : _pane.currentState?.reload();
+  Future<void> _refresh() async => switch (_tab) {
+        'services' => _load(),
+        'templates' => _templates.currentState?.reload(),
+        _ => _pane.currentState?.reload(),
+      };
 
-  void _setTab(String tab) => setState(() => _tab = tab);
+  /// A template's "Use for a new service": the one form, filled from it.
+  Future<void> _useTemplate(ServiceTemplate t) async {
+    final saved = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ServiceFormScreen(api: widget.api, template: t, business: widget.business)));
+    if (saved == true && mounted) {
+      _templates.currentState?.reload();
+      _load();
+    }
+  }
+
+  static const _tabOrder = ['services', 'templates', 'inventory'];
+  void _setTab(String tab) => setState(() {
+        _paneDir = _tabOrder.indexOf(tab) >= _tabOrder.indexOf(_tab) ? 1 : -1;
+        _tab = tab;
+      });
 
   Future<void> _open(SvcData s) async {
     final type = s.s('type');
@@ -114,25 +143,24 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
     if (mounted) _load();
   }
 
-  Future<void> _more(SvcData s) async {
+  /// The row's actions, in a small frosted box beside its ⋮ ([from]).
+  Future<void> _more(BuildContext from, SvcData s) async {
     final type = s.s('type');
     final plan = type == 'package' || type == 'membership';
-    final pick = await showOrderSheet<String>(context, title: s.s('name'), body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          LightCta(label: plan ? 'Open ${type == 'package' ? 'packages' : 'memberships'}' : 'View details', onPressed: () => Navigator.pop(ctx, 'open')),
-          if (!plan) ...[
-            const SizedBox(height: 8),
-            LightCta(label: 'Edit service', onPressed: () => Navigator.pop(ctx, 'edit')),
-            const SizedBox(height: 8),
-            LightCta(key: const ValueKey('toggle-status'), label: s.s('status') == 'active' ? 'Pause bookings' : 'Take bookings again', onPressed: () => Navigator.pop(ctx, 'toggle')),
-          ],
-        ]));
+    final pick = await showActionBox<String>(from, title: s.s('name'), actions: [
+      ('open', plan ? 'Open ${type == 'package' ? 'packages' : 'memberships'}' : 'View details', null),
+      if (!plan) ...[
+        ('edit', 'Edit service', null),
+        ('toggle', s.s('status') == 'active' ? 'Pause bookings' : 'Take bookings again', const ValueKey('toggle-status')),
+      ],
+    ]);
     if (!mounted || pick == null) return;
     if (pick == 'open') return _open(s);
     try {
       final d = await widget.api.serviceDetail(s.s('id'));
       if (!mounted) return;
       if (pick == 'edit') {
-        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ServiceEditScreen(api: widget.api, detail: d, business: widget.business)));
+        await editService(context, widget.api, d, business: widget.business);
       } else {
         await widget.api.saveService({...serviceFields(d), 'is_bookable': !d.active}, key: ServiceApi.newKey());
         if (mounted) showToast(context, d.active ? '${d.name} is paused.' : '${d.name} takes bookings again.');
@@ -182,10 +210,23 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
 
   /// All · Active · Paused · Draft, then the categories: one row that scrolls sideways (the design's chips).
   Widget _chips(ServiceListData d) {
-    Widget chip(String key, String label, bool on, VoidCallback tap) => Padding(
-          padding: const EdgeInsets.only(right: 6),
-          child: ModeChip(label, key: ValueKey('chip-$key'), selected: on, onTap: tap),
-        );
+    var at = 0;
+    Widget chip(String key, String label, bool on, VoidCallback tap) {
+      final i = at++;
+      return Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: Builder(
+          builder: (ctx) => ModeChip(label, key: ValueKey('chip-$key'), selected: on, onTap: () {
+            // the tapped chip glides towards the middle of the row; the list slides in from its side
+            Scrollable.ensureVisible(ctx, alignment: 0.5, duration: const Duration(milliseconds: 360), curve: Curves.easeOutCubic);
+            _slide = i >= _chipAt ? 1 : -1;
+            _chipAt = i;
+            tap();
+          }),
+        ),
+      );
+    }
+
     void set(String status, String cat) {
       _status = status;
       _cat = cat;
@@ -194,6 +235,7 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.none,
       child: Row(children: [
         chip('all', 'All', _status.isEmpty && _cat.isEmpty, () => set('', '')),
         for (final (v, l) in [('active', 'Active'), ('paused', 'Paused'), ('draft', 'Draft')])
@@ -204,14 +246,17 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
   }
 
   Future<void> _add() async {
-    final kind = await showOrderSheet<String>(context, title: 'What are you adding?', body: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Each one opens its own form.', style: inter(13.5, 400, color: kMuted)),
+    final kind = await showOrderSheet<String>(context, title: 'What are you adding?', body: (ctx) => ConstrainedBox(
+        // nine rows: the list scrolls on a short screen
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.72),
+        child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Pick what you are adding, or start from a template you saved.', style: inter(13.5, 400, color: kMuted)),
           const SizedBox(height: 12),
-          for (final (v, n, line) in _addKinds)
+          for (final (v, n, line, icon) in _addKinds)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: InkWell(
-                key: ValueKey('add-$v'),
+                key: ValueKey('add-kind-$v'),
                 borderRadius: BorderRadius.circular(14),
                 onTap: () => Navigator.pop(ctx, v),
                 child: Container(
@@ -222,7 +267,7 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(color: kChipGreen, borderRadius: BorderRadius.circular(12)),
-                      child: Icon(serviceTypeIcon(v), size: 20, color: kGreenText),
+                      child: Icon(icon, size: 20, color: kGreenText),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -237,18 +282,20 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
                 ),
               ),
             ),
-        ]));
+        ]))));
     if (kind == null || !mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => kind == 'package' || kind == 'membership'
-            ? serviceScreen(kind == 'package' ? 'packages' : 'memberships', widget.api, business: widget.business, onNavigate: widget.onNavigate)
-            : ServiceEditScreen(api: widget.api, business: widget.business, fulfilment: kind)));
+        builder: (_) => switch (kind) {
+              'package' || 'membership' => serviceScreen(kind == 'package' ? 'packages' : 'memberships', widget.api, business: widget.business, onNavigate: widget.onNavigate),
+              'templates' => TemplatePickScreen(api: widget.api, business: widget.business),
+              _ => ServiceFormScreen(api: widget.api, business: widget.business, category: kind),
+            }));
     if (mounted) _load();
   }
 
-  /// Services · Inventory; the white highlight slides to the picked tab (the store's segmented tabs).
+  /// Services · Templates · Inventory; the white highlight slides to the picked tab (the store's segmented tabs).
   Widget _tabs(ServiceListData d) {
-    final tabs = [('services', 'Services', '${d.total}'), ('inventory', 'Inventory', (_alerts ?? 0) == 0 ? '' : '$_alerts to do')];
+    final tabs = [('services', 'Services', '${d.total}'), ('templates', 'Templates', ''), ('inventory', 'Inventory', (_alerts ?? 0) == 0 ? '' : '$_alerts')];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(color: kInfoGreyBg, borderRadius: BorderRadius.circular(14)),
@@ -261,17 +308,29 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
         highlight: Container(
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 4, offset: Offset(0, 1))]),
         ),
-        builder: (_, i, on) => Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(tabs[i].$2, style: inter(14.5, on ? 700 : 500, color: on ? kInk : kMuted)),
-          if (tabs[i].$3.isNotEmpty) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(color: on ? kChipGreen : Colors.white, borderRadius: BorderRadius.circular(999)),
-              child: Text(tabs[i].$3, style: inter(11.5, 700, color: on ? kGreenText : kMuted)),
-            ),
-          ],
-        ]),
+        // three tabs on a phone: the label shrinks a little rather than spill over (founder, 4 Nov 2026); Inventory's number is what needs
+        // doing, in amber
+        builder: (_, i, on) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(tabs[i].$2, style: inter(14.5, on ? 700 : 500, color: on ? kInk : kMuted)),
+              if (tabs[i].$3.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Container(
+                  key: ValueKey('tab-count-${tabs[i].$1}'),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: tabs[i].$1 == 'inventory' ? const Color(0xFFFFF1D6) : on ? kChipGreen : Colors.white,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(tabs[i].$3, style: inter(11.5, 700, color: tabs[i].$1 == 'inventory' ? const Color(0xFF7A4E00) : on ? kGreenText : kMuted)),
+                ),
+              ],
+            ]),
+          ),
+        ),
       ),
     );
   }
@@ -293,9 +352,18 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
           : [
               _tabs(d),
               const SizedBox(height: 14),
+              // Services · Templates · Inventory: the new pane slides in from the side of the tab tapped, the old one slides out the other way
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: KeyedSubtree(key: ValueKey('pane-$_tab'), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _tab == 'services' ? _services(d) : [InventoryPane(key: _pane, api: widget.api, business: widget.business, onNavigate: widget.onNavigate, onAlerts: (n) => setState(() => _alerts = n))])),
+                duration: const Duration(milliseconds: 320),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                layoutBuilder: (current, previous) => Stack(alignment: Alignment.topCenter, children: [...previous, ?current]),
+                transitionBuilder: (child, a) {
+                  final incoming = child.key == ValueKey('pane-$_tab');
+                  final from = Offset((incoming ? 0.25 : -0.25) * _paneDir, 0);
+                  return FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: from, end: Offset.zero).animate(a), child: child));
+                },
+                child: KeyedSubtree(key: ValueKey('pane-$_tab'), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: _tab == 'services' ? _services(d) : _tab == 'templates' ? [TemplatesPane(key: _templates, api: widget.api, onUse: _useTemplate)] : [InventoryPane(key: _pane, api: widget.api, business: widget.business, onNavigate: widget.onNavigate, onAlerts: (n) => setState(() => _alerts = n))])),
               ),
             ],
     );
@@ -337,7 +405,10 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
         const SizedBox(height: 12),
         if (d.services.isEmpty)
           OrderCardBox(child: Text(d.total == 0 ? 'No services yet. Tap Add service to create the first one.' : 'No services in this filter.', style: inter(14, 400, color: kMuted))),
-        for (var i = 0; i < d.services.length; i++) Entrance(key: ValueKey('in-${d.services[i].s('id')}'), index: i, child: _row(d.services[i])),
+        for (var i = 0; i < d.services.length; i++)
+          _slides == 0
+              ? Entrance(key: ValueKey('in-${d.services[i].s('id')}'), index: i, child: _row(d.services[i]))
+              : SlideIn(key: ValueKey('slide-$_slides-${d.services[i].s('id')}'), dir: _slide, index: i, child: _row(d.services[i])),
       ];
 
   Widget _pill(String label, Color bg, Color fg) => Container(
@@ -382,7 +453,7 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
               const SizedBox(height: 4),
               Text(s.s('length_label'), style: inter(12.5, 400, color: kMuted)),
             ]),
-            IconButton(key: ValueKey('more-${s.s('id')}'), tooltip: 'More', onPressed: () => _more(s), icon: const Icon(LucideIcons.ellipsisVertical, size: 20, color: kMuted)),
+            Builder(builder: (from) => IconButton(key: ValueKey('more-${s.s('id')}'), tooltip: 'More', onPressed: () => _more(from, s), icon: const Icon(LucideIcons.ellipsisVertical, size: 20, color: kMuted))),
           ]),
         ),
       ),
@@ -391,6 +462,15 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
 }
 
 /// The fields of a saved service, ready to send back with a change.
+/// "Edit service" (from the list's menu and from the service's page): the same form as Add service, filled with everything already
+/// saved (founder, 4 Nov 2026: "it should look similar to making a service form but all the existing details filled").
+Future<void> editService(BuildContext context, ServiceApi api, ServiceDetail d, {String business = ''}) async {
+  final l = await api.listingView(serviceId: d.id);
+  if (!context.mounted) return;
+  await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ServiceFormScreen(api: api, detail: d, listing: {...l.listing, if (l.category != null) 'category': l.category}, business: business)));
+}
+
 Map<String, Object?> serviceFields(ServiceDetail d) => {
       'id': d.id,
       'name': d.name,
@@ -492,7 +572,11 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 DarkCta(
                   label: 'Edit service',
                   onPressed: () async {
-                    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ServiceEditScreen(api: widget.api, detail: d, business: widget.business)));
+                    try {
+                      await editService(context, widget.api, d, business: widget.business);
+                    } catch (e) {
+                      if (context.mounted) showToast(context, e is ServiceApiException ? e.message : e.toString());
+                    }
                     if (mounted) _load();
                   },
                 ),
@@ -705,7 +789,7 @@ class _ServiceEditScreenState extends State<ServiceEditScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label, style: inter(13, 600, color: kMuted)),
           const SizedBox(height: 6),
-          TextField(key: ValueKey('field-$label'), controller: c, keyboardType: keyboard, minLines: lines, maxLines: lines, decoration: InputDecoration(hintText: hint), onChanged: (_) => _key = null),
+          TextField(key: ValueKey('field-$label'), controller: c, keyboardType: keyboard, inputFormatters: numberOnly(keyboard), minLines: lines, maxLines: lines, decoration: InputDecoration(hintText: hint), onChanged: (_) => _key = null),
         ]),
       );
 

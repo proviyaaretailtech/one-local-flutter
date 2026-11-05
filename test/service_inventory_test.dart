@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vinii_pos/service/catalogue_screen.dart';
+import 'package:vinii_pos/service/service_widgets.dart' show SlideIn;
 
 import 'service_screens_test.dart' show FakeRpc, refuse, serviceList, show, staff;
 
@@ -58,14 +59,30 @@ Future<void> _open(WidgetTester t, FakeRpc f, [String section = 'team']) async {
 }
 
 void main() {
+  slidingTests();
   testWidgets('five tiles with counts; Team first; the tab says how many things need doing', (t) async {
     final f = _fake();
     await _open(t, f);
-    for (final s in ['Team', 'Places', 'Tools', 'Materials', 'In care', '8', '2', '2 to do', 'Neha Rao', '5 free now · 2 on a job · 1 off']) {
+    for (final s in ['Team', 'Places', 'Tools', 'Materials', 'In care', '8', '2', 'Neha Rao', '5 free now · 2 on a job · 1 off']) {
       expect(find.text(s), findsWidgets, reason: s);
     }
+    expect(find.descendant(of: find.byKey(const ValueKey('tab-count-inventory')), matching: find.text('2')), findsOneWidget,
+        reason: 'the Inventory tab shows how many things need doing');
     expect(f.of('svc_inventory').length, 1);
     expect(f.of('svc_staff_list').length, 1);
+  });
+
+  testWidgets('on a phone the three tabs fit: no label spills over, even with things to do', (t) async {
+    final f = _fake();
+    t.view.physicalSize = const Size(375, 812);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(home: ServiceCatalogueScreen(api: f.api)));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('tab-inventory')));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull, reason: 'no overflow');
+    expect(find.byKey(const ValueKey('tab-count-inventory')), findsOneWidget);
   });
 
   testWidgets('Places: ready and blocked with the reason; Block asks why and sends it; Take it back in use', (t) async {
@@ -85,6 +102,25 @@ void main() {
     await _tap(t, const ValueKey('inv-p2'));
     await _tap(t, const ValueKey('inv-act-unblock'));
     expect(f.of('svc_inventory_save').last.$2['blocked'], false);
+  });
+
+  testWidgets('a row menu is a small box over the card tapped, not a sheet from the bottom, and stays on a phone screen', (t) async {
+    final f = _fake();
+    t.view.physicalSize = const Size(375, 812);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(home: ServiceCatalogueScreen(api: f.api)));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('tab-inventory')));
+    await t.pumpAndSettle();
+    await _tap(t, const ValueKey('inv-tile-places'));
+    await _tap(t, const ValueKey('inv-p1'));
+    final card = t.getRect(find.byKey(const ValueKey('inv-p1'))), box = t.getRect(find.byKey(const ValueKey('action-box')));
+    expect(box.overlaps(card), isTrue, reason: 'over the card');
+    expect(box.top, greaterThanOrEqualTo(0));
+    expect(box.bottom, lessThanOrEqualTo(812));
+    expect(box.width, lessThan(300), reason: 'a small box, not a full-width sheet');
+    expect(find.byKey(const ValueKey('inv-act-block')), findsOneWidget);
   });
 
   testWidgets('adding a place: name, how many, note, the services it is for', (t) async {
@@ -168,5 +204,26 @@ void main() {
     await t.pumpAndSettle();
     await _tap(t, const ValueKey('inv-tile-care'));
     expect(find.byKey(const ValueKey('inv-add-care')), findsOneWidget);
+  });
+}
+
+// Sliding after a tap (founder, 4 Nov 2026): a chip shows a tick when picked and the list slides in from the side of the chip.
+void slidingTests() {
+  testWidgets('catalogue chips: the picked chip gets a tick; the list slides in from the right, then from the left going back', (t) async {
+    final f = _fake();
+    await show(t, ServiceCatalogueScreen(api: f.api));
+    await t.ensureVisible(find.byKey(const ValueKey('chip-cat-Grooming')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('chip-cat-Grooming')));
+    await t.pumpAndSettle();
+    final slides = t.widgetList<SlideIn>(find.byType(SlideIn));
+    expect(slides, isNotEmpty);
+    expect(slides.first.dir, 1);
+    expect(find.descendant(of: find.byKey(const ValueKey('chip-cat-Grooming')), matching: find.byType(Icon)), findsOneWidget, reason: 'the tick');
+    await t.ensureVisible(find.byKey(const ValueKey('chip-all')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('chip-all')));
+    await t.pumpAndSettle();
+    expect(t.widgetList<SlideIn>(find.byType(SlideIn)).first.dir, -1);
   });
 }

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/devices/devices_api.dart' show sendRawToPrinter;
 import 'package:vinii_pos/devices/printer_router.dart' show printPdfDialog;
+import 'package:vinii_pos/devices/usb_printer.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart';
 import 'package:vinii_pos/tables/bill_api.dart';
 import 'package:vinii_pos/tables/bill_paid_screen.dart';
@@ -156,6 +157,22 @@ List<String> dialogs() {
     return true;
   };
   addTearDown(() => printPdfDialog = before);
+  return got;
+}
+
+/// Replaces the USB printer for one test, on the restaurant's Android app: what went down the cable ([error]: it fails).
+List<String> usbPrinter({Object? error}) {
+  final got = <String>[];
+  final (beforeOn, beforeSend) = (usbPrintingOn, sendUsbPrinter);
+  usbPrintingOn = () => true;
+  sendUsbPrinter = (bytes) async {
+    if (error != null) throw error;
+    got.add(String.fromCharCodes(bytes));
+  };
+  addTearDown(() {
+    usbPrintingOn = beforeOn;
+    sendUsbPrinter = beforeSend;
+  });
   return got;
 }
 
@@ -474,6 +491,51 @@ void main() {
       expect(printed, isEmpty, reason: 'no print dialog for a network printer');
       expect(find.text('Bill printed on Counter printer 1.'), findsOneWidget);
       expect(argsOf(s.calls('pos_print_log').single), {'kind': 'bill', 'outcome': 'printed', 'order_id': o1, 'printer_id': 'p-c1'});
+    });
+
+    // founder, 4-5 Nov 2026: a USB printer is never reached through Android's print screen
+    Map<String, dynamic> usbOne(String type, {int copies = 1}) =>
+        {'id': 'p-u1', 'name': 'Counter USB', 'type': type, 'connection': 'usb', 'paper_mm': 58, 'copies': copies, 'auto_cut': true, 'is_default': true};
+
+    testWidgets('Print bill on a USB receipt printer: ESC/POS down the cable, its copies, no print dialog, 32 characters a line on 58 mm', (t) async {
+      final s = Fake()..printers = [usbOne('receipt', copies: 2)];
+      final usb = usbPrinter();
+      final printed = dialogs();
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      await tapKey(t, 'bill-print');
+      expect(printed, isEmpty);
+      expect(RegExp('Bill No: R5501').allMatches(usb.single).length, 2, reason: 'two copies');
+      expect(usb.single.split('\n').every((l) => l.replaceAll(RegExp(r'\x1b[@aEd].?|\x1d[!V]B?.?'), '').length <= 32), isTrue);
+      expect(find.text('Bill printed on Counter USB (2 copies).'), findsOneWidget);
+      expect(argsOf(s.calls('pos_print_log').single), {'kind': 'bill', 'outcome': 'printed', 'order_id': o1, 'printer_id': 'p-u1'});
+    });
+
+    testWidgets('a single USB printer saved under Kitchen still prints the bill', (t) async {
+      final s = Fake()..printers = [usbOne('kot')];
+      final usb = usbPrinter();
+      final printed = dialogs();
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      await tapKey(t, 'bill-print');
+      expect(printed, isEmpty);
+      expect(usb.single, contains('Bill No: R5501'));
+    });
+
+    testWidgets('Print bill with the USB printer unplugged: says what to check, logged as failed', (t) async {
+      final s = Fake()..printers = [usbOne('receipt')];
+      usbPrinter(error: UsbPrintException('no USB printer found. Check the cable (an OTG adapter on a phone) and that the printer is on'));
+      await show(t, BillPayScreen(env: s.env, tableId: t1, bill: s.bill));
+      await tapKey(t, 'bill-print');
+      expect(find.text('Bill not printed: no USB printer found. Check the cable (an OTG adapter on a phone) and that the printer is on.'), findsOneWidget);
+      expect(argsOf(s.calls('pos_print_log').single), containsPair('outcome', 'failed'));
+    });
+
+    testWidgets('Print after payment (founder, 5 Nov 2026: the test print came but the bill did not): the receipt goes down the cable and is recorded', (t) async {
+      final s = Fake()..printers = [usbOne('receipt')];
+      final usb = usbPrinter();
+      await show(t, BillReceiptScreen(env: s.env, orderId: o1, bill: s.bill, openUrl: s.open));
+      await tapKey(t, 'receipt-print');
+      expect(usb.single, allOf(contains('Bill No: R5501'), contains('PAID')));
+      expect(argsOf(s.calls('rst_receipt_log').single), {'order_id': o1, 'channel': 'print', 'to': 'Counter USB'});
     });
 
     testWidgets('a split bill sends the cashier to the split instead of taking it in one go', (t) async {

@@ -304,6 +304,8 @@ class _AnalyticsCard extends StatelessWidget {
         _Metric(label: tr('Orders completed'), value: count(f.delivered), change: compare ? percentChange(f.delivered, f.prevDelivered) : null),
         const Divider(height: 20, color: kLine),
         _Metric(label: tr('Average order value'), value: f.aov == null ? '—' : rupees(f.aov!.round()), change: compare ? percentChange(f.aov, f.prevAov) : null),
+        if (f.cashShort > 0) ...[const Divider(height: 20, color: kLine), _Metric(label: tr('Cash shortage'), value: rupees(f.cashShort.round()), change: null)],
+        if (f.cashExtra > 0) ...[const Divider(height: 20, color: kLine), _Metric(label: tr('Cash excess'), value: rupees(f.cashExtra.round()), change: null)],
         const SizedBox(height: 16),
         if (f.daily.length > 1) SalesBars(days: f.daily) else const SizedBox.shrink(),
         const SizedBox(height: 16),

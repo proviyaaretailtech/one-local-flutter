@@ -132,6 +132,59 @@ void main() {
     expect(f.calls('dev_printers'), hasLength(2)); // the list again
   });
 
+  testWidgets('add a USB printer: Find printers lists the one on the OTG cable; picking it fills its id and name', (t) async {
+    final f = Fake();
+    final real = findLocalPrinters;
+    findLocalPrinters = () async => [
+          (kind: 'usb', address: 'usb:04b8:0e28', name: 'EPSON TM-T82X'),
+          (kind: 'bluetooth', address: '66:22:B1:0A:7C:01', name: 'RPP02N'),
+        ];
+    addTearDown(() => findLocalPrinters = real);
+    await show(t, DeviceManagerScreen(api: f.api));
+    await tapKey(t, 'printer-add');
+    await tapKey(t, 'printer-conn-usb');
+    await tapKey(t, 'printer-find');
+    expect(find.byKey(const ValueKey('printer-found-66:22:B1:0A:7C:01')), findsNothing); // only USB ones for a USB printer
+    await tapKey(t, 'printer-found-usb:04b8:0e28');
+    expect(find.byKey(const ValueKey('printer-picked')), findsOneWidget);
+    await tapKey(t, 'printer-save');
+    expect(f.body('dev_printer_save'), {
+      'name': 'EPSON TM-T82X', 'printer_type': 'receipt', 'connection': 'usb', 'address': 'usb:04b8:0e28', 'paper_mm': 80, 'auto_cut': true, 'is_default': false, 'model': 'EPSON TM-T82X',
+    });
+  });
+
+  testWidgets('no printer on the cable: says what to check', (t) async {
+    final f = Fake();
+    final real = findLocalPrinters;
+    findLocalPrinters = () async => const [];
+    addTearDown(() => findLocalPrinters = real);
+    await show(t, DeviceManagerScreen(api: f.api));
+    await tapKey(t, 'printer-add');
+    await tapKey(t, 'printer-conn-usb');
+    await tapKey(t, 'printer-find');
+    expect(find.textContaining('No USB printer found'), findsOneWidget);
+  });
+
+  testWidgets('test print, paired Bluetooth printer: a slip straight to it, no dialog; its error is saved when it fails', (t) async {
+    final f = Fake()..printers[1]['address'] = '66:22:B1:0A:7C:01';
+    final sent = <String>[];
+    final real = sendLocalPrinter, realDialog = printDevicePdf;
+    sendLocalPrinter = (address, bytes) async => sent.add(address);
+    printDevicePdf = (pdf, name) async => fail('no print dialog for a picked printer');
+    addTearDown(() {
+      sendLocalPrinter = real;
+      printDevicePdf = realDialog;
+    });
+    await show(t, DeviceManagerScreen(api: f.api));
+    await tapKey(t, 'printer-test-p2');
+    expect(sent, ['66:22:B1:0A:7C:01']);
+    expect(f.body('dev_printer_tested'), {'id': 'p2', 'ok': true, 'note': 'Printed over Bluetooth'});
+
+    sendLocalPrinter = (address, bytes) async => throw StateError('Pair the printer in the phone\'s Bluetooth settings first.');
+    await tapKey(t, 'printer-test-p2');
+    expect(f.body('dev_printer_tested'), {'id': 'p2', 'ok': false, 'note': 'Pair the printer in the phone\'s Bluetooth settings first.'});
+  });
+
   testWidgets('remove asks first', (t) async {
     final f = Fake();
     await show(t, DeviceManagerScreen(api: f.api));

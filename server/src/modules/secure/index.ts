@@ -9,6 +9,7 @@ import * as settingsFiles from './settings_files.ts';
 import * as itemPhotos from './itemPhotos.ts';
 import * as moneyProofs from './moneyProofs.ts';
 import * as adMedia from './adMedia.ts';
+import * as serviceMedia from './serviceMedia.ts';
 import * as packedPhotos from './packedPhotos.ts';
 import { me } from './me.ts';
 import { webhook } from './payments.ts';
@@ -46,6 +47,7 @@ export const secureHandlers = {
   smoney_proof_link: moneyProofs.proofLink,
   ads_media_slot: adMedia.mediaSlot,
   ads_media_link: adMedia.mediaLink,
+  svc_media_slot: serviceMedia.mediaSlot,
   pos_packed_photo_slot: packedPhotos.photoSlot,
   pos_packed_photo_link: packedPhotos.photoLink,
   maps_search: ctx => mapsSearch(ctx),

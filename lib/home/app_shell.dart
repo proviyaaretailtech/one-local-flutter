@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../assistant/ol_bot.dart';
 import '../service/service_nav.dart' show kServiceTabs;
 import '../service/service_ol.dart';
+import '../service/service_tab_bar.dart';
 import '../ui/app_tab_bar.dart';
 import '../ui/motion.dart';
 import '../ui/theme.dart';
@@ -171,11 +172,10 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
         // bar ends with Ol the guide (founder, 3 Nov 2026), who takes you anywhere in the Service POS
         bottomNavigationBar: (_popups[_current] ?? 0) > 0
             ? null
-            : FloatingTabBar(tabs: tabs, onTap: _tap, current: _current, trailing: switch (_kind) {
-              'restaurant' => OlBot(current: _current, onNavigate: _tap),
-              'service' => ServiceOl(current: _current, open: _olOpen),
-              _ => null,
-            }),
+            // the service bar is the interactive one: the picked tab lifts into a bubble over a sliding dip (founder, 4 Nov 2026)
+            : _kind == 'service'
+                ? ServiceTabBar(tabs: tabs, onTap: _tap, current: _current, trailing: ServiceOl(current: _current, open: _olOpen))
+                : FloatingTabBar(tabs: tabs, onTap: _tap, current: _current, trailing: _kind == 'restaurant' ? OlBot(current: _current, onNavigate: _tap) : null),
       ),
     );
   }
