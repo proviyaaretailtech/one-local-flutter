@@ -43,7 +43,7 @@ void main() {
         child: const Text('menu'))));
     await t.tap(find.text('menu'));
     await t.pumpAndSettle();
-    for (final s in ['Priya Kulkarni', 'Service management', 'Money', 'Media', 'Company details', 'Team management', 'Support', 'Sign out']) {
+    for (final s in ['Priya Kulkarni', 'Service management', 'Money', 'Reports', 'Media', 'Company details', 'Team management', 'Support', 'Sign out']) {
       expect(find.text(s), findsWidgets, reason: s);
     }
     for (final s in ['Barcodes', 'Media manager', 'Page Manager', 'One Local Wallet']) {

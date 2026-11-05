@@ -8,6 +8,7 @@ import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/service/bookings_screen.dart';
 import 'package:vinii_pos/service/job_screens.dart';
 import 'package:vinii_pos/service/service_api.dart';
+import 'package:vinii_pos/ui/theme.dart';
 
 import 'helpers.dart';
 
@@ -81,6 +82,17 @@ Future<void> _tap(WidgetTester t, Key key) async {
   await t.pumpAndSettle();
 }
 
+/// New job is in steps (4 Nov 2026): a step bar segment jumps straight to step [n] (0 Customer, 1 Services, 2 Schedule, 3 Team and billing).
+Future<void> _step(WidgetTester t, int n) => _tap(t, ValueKey('job-seg-$n'));
+
+Future<void> _saveJob(WidgetTester t) async {
+  // the last toast floats over the bottom bar, where Save now is
+  t.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar();
+  await t.pumpAndSettle();
+  await t.ensureVisible(find.text('Save job'));
+  await t.tap(find.text('Save job'));
+  await t.pumpAndSettle();
+}
 
 void main() {
   tearDown(HomeNav.reset);
@@ -93,25 +105,33 @@ void main() {
         child: const Text('open'))));
     await t.tap(find.text('open'));
     await t.pumpAndSettle();
-    for (final s in ['New job', 'Customer', 'Services', 'Schedule', 'Tue, 3 Nov 2026', '10:00 AM', '11:00 AM', 'Arrival window', 'Repeating', 'Team', 'Remind me to bill when I close the job']) {
+    for (final s in ['New job', 'Customer', 'Job', 'Step 1 of 4']) {
       expect(find.text(s), findsWidgets, reason: s);
     }
+    expect(find.text('Save job'), findsNothing, reason: 'save is on the last step');
     await t.enterText(find.byKey(const ValueKey('job-name')), 'Job Cust');
     await t.enterText(find.byKey(const ValueKey('job-phone')), '9000000398');
     await t.enterText(find.byKey(const ValueKey('job-address')), 'Flat 2, Pune');
     await t.enterText(find.byKey(const ValueKey('job-title')), 'AC + plumbing');
+    await _step(t, 1);
     await _tap(t, const ValueKey('jmore-ac'));
     await _tap(t, const ValueKey('jmore-pl'));
     await _tap(t, const ValueKey('jmore-pl'));
     expect(find.text('₹1,400'), findsWidgets);
+    await _step(t, 2);
+    for (final s in ['Schedule', 'Tue, 3 Nov 2026', '10:00 AM', '11:00 AM', 'Arrival window', 'Repeating']) {
+      expect(find.text(s), findsWidgets, reason: s);
+    }
     await _tap(t, const ValueKey('window-60'));
     await _tap(t, const ValueKey('repeat-weekly'));
     await _tap(t, const ValueKey('visits-more'));
+    await _step(t, 3);
+    for (final s in ['Team', 'Billing', 'Remind me to bill when I close the job']) {
+      expect(find.text(s), findsWidgets, reason: s);
+    }
     await _tap(t, const ValueKey('team-s2'));
     await _tap(t, const ValueKey('job-remind'));
-    await t.ensureVisible(find.text('Save job'));
-    await t.tap(find.text('Save job'));
-    await t.pumpAndSettle();
+    await _saveJob(t);
     final call = f.calls.singleWhere((c) => c.$1 == 'svc_job_save');
     expect(call.$2, {
       'customer_name': 'Job Cust', 'customer_phone': '9000000398', 'address': 'Flat 2, Pune', 'title': 'AC + plumbing',
@@ -126,18 +146,58 @@ void main() {
     final f = _Fake({'svc_catalogue': _catalogue, 'svc_job_save': (_) => _job(status: 'unscheduled', visitStatus: [])});
     await _show(t, NewJobScreen(api: f.api, today: () => DateTime(2026, 11, 2, 15)));
     await t.enterText(find.byKey(const ValueKey('job-name')), 'Z');
+    await _step(t, 2);
     await _tap(t, const ValueKey('job-later'));
     expect(find.text('Arrival window'), findsNothing);
-    await t.ensureVisible(find.text('Save job'));
-    await t.tap(find.text('Save job'));
-    await t.pumpAndSettle();
+    await _step(t, 3);
+    await _saveJob(t);
     expect(find.text('Add at least one service.'), findsOneWidget);
+    expect(find.text('Step 2 of 4'), findsOneWidget, reason: 'back on Services, where the service is missing');
     expect(f.of('svc_job_save'), isEmpty);
     await _tap(t, const ValueKey('jmore-pl'));
-    await t.ensureVisible(find.text('Save job'));
-    await t.tap(find.text('Save job'));
-    await t.pumpAndSettle();
+    await _step(t, 3);
+    await _saveJob(t);
     expect(f.of('svc_job_save').single, {'customer_name': 'Z', 'lines': [{'menu_item_id': 'pl', 'qty': 1}], 'team': [], 'schedule_later': true, 'remind_invoice': true});
+  });
+
+  testWidgets('new job steps: Step 1 of 4, Next moves on, Back goes back; no name sends you to Customer', (t) async {
+    final f = _Fake({'svc_catalogue': _catalogue});
+    await _show(t, NewJobScreen(api: f.api, today: () => DateTime(2026, 11, 2, 15)));
+    expect(find.text('Step 1 of 4'), findsOneWidget);
+    expect(find.text('Next: Services'), findsWidgets);
+    expect(find.byKey(const ValueKey('job-back')), findsNothing);
+    await _tap(t, const ValueKey('job-next'));
+    expect(find.text('Step 2 of 4'), findsOneWidget);
+    expect(find.byKey(const ValueKey('jmore-ac')), findsOneWidget);
+    await _tap(t, const ValueKey('job-next'));
+    expect(find.text('Step 3 of 4'), findsOneWidget);
+    await _tap(t, const ValueKey('job-back'));
+    expect(find.text('Step 2 of 4'), findsOneWidget);
+    await _step(t, 3);
+    expect(find.text('Step 4 of 4'), findsOneWidget);
+    expect(find.text('Last step: save the job'), findsOneWidget);
+    expect(find.byKey(const ValueKey('job-next')), findsNothing);
+    await _saveJob(t);
+    expect(find.text('Enter the customer\'s name.'), findsOneWidget);
+    expect(find.text('Step 1 of 4'), findsOneWidget);
+    expect(find.byKey(const ValueKey('job-name')), findsOneWidget);
+  });
+
+  testWidgets('new job on a phone (375 x 812): every step fits', (t) async {
+    final f = _Fake({'svc_catalogue': _catalogue});
+    t.view.physicalSize = const Size(375, 812);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(theme: posTheme(), home: NewJobScreen(api: f.api, today: () => DateTime(2026, 11, 2, 15))));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+    for (var i = 1; i < 4; i++) {
+      await t.tap(find.byKey(const ValueKey('job-next')));
+      await t.pumpAndSettle();
+      expect(t.takeException(), isNull, reason: 'step ${i + 1}');
+      expect(find.text('Step ${i + 1} of 4'), findsOneWidget);
+    }
+    expect(find.text('Save job'), findsOneWidget);
   });
 
   testWidgets('job page: who, where, team, every visit with Start; Close asks to bill now and opens the bill', (t) async {

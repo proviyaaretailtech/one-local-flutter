@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../api/app_env.dart';
 import '../api/rpc_client.dart';
 import '../auth/partner_api.dart';
+import '../onboarding/document_picker.dart' show PickedDocument;
 
 /// Error from the service functions: the server's own message plus its code (`version_conflict` = changed on another device).
 class ServiceApiException extends PartnerApiException {
@@ -147,6 +148,15 @@ class ServiceQuote {
   int get bufferMin => (raw['buffer_min'] as num?)?.toInt() ?? 0;
   int get freeCancelHours => (raw['free_cancel_hours'] as num?)?.toInt() ?? 12;
   List<Map<String, dynamic>> get lines => _list(raw['lines']);
+
+  /// The listing has rules or limits about who is coming, or prices per person (4 Nov 2026): ask before booking.
+  bool get partyAsks => raw['party_asks'] == true;
+
+  /// Why this party cannot book, in the listing's words ("Not allowed: Under 8"); null when it can.
+  String? get notAllowed => raw['not_allowed'] as String?;
+
+  /// A rule says this booking needs the owner's approval.
+  String? get needsApproval => raw['needs_approval'] as String?;
 }
 
 class SlotProvider {
@@ -244,6 +254,44 @@ class StaffData extends SvcData {
   List<SvcData> get services => l('services');
   List<SvcData> get locations => l('locations');
   bool get canEdit => b('can_edit');
+}
+
+/// A saved template (`svc_templates`, 3 Nov 2026): what a service needs and its rules, under a name such as "Manicure".
+class ServiceTemplate extends SvcData {
+  const ServiceTemplate(super.raw);
+  String get id => s('id');
+  String get name => s('name');
+  String? get category => so('category');
+  String? get subcategory => so('subcategory');
+  int? get durationMin => raw['duration_min'] == null ? null : i('duration_min');
+  List<Map<String, dynamic>> get requirements => _list(raw['requirements']);
+  List<Map<String, dynamic>> get rules => _list(raw['rules']);
+  String get notes => s('notes');
+  int get usedBy => i('used_by');
+}
+
+/// The business's templates (`svc_template_list`).
+class TemplateListData extends SvcData {
+  const TemplateListData(super.raw);
+  bool get canEdit => b('can_edit');
+  int get total => i('total');
+  List<ServiceTemplate> get templates => l('templates').map((t) => ServiceTemplate(t.raw)).toList();
+  ServiceTemplate? get saved => raw['saved'] == null ? null : ServiceTemplate(m('saved').raw);
+  int get added => i('added');
+  int get updated => i('updated');
+}
+
+/// A listing form's answers and what it picks from (`svc_listing_view`, 3 Nov 2026).
+class ListingData extends SvcData {
+  const ListingData(super.raw);
+  String? get category => so('category');
+  Map<String, dynamic> get listing => (raw['listing'] as Map?)?.cast<String, dynamic>() ?? {};
+  bool get canEdit => b('can_edit');
+  List<SvcData> get places => l('places');
+  List<SvcData> get tools => l('tools');
+  List<SvcData> get materials => l('materials');
+  List<SvcData> get team => l('team');
+  List<SvcData> get branches => l('branches');
 }
 
 /// The catalogue's Inventory tab (`svc_inventory`, 3 Nov 2026): places, tools, materials, customers' items in care, and what needs doing.
@@ -385,9 +433,22 @@ class EntitlementView extends SvcData {
 /// Idempotency-Key so a retried tap never books, charges or saves twice.
 class ServiceApi {
   ServiceApi({http.Client? client, String? baseUrl, String? Function()? accessToken, RpcClient? rpc})
-      : _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken);
+      : _rpc = rpc ?? RpcClient(client: client, baseUrl: baseUrl, accessToken: accessToken),
+        _http = client;
 
   final RpcClient _rpc;
+  final http.Client? _http; // the upload of a banner photo or video straight to storage
+
+  /// A banner photo or video for a service (founder, 4 Nov 2026): a signed slot under this business, then the bytes straight to storage.
+  /// Returns the public link to keep in the listing, and whether it is an image or a video.
+  Future<({String url, String kind})> uploadMedia(PickedDocument d) async {
+    final slot = await _call('svc_media_slot', {'content_type': d.contentType, 'size': d.bytes.length});
+    final put = await (_http ?? http.Client())
+        .put(Uri.parse(slot['upload_url'] as String), headers: {'Content-Type': d.contentType, 'x-upsert': 'true'}, body: d.bytes)
+        .timeout(const Duration(minutes: 5));
+    if (put.statusCode >= 300) throw ServiceApiException(put.statusCode, 'The upload did not finish. Try again.', 'upload');
+    return (url: slot['url'] as String, kind: slot['media_kind'] as String? ?? 'image');
+  }
   static final _rand = Random.secure();
 
   /// A fresh key for one intent (one tap). Keep it and send it again when retrying that same tap.
@@ -413,8 +474,9 @@ class ServiceApi {
   Future<CalendarData> calendar({required String date, String view = 'day', String? locationId, String? staffId, bool withCancelled = false, String? source}) async =>
       CalendarData(await _call('svc_calendar', {'date': date, 'view': view, 'location_id': locationId, 'staff_id': staffId, if (withCancelled) 'with_cancelled': true, 'source': source}));
 
-  Future<ServiceQuote> quote({required String serviceId, List<String> addonIds = const [], String? staffId}) async =>
-      ServiceQuote(await _call('svc_quote', {'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': staffId}));
+  /// [party]: who is coming ({group, guests: [{g, a}]}); [startsAt]: the time picked, for peak prices and time rules.
+  Future<ServiceQuote> quote({required String serviceId, List<String> addonIds = const [], String? staffId, Map<String, Object?>? party, String? startsAt}) async =>
+      ServiceQuote(await _call('svc_quote', {'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': staffId, 'party': party, 'starts_at': startsAt}));
 
   Future<List<SlotProvider>> slots({required String date, required String serviceId, List<String> addonIds = const [], String? staffId}) async {
     final r = await _call('svc_slots', {'date': date, 'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': staffId});
@@ -436,8 +498,10 @@ class ServiceApi {
     String? entitlementId,
     String? serviceAddress,
     String? accessNote,
+    Map<String, Object?>? party,
   }) async =>
       AppointmentView(await _call('svc_book', key: key, {
+        'party': ?party,
         'customer_name': customerName,
         if (customerPhone != null && customerPhone.isNotEmpty) 'customer_phone': customerPhone,
         'service_id': serviceId,
@@ -497,6 +561,29 @@ class ServiceApi {
 
   Future<StaffData> saveProvider(Map<String, Object?> fields, {required String key}) async => StaffData(await _call('svc_provider_save', fields, key: key));
 
+
+
+
+  /// A service report (`svc_report`, 4 Nov 2026): [kind] is sales, services, categories, bookings, staff, payments, dues, discounts or
+  /// cancellations; [from] and [to] are days in the business's time zone.
+  Future<SvcData> report(String kind, {required DateTime from, required DateTime to}) async =>
+      SvcData(await _call('svc_report', {'kind': kind, 'from': _day(from), 'to': _day(to)}));
+
+  static String _day(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  Future<TemplateListData> templates({String q = ''}) async => TemplateListData(await _call('svc_template_list', {if (q.trim().isNotEmpty) 'q': q.trim()}));
+
+  /// Add or change a template ({id?, name, category, subcategory, duration_min, requirements, rules, notes}); `archived: true` deletes it.
+  Future<TemplateListData> saveTemplate(Map<String, Object?> fields, {required String key}) async => TemplateListData(await _call('svc_template_save', fields, key: key));
+
+  /// Templates from Excel: one with the same name is replaced, a new one added.
+  Future<TemplateListData> importTemplates(List<Map<String, Object?>> templates, {required String key}) async =>
+      TemplateListData(await _call('svc_template_import', {'templates': templates}, key: key));
+  /// A listing form: its answers when [serviceId] is given, and the places, tools, materials, team and branches it picks from.
+  Future<ListingData> listingView({String? serviceId}) async => ListingData(await _call('svc_listing_view', {'service_id': serviceId}));
+
+  /// Keeps a service's listing (its category and the form's answers).
+  Future<ListingData> saveListing(String serviceId, String category, Map<String, Object?> listing, {required String key}) async =>
+      ListingData(await _call('svc_listing_save', {'service_id': serviceId, 'category': category, 'listing': listing}, key: key));
   Future<InventoryData> inventory() async => InventoryData(await _call('svc_inventory', {}));
 
   /// Add or change a place, tool or material ({id?, kind, name, qty, ...}); `archived: true` removes it. Manager roles.

@@ -58,7 +58,7 @@ class BookingsScreen extends StatefulWidget {
   /// Opens a map link (tests pass a fake).
   final Future<bool> Function(Uri url)? openUrl;
 
-  /// The view to open on: calendar, list, board or map (the dashboard's Visits tile opens the list, 2 Nov 2026).
+  /// The view to open on: calendar, board or map (the dashboard's Visits tile opens the board). 'list' was removed (4 Nov 2026) and opens the board.
   final String mode;
   @override
   State<BookingsScreen> createState() => _BookingsScreenState();
@@ -68,7 +68,8 @@ class _BookingsScreenState extends State<BookingsScreen> {
   late final ServiceApi _api = widget.api ?? ServiceApi();
   DateTime get _now => (widget.now ?? DateTime.now)();
   late DateTime _date = DateTime(_now.year, _now.month, _now.day);
-  late String _mode = widget.mode; // calendar | list | board | map
+  late String _mode = widget.mode == 'list' ? 'board' : widget.mode; // calendar | board | map
+  String _boardCol = kBoardColumns.first.$1; // on a phone the board shows one status at a time (4 Nov 2026)
   String? _staffId;
   String? _source; // null: all; 'pos': logged offline; 'app': booked online (2 Nov 2026)
   bool _folded = false; // the month view's sheet pulled up: the month folds into the chosen week (2 Nov 2026)
@@ -192,7 +193,6 @@ class _BookingsScreenState extends State<BookingsScreen> {
         if (d == null)
           const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(color: kGreenText)))
         else ...switch (_mode) {
-          'list' => _list(d),
           'board' => _board(d),
           'map' => _map(d),
           _ => _calendar(d),
@@ -214,9 +214,9 @@ class _BookingsScreenState extends State<BookingsScreen> {
           }),
       ];
 
-  static const _modes = [('calendar', 'Calendar'), ('list', 'List'), ('board', 'Board'), ('map', 'Map')];
+  static const _modes = [('calendar', 'Calendar'), ('board', 'Board'), ('map', 'Map')];
 
-  /// Calendar · List · Board · Map; the white highlight slides to the picked view (the store's segmented tabs, founder's reference video).
+  /// Calendar · Board · Map (List removed, founder 4 Nov 2026); the white highlight slides to the picked view (the store's segmented tabs, founder's reference video).
   Widget _modeTabs() => Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(color: kInfoGreyBg, borderRadius: BorderRadius.circular(14)),
@@ -237,28 +237,38 @@ class _BookingsScreenState extends State<BookingsScreen> {
   /// The calendar is the planner (founder, 2 Nov 2026): the month with the chosen day's bookings; pulled up, the week with the day by the hour.
   List<Widget> _calendar(CalendarData d) => [_monthGrid(d)];
 
-  List<Widget> _list(CalendarData d) => [
-        _weekStrip(d, arrows: true),
-        const SizedBox(height: 10),
-        SvcSectionHead(_isToday ? 'Today' : _dayLabel(_date), count: '${_dayItems.length} ${_dayItems.length == 1 ? 'booking' : 'bookings'}'),
-        if (_dayItems.isEmpty) _empty(),
-        for (final a in _dayItems) _card(a),
-      ];
-
-  List<Widget> _board(CalendarData d) => [
-        _weekStrip(d, arrows: true),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 340,
-          // five columns: all built at once, so a card can be found in any column without scrolling to it
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+  /// The board (4 Nov 2026: fits a phone). Wide: the five status columns side by side, filling the width.
+  /// Phone: the statuses as pills with counts; the picked one's bookings below, full width.
+  List<Widget> _board(CalendarData d) {
+    List<AppointmentView> of(List<String> states) => _dayItems.where((a) => states.contains(a.status)).toList();
+    return [
+      _weekStrip(d, arrows: true),
+      const SizedBox(height: 10),
+      LayoutBuilder(builder: (_, c) {
+        if (c.maxWidth >= 700) {
+          return IntrinsicHeight(
             child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              for (final (name, states) in kBoardColumns) _column(name, _dayItems.where((a) => states.contains(a.status)).toList()),
+              for (final (i, (name, states)) in kBoardColumns.indexed)
+                Expanded(child: Padding(padding: EdgeInsets.only(right: i == kBoardColumns.length - 1 ? 0 : 10), child: _column(name, of(states)))),
             ]),
-          ),
-        ),
-      ];
+          );
+        }
+        final (name, states) = kBoardColumns.firstWhere((x) => x.$1 == _boardCol, orElse: () => kBoardColumns.first);
+        final items = of(states);
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final (n, st) in kBoardColumns)
+              ModeChip('$n ${of(st).length}', key: ValueKey('board-tab-$n'), selected: n == name, onTap: () => setState(() => _boardCol = n)),
+          ]),
+          const SizedBox(height: 12),
+          Column(key: ValueKey('column-$name'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (items.isEmpty) OrderCardBox(child: Text('Nothing here on this day.', style: inter(14, 400, color: kMuted))),
+            for (final a in items) _card(a),
+          ]),
+        ]);
+      }),
+    ];
+  }
 
   List<Widget> _map(CalendarData d) {
     final jobs = _dayItems.where((a) => a.serviceAddress.isNotEmpty && a.status != 'cancelled').toList();
@@ -671,8 +681,6 @@ class _BookingsScreenState extends State<BookingsScreen> {
 
   Widget _column(String name, List<AppointmentView> items) => Container(
         key: ValueKey('column-$name'),
-        width: 220,
-        margin: const EdgeInsets.only(right: 12),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(color: kInfoGreyBg, borderRadius: BorderRadius.circular(16)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -685,13 +693,9 @@ class _BookingsScreenState extends State<BookingsScreen> {
             ),
           ]),
           const SizedBox(height: 10),
-          Expanded(
-            child: items.isEmpty
-                ? Text('Nothing here', style: inter(13, 400, color: kMuted))
-                : ListView(children: [for (final a in items) Padding(padding: const EdgeInsets.only(bottom: 8), child: _block(a))]),
-          ),
+          if (items.isEmpty) Text('Nothing here', style: inter(13, 400, color: kMuted)),
+          for (final a in items) Padding(padding: const EdgeInsets.only(bottom: 8), child: _block(a)),
         ]),
       );
 
-  Widget _empty() => OrderCardBox(child: Text('No bookings on this day. Tap New booking to add one.', style: inter(14, 400, color: kMuted)));
 }

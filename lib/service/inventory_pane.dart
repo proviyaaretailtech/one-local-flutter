@@ -262,7 +262,9 @@ class InventoryPaneState extends State<InventoryPane> {
         onTap: _openTeam,
       );
 
-  Widget _row(_Section s, SvcData r) {
+  Widget _row(_Section s, SvcData r) => Builder(builder: (from) => _rowCard(from, s, r));
+
+  Widget _rowCard(BuildContext from, _Section s, SvcData r) {
     final care = s.key == 'care';
     return _card(
       key: ValueKey('inv-${r.s('id')}'),
@@ -273,7 +275,7 @@ class InventoryPaneState extends State<InventoryPane> {
       services: r.s('services'),
       bar: r.raw['bar'] == null ? null : r.i('bar'),
       tone: r.s('tone'),
-      onTap: () => _actions(s, r),
+      onTap: () => _actions(from, s, r),
     );
   }
 
@@ -286,7 +288,7 @@ class InventoryPaneState extends State<InventoryPane> {
     return n != null && n > 0 ? n : null;
   }
 
-  Future<void> _actions(_Section s, SvcData r) async {
+  Future<void> _actions(BuildContext from, _Section s, SvcData r) async {
     final edit = _inv!.canEdit;
     final options = <(String, String)>[
       if (s.key == 'tools') ...[
@@ -304,16 +306,9 @@ class InventoryPaneState extends State<InventoryPane> {
       if (s.key != 'care' && edit) ...[('edit', 'Edit'), ('remove', 'Remove')],
     ];
     if (options.isEmpty) return;
-    final pick = await showOrderSheet<String>(context, title: s.key == 'care' ? '${r.s('item')} · ${r.s('tag')}' : r.s('name'), body: (ctx) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final (v, l) in options) ...[
-              LightCta(key: ValueKey('inv-act-$v'), label: l, onPressed: () => Navigator.pop(ctx, v)),
-              const SizedBox(height: 8),
-            ],
-          ],
-        ));
+    final pick = await showActionBox<String>(from, over: true, title: s.key == 'care' ? '${r.s('item')} · ${r.s('tag')}' : r.s('name'), actions: [
+      for (final (v, l) in options) (v, l, ValueKey('inv-act-$v')),
+    ]);
     if (pick == null || !mounted) return;
     final id = r.s('id');
     switch (pick) {
@@ -363,6 +358,7 @@ class InventoryPaneState extends State<InventoryPane> {
           key: ValueKey('inv-$key'),
           controller: c,
           keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+              inputFormatters: number ? numberOnly(const TextInputType.numberWithOptions(decimal: true)) : null,
           decoration: InputDecoration(labelText: label, hintText: hint),
         ),
       );

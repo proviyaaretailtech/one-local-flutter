@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/service/availability_screen.dart';
 import 'package:vinii_pos/service/catalogue_screen.dart';
+import 'package:vinii_pos/service/service_form.dart';
 import 'package:vinii_pos/service/history_screen.dart';
 import 'package:vinii_pos/service/plans_screen.dart';
 import 'package:vinii_pos/service/service_api.dart';
@@ -331,18 +332,23 @@ void main() {
       expect(s.of('svc_service_list').last.$2['q'], 'LOC');
     });
 
-    testWidgets('Add service asks what is being added; each kind opens its own form', (t) async {
-      final s = FakeRpc({'svc_service_list': (_) => serviceList(), 'svc_plan_list': (_) => {'plans': [], 'counts': {}, 'can_edit': true}});
+    testWidgets('Add service: the six categories, Add from existing templates, packages and memberships; a category opens the form with it picked', (t) async {
+      final s = FakeRpc({'svc_service_list': (_) => serviceList(), 'svc_template_list': (_) => {'templates': [], 'total': 0, 'can_edit': true},
+        'svc_listing_view': (_) => {'listing': {}, 'can_edit': true, 'places': [], 'tools': [], 'materials': [], 'team': [], 'branches': []}});
       await show(t, ServiceCatalogueScreen(api: s.api));
       await t.tap(find.byKey(const ValueKey('add-service')));
       await t.pumpAndSettle();
-      for (final text in ['What are you adding?', 'Each one opens its own form.', 'Appointment', 'Event', 'On-location', 'On-demand', 'Package', 'Membership', 'You go to the customer']) {
+      expect(find.text('Dining'), findsNothing, reason: 'no Dining in the Service POS');
+      for (final text in ['What are you adding?', 'Events', 'Activities', 'Play', 'Service', 'Stay', 'Add from existing templates', 'Package', 'Membership',
+        'Books: court, turf or table by the hour']) {
         expect(find.text(text), findsWidgets, reason: text);
       }
-      await t.tap(find.byKey(const ValueKey('add-on_location')));
+      await t.ensureVisible(find.byKey(const ValueKey('add-kind-play')));
+      await t.tap(find.byKey(const ValueKey('add-kind-play')));
       await t.pumpAndSettle();
-      expect(find.byType(ServiceEditScreen), findsOneWidget);
-      expect(t.widget<ServiceEditScreen>(find.byType(ServiceEditScreen)).fulfilment, 'on_location');
+      expect(find.byType(ServiceFormScreen), findsOneWidget);
+      expect(t.widget<ServiceFormScreen>(find.byType(ServiceFormScreen)).category, 'play');
+      expect(find.text('Play'), findsWidgets, reason: 'the category is already picked');
     });
 
     testWidgets('Inventory tab: the team, who is free, and the services each person does', (t) async {
@@ -362,11 +368,35 @@ void main() {
       expect(find.text('Add service'), findsOneWidget);
     });
 
+    testWidgets('the row menu near the bottom of a phone opens above its button and stays on the screen', (t) async {
+      final s = FakeRpc({'svc_service_list': (_) => serviceList(), 'svc_service_detail': (_) => serviceDetail()});
+      t.view.physicalSize = const Size(375, 520);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(MaterialApp(home: ServiceCatalogueScreen(api: s.api)));
+      await t.pumpAndSettle();
+      final more = find.byKey(const ValueKey('more-s2'));
+      await t.ensureVisible(more);
+      await t.pumpAndSettle();
+      await t.tap(more);
+      await t.pumpAndSettle();
+      final box = t.getRect(find.byKey(const ValueKey('action-box')));
+      expect(box.top, greaterThanOrEqualTo(0));
+      expect(box.bottom, lessThanOrEqualTo(520));
+      expect(box.left, greaterThanOrEqualTo(16));
+      expect(find.text('Edit service'), findsOneWidget);
+    });
+
     testWidgets('pausing a service sends the whole service back with is_bookable false and a key', (t) async {
       final s = FakeRpc({'svc_service_list': (_) => serviceList(), 'svc_service_detail': (_) => serviceDetail(), 'svc_service_save': (_) => serviceDetail()});
       await show(t, ServiceCatalogueScreen(api: s.api));
       await t.tap(find.byKey(const ValueKey('more-s1')));
       await t.pumpAndSettle();
+      // a small box beside the button, not a sheet from the bottom (5 Nov 2026)
+      expect(find.byKey(const ValueKey('action-box')), findsOneWidget);
+      final button = t.getRect(find.byKey(const ValueKey('more-s1'))), box = t.getRect(find.byKey(const ValueKey('action-box')));
+      expect((box.top - button.bottom).abs(), lessThan(20), reason: 'right under the button');
+      expect(box.right, closeTo(button.right, 20));
       await t.tap(find.byKey(const ValueKey('toggle-status')));
       await t.pumpAndSettle();
       final save = s.of('svc_service_save').single;
@@ -385,6 +415,52 @@ void main() {
         '15 min after each appointment', '₹200 at booking', 'Free until 12 hours before', '10-minute grace period', 'Appointment only', 'Edit service']) {
         expect(find.text(text), findsWidgets, reason: text);
       }
+    });
+
+    testWidgets('Edit service opens the same form as Add service, filled in; saving keeps what the form does not show', (t) async {
+      final s = FakeRpc({
+        'svc_service_detail': (_) => serviceDetail(),
+        'svc_listing_view': (_) => {'listing': {}, 'can_edit': true, 'places': [], 'tools': [], 'materials': [], 'team': [], 'branches': []},
+        'svc_template_list': (_) => {'templates': [], 'can_edit': true},
+        'svc_service_save': (_) => serviceDetail(),
+        'svc_listing_save': (_) => {'listing': {}, 'can_edit': true, 'places': [], 'tools': [], 'materials': [], 'team': [], 'branches': []},
+      });
+      await show(t, ServiceDetailScreen(api: s.api, id: 's1'));
+      await t.ensureVisible(find.text('Edit service'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Edit service'));
+      await t.pumpAndSettle();
+      expect(find.byType(ServiceFormScreen), findsOneWidget);
+      expect(find.byType(ServiceEditScreen), findsNothing);
+      expect(t.widget<TextField>(find.byKey(const ValueKey('sf-name'))).controller!.text, 'Precision haircut');
+      // an older service's category (Grooming) is not one of the five: its tile is tapped once, then the subcategory
+      await t.ensureVisible(find.byKey(const ValueKey('sf-cat-service')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('sf-cat-service')));
+      await t.pumpAndSettle();
+      for (final (box, opt) in [('sf-sub_group', 'Salon'), ('sf-subcategory', "Men's salon")]) {
+        await t.ensureVisible(find.byKey(ValueKey(box)));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(ValueKey(box)));
+        await t.pumpAndSettle();
+        await t.ensureVisible(find.byKey(ValueKey('opt-$opt')).last);
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(ValueKey('opt-$opt')).last);
+        await t.pumpAndSettle();
+      }
+      // through the steps: Booking shows the length it has; Save draft is on the last step
+      for (var i = 0; i < 5; i++) {
+        await t.tap(find.byKey(const ValueKey('sf-next')));
+        await t.pumpAndSettle();
+        if (i == 0) expect(find.text('45 min'), findsWidgets, reason: 'the length it has');
+      }
+      await t.ensureVisible(find.byKey(const ValueKey('sf-draft')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('sf-draft')));
+      await t.pumpAndSettle();
+      final saved = s.of('svc_service_save').single.$2;
+      expect(saved['id'], 's1');
+      expect(saved['min_notice_min'], 120, reason: 'kept from the service');
     });
 
     testWidgets('no Edit button for a role that cannot edit', (t) async {

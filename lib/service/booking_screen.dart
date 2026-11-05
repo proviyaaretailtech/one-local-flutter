@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../orders/order_widgets.dart';
@@ -8,6 +7,7 @@ import '../ui/mobile_input.dart';
 import '../ui/theme.dart';
 import 'service_api.dart';
 import 'service_widgets.dart';
+import 'step_form.dart';
 
 const _months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const _days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -42,10 +42,39 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
   bool _policyShown = true;
   bool _busy = false;
   String _address = '', _access = '';
+  // who is coming (4 Nov 2026): asked when the listing has rules or limits about it, or prices per person
+  final Map<String, int> _who = {'women': 0, 'men': 0, 'seniors': 0, 'teens': 0, 'kids': 0, 'under8': 0};
+  String? _group;
+  static const _whoRows = [
+    ('women', 'Women', '18 to 59'),
+    ('men', 'Men', '18 to 59'),
+    ('seniors', 'Seniors', '60 and above'),
+    ('teens', 'Teens', '12 to 17'),
+    ('kids', 'Children', '8 to 11'),
+    ('under8', 'Children', 'under 8'),
+  ];
+
+  int get _people => _who.values.fold(0, (a, b) => a + b);
+
+  /// Who is coming, as the server reads it; null until anyone is added.
+  Map<String, Object?>? get _party => _people == 0
+      ? null
+      : {
+          'group': ?_group,
+          'guests': [
+            for (var i = 0; i < _who['women']!; i++) {'g': 'woman', 'a': '18_59'},
+            for (var i = 0; i < _who['men']!; i++) {'g': 'man', 'a': '18_59'},
+            for (var i = 0; i < _who['seniors']!; i++) {'g': 'any', 'a': '60_plus'},
+            for (var i = 0; i < _who['teens']!; i++) {'g': 'any', 'a': '12_17'},
+            for (var i = 0; i < _who['kids']!; i++) {'g': 'any', 'a': '8_11'},
+            for (var i = 0; i < _who['under8']!; i++) {'g': 'any', 'a': 'under_8'},
+          ],
+        };
   List<EntitlementView> _ents = const [];
   EntitlementView? _ent;
   String? _key; // one key per booking intent: kept for a retry, dropped when anything the person chose changes
   int _seq = 0;
+  int _step = 0;
 
   @override
   void initState() {
@@ -72,7 +101,7 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     if (s == null) return;
     final mine = ++_seq;
     try {
-      final q = await _api.quote(serviceId: s.id, addonIds: _addons.toList(), staffId: _provider?.id);
+      final q = await _api.quote(serviceId: s.id, addonIds: _addons.toList(), staffId: _provider?.id, party: _party, startsAt: _slot == null ? null : '${_slot!['starts_at']}');
       if (!mounted || mine != _seq) return;
       setState(() {
         _quote = q;
@@ -192,6 +221,7 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     _slot = null;
     _resource = null;
     _changed();
+    _requote(); // the provider is now chosen after the add-ons (steps, 4 Nov 2026): price again with them
   }
 
   Future<void> _pickDate() async {
@@ -213,6 +243,7 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     if (picked == null) return;
     _slot = picked;
     _changed();
+    _requote(); // the time can change the price (peak, weekend) and which rules fit
   }
 
   Future<void> _pickResource() async {
@@ -230,16 +261,16 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
   bool get _ready => _name.isNotEmpty && _service != null && _provider != null && _slot != null && _quote != null;
 
   Future<void> _confirm() async {
+    // something missing on an earlier step: open that step, then say what (4 Nov 2026)
+    for (var i = 0; i < 3; i++) {
+      final why = _missing(i);
+      if (why == null) continue;
+      setState(() => _step = i);
+      showToast(context, why);
+      return;
+    }
     if (!_ready) {
-      showToast(context, _name.isEmpty ? 'Add the customer first.' : (_service == null ? 'Choose a service.' : (_provider == null ? 'Choose a provider.' : 'Choose a date and time.')));
-      return;
-    }
-    if (_service!.fulfilment == 'on_location' && _address.trim().isEmpty) {
-      showToast(context, 'Add the customer\'s address for an on-location job.');
-      return;
-    }
-    if (_phone.isNotEmpty && _phone.length != 10) {
-      showToast(context, 'Enter a 10-digit mobile number.');
+      showToast(context, 'The price is still loading. Try again.');
       return;
     }
     final q = _quote!;
@@ -268,6 +299,7 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
         entitlementId: _ent?.id,
         serviceAddress: _address,
         accessNote: _access,
+        party: _party,
       );
       if (!mounted) return;
       showToast(context, '${booked.displayNo} booked.');
@@ -283,7 +315,10 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     } on ServiceApiException catch (e) {
       if (mounted) {
         showToast(context, e.message);
-        if (e.status == 409) _slot = null; // the time was taken: choose again
+        if (e.status == 409) {
+          _slot = null; // the time was taken: choose again on the Time step
+          _step = 2;
+        }
         if (e.status < 500) _key = null; // a refusal is final; after a server fault the same key is kept so the retry cannot book twice
       }
     } catch (e) {
@@ -293,43 +328,175 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     }
   }
 
+  // The booking in steps like every Service POS form (founder, 4 Nov 2026): who, what, when, then the server's price and Confirm.
+  static const _steps = ['Customer', 'Service', 'Time', 'Review and book'];
+
+  /// Why Next must wait on [step], or null when it can go on. The same checks as Confirm, step by step.
+  String? _missing(int step) => switch (step) {
+        0 => _name.isEmpty ? 'Add the customer first.' : (_phone.isNotEmpty && _phone.length != 10 ? 'Enter a 10-digit mobile number.' : null),
+        1 => _service == null
+            ? 'Choose a service.'
+            : (_quote?.partyAsks == true && _people == 0 ? 'Say who is coming.' : _quote?.notAllowed),
+        2 => _provider == null
+            ? 'Choose a provider.'
+            : (_slot == null ? 'Choose a date and time.' : (_service?.fulfilment == 'on_location' && _address.trim().isEmpty ? 'Add the customer\'s address for an on-location job.' : null)),
+        _ => null,
+      };
+
+  bool _canAdvance(int step) {
+    final why = _missing(step);
+    if (why != null) showToast(context, why);
+    return why == null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final q = _quote;
+    return StepFormPage(
+      title: widget.business.isEmpty ? 'New booking' : 'New booking · ${widget.business}',
+      keyPrefix: 'book',
+      steps: _steps,
+      step: _step,
+      onStep: (i) => setState(() => _step = i),
+      canAdvance: _canAdvance,
+      lastLine: 'Last step: review and book',
+      body: _stepBody(),
+      above: q == null
+          ? null
+          : Row(children: [
+              Expanded(child: Text(q.deposit > 0 ? 'Advance ${rupees(q.deposit)} · rest at the studio' : 'Pay at the studio', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(13.5, 500, color: kMuted))),
+              const SizedBox(width: 8),
+              Text(rupees(q.total), key: const ValueKey('book-total'), style: inter(18, 800)),
+            ]),
+      finish: DarkCta(key: const ValueKey('book-confirm'), label: q == null ? 'Confirm booking' : (q.deposit > 0 ? 'Confirm booking · ${rupees(q.deposit)} advance' : 'Confirm booking'), busy: _busy, onPressed: _confirm),
+    );
+  }
+
+  List<Widget> _stepBody() {
+    final q = _quote;
     final s = _service;
-    return Scaffold(
-      backgroundColor: kBg,
-      body: Column(children: [
-        ServiceTopBar(business: widget.business, initials: widget.initials, onBack: () => Navigator.maybePop(context)),
-        Expanded(
-          child: ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 16), children: [
-            Text('Appointment Booking', style: inter(30, 700, height: 1.15)),
-            const SizedBox(height: 8),
-            Text(s?.fulfilment == 'on_location' ? 'New job · Provider visits the customer' : 'New appointment · Customer visits the studio', style: inter(13.5, 400, color: kMuted)),
-            if (_error != null) ...[const SizedBox(height: 16), OrderCardBox(child: Text(_error!, style: inter(13.5, 500)))],
-            const SizedBox(height: 22),
-            _heading('Customer & service'),
-            _field('Customer', _name.isEmpty ? 'Add customer' : (_phone.isEmpty ? _name : '$_name · +91 $_phone'), _name.isEmpty, _pickCustomer, key: 'customer'),
-            _field('Service', s == null ? 'Choose a service' : '${s.name} · ${rupees(s.price)} · ${s.durationMin} min', s == null, _pickService, key: 'service'),
-            if (_ents.isNotEmpty) _field('Package', _ent == null ? 'Do not use a package' : _ent!.name, _ent == null, _pickEntitlement, key: 'package'),
-            _field('Provider', _provider == null ? 'Choose a provider' : (_provider!.title.isEmpty ? _provider!.name : '${_provider!.name} · ${_provider!.title}'), _provider == null, _pickProvider, key: 'provider'),
-            const SizedBox(height: 6),
-            _heading('Schedule & location'),
-            _field('Date', _dateLabel(_date), false, _pickDate, key: 'date'),
-            _field('Time', _slot == null ? 'Choose a time' : '${_slot!['range_label']}', _slot == null, _pickTime, key: 'time'),
-            if (s?.fulfilment == 'on_location')
-              _field('Customer address', _address.isEmpty ? 'Add the address' : [_address, if (_access.isNotEmpty) _access].join(' · '), _address.isEmpty, _pickAddress, key: 'address')
-            else
-              _field('Business location', _locationText(), false, (_cat?.resources.isEmpty ?? true) ? null : _pickResource, key: 'location'),
-            if (_ent != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('${_ent!.name} credit is applied when the booking is made; the advance is then taken only on what is left.', style: inter(12.5, 400, color: kMuted))),
-            if (s != null && s.addons.isNotEmpty) ...[const SizedBox(height: 4), _addonsCard(s, q)],
-            if (q != null) ...[const SizedBox(height: 14), _summary(q)] else if (_quoteError != null) ...[const SizedBox(height: 14), OrderCardBox(child: Text(_quoteError!, style: inter(13.5, 500)))],
-            if (_policyShown) ...[const SizedBox(height: 14), _policy(q?.freeCancelHours ?? _cat?.freeCancelHours ?? 12, q?.deposit ?? _cat?.deposit ?? 0)],
-            const SizedBox(height: 16),
-            DarkCta(label: q == null ? 'Confirm booking' : (q.deposit > 0 ? 'Confirm booking · ${rupees(q.deposit)} advance' : 'Confirm booking'), busy: _busy, onPressed: _confirm),
+    return switch (_step) {
+      0 => [
+          Text(s?.fulfilment == 'on_location' ? 'New job · Provider visits the customer' : 'New appointment · Customer visits the studio', style: inter(13.5, 400, color: kMuted)),
+          if (_error != null) ...[const SizedBox(height: 16), OrderCardBox(child: Text(_error!, style: inter(13.5, 500)))],
+          const SizedBox(height: 18),
+          _field('Customer', _name.isEmpty ? 'Add customer' : (_phone.isEmpty ? _name : '$_name · +91 $_phone'), _name.isEmpty, _pickCustomer, key: 'customer'),
+        ],
+      1 => [
+          const SizedBox(height: 10),
+          _field('Service', s == null ? 'Choose a service' : '${s.name} · ${rupees(s.price)} · ${s.durationMin} min', s == null, _pickService, key: 'service'),
+          if (_ents.isNotEmpty) _field('Package', _ent == null ? 'Do not use a package' : _ent!.name, _ent == null, _pickEntitlement, key: 'package'),
+          if (_ent != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('${_ent!.name} credit is applied when the booking is made; the advance is then taken only on what is left.', style: inter(12.5, 400, color: kMuted))),
+          if (s != null && s.addons.isNotEmpty) ...[const SizedBox(height: 4), _addonsCard(s, q)],
+          if (q != null && q.partyAsks) ...[const SizedBox(height: 4), _whoCard(q)],
+        ],
+      2 => [
+          const SizedBox(height: 10),
+          _field('Provider', _provider == null ? 'Choose a provider' : (_provider!.title.isEmpty ? _provider!.name : '${_provider!.name} · ${_provider!.title}'), _provider == null, _pickProvider, key: 'provider'),
+          _field('Date', _dateLabel(_date), false, _pickDate, key: 'date'),
+          _field('Time', _slot == null ? 'Choose a time' : '${_slot!['range_label']}', _slot == null, _pickTime, key: 'time'),
+          if (s?.fulfilment == 'on_location')
+            _field('Customer address', _address.isEmpty ? 'Add the address' : [_address, if (_access.isNotEmpty) _access].join(' · '), _address.isEmpty, _pickAddress, key: 'address')
+          else
+            _field('Business location', _locationText(), false, (_cat?.resources.isEmpty ?? true) ? null : _pickResource, key: 'location'),
+        ],
+      _ => [
+          const SizedBox(height: 10),
+          _recap(),
+          if (q?.notAllowed != null) ...[const SizedBox(height: 10), _refusal(q!.notAllowed!)],
+          if (q?.needsApproval != null)
+            Padding(padding: const EdgeInsets.only(top: 8), child: Text('Needs your approval: ${q!.needsApproval}. It is noted on the booking.', style: inter(12.5, 500, color: kMuted))),
+          if (q != null) ...[const SizedBox(height: 14), _summary(q)] else if (_quoteError != null) ...[const SizedBox(height: 14), OrderCardBox(child: Text(_quoteError!, style: inter(13.5, 500)))],
+          if (_policyShown) ...[const SizedBox(height: 14), _policy(q?.freeCancelHours ?? _cat?.freeCancelHours ?? 12, q?.deposit ?? _cat?.deposit ?? 0)],
+        ],
+    };
+  }
+
+  /// Who is coming (4 Nov 2026): a count for each kind of guest and the group type; the price and the rules follow it.
+  Widget _whoCard(ServiceQuote q) => OrderCardBox(
+        key: const ValueKey('book-who'),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Who is coming', style: inter(15, 700)),
+          Text('This listing prices or limits by who comes.', style: inter(12.5, 400, color: kMuted)),
+          const SizedBox(height: 8),
+          for (final (k, label, line) in _whoRows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(children: [
+                Expanded(child: Text.rich(TextSpan(children: [TextSpan(text: label, style: inter(14, 600)), TextSpan(text: '  $line', style: inter(12, 400, color: kMuted))]))),
+                IconButton(
+                  key: ValueKey('who-$k-less'),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _who[k]! == 0 ? null : () => setState(() { _who[k] = _who[k]! - 1; _key = null; _requote(); }),
+                  icon: const Icon(Icons.remove_circle_outline, size: 22),
+                ),
+                SizedBox(width: 24, child: Text('${_who[k]}', key: ValueKey('who-$k'), textAlign: TextAlign.center, style: inter(15, 700))),
+                IconButton(
+                  key: ValueKey('who-$k-more'),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _people >= 200 ? null : () => setState(() { _who[k] = _who[k]! + 1; _key = null; _requote(); }),
+                  icon: const Icon(Icons.add_circle_outline, size: 22, color: kGreenText),
+                ),
+              ]),
+            ),
+          const SizedBox(height: 6),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (final gtype in const ['Single', 'Couple', 'Family', 'Group'])
+              ChoiceChip(
+                key: ValueKey('who-group-$gtype'),
+                label: Text(gtype),
+                selected: _group == gtype,
+                showCheckmark: false,
+                labelStyle: inter(12.5, 600, color: _group == gtype ? kGreenText : kInk),
+                selectedColor: kChipGreen,
+                backgroundColor: Colors.white,
+                side: BorderSide(color: _group == gtype ? kGreenText : kLine),
+                onSelected: (on) => setState(() { _group = on ? gtype : null; _key = null; _requote(); }),
+              ),
           ]),
-        ),
-        PosBottomNav(active: 'bill', onTap: (id) => id == 'bill' ? null : Navigator.of(context).maybePop()),
+          if (q.notAllowed != null) ...[const SizedBox(height: 10), _refusal(q.notAllowed!)],
+        ]),
+      );
+
+  /// The listing's own reason this party cannot book.
+  Widget _refusal(String why) => Container(
+        key: const ValueKey('book-not-allowed'),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: const Color(0xFFFDECEA), borderRadius: BorderRadius.circular(10)),
+        child: Row(children: [
+          const Icon(Icons.block, size: 18, color: kError),
+          const SizedBox(width: 8),
+          Expanded(child: Text(why, style: inter(13.5, 600, color: kError))),
+        ]),
+      );
+
+  /// What was chosen on the steps before, one line each; a line opens its step again.
+  Widget _recap() {
+    final s = _service, p = _provider;
+    final rows = [
+      ('Customer', _name.isEmpty ? '-' : (_phone.isEmpty ? _name : '$_name · +91 $_phone'), 0),
+      ('Service', s == null ? '-' : [s.name, if (_ent != null) _ent!.name].join(' · '), 1),
+      ('Provider', p?.name ?? '-', 2),
+      ('When', '${_dateLabel(_date)}${_slot == null ? '' : ' · ${_slot!['range_label']}'}', 2),
+      if (s?.fulfilment == 'on_location') ('Address', _address.isEmpty ? '-' : _address, 2) else ('Location', _locationText(), 2),
+    ];
+    return OrderCardBox(
+      radius: 18,
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Booking', style: inter(17, 700)),
+        const SizedBox(height: 6),
+        for (final (k, v, step) in rows)
+          InkWell(
+            onTap: () => setState(() => _step = step),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(width: 90, child: Text(k, style: inter(13.5, 400, color: kMuted))),
+                Expanded(child: Text(v, style: inter(14, 600))),
+              ]),
+            ),
+          ),
       ]),
     );
   }
@@ -338,14 +505,6 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     final parts = [if (widget.location.isNotEmpty) widget.location, if (_resource != null) '${_resource!['name']}'];
     return parts.isEmpty ? 'Studio' : parts.join(' · ');
   }
-
-  Widget _heading(String t) => Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: Row(children: [
-          Expanded(child: Text(t, style: inter(17, 700))),
-          Container(width: 28, height: 28, decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: kLine))),
-        ]),
-      );
 
   Widget _field(String label, String value, bool placeholder, VoidCallback? onTap, {required String key}) => Padding(
         padding: const EdgeInsets.only(bottom: 16),
@@ -365,7 +524,7 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
                 alignment: Alignment.centerLeft,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(color: const Color(0xFFF7F8F6), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE3E8E3))),
-                child: ExcludeSemantics(child: Text(value, overflow: TextOverflow.ellipsis, style: inter(15, 400, color: placeholder ? kMuted : kInk))),
+                child: ExcludeSemantics(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(15, 400, color: placeholder ? kMuted : kInk))),
               ),
             ),
           ),

@@ -11,6 +11,7 @@ import 'bills_screen.dart';
 import 'service_api.dart';
 import 'service_media.dart';
 import 'service_money.dart';
+import 'service_reports.dart';
 
 // The Service POS frame (founder's sketch, 2 Nov 2026), common to every kind of service: the bottom bar and the side menu. It looks like
 // the store POS (same floating bar and side nav); only the tabs and rows are the service's own.
@@ -45,7 +46,7 @@ String? serviceTabFor(String id) => switch (id) {
       _ => null,
     };
 
-/// The service side menu (founder's sketch): Profile & manage account (the top of the menu), Service management, Money, Media, Company
+/// The service side menu (founder's sketch): Profile & manage account (the top of the menu), Service management, Money, Reports, Media, Company
 /// details, Team management, Support, Sign out. Same look as the store's side nav.
 Future<void> showServiceSideNav(BuildContext context, {required String name, String? email, required VoidCallback onSignOut}) {
   VoidCallback? hook(HomeRoute? r) => r == null ? null : () => r(context);
@@ -58,6 +59,8 @@ Future<void> showServiceSideNav(BuildContext context, {required String name, Str
       SideNavEntry(LucideIcons.slidersHorizontal, 'Service management', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ManageScreen(api: ServiceApi())))),
       // Money, as in the store's side nav (founder, 2 Nov 2026): the service's own wallet, money from services, cash drawer and dues
       SideNavEntry(LucideIcons.wallet, 'Money', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ServiceMoneyScreen()))),
+      // Reports (founder, 4 Nov 2026): the restaurant's Reports, counted and worded for a service business
+      SideNavEntry(LucideIcons.chartColumn, 'Reports', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ServiceReportsScreen()))),
       // Media, as the store's Media manager (2 Nov 2026): the business's service photos and standard media
       SideNavEntry(LucideIcons.images, 'Media', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ServiceMediaScreen()))),
       SideNavEntry(LucideIcons.building2, 'Company details', hook(HomeNav.outletInfo)),
