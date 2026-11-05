@@ -41,3 +41,19 @@ export async function guestWeb(request: Request): Promise<Response> {
   if (!page) return new Response('The guest menu is not built on this server yet.', { status: 503, headers: headers('text/plain; charset=utf-8') });
   return new Response(new Uint8Array(page), { status: 200, headers: headers('text/html; charset=utf-8') });
 }
+
+// The brand page of a restaurant (0654): onelocal.co/<store link> (and /r/<store link>) answers the same guest page, which reads the store
+// link from its own address. Names OneLocal itself uses can never be a store link (the database refuses them too: gx__reserved_slug).
+export const RESERVED_SLUGS = new Set(['privacy', 'terms', 'delete-account', 'join', 'auth', 'api', 'm', 't', 'b', 'r', 'guest', 'rpc', 'health',
+  'admin', 'partner', 'partners', 'app', 'static', 'assets', 'www', 'help', 'support', 'about', 'login', 'signup', 'signin', 'onelocal',
+  'source', 'ol-api', 'webhooks', 'download', 'blog', 'careers', 'contact', 'master', 'rider', 'riders', 'store', 'stores']);
+const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
+
+/** GET /<store link>, /r/<store link> */
+export async function brandPage(request: Request, params: Record<string, string>): Promise<Response> {
+  const slug = (params.slug ?? '').toLowerCase();
+  if (!SLUG.test(slug) || RESERVED_SLUGS.has(slug)) return fail(404, 'Not found');
+  const page = await file(join(guestWebDir(), 'index.html'));
+  if (!page) return new Response('The guest menu is not built on this server yet.', { status: 503, headers: headers('text/plain; charset=utf-8') });
+  return new Response(new Uint8Array(page), { status: 200, headers: headers('text/html; charset=utf-8') });
+}

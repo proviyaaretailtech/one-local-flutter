@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
+import '../experience/experience_api.dart';
+import '../experience/experience_screen.dart';
 import '../home/home_nav.dart';
 import '../inventory/inventory_api.dart' show Facts;
 import '../money/rst_money.dart' show RmDarkCard, kRmDeep, kRmDeepSoft, kRmLime, kRmRadius, rmCard, rs, RmRings;
@@ -18,8 +20,8 @@ import 'restaurant_more_screen.dart';
 
 // Page Manager for the restaurant, in the store's design (founder, 29 Oct 2026: "make a page manager for restaurant POS as shown"):
 // the page's readiness card with Edit store page and Share, Grow your sales (Ads, Offers & promotions) and Your page (Shop profile, Store
-// page, Business hours, Delivery & pickup, Store link & QR, Reviews). Everything opens the storefront screens the store already uses;
-// the data is sf_settings_get, sf_builder_get and menu_link_get.
+// page, Business hours, Delivery & pickup, Store link & QR, Reviews, Guest experience). Everything opens the storefront screens the store
+// already uses, and Guest experience its builder; the data is sf_settings_get, sf_builder_get and menu_link_get.
 
 /// One thing the page needs before it is ready, and whether it is there.
 typedef PageCheck = (String label, bool done);
@@ -61,9 +63,10 @@ String deliveryLine(Facts d) {
 String _num(num v) => v == v.roundToDouble() ? '${v.round()}' : '$v';
 
 class RstPageManagerScreen extends StatefulWidget {
-  const RstPageManagerScreen({super.key, this.api, this.linkApi, this.today, this.linkBase});
+  const RstPageManagerScreen({super.key, this.api, this.linkApi, this.experienceApi, this.today, this.linkBase});
   final StorefrontApi? api;
   final MenuLinkApi? linkApi;
+  final ExperienceApi? experienceApi;
 
   /// Tests fix "today" and the link's address.
   final DateTime? today;
@@ -316,6 +319,9 @@ class _RstPageManagerScreenState extends State<RstPageManagerScreen> {
       _tile('pm-delivery', 'Delivery & pickup', deliveryLine(s.m('delivery')), LucideIcons.truck, const Color(0xFFF1E8FF), const Color(0xFF7C3AED), () => _open(DeliveryScreen(api: _api))),
       _tile('pm-link', 'Store link & QR', slug == null ? 'Choose your link' : '/$slug', LucideIcons.qrCode, const Color(0xFFEDEEF1), const Color(0xFF475569), () => _open(MenuLinkScreen(api: _links, linkBase: widget.linkBase))),
       _tile('pm-reviews', 'Reviews', 'What customers say', LucideIcons.star, const Color(0xFFFFE4EC), const Color(0xFFE11D48), reviews == null ? null : () => _openRoute(reviews)),
+      // the branded page guests see from a table QR or the link: look, welcome screen, blocks, publish (specs/guest-experience-builder)
+      _tile('pm-guest', 'Guest experience', 'Look, welcome screen, pre-orders', LucideIcons.sparkles, const Color(0xFFFFF4D6), const Color(0xFFB7791F),
+          () => _open(ExperienceScreen(api: widget.experienceApi, storefront: _api, linkBase: widget.linkBase))),
     ];
     return [
       for (var i = 0; i < tiles.length; i += 2)

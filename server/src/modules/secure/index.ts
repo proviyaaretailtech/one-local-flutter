@@ -1,5 +1,5 @@
 // The secret-bearing handlers. The gateway calls one of these instead of a database function ONLY when the work needs a secret
-// (PARTNER_PII_KEY, ANTHROPIC_API_KEY, REMOVE_BG_API_KEY, GOOGLE_MAPS_API_KEY), the storage service or a third party. Each receives the user id from the verified token and the checked body;
+// (PARTNER_PII_KEY, ANTHROPIC_API_KEY, REMOVE_BG_API_KEY, GOOGLE_MAPS_API_KEY, GROQ_API_KEY), the storage service or a third party. Each receives the user id from the verified token and the checked body;
 // it must never trust the client for who the user is. They may use the service-role key; nothing else on the gateway does.
 import type { Handler } from '../../http.ts';
 import * as pii from './pii.ts';
@@ -16,6 +16,7 @@ import { describeDish } from './menuAi.ts';
 import { removeBackground } from './removeBg.ts';
 import { smsHook } from './smsHook.ts';
 import { mapsPlace, mapsReverse, mapsSearch } from './maps.ts';
+import * as experienceAi from './experienceAi.ts';
 
 export type SecureCtx = { request: Request; userId: string; args: Record<string, unknown> };
 export type SecureHandler = (ctx: SecureCtx) => Promise<unknown>;
@@ -50,6 +51,11 @@ export const secureHandlers = {
   maps_search: ctx => mapsSearch(ctx),
   maps_place: ctx => mapsPlace(ctx),
   maps_reverse: ctx => mapsReverse(ctx),
+  // guest page publish: rules in the database, then the AI wording check (GROQ_API_KEY) for what the rules let through (0654)
+  gx_publish: experienceAi.publish,
+  // Create with AI (fills the draft through the caller's gx_draft_save) and Import menu (a proposal only), both GROQ_API_KEY; spec part 2 D
+  gx_ai_create: ctx => experienceAi.aiCreate(ctx),
+  menu_ai_import: ctx => experienceAi.menuImport(ctx),
 } satisfies Record<string, SecureHandler>;
 
 /** Real HTTP endpoints (no user token): provider webhooks. */

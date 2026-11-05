@@ -1,5 +1,5 @@
 // Page Manager for the restaurant: the readiness card (x/7 ready, what is still missing, published or not), Grow your sales and Your page,
-// each opening the storefront screen it names; Share copies the link only once the page is live.
+// each opening the storefront screen it names (Guest experience opens its builder); Share copies the link only once the page is live.
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/api/rpc_client.dart';
+import 'package:vinii_pos/experience/experience_api.dart';
 import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/inventory/inventory_api.dart' show Facts;
 import 'package:vinii_pos/restaurant/rst_page_manager.dart';
@@ -41,6 +42,7 @@ void main() {
         'menu_link_get' => link,
         'sf_offer_list' => {'offers': []},
         'sf_ad_list' => {'ads': []},
+        'gx_builder_get' => {'draft_version': 0, 'business': {'name': 'Niks Cafe'}, 'blockers': [], 'history': []},
         _ => <String, dynamic>{},
       };
       return http.Response(jsonEncode(answer), 200, headers: {'content-type': 'application/json'});
@@ -56,7 +58,8 @@ void main() {
   tearDown(HomeNav.reset);
 
   Future<void> show(WidgetTester t) async {
-    t.view.physicalSize = const Size(1080, 2400);
+    // tall enough for every tile (seven since Guest experience): the readiness card stays built while the test scrolls to a tile
+    t.view.physicalSize = const Size(1080, 3000);
     t.view.devicePixelRatio = 2;
     addTearDown(t.view.reset);
     final r = rpc();
@@ -66,7 +69,7 @@ void main() {
       home: Builder(
         builder: (c) => TextButton(
           onPressed: () => Navigator.of(c).push(MaterialPageRoute(
-              builder: (_) => RstPageManagerScreen(api: StorefrontApi(rpc: r), linkApi: MenuLinkApi(rpc: r), today: DateTime(2026, 10, 29), linkBase: 'https://m.test'))),
+              builder: (_) => RstPageManagerScreen(api: StorefrontApi(rpc: r), linkApi: MenuLinkApi(rpc: r), experienceApi: ExperienceApi(rpc: r), today: DateTime(2026, 10, 29), linkBase: 'https://m.test'))),
           child: const Text('go'),
         ),
       ),
@@ -95,7 +98,7 @@ void main() {
     expect(find.text('57%'), findsOneWidget);
     expect(find.text('Still to add: Logo, Banner, Store link'), findsOneWidget);
     expect(find.text('Not published yet'), findsOneWidget);
-    for (final s in ['Grow your sales', 'Ads', 'Offers & promotions', 'Your page', 'Shop profile', 'Store page', 'Business hours', 'Delivery & pickup', 'Store link & QR', 'Reviews']) {
+    for (final s in ['Grow your sales', 'Ads', 'Offers & promotions', 'Your page', 'Shop profile', 'Store page', 'Business hours', 'Delivery & pickup', 'Store link & QR', 'Reviews', 'Guest experience']) {
       expect(find.text(s), findsOneWidget, reason: s);
     }
     expect(t.widget<Text>(find.byKey(const ValueKey('pm-hours-sub'))).data, 'Today 12:00 – 23:00');
@@ -135,7 +138,7 @@ void main() {
   testWidgets('each card opens its screen and the page reads again on the way back', (t) async {
     HomeNav.reviews = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => const Scaffold(body: Text('reviews page'))));
     await show(t);
-    for (final (key, fn) in [('pm-edit', 'sf_builder_get'), ('pm-ads', 'sf_ad_list'), ('pm-offers', 'sf_offer_list'), ('pm-profile', 'sf_settings_get'), ('pm-hours', 'sf_settings_get'), ('pm-delivery', 'sf_settings_get'), ('pm-link', 'menu_link_get'), ('pm-reviews', null)]) {
+    for (final (key, fn) in [('pm-edit', 'sf_builder_get'), ('pm-ads', 'sf_ad_list'), ('pm-offers', 'sf_offer_list'), ('pm-profile', 'sf_settings_get'), ('pm-hours', 'sf_settings_get'), ('pm-delivery', 'sf_settings_get'), ('pm-link', 'menu_link_get'), ('pm-reviews', null), ('pm-guest', 'gx_builder_get')]) {
       await t.ensureVisible(find.byKey(ValueKey(key)));
       await t.pumpAndSettle();
       calls.clear();
