@@ -10,9 +10,11 @@ import '../api/net_guard.dart' show errorSentence;
 import '../api/rpc_client.dart';
 import '../inventory/inventory_api.dart' show Facts;
 import '../outlets/outlet_scope.dart';
+import '../outlets/outlets_api.dart' show outletIsRestaurant;
 import '../ui/theme.dart' show showToast;
 import 'devices_api.dart';
 import 'print_service.dart' show receiptPdf;
+import 'usb_printer.dart';
 
 // Printing that prints (founder, 4 Nov 2026: kitchen tickets never printed while the app said "sent to the printer"; Print KOT and the
 // receipt's Print did nothing; the printers saved in Devices were never used). The phone or tablet on the shop's Wi-Fi prints: a server
@@ -21,7 +23,8 @@ import 'print_service.dart' show receiptPdf;
 //   Network (LAN)          ESC/POS bytes on the printer's port (9100 unless the address names another), its copies, cut when auto cut is on
 //   Phone's print service  the phone's print dialog
 //   Bluetooth / USB        picked with Find printers in the store's Devices: ESC/POS straight to it from the Android app (LocalPrinters.kt).
-//                          Not picked (the restaurant's Devices has no picker yet), or in a browser: said plainly, nothing pretends to print
+//   USB, not picked        the restaurant's Android app: ESC/POS down the cable (usb_printer.dart, 5 Nov 2026)
+//   Anything else          Bluetooth not picked, or in a browser: said plainly, nothing pretends to print
 //   a browser              cannot open a socket to a printer: the print dialog, and it says so
 // Every message says what happened; "printed" only once the bytes were written to the printer.
 
@@ -210,7 +213,8 @@ class PrinterRouter {
       loadError = errorSentence(e);
     }
     final business = t?.business ?? const Facts({});
-    final p = t?.forJob('receipt');
+    // a restaurant's one USB printer saved under another job still prints the bill: Android's print dialog cannot reach it
+    final p = t?.forJob('receipt') ?? (usbPrintingOn() ? t?.printers.where((x) => x.connection == 'usb' && x.type != 'label').firstOrNull : null);
     final PrintResult r;
     if (p == null) {
       final why = t == null ? 'The printers could not be loaded ($loadError)' : 'No receipt printer set up';
@@ -258,6 +262,14 @@ class PrinterRouter {
           final why = e is StateError ? e.message : '$e';
           return PrintResult('failed', '$what not printed on ${p.name}: $why', printerId: p.id, printer: p.name, detail: why);
         }
+      case 'usb' when usbPrintingOn():
+        final one = escPos();
+        try {
+          await sendUsbPrinter([for (var i = 0; i < p.copies; i++) ...one]);
+          return PrintResult('printed', '$what printed on ${p.name}${p.copies > 1 ? ' (${p.copies} copies)' : ''}.', printerId: p.id, printer: p.name);
+        } on UsbPrintException catch (e) {
+          return PrintResult('failed', '$what not printed: ${e.message}.', printerId: p.id, printer: p.name, detail: e.message);
+        }
       case 'bluetooth' || 'usb':
         return PrintResult('failed', '$what not printed on ${p.name}. ${notSupported(p.connection)}', printerId: p.id, printer: p.name, detail: '${p.connection} printers are not supported yet');
       default:
@@ -278,8 +290,9 @@ class PrinterRouter {
 String _cap(String s) => s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
 
 /// The sentence for a printer this build cannot reach (Bluetooth, USB).
-String notSupported(String connection) =>
-    '${connection == 'usb' ? 'USB' : 'Bluetooth'} printers are not supported yet. In Settings → Devices, set it to Network (Wi-Fi / LAN) or Phone\'s print service.';
+String notSupported(String connection) => connection == 'usb' && outletIsRestaurant()
+    ? 'USB printers print from the Android app, not from a browser.'
+    : '${connection == 'usb' ? 'USB' : 'Bluetooth'} printers are not supported yet. In Settings → Devices, set it to Network (Wi-Fi / LAN) or Phone\'s print service.';
 
 /// Why a network printer did not take the job, as a few words after "did not answer".
 String noAnswer(Object e) {

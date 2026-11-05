@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/devices/devices_api.dart' show sendRawToPrinter;
+import 'package:vinii_pos/devices/usb_printer.dart';
 import 'package:vinii_pos/settings/rst_devices_screen.dart';
 import 'package:vinii_pos/ui/theme.dart';
 
@@ -243,6 +244,48 @@ void main() {
     expect(f.calls.where((c) => c.$1 == 'rst_printer_tested'), isEmpty);
     expect(find.text('Test page not printed: Hot kitchen at 192.168.1.50 did not answer (connection refused). Not marked as tested.'), findsOneWidget);
     expect(f.last('pos_print_log'), allOf(containsPair('outcome', 'failed'), containsPair('detail', '192.168.1.50 did not answer (connection refused)')));
+  });
+
+  // founder, 4 Nov 2026: "whenever i try to print the test print it is not connecting to any printer" (a USB printer)
+  Future<(Fake, List<List<int>>)> usbTest(WidgetTester t, {Object? error, bool on = true}) async {
+    final f = Fake(printers: [_printer('p1', 'Counter USB', 'receipt', conn: 'usb', dflt: true)]);
+    final usb = <List<int>>[];
+    final (beforeOn, beforeSend, beforePdf) = (usbPrintingOn, sendUsbPrinter, printTestPagePdf);
+    usbPrintingOn = () => on;
+    sendUsbPrinter = (bytes) async {
+      if (error != null) throw error;
+      usb.add(bytes);
+    };
+    printTestPagePdf = (pdf, name) async => fail('a USB printer gets no print dialog');
+    addTearDown(() {
+      usbPrintingOn = beforeOn;
+      sendUsbPrinter = beforeSend;
+      printTestPagePdf = beforePdf;
+    });
+    await show(t, RstDevicesScreen(api: f.api));
+    await tapKey(t, 'printer-test-p1');
+    return (f, usb);
+  }
+
+  testWidgets('Test print on a USB printer in the restaurant app: the slip goes down the cable and cuts; marked tested', (t) async {
+    final (f, usb) = await usbTest(t);
+    expect(String.fromCharCodes(usb.single), contains('OneLocal test print'));
+    expect(usb.single.sublist(usb.single.length - 4), [0x1D, 0x56, 0x42, 0x00], reason: 'auto cut');
+    expect(f.last('rst_printer_tested'), {'id': 'p1'});
+    expect(f.last('pos_print_log'), {'kind': 'test', 'outcome': 'printed', 'printer_id': 'p1'});
+  });
+
+  testWidgets('Test print on a USB printer not plugged in: says what to check, not marked tested', (t) async {
+    final (f, _) = await usbTest(t, error: UsbPrintException('no USB printer found. Check the cable (an OTG adapter on a phone) and that the printer is on'));
+    expect(find.textContaining('no USB printer found'), findsOneWidget);
+    expect(f.calls.where((c) => c.$1 == 'rst_printer_tested'), isEmpty);
+    expect(f.last('pos_print_log'), containsPair('outcome', 'failed'));
+  });
+
+  testWidgets('Test print on a USB printer anywhere else (a browser, the store): nothing goes out, said plainly', (t) async {
+    final (f, usb) = await usbTest(t, on: false);
+    expect(usb, isEmpty);
+    expect(f.calls.where((c) => c.$1 == 'rst_printer_tested'), isEmpty);
   });
 
   testWidgets('Test print on a Bluetooth printer: not supported yet, said plainly; nothing printed or marked', (t) async {
