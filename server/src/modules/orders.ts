@@ -337,7 +337,7 @@ export function shapeCard(r: Row) {
   const missing = Number(f?.units_missing ?? 0);
   const damages = [refunded > 0 ? `${rupees(refunded)} issued` : null, missing ? plural(missing, 'missing unit') : null].filter(Boolean).join(' · ') || 'None';
   return {
-    id: r.id, display_no: r.display_no, channel_label: channelLabel(r), customer: r.customer_name || 'Guest', placed_at: `${dayYear(r.created_at)} · ${time(r.created_at)}`,
+    id: r.id, display_no: r.display_no, channel_label: channelLabel(r), channel: r.channel, created_at: r.created_at, customer: r.customer_name || 'Guest', placed_at: `${dayYear(r.created_at)} · ${time(r.created_at)}`,
     status: cancelled ? 'cancelled' : completed ? 'completed' : 'pending', status_label: cancelled ? 'Cancelled' : completed ? 'Completed' : 'Pending',
     total, items: `${plural(Number(r.lines), 'line')} · ${plural(units, 'unit')}`, payment_status: payStatus, payment_mode: mode,
     delivery_status: delivery, delivery_time: when, refund_damages: damages,
