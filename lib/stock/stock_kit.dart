@@ -1,3 +1,4 @@
+import '../home/home_nav.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -181,4 +182,13 @@ class StockPageButton extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// A store counts pieces, packs and boxes whole: half a bottle cannot be taken off the shelf. Weights and liquids may have decimals.
+/// Restaurant and service kitchens keep their own way of counting.
+bool halfOfAWholeUnit(num n, String unit) {
+  final kind = HomeNav.shell?.kind;
+  if (kind == 'restaurant' || kind == 'service') return false;
+  const whole = {'pc', 'pcs', 'piece', 'pieces', 'no', 'nos', 'unit', 'units', 'box', 'boxes', 'pack', 'packs', 'packet', 'packets', 'bottle', 'bottles', 'can', 'cans', 'jar', 'jars', 'dozen'};
+  return n != n.truncate() && whole.contains(unit.trim().toLowerCase());
 }

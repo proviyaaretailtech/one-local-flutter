@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vinii_pos/money/store_money.dart';
+import 'package:vinii_pos/stock/stock_kit.dart' show halfOfAWholeUnit;
 import 'package:vinii_pos/ui/theme.dart';
 
 // Store Money's Close day is the one close (0665): it warns about unpaid bills, refuses an unreadable count, can be reopened, and a drawer that does not
@@ -61,6 +62,7 @@ Future<void> tapKey(WidgetTester t, String key) async {
 }
 
 void main() {
+  wholeUnits();
   testWidgets('Close day says what is still unpaid and will not take an unreadable count', (t) async {
     final f = Fake();
     await show(t, f);
@@ -99,5 +101,14 @@ void main() {
     expect(f.calls['smoney_opening_count'], containsPair('counted_minor', 95000));
     expect(find.text('Shortage at opening'), findsOneWidget);
     expect(find.byKey(const ValueKey('count-opening')), findsNothing);
+  });
+}
+
+void wholeUnits() {
+  test('a store counts pieces whole; weights may have decimals', () {
+    expect(halfOfAWholeUnit(1.5, 'pc'), isTrue);
+    expect(halfOfAWholeUnit(2, 'pc'), isFalse);
+    expect(halfOfAWholeUnit(1.5, 'kg'), isFalse);
+    expect(halfOfAWholeUnit(0.5, 'Box'), isTrue);
   });
 }

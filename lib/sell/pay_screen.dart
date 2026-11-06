@@ -34,6 +34,7 @@ class _SplitPart {
   String method;
   final amount = TextEditingController();
   final tendered = TextEditingController();
+  final reference = TextEditingController();
 }
 
 class _PayScreenState extends State<PayScreen> {
@@ -66,6 +67,7 @@ class _PayScreenState extends State<PayScreen> {
     for (final p in _parts) {
       p.amount.dispose();
       p.tendered.dispose();
+      p.reference.dispose();
     }
     super.dispose();
   }
@@ -211,11 +213,15 @@ class _PayScreenState extends State<PayScreen> {
       showToast(context, 'The parts add up to ${rupees(_splitSum)} but ${rupees(_total)} is due.');
       return;
     }
+    if (_parts.any((p) => p.method != 'cash' && p.reference.text.trim().isEmpty)) {
+      showToast(context, 'Enter the UPI reference or card approval code for every part that is not cash.');
+      return;
+    }
     final order = await _ensurePlaced();
     _payKey ??= OrdersApi.newKey();
     final parts = [
       for (final p in _parts)
-        {'method': p.method, 'amount': num.parse(p.amount.text.trim()), if (p.method == 'cash' && num.tryParse(p.tendered.text.trim()) != null) 'tendered': num.parse(p.tendered.text.trim())},
+        {'method': p.method, 'amount': num.parse(p.amount.text.trim()), if (p.method == 'cash' && num.tryParse(p.tendered.text.trim()) != null) 'tendered': num.parse(p.tendered.text.trim()), if (p.method != 'cash') 'reference': p.reference.text.trim()},
     ];
     final v = await env.sell.splitPay(order.id, parts, version: order.version, key: _payKey!);
     if (mounted) _done(v);
@@ -484,7 +490,7 @@ class _PayScreenState extends State<PayScreen> {
         const SizedBox(height: 4),
         Text('Total due ${rupees(_total)}. Add 2 to 4 parts; they must add up to the total.', style: inter(13, 400, color: kMuted)),
         const SizedBox(height: 10),
-        for (var i = 0; i < _parts.length; i++)
+        for (var i = 0; i < _parts.length; i++) ...[
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Row(children: [
@@ -513,6 +519,17 @@ class _PayScreenState extends State<PayScreen> {
               ),
             ]),
           ),
+          if (_parts[i].method != 'cash')
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextField(
+                key: ValueKey('split-reference-$i'),
+                controller: _parts[i].reference,
+                maxLength: 40,
+                decoration: InputDecoration(counterText: '', isDense: true, hintText: _parts[i].method == 'upi' ? tr('UPI reference') : tr('Card approval code')),
+              ),
+            ),
+        ],
         Row(children: [
           if (_parts.length < 4) TextButton.icon(onPressed: () {
             _parts.add(_SplitPart('upi'));

@@ -110,6 +110,7 @@ class _AdjustStockScreenState extends State<AdjustStockScreen> {
     final item = _item, n = num.tryParse(_qty.text.trim());
     if (item == null) return showToast(context, 'Choose a product first.');
     if (n == null || n <= 0) return showToast(context, 'Enter how many.');
+    if (halfOfAWholeUnit(n, item.s('unit'))) return showToast(context, 'Enter a whole number: this is counted in ${item.s('unit')}.');
     final places = _places;
     final bin = _binId ?? (places.isEmpty ? null : places.first.$1);
     if (_kind == 'remove' && bin == null) return showToast(context, 'There is no stock of this product to remove.');

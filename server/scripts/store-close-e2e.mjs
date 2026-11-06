@@ -129,6 +129,25 @@ try {
     return sql(`select count(*) from payments where order_id='${o}'`) === '1';
   })());
 
+  // ---- customers on bills are on file (0666)
+  const P = newOrg('p', 'Retail');
+  const P1 = await staff(P.org, 'org_owner', 'p1');
+  const milk = item(P.org, 'Milk', 50);
+  r = await api(P1, 'POST', '/pos-orders/checkout', { lines: [{ menu_item_id: milk, qty: 1 }], method: 'cash', tendered: 50, customer_name: 'Sachin C S', customer_phone: '9881396282' }, k());
+  ok('a bill with a customer number is paid', r.s === 200, r);
+  let cu = await rpc(P1, 'cust_list');
+  ok('the customer is on file, with the name split', cu.j.total === 1 && cu.j.items?.[0]?.first_name === 'Sachin', cu.j);
+  ok('the bill points at them', sql(`select count(*) from orders where organization_id='${P.org}' and pos_customer_id is not null`) === '1');
+  r = await api(P1, 'POST', '/pos-orders/hold', { lines: [{ menu_item_id: milk, qty: 1 }], customer_name: 'S', customer_phone: '9881396282' }, k());
+  cu = await rpc(P1, 'cust_list');
+  ok('a second bill with the same number adds no second customer', r.s === 200 && cu.j.total === 1, cu.j);
+  sql(`insert into orders(organization_id,location_id,channel,status,subtotal,total,order_no,display_no,customer_name,customer_phone) values ('${P.org}','${P.loc}','pickup','in_billing',10,10,9003,'P-9003','Bad','123')`);
+  cu = await rpc(P1, 'cust_list');
+  ok('a bad number makes no customer, and the bill is still saved', cu.j.total === 1 && sql(`select count(*) from orders where organization_id='${P.org}' and display_no='P-9003'`) === '1', cu.j);
+  const RC = newOrg('rc', 'Restaurant');
+  sql(`insert into orders(organization_id,location_id,channel,status,subtotal,total,order_no,display_no,customer_name,customer_phone) values ('${RC.org}','${RC.loc}','pickup','in_billing',10,10,9002,'R-9002','Guest','9881396283')`);
+  ok('a restaurant bill makes no customer here', sql(`select count(*) from pos_customers where organization_id='${RC.org}'`) === '0');
+
   // ---- 5. stock adjustments
   const solo = newOrg('a', 'Retail');
   const SOLO = await staff(solo.org, 'org_owner', 'solo');

@@ -72,6 +72,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     };
   }
 
+  /// The bills that brought money in, what they kept, and the unpaid ones apart: the count and the amount are about the same bills.
+  String _countLine(List<Receipt> rows) {
+    final taken = rows.where((r) => r.paid > 0).toList();
+    final unpaid = rows.length - taken.length;
+    return '${taken.length}${_more ? '+' : ''} ${taken.length == 1 ? 'order' : 'orders'} · ${rupees(taken.fold<num>(0, (s, r) => s + r.paid - r.refunded))}${unpaid > 0 ? ' · $unpaid unpaid' : ''}';
+  }
+
   String get _spanText {
     final (a, b) = _span;
     return a == b ? fmtDay(a) : '${a.day} ${_mon(a)}${a.year == b.year ? '' : ' ${a.year}'} – ${fmtDay(b)}';
@@ -215,7 +222,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               Expanded(child: Text(_spanText, key: const ValueKey('hist-span'), style: inter(15, 700, color: kMuted))),
               if (rows != null)
                 Text(
-                  '${rows.length}${_more ? '+' : ''} ${rows.length == 1 ? 'order' : 'orders'} · ${rupees(rows.fold<num>(0, (s, r) => s + r.paid - r.refunded))}',
+                  _countLine(rows),
                   key: const ValueKey('hist-count'),
                   style: inter(14, 400, color: kMuted),
                 ),
