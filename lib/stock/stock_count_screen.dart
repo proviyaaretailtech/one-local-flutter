@@ -110,6 +110,12 @@ class _StockCountScreenState extends State<StockCountScreen> {
 
   Future<void> _save({bool finish = false}) async {
     final d = _doc;
+    if (d != null) {
+      for (final l in d.lines) {
+        final typed = num.tryParse(_typed[l.s('id')]?.text.trim() ?? ''), unit = l.m('item').s('unit');
+        if (typed != null && halfOfAWholeUnit(typed, unit)) return showToast(context, 'Enter a whole number: ${l.m('item').s('name')} is counted in $unit.');
+      }
+    }
     if (d == null) return;
     if (finish && _lines(d).any((l) => l.countedQty == null)) return showToast(context, 'Type a count for every product first.');
     await _run(() async {

@@ -85,6 +85,19 @@ void main() {
     expect(calls.where((c) => c.$1 == 'inv_document_act').single.$2['action'], 'submit');
   });
 
+  testWidgets('counted in pieces: part of a whole unit is refused and nothing is saved', (t) async {
+    final e = env();
+    ((current['lines'] as List).first['item'] as Map)['unit'] = 'pc';
+    await show(t, StockCountScreen(env: e));
+    await tap(t, 'count-doc1');
+    await t.enterText(find.byKey(const ValueKey('count-qty-l1')), '19.5');
+    await t.pump();
+    await tap(t, 'count-finish');
+    expect(find.textContaining('Enter a whole number'), findsOneWidget);
+    expect(calls.where((c) => c.$1 == 'inv_document_save'), isEmpty);
+    expect(calls.where((c) => c.$1 == 'inv_document_act'), isEmpty);
+  });
+
   testWidgets('a finished count can be opened again (Edit counts) and its quantity changed before the difference is fixed', (t) async {
     final e = env();
     current = doc(status: 'review', counted: 1.75);

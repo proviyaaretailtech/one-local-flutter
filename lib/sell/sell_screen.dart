@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../home/home_nav.dart';
 import '../orders/order_widgets.dart';
 import '../ui/barcode_scanner.dart';
 import '../orders/orders_api.dart';
@@ -110,6 +111,9 @@ class _SellScreenState extends State<SellScreen> {
     _relatedWait = Timer(const Duration(milliseconds: 400), _loadRelated);
   }
 
+  /// What the empty till ranks first (the best sellers): a store's order for the whole bill.
+  List<String>? _popular;
+
   /// Market basket analysis (founder, 27 Oct 2026): what other bills had with the products in this cart; nothing in the cart, the best sellers.
   Future<void> _loadRelated() async {
     final ids = [for (final l in cart.lines) l.menuItemId]..sort();
@@ -121,6 +125,7 @@ class _SellScreenState extends State<SellScreen> {
       setState(() {
         _related = r;
         _relatedFor = key;
+        if (ids.isEmpty) _popular = r;
       });
     } catch (_) {} // the list stays in its usual order
   }
@@ -308,8 +313,10 @@ class _SellScreenState extends State<SellScreen> {
   List<SellItem> get _items {
     final all = _catalog?.items ?? const <SellItem>[];
     if (_category.isNotEmpty) return all.where((i) => i.category == _category).toList();
-    // All items: the related products first, in their order, then the rest as they come
-    final rank = {for (final (i, id) in _related.indexed) id: i};
+    // All items: the related products first, in their order, then the rest as they come. A store keeps the order it had before the bill began,
+    // so a tile never moves under the cashier's finger (founder's test round, 6 Nov 2026); the related products are badged where they are.
+    final steady = !const {'restaurant', 'service'}.contains(HomeNav.shell?.kind) && !cart.isEmpty;
+    final rank = {for (final (i, id) in (steady ? (_popular ?? const <String>[]) : _related).indexed) id: i};
     return [...all.where((i) => rank.containsKey(i.id)).toList()..sort((a, b) => rank[a.id]!.compareTo(rank[b.id]!)), ...all.where((i) => !rank.containsKey(i.id))];
   }
 
@@ -379,7 +386,7 @@ class _SellScreenState extends State<SellScreen> {
               ])
                 _Shortcut(
                   icon: icon,
-                  label: label,
+                  label: tr(label),
                   onTap: () async {
                     await env.open(context, id);
                     if (mounted) {
@@ -414,7 +421,7 @@ class _SellScreenState extends State<SellScreen> {
               child: Row(children: [
                 Icon(LucideIcons.wallet, size: 18, color: s.mustOpen ? kWarnText : kGreenText),
                 const SizedBox(width: 10),
-                Expanded(child: Text(s.mustOpen ? 'Open the cash shift before the first bill' : 'No cash shift open', style: inter(13.5, 600, color: s.mustOpen ? kWarnText : kInk))),
+                Expanded(child: Text(tr(s.mustOpen ? 'Open the cash shift before the first bill' : 'No cash shift open'), style: inter(13.5, 600, color: s.mustOpen ? kWarnText : kInk))),
                 Text(tr('Open shift'), style: inter(13.5, 800, color: s.mustOpen ? kWarnText : kGreenText)),
               ]),
             ),
@@ -454,7 +461,7 @@ class _SellScreenState extends State<SellScreen> {
                           child: Icon(c.isEmpty ? LucideIcons.layoutGrid : LucideIcons.tag, size: 16, color: c == _category ? const Color(0xFFD97706) : kMuted),
                         ),
                         const SizedBox(height: 6),
-                        ExcludeSemantics(child: Text(c.isEmpty ? 'All items' : c, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(11, c == _category ? 700 : 500, color: c == _category ? const Color(0xFFB45309) : kMuted))),
+                        ExcludeSemantics(child: Text(c.isEmpty ? tr('All items') : c, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(11, c == _category ? 700 : 500, color: c == _category ? const Color(0xFFB45309) : kMuted))),
                       ]),
                     ),
                   ),
@@ -603,7 +610,7 @@ class _SellScreenState extends State<SellScreen> {
           Row(children: [
             Expanded(
               flex: 3,
-              child: DarkCta(label: 'PAY', labelStart: true, amount: cart.isEmpty || (_quote?.total ?? _lastTotal) == null ? null : rupees(_quote?.total ?? _lastTotal!), onPressed: cart.isEmpty ? null : _pay),
+              child: DarkCta(label: tr('PAY'), labelStart: true, amount: cart.isEmpty || (_quote?.total ?? _lastTotal) == null ? null : rupees(_quote?.total ?? _lastTotal!), onPressed: cart.isEmpty ? null : _pay),
             ),
             const SizedBox(width: 12),
             Expanded(flex: 1, child: LightCta(label: tr('Hold'), onPressed: cart.isEmpty || _busy ? null : _hold)),

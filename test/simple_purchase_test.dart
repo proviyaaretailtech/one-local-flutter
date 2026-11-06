@@ -192,6 +192,12 @@ void main() {
       expect(t.widget<Text>(find.byKey(const ValueKey('line-facts'))).data, contains('Last bought at ₹260/pc'));
       await tapKey(t, 'line-add');
       expect(find.byKey(const ValueKey('line-error')), findsOneWidget); // no quantity yet
+      // counted in pieces: 2.5 stays 2.5 and is refused, it never becomes 25
+      await t.enterText(find.byKey(const ValueKey('line-qty')), '2.5');
+      await t.pumpAndSettle();
+      expect(t.widget<TextField>(find.byKey(const ValueKey('line-qty'))).controller!.text, '2.5');
+      await tapKey(t, 'line-add');
+      expect(find.textContaining('enter a whole number'), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('line-qty')), '4');
       await t.pumpAndSettle();
       expect(t.widget<Text>(find.byKey(const ValueKey('line-total'))).data, '₹1,040');

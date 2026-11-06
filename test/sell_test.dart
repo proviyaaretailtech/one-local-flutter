@@ -154,11 +154,13 @@ void main() {
       expect(t.getTopLeft(find.byKey(const ValueKey('product-m2'))).dx, lessThan(t.getTopLeft(find.byKey(const ValueKey('product-m1'))).dx));
       expect(find.text('Popular'), findsOneWidget);
       // Coca-Cola in the cart: the till asks what goes with it, and butter is tagged Bought together
+      final before = t.getTopLeft(find.byKey(const ValueKey('product-m1')));
       await t.tap(find.byKey(const ValueKey('product-m1')));
       await t.pump(const Duration(milliseconds: 500));
       await t.pumpAndSettle();
       expect(till.basketAsked.last, ['m1']);
       expect(find.text('Bought together'), findsOneWidget);
+      expect(t.getTopLeft(find.byKey(const ValueKey('product-m1'))), before, reason: 'a tile stays under the finger during a bill');
     });
 
     group('444 Discount', () {

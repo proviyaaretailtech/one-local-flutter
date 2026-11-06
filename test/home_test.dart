@@ -412,6 +412,23 @@ void main() {
       expect(find.text('We could not reach OneLocal.'), findsOneWidget);
     });
 
+    testWidgets('a store coming back to Home: new figures when they come; a failed refresh keeps the ones on screen', (t) async {
+      final api = await showHome(t);
+      expect(find.text('Store open'), findsOneWidget);
+      final asked = api.calls.length;
+      HomeNav.tabShown.value = 'Item';
+      HomeNav.tabShown.value = 'Home';
+      await t.pumpAndSettle();
+      expect(api.calls.length, asked + 1);
+      api.failWith = Exception('socket');
+      HomeNav.tabShown.value = 'Item';
+      HomeNav.tabShown.value = 'Home';
+      await t.pumpAndSettle();
+      expect(find.text('We could not reach OneLocal.'), findsNothing);
+      expect(find.text('Store open'), findsOneWidget);
+      expect(find.text('Could not refresh. These figures may be out of date.'), findsOneWidget);
+    });
+
     testWidgets('Business insights See all opens the sales feed', (t) async {
       final api = await showHome(t);
       await tapText(t, 'See all');

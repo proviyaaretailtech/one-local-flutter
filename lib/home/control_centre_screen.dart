@@ -68,7 +68,17 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
 
   // a store's sale, refund or day end happens on another tab: Home shows it on the way back
   void _followTab() {
-    if (mounted && HomeNav.tabShown.value == 'Home' && _kind == 'store') _reload();
+    if (mounted && HomeNav.tabShown.value == 'Home' && _kind == 'store') _refreshQuietly();
+  }
+
+  /// New figures when they come; the ones on screen stay if they do not (no internet at the counter must not blank Home).
+  Future<void> _refreshQuietly() async {
+    try {
+      final s = await _api.summary(location: _location);
+      if (mounted) setState(() => _summary = Future.value(s));
+    } catch (_) {
+      if (mounted) showToast(context, tr('Could not refresh. These figures may be out of date.'));
+    }
   }
 
   void _followScope() {
@@ -301,8 +311,8 @@ class _Body extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(open == true ? 'Store open' : open == false ? 'Store closed' : 'Status not set', style: inter(14, 700)),
-                      Text('Today · ${dayLabel(s.day, caps: false)}', style: inter(11, 400, color: kMuted)),
+                      Text(tr(open == true ? 'Store open' : open == false ? 'Store closed' : 'Status not set'), style: inter(14, 700)),
+                      Text('${tr('Today')} · ${dayLabel(s.day, caps: false)}', style: inter(11, 400, color: kMuted)),
                     ]),
                   ),
                   // The outlet's sync time; tapping it switches outlet (as the old header line did).
@@ -316,7 +326,7 @@ class _Body extends StatelessWidget {
                   Expanded(child: _StatTile(label: tr('Sales'), value: s.salesTotal == null ? '—' : rupees(s.salesTotal!.round()))),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: _StatTile(label: tr('Orders'), value: s.ordersCount == null ? '—' : count(s.ordersCount!), note: '${s.activeCount ?? 0} active now'),
+                    child: _StatTile(label: tr('Orders'), value: s.ordersCount == null ? '—' : count(s.ordersCount!), note: '${s.activeCount ?? 0} ${tr('active now')}'),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -335,7 +345,7 @@ class _Body extends StatelessWidget {
                     child: Row(children: [
                       Expanded(
                         child: Text(
-                          '${s.settledCount ?? 0} bills settled · ${s.pax ?? 0} pax · ${s.activeCount ?? 0} open',
+                          '${s.settledCount ?? 0} ${tr('bills settled')} · ${s.pax ?? 0} ${tr('pax')} · ${s.activeCount ?? 0} ${tr('open')}',
                           style: inter(11.5, 400, color: kMuted),
                         ),
                       ),
@@ -352,19 +362,19 @@ class _Body extends StatelessWidget {
               const SizedBox(height: 20),
             ],
             SectionHeader(
-              'Active orders',
-              badge: GreyTag('${s.activeCount ?? 0} active', dot: (s.activeCount ?? 0) > 0 ? kRed : kMuted),
+              tr('Active orders'),
+              badge: GreyTag('${s.activeCount ?? 0} ${tr('active')}', dot: (s.activeCount ?? 0) > 0 ? kRed : kMuted),
               action: tr('View all'),
               onAction: () => HomeNav.go(context, HomeNav.orders, 'Orders'),
             ),
             const SizedBox(height: 12),
             if (s.activeOrders.isEmpty)
-              const HomeCard(child: EmptyNote('No open orders right now.'))
+              HomeCard(child: EmptyNote(tr('No open orders right now.')))
             else
               for (final o in s.activeOrders) ...[_OrderCard(o), const SizedBox(height: 8)],
             const SizedBox(height: 12),
             // "Full report" is the stock alerts (low stock, expiry, not selling, mismatch) (founder, 25 Oct 2026)
-            SectionHeader('Stock health', action: tr('Full report'), onAction: () => HomeNav.go(context, HomeNav.stockPage == null ? null : (c) => HomeNav.stockPage!(c, 'alerts'), 'Stock alerts')),
+            SectionHeader(tr('Stock health'), action: tr('Full report'), onAction: () => HomeNav.go(context, HomeNav.stockPage == null ? null : (c) => HomeNav.stockPage!(c, 'alerts'), 'Stock alerts')),
             const SizedBox(height: 12),
             _StockCard(s),
             if (s.stock.isNotEmpty) ...[
@@ -439,7 +449,7 @@ class _AttentionCard extends StatelessWidget {
   static const _icons = {'description': LucideIcons.fileText, 'photo': LucideIcons.image, 'recipe': LucideIcons.chefHat};
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SectionHeader('Needs attention', badge: GreyTag('$total ${restaurant ? 'menu' : 'catalogue'} items')),
+        SectionHeader(tr('Needs attention'), badge: GreyTag('$total ${tr(restaurant ? 'menu items' : 'catalogue items')}')),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: kAmber)),
@@ -454,7 +464,7 @@ class _AttentionCard extends StatelessWidget {
                     Icon(_icons[gaps[i].$1] ?? LucideIcons.circleAlert, size: 16, color: kAmberInk),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text('${gaps[i].$2} ${gaps[i].$2 == 1 ? 'item' : 'items'} missing ${gaps[i].$2 == 1 ? 'a ${gaps[i].$1}' : '${gaps[i].$1}s'}',
+                      child: Text(appLang.value == 'en' ? '${gaps[i].$2} ${gaps[i].$2 == 1 ? 'item' : 'items'} missing ${gaps[i].$2 == 1 ? 'a ${gaps[i].$1}' : '${gaps[i].$1}s'}' : '${gaps[i].$2} ${tr('items')} · ${tr('no ${gaps[i].$1}')}',
                           style: inter(12.5, 500)),
                     ),
                     Text(tr('Fix'), style: inter(12.5, 700, color: kLink)),
@@ -515,14 +525,14 @@ class _OrderCard extends StatelessWidget {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(child: Text('Order #${o.number}', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 700))),
+              Expanded(child: Text('${tr('Order')} #${o.number}', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 700))),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Dot(dot, size: 6),
                   const SizedBox(width: 6),
-                  Text(statusLabel(o.status), style: inter(9, 600, color: fg)),
+                  Text(tr(statusLabel(o.status)), style: inter(9, 600, color: fg)),
                 ]),
               ),
             ]),
