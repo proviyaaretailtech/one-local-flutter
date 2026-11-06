@@ -12,6 +12,7 @@ import 'stock_env.dart';
 import 'stock_kit.dart';
 import 'stock_movements_screen.dart' show movementLabel, showMovement;
 import 'update_stock_screen.dart' show UpdateStockScreenTones;
+import '../home/home_nav.dart';
 import '../ui/i18n.dart';
 
 /// One product, everything about it on one page (founder, 25 Oct 2026; replaces the catalogue detail drawer and the stock page):
@@ -495,7 +496,12 @@ class _ProductPageState extends State<ProductPage> {
             ),
           ),
         );
-    VoidCallback? go(String page) => inv == null ? null : () => env.open(context, page, itemId: inv);
+    VoidCallback? go(String page) => inv == null
+        ? null
+        : () async {
+            await env.open(context, page, itemId: inv);
+            if (mounted && !const {'restaurant', 'service'}.contains(HomeNav.shell?.kind)) _load(); // the stock or its location may have changed there
+          };
     return Wrap(spacing: 8, runSpacing: 8, children: [
       b('Adjust', LucideIcons.slidersHorizontal, 'product-adjust', go(StockPage.adjust)),
       b('Transfer', LucideIcons.arrowLeftRight, 'product-transfer', go(StockPage.transfer)),

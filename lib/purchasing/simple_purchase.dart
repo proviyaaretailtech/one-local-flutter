@@ -737,7 +737,7 @@ class _ReceiveGoodsScreenState extends State<ReceiveGoodsScreen> {
         } catch (_) {} // the stock is in; the bill screen that opens next lets them save it again
       }
       if (!mounted) return;
-      final open = widget.openBill ?? (c, id) => Navigator.of(c).pushReplacement(MaterialPageRoute(builder: (_) => PurchaseBillScreen(api: widget.api, receiptId: id, justReceived: true)));
+      final open = widget.openBill ?? (c, id) => Navigator.of(c).pushReplacement(MaterialPageRoute(builder: (_) => PurchaseBillScreen(api: widget.api, receiptId: id, justReceived: !billed)));
       await Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (_) => PurchaseDoneScreen(
           docNo: r.s('doc_no'),

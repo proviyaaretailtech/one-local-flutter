@@ -49,7 +49,7 @@ class SuccessScreen extends StatelessWidget {
               ),
               // beside Print: the paid bill to the customer on WhatsApp, as a short note with its online page (founder, 2 Nov 2026)
               onWhatsApp: () => _whatsapp(context),
-              footnote: 'Use New Order to start the next sale.',
+              footnote: tr('Use New Order to start the next sale.'),
             ),
           ]),
         ),
@@ -120,25 +120,31 @@ class TransactionSuccessCard extends StatelessWidget {
           const SizedBox(height: 16),
           Text(tr('Transaction Successful'), textAlign: TextAlign.center, style: inter(24, 800, color: const Color(0xFF3DB800))),
           const SizedBox(height: 4),
-          Text('Receipt generated and sent to customer queue', textAlign: TextAlign.center, style: inter(13.5, 400, color: kMuted)),
+          Text(tr('Receipt generated and sent to customer queue'), textAlign: TextAlign.center, style: inter(13.5, 400, color: kMuted)),
           const Divider(height: 28, color: kLine),
-          KeyValue('Order Number', orderNo, size: 15),
-          KeyValue('Total Amount Paid', rupees(amountPaid), size: 15),
-          KeyValue('Payment Method', method, size: 15),
+          KeyValue(tr('Order Number'), orderNo, size: 15),
+          KeyValue(tr('Total Amount Paid'), rupees(amountPaid), size: 15),
+          KeyValue(tr('Payment Method'), tr(method), size: 15),
           if (tendered != null) ...[KeyValue('Amount Tendered', rupees(tendered!), size: 15), KeyValue('Change Returned', rupees(change), size: 15)],
           if (branch != null) KeyValue('Terminal Branch', branch!, size: 15),
-          KeyValue('Date & Time', when, size: 15),
+          KeyValue(tr('Date & Time'), when, size: 15),
           const Divider(height: 28, color: kLine),
           DarkCta(label: tr('New Order'), onPressed: onNewOrder),
           const SizedBox(height: 12),
           if (onWhatsApp == null)
             LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt)
           else
-            Row(children: [
-              Expanded(child: LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt)),
-              const SizedBox(width: 10),
-              Expanded(child: LightCta(key: const ValueKey('receipt-whatsapp'), label: tr('Send by WhatsApp'), onPressed: onWhatsApp)),
-            ]),
+            MediaQuery.sizeOf(context).width < 420
+                ? Column(children: [
+                    LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt),
+                    const SizedBox(height: 10),
+                    LightCta(key: const ValueKey('receipt-whatsapp'), label: tr('Send by WhatsApp'), onPressed: onWhatsApp),
+                  ])
+                : Row(children: [
+                    Expanded(child: LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt)),
+                    const SizedBox(width: 10),
+                    Expanded(child: LightCta(key: const ValueKey('receipt-whatsapp'), label: tr('Send by WhatsApp'), onPressed: onWhatsApp)),
+                  ]),
           if (footnote != null) ...[const SizedBox(height: 14), Text(footnote!, style: inter(12.5, 400, color: kKicker))],
         ]),
       );

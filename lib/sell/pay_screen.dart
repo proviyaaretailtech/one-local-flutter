@@ -280,7 +280,7 @@ class _PayScreenState extends State<PayScreen> {
             const SizedBox(height: 14),
             if (_method == 'split') _splitCard() else _summaryCard(q, order),
             const SizedBox(height: 18),
-            DarkCta(label: 'Pay ${rupees(_total)}', busy: _busy, onPressed: (order == null && q == null && _method != 'split') ? null : _pay),
+            DarkCta(label: '${tr('Pay')} ${rupees(_total)}', busy: _busy, onPressed: (order == null && q == null && _method != 'split') ? null : _pay),
             const SizedBox(height: 10),
             // Send by WhatsApp is on the receipt, once the bill is paid (founder, 2 Nov 2026)
             LightCta(label: tr('Save & Hold'), onPressed: _busy ? null : _hold),
@@ -331,15 +331,15 @@ class _PayScreenState extends State<PayScreen> {
             ),
         ]),
         const SizedBox(height: 8),
-        Text('${env.storeLine} · ${_methods.firstWhere((m) => m.$1 == _method).$2} selected', style: inter(13, 400, color: kMuted)),
-        Text(order == null ? 'Payment not completed' : 'Payment not completed · ${order.paymentChip}', style: inter(13, 400, color: kMuted)),
+        Text('${env.storeLine} · ${tr(_methods.firstWhere((m) => m.$1 == _method).$2)} ${tr('selected')}', style: inter(13, 400, color: kMuted)),
+        Text(order == null ? tr('Payment not completed') : '${tr('Payment not completed')} · ${order.paymentChip}', style: inter(13, 400, color: kMuted)),
         const Divider(height: 20, color: kLine),
         for (final (name, qty, amount) in rows)
           ItemLine(name: name, sub: '', amount: amount, qtyBadge: '$qty×'),
         if (cart != null && order == null) ...[
           const Divider(height: 18, color: kLine),
           Wrap(spacing: 8, children: [
-            SmallPill(cart.couponCode == null ? 'Apply coupon' : 'Coupon ${cart.couponCode}', bg: kChipGreen, fg: kGreenText, border: kChipGreen, onTap: _coupon),
+            SmallPill(cart.couponCode == null ? tr('Apply coupon') : 'Coupon ${cart.couponCode}', bg: kChipGreen, fg: kGreenText, border: kChipGreen, onTap: _coupon),
           ]),
         ],
       ]),
@@ -349,7 +349,7 @@ class _PayScreenState extends State<PayScreen> {
   Widget _methodCard() => OrderCardBox(
         radius: 22,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Kick('Select payment method'),
+          Kick(tr('Select payment method')),
           const SizedBox(height: 10),
           GridView.count(
             crossAxisCount: 2,
@@ -373,7 +373,7 @@ class _PayScreenState extends State<PayScreen> {
                         _method = id;
                         _intentChanged();
                       },
-                      child: Center(child: ExcludeSemantics(child: Text(label, style: inter(14, _method == id ? 800 : 500, color: _method == id ? kInk : kMuted)))),
+                      child: Center(child: ExcludeSemantics(child: Text(tr(label), style: inter(14, _method == id ? 800 : 500, color: _method == id ? kInk : kMuted)))),
                     ),
                   ),
                 ),
@@ -402,9 +402,9 @@ class _PayScreenState extends State<PayScreen> {
     return OrderCardBox(
       radius: 22,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Kick('Bill summary'),
+        Kick(tr('Bill summary')),
         const SizedBox(height: 8),
-        KeyValue('Subtotal', rupees(subtotal), size: 15, bold: true),
+        KeyValue(tr('Subtotal'), rupees(subtotal), size: 15, bold: true),
         if (gst > 0 || gstPct > 0) KeyValue('GST (${gstPct == gstPct.roundToDouble() ? gstPct.toInt() : gstPct}%)', rupees(gst), size: 15),
         if (sc > 0) KeyValue('Service Charge', rupees(sc), size: 15),
         if (disc > 0)
@@ -486,9 +486,9 @@ class _PayScreenState extends State<PayScreen> {
     return OrderCardBox(
       radius: 22,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Kick('Split payment'),
+        Kick(tr('Split payment')),
         const SizedBox(height: 4),
-        Text('Total due ${rupees(_total)}. Add 2 to 4 parts; they must add up to the total.', style: inter(13, 400, color: kMuted)),
+        Text(appLang.value == 'en' ? 'Total due ${rupees(_total)}. Add 2 to 4 parts; they must add up to the total.' : '${tr('Total due')} ${rupees(_total)}. ${tr('Add 2 to 4 parts; they must add up to the total.')}', style: inter(13, 400, color: kMuted)),
         const SizedBox(height: 10),
         for (var i = 0; i < _parts.length; i++) ...[
           Padding(
@@ -534,9 +534,9 @@ class _PayScreenState extends State<PayScreen> {
           if (_parts.length < 4) TextButton.icon(onPressed: () {
             _parts.add(_SplitPart('upi'));
             _intentChanged();
-          }, icon: const Icon(LucideIcons.plus, size: 16), label: const Text('Add part')),
+          }, icon: const Icon(LucideIcons.plus, size: 16), label: Text(tr('Add part'))),
           const Spacer(),
-          Text(left.abs() < 0.005 ? 'Adds up' : (left > 0 ? '${rupees(left)} still to allocate' : '${rupees(-left)} too much'), style: inter(13, 700, color: left.abs() < 0.005 ? kGreenText : kWarnText)),
+          Text(left.abs() < 0.005 ? tr('Adds up') : (left > 0 ? '${rupees(left)} ${tr('still to allocate')}' : '${rupees(-left)} ${tr('too much')}'), style: inter(13, 700, color: left.abs() < 0.005 ? kGreenText : kWarnText)),
         ]),
       ]),
     );

@@ -110,6 +110,12 @@ class _StockCountScreenState extends State<StockCountScreen> {
 
   Future<void> _save({bool finish = false}) async {
     final d = _doc;
+    if (d != null) {
+      for (final l in d.lines) {
+        final typed = num.tryParse(_typed[l.s('id')]?.text.trim() ?? ''), unit = l.m('item').s('unit');
+        if (typed != null && halfOfAWholeUnit(typed, unit)) return showToast(context, 'Enter a whole number: ${l.m('item').s('name')} is counted in $unit.');
+      }
+    }
     if (d == null) return;
     if (finish && _lines(d).any((l) => l.countedQty == null)) return showToast(context, 'Type a count for every product first.');
     await _run(() async {
@@ -144,8 +150,13 @@ class _StockCountScreenState extends State<StockCountScreen> {
     if (d == null) return;
     await _run(() async {
       final adj = await env.api.adjustmentFromAudit(d.id);
-      final sent = await env.api.act(adj.id, 'submit', version: adj.version);
-      if (mounted) showToast(context, 'Sent for approval as ${sent.number}. Stock changes once a manager approves it.');
+      if (adj.status != 'draft') {
+        // already sent from this count: nothing more to do here
+        if (mounted) showToast(context, adj.status == 'posted' ? '${adj.number} is already approved. The stock is corrected.' : '${adj.number} is already waiting for approval. Approve it in Adjust stock.');
+      } else {
+        final sent = await env.api.act(adj.id, 'submit', version: adj.version);
+        if (mounted) showToast(context, 'Sent for approval as ${sent.number}. Stock changes once a manager approves it.');
+      }
       setState(() => _doc = null);
       await _load();
     });

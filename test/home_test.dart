@@ -210,7 +210,7 @@ void main() {
       await showHome(t);
       expect(find.text('OneLocal'), findsNothing, reason: 'the stray wordmark under the header is gone');
       expect(find.text('ONELOCAL PARTNER'), findsOneWidget, reason: 'the banner (founder, 22 Oct)');
-      expect(find.text('Store open'), findsOneWidget);
+      expect(find.text('Taking online orders'), findsOneWidget);
       expect(find.text('Today · 5 Oct'), findsOneWidget);   // the day once, not on every label
       expect(find.text('Synced 2 min ago'), findsOneWidget);
       expect(find.text('Latur Main Branch · Synced 2 min ago'), findsWidgets);
@@ -219,19 +219,19 @@ void main() {
       expect(find.text('53'), findsOneWidget);
       expect(find.text('8 active now'), findsOneWidget);
       expect(find.text('140'), findsOneWidget);
-      expect(find.text('25 bills settled · 57 pax · 8 open'), findsOneWidget);
+      expect(find.text('25 bills settled · 8 open'), findsOneWidget);
     });
 
     testWidgets('no bills yet: items tile says Not reported, open status unknown says so', (t) async {
       await showHome(t, summary: summaryJson(orders: 0, total: 0, open: null));
       expect(find.text('Not reported'), findsOneWidget);
-      expect(find.text('Status not set'), findsOneWidget);
+      expect(find.text('Online orders not set'), findsOneWidget);
       expect(find.text('Nothing sold yet today.'), findsOneWidget);
     });
 
     testWidgets('closed store says Store closed', (t) async {
       await showHome(t, summary: summaryJson(open: false));
-      expect(find.text('Store closed'), findsOneWidget);
+      expect(find.text('Not taking online orders'), findsOneWidget);
     });
 
     testWidgets('item data gaps: one line each with Fix; the store list hides recipes, none means no list (a restaurant has its own dashboard)', (t) async {
@@ -406,10 +406,27 @@ void main() {
       expect(find.text('No outlet is assigned to you yet.'), findsOneWidget);
       api.failWith = null;
       await tapText(t, 'Try again');
-      expect(find.text('Store open'), findsOneWidget);
+      expect(find.text('Taking online orders'), findsOneWidget);
 
       await showTall(t, ControlCentreScreen(api: FakeHome(failWith: Exception('socket')), now: () => _clock));
       expect(find.text('We could not reach OneLocal.'), findsOneWidget);
+    });
+
+    testWidgets('a store coming back to Home: new figures when they come; a failed refresh keeps the ones on screen', (t) async {
+      final api = await showHome(t);
+      expect(find.text('Taking online orders'), findsOneWidget);
+      final asked = api.calls.length;
+      HomeNav.tabShown.value = 'Item';
+      HomeNav.tabShown.value = 'Home';
+      await t.pumpAndSettle();
+      expect(api.calls.length, asked + 1);
+      api.failWith = Exception('socket');
+      HomeNav.tabShown.value = 'Item';
+      HomeNav.tabShown.value = 'Home';
+      await t.pumpAndSettle();
+      expect(find.text('We could not reach OneLocal.'), findsNothing);
+      expect(find.text('Taking online orders'), findsOneWidget);
+      expect(find.text('Could not refresh. These figures may be out of date.'), findsOneWidget);
     });
 
     testWidgets('Business insights See all opens the sales feed', (t) async {
@@ -434,7 +451,7 @@ void main() {
       expect(find.text('Today so far'), findsOneWidget);
       expect(find.text('₹48,920'), findsOneWidget);
       expect(find.text('127 orders received'), findsOneWidget);
-      expect(find.text('Open'), findsOneWidget);
+      expect(find.text('Taking online orders'), findsOneWidget);
       for (final l in ['Order history', 'Complaints', 'Reviews', 'Settings', 'Storefront', 'Show all']) {
         expect(find.text(l), findsOneWidget);
       }

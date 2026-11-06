@@ -7,6 +7,7 @@ import '../barcodes/barcode_sheets.dart' show itemLabel, printBarcodeLabels;
 import '../barcodes/barcode_ui.dart' show LabelCountStepper;
 import '../barcodes/barcodes_api.dart';
 import '../catalogue/price_basis.dart';
+import '../home/home_nav.dart';
 import '../inventory/inventory_api.dart';
 import '../inventory/inventory_widgets.dart' show kCardLine, kPostedText;
 import '../inventory/receiving_screen.dart' show newItemForReceiving;
@@ -501,7 +502,7 @@ class _LineSheetState extends State<_LineSheet> {
           PriceBasisPicker(key: const ValueKey('line-basis'), keyPrefix: 'line-basis', value: _basis, onChanged: _setBasis, compact: true),
           const SizedBox(height: 10),
           Row(children: [
-            _field(_qty, widget.already > 0 ? 'Add quantity' : 'Quantity', key: const ValueKey('line-qty'), suffix: buyUnitWord(unit), autofocus: true, decimals: i.byMeasure),
+            _field(_qty, widget.already > 0 ? 'Add quantity' : 'Quantity', key: const ValueKey('line-qty'), suffix: buyUnitWord(unit), autofocus: true, decimals: i.byMeasure || !const {'restaurant', 'service'}.contains(HomeNav.shell?.kind)),
             const SizedBox(width: 8),
             _field(_rate, 'Buy rate per ${buyUnitWord(unit, 1)}', key: const ValueKey('line-rate'), prefix: '₹ '),
           ]),
