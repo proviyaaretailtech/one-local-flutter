@@ -431,6 +431,10 @@ class BillListData extends SvcData {
   /// Money taken today, less refunds today (the dashboard's "Money · today").
   num get paidToday => n('paid_today');
   List<BillView> get bills => l('bills').map((b) => BillView(b.raw)).toList();
+
+  /// Filter walkins: each session with its paid walk-ins.
+  List<SvcData> get walkinSessions => l('walkin_sessions');
+  num get walkinsTakenToday => n('walkins_taken_today');
 }
 
 /// Frames 85 and 86 (`svc_plan_list`).
@@ -503,8 +507,16 @@ class ServiceApi {
   Future<FrontDeskData> frontDesk({String? date}) async => FrontDeskData(await _call('svc_front_desk', {'date': date}));
 
   /// One walk-in on (+1) or off (-1) an event or activity; 0 starts a count now. Answers with the whole day.
-  Future<FrontDeskData> countWalkIn(String serviceId, {String? startsAt, int delta = 0}) async =>
-      FrontDeskData(await _call('svc_session_count', key: newKey(), {'service_id': serviceId, 'starts_at': startsAt, 'delta': delta}));
+  /// [split] is for method 'split': the cash and card amounts; the rest is UPI.
+  Future<FrontDeskData> countWalkIn(String serviceId, {String? startsAt, int delta = 0, String? method, ({num cash, num card})? split}) async =>
+      FrontDeskData(await _call('svc_session_count', key: newKey(), {'service_id': serviceId, 'starts_at': startsAt, 'delta': delta, 'method': ?method, if (split != null) 'split': {'cash': split.cash, 'card': split.card}}));
+
+  /// Past and finished events and activities, newest first. [category]: events or activities.
+  Future<List<SvcData>> sessionHistory({String? category}) async => SvcData(await _call('svc_session_history', {'category': ?category})).l('sessions');
+
+  /// Completes everyone admitted to a session; whoever still owes stays to be collected. [noShows] also marks those who never came.
+  Future<FrontDeskData> finishSession(String serviceId, {required String startsAt, bool noShows = false}) async =>
+      FrontDeskData(await _call('svc_session_finish', key: newKey(), {'service_id': serviceId, 'starts_at': startsAt, 'no_shows': noShows}));
 
   /// How many on a booking are in; none undoes the check-in. Answers with the whole day.
   Future<FrontDeskData> admit(String id, int admitted, {required int version}) async =>

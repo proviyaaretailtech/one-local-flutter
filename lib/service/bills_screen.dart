@@ -133,8 +133,13 @@ class _BillsScreenState extends State<BillsScreen> {
   static const _piles = [
     ('due', 'Due', 'Waiting for payment', LucideIcons.hourglass, WalletColors.red),
     ('today', 'Taken today', 'Money taken today', LucideIcons.banknote, WalletColors.green),
-    ('paid', 'Paid', 'Fully paid', LucideIcons.circleCheck, WalletColors.blue),
+    ('paid', 'Paid', 'Fully paid · money includes walk-ins', LucideIcons.circleCheck, WalletColors.blue),
+    // paid at the door: kept apart so they do not bury the other bills; their money still counts in Taken today and Paid
+    ('walkins', 'Walk-ins', 'Paid at the door, by session', LucideIcons.users, WalletColors.slate),
   ];
+
+  /// The sessions opened in the Walk-ins pile.
+  final _openSessions = <String>{};
 
   @override
   void initState() {
@@ -180,10 +185,54 @@ class _BillsScreenState extends State<BillsScreen> {
     String bills(int n) => '$n ${n == 1 ? 'bill' : 'bills'}';
     return switch (pile) {
       'due' => '${bills(d.count('due'))} · ${svcRupees(d.dueAmount)} due',
-      'today' => '${bills(d.count('today'))} · ${svcRupees(d.paidToday)} taken',
+      'today' => '${bills(d.count('today'))}${d.count('walkins_today') > 0 ? ' + ${d.count('walkins_today')} walk-ins' : ''} · ${svcRupees(d.paidToday)} taken',
       'paid' => '${bills(d.count('paid'))} · ${svcRupees(d.paidThisMonth)} this month',
+      'walkins' => '${d.count('walkins')} paid · ${svcRupees(d.walkinsTakenToday)} today',
       _ => bills(d.count('all')),
     };
+  }
+
+  /// One session in the Walk-ins pile: a dropdown of its bills.
+  Widget _walkinSession(SvcData x) {
+    final key = x.s('key');
+    final open = _openSessions.contains(key);
+    final notes = [
+      '${x.i('charged')} paid',
+      if (x.i('free') > 0) '${x.i('free')} no charge',
+      if (x.i('refunded') > 0) '${x.i('refunded')} refunded',
+      svcRupees(x.n('taken')),
+    ].join(' · ');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Material(
+          color: Colors.white,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: kLine)),
+          child: InkWell(
+            key: ValueKey('walkins-$key'),
+            onTap: () => setState(() => open ? _openSessions.remove(key) : _openSessions.add(key)),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(x.s('title'), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(14.5, 700)),
+                    Text('${x.s('date_label')} · ${x.s('time_label')}', maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12, 400, color: kMuted)),
+                    Text(notes, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12, 600)),
+                  ]),
+                ),
+                Icon(open ? LucideIcons.chevronUp : LucideIcons.chevronDown, size: 18, color: kMuted),
+              ]),
+            ),
+          ),
+        ),
+        if (open) ...[
+          const SizedBox(height: 8),
+          for (final b in x.l('bills')) billWalletCard(BillView(b.raw), () => _open(b.s('id')), colors: b.b('removed') ? WalletColors.slate : WalletColors.green),
+        ],
+      ]),
+    );
   }
 
   @override
@@ -210,9 +259,14 @@ class _BillsScreenState extends State<BillsScreen> {
                 if (open != null) _pileCard(d, open, isOpen: true),
                 if (open == null)
                   Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Search results', style: inter(15, 700))),
-                if (d.bills.isEmpty)
-                  OrderCardBox(child: Text(switch (_pile) { 'due' => 'Nothing is due. Every bill is paid.', 'today' => 'No money taken today yet.', _ => 'No bills here.' }, style: inter(14, 400, color: kMuted))),
-                for (final b in d.bills) billWalletCard(b, () => _open(b.id), colors: open?.$5),
+                if (_pile == 'walkins') ...[
+                  if (d.walkinSessions.isEmpty) OrderCardBox(child: Text('No walk-ins yet.', style: inter(14, 400, color: kMuted))),
+                  for (final x in d.walkinSessions) _walkinSession(x),
+                ] else ...[
+                  if (d.bills.isEmpty)
+                    OrderCardBox(child: Text(switch (_pile) { 'due' => 'Nothing is due. Every bill is paid.', 'today' => 'No money taken today yet.', _ => 'No bills here.' }, style: inter(14, 400, color: kMuted))),
+                  for (final b in d.bills) billWalletCard(b, () => _open(b.id), colors: open?.$5),
+                ],
               ],
             ];
     if (widget.embedded) {
@@ -418,7 +472,7 @@ class _BillDetailScreenState extends State<BillDetailScreen> {
         KeyValue('Due', svcRupees(b.due), size: 14, valueColor: b.due > 0 ? kBadText : kInk),
       ]),
       if (b.payments.isNotEmpty)
-        SvcCard(title: 'Payments', children: [for (final p in b.payments) SvcKV('${_method(p.s('method'))} · ${p.s('at_label')}', svcRupees(p.n('amount')))]),
+        SvcCard(title: 'Payments', children: [for (final p in b.payments) KeyValue('${_method(p.s('method'))} · ${p.s('at_label')}', svcRupees(p.n('amount')), size: 13.5)]),
       if (b.message.isNotEmpty) SvcCard(title: 'Message', children: [Text(b.message, style: inter(14, 400))]),
       const SizedBox(height: 4),
       if (b.canCollect) DarkCta(label: 'Collect ${svcRupees(b.due)}', busy: _busy, onPressed: _busy ? null : _collect),

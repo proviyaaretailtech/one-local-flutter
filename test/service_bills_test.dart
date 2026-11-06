@@ -80,8 +80,8 @@ void main() {
       expect(find.text(s), findsWidgets, reason: s);
     }
     final piles = t.widgetList<WalletPile>(find.byType(WalletPile)).toList();
-    expect(piles.map((p) => p.key), [const ValueKey('pile-due'), const ValueKey('pile-today'), const ValueKey('pile-paid')]);
-    expect(piles.map((p) => p.colors), [WalletColors.red, WalletColors.green, WalletColors.blue]);
+    expect(piles.map((p) => p.key), [const ValueKey('pile-due'), const ValueKey('pile-today'), const ValueKey('pile-paid'), const ValueKey('pile-walkins')]);
+    expect(piles.map((p) => p.colors), [WalletColors.red, WalletColors.green, WalletColors.blue, WalletColors.slate]);
     expect(find.byKey(const ValueKey('bill-1')), findsNothing, reason: 'no bills until a pile is opened');
     expect(find.byKey(const ValueKey('pile-all')), findsNothing, reason: 'every bill is in a pile already; no All pile');
     expect(find.text('All bills'), findsNothing);

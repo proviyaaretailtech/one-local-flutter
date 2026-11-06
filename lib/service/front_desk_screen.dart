@@ -9,6 +9,7 @@ import 'bills_screen.dart';
 import 'job_screens.dart';
 import 'service_api.dart';
 import 'service_widgets.dart';
+import 'session_history_screen.dart';
 import 'visit_screens.dart';
 
 // The Bill tab's first screen (5 Nov 2026): today's bookings in a tab per listing type, so people can be checked in from one place, with the
@@ -47,6 +48,9 @@ class _FrontDeskScreenState extends State<FrontDeskScreen> {
 
   /// Taps on + and - not yet answered, per session: the count moves at once however fast the door is.
   final _pending = <String, int>{};
+
+  /// How walk-ins pay at each session, as just picked: the next +1 uses it.
+  final _methods = <String, String>{};
 
   /// Moves the time left on the courts along.
   Timer? _tick;
@@ -135,10 +139,17 @@ class _FrontDeskScreenState extends State<FrontDeskScreen> {
   /// One walk-in on or off; the answer is the whole day, newest answer wins.
   Future<void> _count(SvcData session, int delta) async {
     final key = session.s('key');
+    final method = delta == 1 ? _methodOf(session) : null;
+    // a split is asked each time: every person pays their own way
+    ({num cash, num card})? split;
+    if (method == 'split' && session.n('price') > 0) {
+      split = await _askSplit(_doorTotal(session));
+      if (split == null || !mounted) return;
+    }
     setState(() => _pending[key] = (_pending[key] ?? 0) + delta);
     final mine = ++_seq;
     try {
-      final d = await _api.countWalkIn(session.s('service_id'), startsAt: session.s('starts_at'), delta: delta);
+      final d = await _api.countWalkIn(session.s('service_id'), startsAt: session.s('starts_at'), delta: delta, method: method, split: split);
       if (mounted && mine == _seq) _data = d;
     } on ServiceApiException catch (e) {
       if (mounted) showToast(context, e.message);
@@ -147,6 +158,101 @@ class _FrontDeskScreenState extends State<FrontDeskScreen> {
       if (mounted) showToast(context, 'Could not save that. Check the connection and try again.');
     } finally {
       if (mounted) setState(() => _pending[key] = (_pending[key] ?? 0) - delta);
+    }
+  }
+
+  String _methodOf(SvcData session) => _methods[session.s('key')] ?? (session.s('method').isEmpty ? 'cash' : session.s('method'));
+
+  /// What one walk-in's bill comes to, tax included.
+  num _doorTotal(SvcData session) => session.raw['door_total'] == null ? session.n('price') : session.n('door_total');
+
+  /// Cash and card as typed; the rest is UPI, so it always adds up.
+  Future<({num cash, num card})?> _askSplit(num total) async {
+    final cash = TextEditingController(), card = TextEditingController();
+    num value(TextEditingController c) => num.tryParse(c.text.trim()) ?? 0;
+    final done = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
+        final rest = total - value(cash) - value(card);
+        Widget field(String label, TextEditingController c, String key) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TextField(
+                key: ValueKey(key),
+                controller: c,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: numberOnly(const TextInputType.numberWithOptions(decimal: true)),
+                onChanged: (_) => set(() {}),
+                decoration: InputDecoration(labelText: label, prefixText: '₹ ', isDense: true),
+              ),
+            );
+        return AlertDialog(
+          title: Text('Split ${svcRupees(total)}', style: inter(16, 700)),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            field('Cash', cash, 'split-cash'),
+            field('Card', card, 'split-card'),
+            Text(rest < 0 ? 'That is ${svcRupees(-rest)} more than the bill.' : 'UPI ${svcRupees(rest)} (the rest)', key: const ValueKey('split-rest'), style: inter(13.5, 700, color: rest < 0 ? kBadText : kInk)),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: inter(13, 600, color: kMuted))),
+            TextButton(key: const ValueKey('split-ok'), onPressed: rest < 0 ? null : () => Navigator.pop(ctx, true), child: Text('Add walk-in', style: inter(13, 700))),
+          ],
+        );
+      }),
+    );
+    // left undisposed, as in pickPayment: the box is still closing here and uses them
+    return done == true ? (cash: value(cash), card: value(card)) : null;
+  }
+
+  /// Asks first: finishing completes everyone admitted and cannot be undone.
+  Future<void> _finish(SvcData x) async {
+    final never = x.i('never_came');
+    final canNoShow = x.b('can_no_show');
+    final actions = <(String, String, Key?)>[
+      if (never > 0 && canNoShow) ('no_shows', 'Finish and mark $never no-show', const ValueKey('desk-finish-no-shows')),
+      ('finish', never > 0 ? 'Finish, leave $never not come' : 'Finish session', const ValueKey('desk-finish-yes')),
+    ];
+    final picked = await showActionBox<String>(context,
+        title: 'Finish ${x.s('title')}?',
+        note: never > 0 && !canNoShow ? 'No-shows can be marked once the start time and its grace period have passed.' : 'Everyone admitted is completed. Money still due stays here to collect. This cannot be undone.',
+        actions: actions);
+    if (picked == null || !mounted) return;
+    final mine = ++_seq;
+    setState(() => _busy = x.s('key'));
+    try {
+      final d = await _api.finishSession(x.s('service_id'), startsAt: x.s('starts_at'), noShows: picked == 'no_shows');
+      if (!mounted) return;
+      if (mine == _seq) _data = d;
+      final f = d.m('finish');
+      showToast(context, [
+        '${f.i('completed')} completed',
+        if (f.i('to_collect') > 0) '${f.i('to_collect')} to collect',
+        if (f.i('no_show') > 0) '${f.i('no_show')} no-show',
+        if (f.i('skipped') > 0) '${f.i('skipped')} could not be finished',
+      ].join(' · '));
+    } on ServiceApiException catch (e) {
+      if (mounted) showToast(context, e.message);
+    } catch (_) {
+      if (mounted) showToast(context, 'Could not save that. Check the connection and try again.');
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  /// Takes what is still due on a booking and completes it.
+  Future<void> _collect(AppointmentView a, num due) async {
+    final pay = await pickPayment(context, title: 'Collect ${svcRupees(due)}', amount: due);
+    if (pay == null || !mounted) return;
+    setState(() => _busy = a.id);
+    try {
+      await _api.bill(a.id, method: pay.$1, tendered: pay.$2, version: a.version, key: ServiceApi.newKey());
+      await _load();
+    } on ServiceApiException catch (e) {
+      if (mounted) showToast(context, e.message);
+      if (e.stale) _load();
+    } catch (_) {
+      if (mounted) showToast(context, 'Could not save that. Check the connection and try again.');
+    } finally {
+      if (mounted) setState(() => _busy = null);
     }
   }
 
@@ -241,7 +347,16 @@ class _FrontDeskScreenState extends State<FrontDeskScreen> {
         if (!searching || d.items.any((a) => a.s('session_key') == x.s('key') && _matches(a))) _session(d, x),
     ];
     return [
-      SvcSearch(hint: 'Search name, phone or booking', fieldKey: const ValueKey('desk-search'), onChanged: (v) => setState(() => _q = v)),
+      Row(children: [
+        Expanded(child: SvcSearch(hint: 'Search name, phone or booking', fieldKey: const ValueKey('desk-search'), onChanged: (v) => setState(() => _q = v))),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          key: const ValueKey('desk-history'),
+          style: OutlinedButton.styleFrom(foregroundColor: kInk, side: const BorderSide(color: kLine), minimumSize: const Size(0, 44), padding: const EdgeInsets.symmetric(horizontal: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+          onPressed: () => _push(SessionHistoryScreen(api: _api, category: _tab, business: _business, onNavigate: widget.onNavigate)),
+          child: Text('History', style: inter(13, 700)),
+        ),
+      ]),
       const SizedBox(height: 10),
       if (cards.isEmpty)
         OrderCardBox(child: Text(searching ? 'No booking matches that.' : 'No one is booked here today. Start a count below when people arrive.', style: inter(14, 400, color: kMuted))),
@@ -274,7 +389,11 @@ class _FrontDeskScreenState extends State<FrontDeskScreen> {
       '$walkIns walk-in${walkIns == 1 ? '' : 's'}',
       if (x.i('to_come') > 0) '${x.i('to_come')} booked to come',
       if (free != null) free <= 0 ? 'Full' : '$free free',
+      if (x.n('taken') > 0) '${svcRupees(x.n('taken'))} taken',
     ].join(' · ');
+    final finished = x.b('finished');
+    final price = x.n('price');
+    final method = _methodOf(x);
     final rows = d.items.where((a) => a.s('session_key') == key && a.status != 'cancelled' && a.status != 'no_show' && _matches(a)).toList();
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -301,13 +420,37 @@ class _FrontDeskScreenState extends State<FrontDeskScreen> {
                 Text(notes, style: inter(11.5, 400, color: kMuted)),
               ]),
             ),
-            const SizedBox(width: 10),
-            _CountButton('−1', key: ValueKey('desk-minus-$key'), filled: false, onTap: walkIns > 0 ? () => _count(x, -1) : null),
-            const SizedBox(width: 6),
-            _CountButton('+1', key: ValueKey('desk-plus-$key'), filled: true, onTap: free != null && free <= 0 ? null : () => _count(x, 1)),
+            if (!finished) ...[
+              const SizedBox(width: 10),
+              _CountButton('−1', key: ValueKey('desk-minus-$key'), filled: false, onTap: walkIns > 0 ? () => _count(x, -1) : null),
+              const SizedBox(width: 6),
+              _CountButton('+1', key: ValueKey('desk-plus-$key'), filled: true, onTap: free != null && free <= 0 ? null : () => _count(x, 1)),
+            ] else ...[
+              const SizedBox(width: 10),
+              ApptStatusChip(key: ValueKey('desk-finished-$key'), label: 'Finished', tone: 'good'),
+            ],
           ]),
+          // how walk-ins pay: picked once, every +1 uses it
+          if (!finished && price > 0) ...[
+            const SizedBox(height: 8),
+            // all in sight, on two lines if need be: nothing to scroll for at a busy door
+            Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              Text('Walk-in ${svcRupees(_doorTotal(x))}', style: inter(12, 600, color: kMuted)),
+              for (final (id, label) in const [('cash', 'Cash'), ('upi', 'UPI'), ('card', 'Card'), ('split', 'Split'), ('none', 'No charge')])
+                ModeChip(label, key: ValueKey('desk-pay-$id-$key'), selected: method == id, onTap: () => setState(() => _methods[key] = id)),
+            ]),
+          ],
           if (rows.isNotEmpty) const Padding(padding: EdgeInsets.only(top: 10), child: Divider(height: 1, color: kLine)),
           for (final a in rows) _guest(a),
+          if (!finished) ...[
+            const SizedBox(height: 8),
+            OutlinedButton(
+              key: ValueKey('desk-finish-$key'),
+              style: OutlinedButton.styleFrom(foregroundColor: kInk, side: const BorderSide(color: kLine), minimumSize: const Size.fromHeight(38), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              onPressed: _busy == null ? () => _finish(x) : null,
+              child: _busy == key ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: kGreenText)) : Text('Finish session', style: inter(13, 700)),
+            ),
+          ],
         ]),
       ),
     );
@@ -336,6 +479,10 @@ class _FrontDeskScreenState extends State<FrontDeskScreen> {
           const SizedBox(width: 8),
           if (a.can('pay_deposit'))
             _DeskButton('Advance', key: ValueKey('desk-act-${a.id}'), busy: false, onTap: () => _open(a))
+          else if (a.status == 'in_service')
+            due > 0
+                ? _DeskButton('Collect', key: ValueKey('desk-collect-${a.id}'), busy: busy, onTap: _busy == null ? () => _collect(a, due) : null)
+                : _DeskButton('Complete', key: ValueKey('desk-act-${a.id}'), busy: false, onTap: _busy == null ? () => _act(a) : null)
           else if (!open)
             ApptStatusChip(label: a.statusLabel, tone: a.tone)
           else if (places == 1)

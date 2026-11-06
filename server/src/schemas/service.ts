@@ -29,7 +29,9 @@ export const Calendar = obj({
 });
 export const FrontDesk = obj({ date: day.nullish(), location_id: id.nullish() }); // the Bill tab's day, 5 Nov 2026
 // the door's count: one walk-in on or off, 0 starts a count now; how many on a booking are in
-export const SessionCount = obj({ service_id: id, starts_at: when.nullish(), delta: z.number().int().min(-1).max(1), location_id: id.nullish(), ...key });
+export const SessionCount = obj({ service_id: id, starts_at: when.nullish(), delta: z.number().int().min(-1).max(1), method: z.enum(['cash', 'upi', 'card', 'split', 'none']).optional(), split: obj({ cash: z.number().min(0), card: z.number().min(0) }).optional(), location_id: id.nullish(), ...key });
+export const SessionHistory = obj({ category: z.enum(['events', 'activities']).nullish(), location_id: id.nullish() });
+export const SessionFinish = obj({ service_id: id, starts_at: when, no_shows: z.boolean().optional(), location_id: id.nullish(), ...key });
 export const Admit = obj({ id, admitted: z.number().int().min(0).max(500), expected_version: ver, ...key });
 // who is coming (4 Nov 2026): checked against the listing's rules and limits, and priced by them
 const party = obj({
@@ -137,7 +139,7 @@ export const Sell = obj({
 export const EntitlementsFor = obj({ customer_phone: text(20) });
 
 // The Bill tab (2 Nov 2026): the business's bills, one bill, a new bill (services from the catalogue), taking payment on it.
-export const BillList = obj({ filter: z.enum(['all', 'due', 'paid', 'today']).optional(), q: text(60).nullish() });
+export const BillList = obj({ filter: z.enum(['all', 'due', 'paid', 'today', 'walkins']).optional(), q: text(60).nullish() });
 export const BillView = obj({ order_id: id });
 export const InvoiceCreate = obj({
   customer_name: text(80), customer_phone: text(20).nullish(), address: text(300).nullish(), title: text(80).nullish(), message: text(500).nullish(),

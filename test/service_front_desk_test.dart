@@ -36,8 +36,14 @@ class _Fake {
         'svc_front_desk' => day(),
         'svc_session_count' => count(body),
         'svc_appointment_admit' => admit(body),
+        'svc_session_finish' => finish(body),
+        'svc_bill' => {'id': body['id'], 'status': 'completed', 'version': 9},
         'svc_appointment_act' => {'id': body['id'], 'status': 'checked_in', 'version': 4},
-        'svc_bill_list' => {'counts': {'all': 1, 'due': 1, 'paid': 0}, 'due_amount': 500, 'paid_this_month': 0, 'bills': []},
+        'svc_bill_list' => {'counts': {'all': 1, 'due': 1, 'paid': 0, 'walkins': 3}, 'walkins_taken_today': 1800, 'due_amount': 500, 'paid_this_month': 0, 'bills': [],
+          'walkin_sessions': [{'key': 'yoga|1', 'title': 'Yoga workshop', 'date_label': '5 Nov 2026', 'time_label': '6:00 – 7:30 PM', 'charged': 3, 'free': 0, 'refunded': 1, 'taken': 1800,
+            'bills': [{'id': 'b1', 'display_no': 'P-1', 'title': 'Walk-in · Yoga', 'customer': 'Walk-in', 'status': 'paid', 'status_label': 'Refunded', 'removed': true, 'total': 600, 'paid': 600, 'due': 0, 'date_label': '5 Nov'}]}]},
+        'svc_session_history' => {'sessions': [{'key': 'old|1', 'title': 'Old yoga', 'date_label': 'Wed, 4 Nov 2026', 'time_label': '6:00 – 7:30 PM', 'finished': true, 'finished_label': '4 Nov, 8:00 PM', 'capacity': 6, 'admitted': 4, 'walk_ins': 2, 'booked': 3, 'no_show': 1, 'cancelled': 0, 'taken': 800,
+          'by_method': {'cash': 500, 'card': 300}, 'guests': [{'id': 'g1', 'display_no': 'APT-1', 'customer': 'Asha', 'status_label': 'Completed', 'places': 2, 'admitted': 2}]}]},
         _ => <String, dynamic>{},
       };
       return http.Response(jsonEncode(answer), 200, headers: _json);
@@ -53,11 +59,18 @@ class _Fake {
       'courts': courts,
       'group_listings': [{'service_id': 'yoga', 'name': 'Yoga workshop', 'category': 'events'}, {'service_id': 'pottery', 'name': 'Pottery', 'category': 'activities'}],
       'sessions': hasSession ? [{'key': 'yoga|1', 'service_id': 'yoga', 'starts_at': '2026-11-05T12:30:00+00:00', 'title': 'Yoga workshop', 'time_label': '6:00 – 7:30 PM', 'category': 'events',
+        'price': 600, 'method': 'cash', 'taken': taken, 'finished': finished, 'can_no_show': canNoShow, 'never_came': rows.where((r) => r['session_key'] == 'yoga|1' && r['status'] == 'confirmed').length,
         'capacity': capacity, 'walk_ins': walkIns, 'booked': booked, 'booked_in': inNow, 'admitted': walkIns + inNow, 'to_come': booked - inNow, 'free': capacity - walkIns - booked}] : [],
     };
   }
 
   bool hasSession = true;
+  bool finished = false, canNoShow = false;
+  num taken = 0;
+  Map<String, dynamic> finish(Map<String, dynamic> b) {
+    finished = true;
+    return {...day(), 'finish': {'completed': 2, 'to_collect': 1, 'no_show': b['no_shows'] == true ? 1 : 0, 'skipped': 0}};
+  }
   List<Map<String, dynamic>> courts = [];
   Map<String, dynamic> count(Map<String, dynamic> b) {
     hasSession = true;
@@ -234,6 +247,130 @@ void main() {
       expect(f.of('svc_session_count').single, containsPair('delta', 0));
       expect(f.of('svc_session_count').single['service_id'], 'yoga');
       expect(find.byKey(const ValueKey('desk-plus-yoga|1')), findsOneWidget);
+    });
+
+    testWidgets('walk-ins pay as picked once; each +1 sends it; money taken shows', (t) async {
+      final f = _Fake([], kinds: const ['events'])..taken = 1200;
+      await show(t, FrontDeskScreen(api: f.api));
+      await t.pumpAndSettle();
+      await _tap(t, 'desk-tab-events');
+      expect(find.text('Walk-in ₹600'), findsOneWidget);
+      expect(find.textContaining('₹1,200 taken'), findsOneWidget);
+      await _tap(t, 'desk-plus-yoga|1');
+      expect(f.of('svc_session_count').last, containsPair('method', 'cash'));
+      await _tap(t, 'desk-pay-upi-yoga|1');
+      await _tap(t, 'desk-plus-yoga|1');
+      expect(f.of('svc_session_count').last, containsPair('method', 'upi'));
+      await _tap(t, 'desk-pay-card-yoga|1');
+      await _tap(t, 'desk-plus-yoga|1');
+      expect(f.of('svc_session_count').last, containsPair('method', 'card'));
+      await _tap(t, 'desk-pay-none-yoga|1');
+      await _tap(t, 'desk-plus-yoga|1');
+      expect(f.of('svc_session_count').last, containsPair('method', 'none'));
+      await _tap(t, 'desk-minus-yoga|1');
+      expect(f.of('svc_session_count').last.containsKey('method'), isFalse, reason: 'taking off undoes how that one paid');
+    });
+
+    testWidgets('a split asks each time: cash and card as typed, the rest UPI; too much cannot be sent', (t) async {
+      final f = _Fake([], kinds: const ['events']);
+      await show(t, FrontDeskScreen(api: f.api));
+      await t.pumpAndSettle();
+      await _tap(t, 'desk-tab-events');
+      await _tap(t, 'desk-pay-split-yoga|1');
+      await _tap(t, 'desk-plus-yoga|1');
+      expect(f.of('svc_session_count'), isEmpty, reason: 'nothing until the amounts are in');
+      await t.enterText(find.byKey(const ValueKey('split-cash')), '700');
+      await t.pump();
+      expect(find.text('That is ₹100 more than the bill.'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('split-ok')));
+      await t.pump();
+      expect(f.of('svc_session_count'), isEmpty);
+      await t.enterText(find.byKey(const ValueKey('split-cash')), '200');
+      await t.enterText(find.byKey(const ValueKey('split-card')), '100');
+      await t.pump();
+      expect(find.text('UPI ₹300 (the rest)'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('split-ok')));
+      await t.pumpAndSettle();
+      final sent = f.of('svc_session_count').single;
+      expect(sent, containsPair('method', 'split'));
+      expect(sent['split'], {'cash': 200, 'card': 100});
+    });
+
+    testWidgets('cancelling a split adds no one', (t) async {
+      final f = _Fake([], kinds: const ['events']);
+      await show(t, FrontDeskScreen(api: f.api));
+      await t.pumpAndSettle();
+      await _tap(t, 'desk-tab-events');
+      await _tap(t, 'desk-pay-split-yoga|1');
+      await _tap(t, 'desk-plus-yoga|1');
+      await t.tap(find.text('Cancel'));
+      await t.pumpAndSettle();
+      expect(f.of('svc_session_count'), isEmpty);
+      expect(find.text('2 of 6 admitted'), findsOneWidget);
+    });
+
+    testWidgets('History lists past sessions; a dropdown shows who came', (t) async {
+      final f = _Fake([], kinds: const ['events']);
+      await show(t, FrontDeskScreen(api: f.api));
+      await t.pumpAndSettle();
+      await _tap(t, 'desk-tab-events');
+      await _tap(t, 'desk-history');
+      expect(f.of('svc_session_history').single, containsPair('category', 'events'));
+      expect(find.text('Finished'), findsOneWidget);
+      expect(find.textContaining('₹800 at the door · Cash ₹500 · Card ₹300'), findsOneWidget);
+      expect(find.text('Asha'), findsNothing);
+      await _tap(t, 'history-old|1');
+      expect(find.text('Asha'), findsOneWidget);
+      await _tap(t, 'history-tab-all');
+      expect(f.of('svc_session_history').last.containsKey('category'), isFalse);
+    });
+
+    testWidgets('Bills keeps walk-ins in their own pile, a dropdown per session', (t) async {
+      final f = _Fake([], kinds: const ['events']);
+      await show(t, FrontDeskScreen(api: f.api));
+      await t.pumpAndSettle();
+      await _tap(t, 'desk-tab-bills');
+      expect(find.textContaining('3 paid · ₹1,800 today'), findsOneWidget);
+      await _tap(t, 'pile-walkins');
+      expect(f.of('svc_bill_list').last, containsPair('filter', 'walkins'));
+      expect(find.text('P-1 · Walk-in · Yoga'), findsNothing);
+      await _tap(t, 'walkins-yoga|1');
+      expect(find.text('P-1 · Walk-in · Yoga'), findsOneWidget);
+      expect(find.text('Refunded'), findsOneWidget);
+    });
+
+    testWidgets('Finish session asks first, then closes the door; who owes shows Collect', (t) async {
+      final owes = {...guest('11', 'Riya', 3, admitted: 3), 'status': 'in_service', 'actions': ['finish'], 'amount': 500, 'paid': 100};
+      final f = _Fake([owes], kinds: const ['events']);
+      await show(t, FrontDeskScreen(api: f.api));
+      await t.pumpAndSettle();
+      await _tap(t, 'desk-tab-events');
+      expect(find.byKey(const ValueKey('desk-collect-11')), findsOneWidget);
+      await _tap(t, 'desk-finish-yoga|1');
+      expect(f.of('svc_session_finish'), isEmpty, reason: 'nothing until the answer');
+      await _tap(t, 'desk-finish-yes');
+      expect(f.of('svc_session_finish').single, containsPair('no_shows', false));
+      expect(find.byKey(const ValueKey('desk-plus-yoga|1')), findsNothing);
+      expect(find.byKey(const ValueKey('desk-finished-yoga|1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('desk-finish-yoga|1')), findsNothing);
+    });
+
+    testWidgets('no-shows are offered only once they are allowed', (t) async {
+      final f = _Fake([guest('11', 'Gone', 1)], kinds: const ['events']);
+      await show(t, FrontDeskScreen(api: f.api));
+      await t.pumpAndSettle();
+      await _tap(t, 'desk-tab-events');
+      await _tap(t, 'desk-finish-yoga|1');
+      expect(find.byKey(const ValueKey('desk-finish-no-shows')), findsNothing);
+      await t.tapAt(const Offset(5, 5));
+      await t.pumpAndSettle();
+      f.canNoShow = true;
+      await show(t, FrontDeskScreen(key: UniqueKey(), api: f.api));
+      await t.pumpAndSettle();
+      await _tap(t, 'desk-tab-events');
+      await _tap(t, 'desk-finish-yoga|1');
+      await _tap(t, 'desk-finish-no-shows');
+      expect(f.of('svc_session_finish').single, containsPair('no_shows', true));
     });
 
     testWidgets('a 375 px phone holds the count and a group row', (t) async {
