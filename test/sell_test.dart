@@ -1045,6 +1045,18 @@ void main() {
       expect(opened, 'o1');
     });
 
+    testWidgets('a store\'s Past orders: paid bills are there, a bill still unpaid is not, and no refund here', (t) async {
+      final till = Till()..receipts = [receipt('c1', 'P-00121', 'Counter sale', 40), {...receipt('c2', 'P-00122', 'On hold', 90), 'status': 'unpaid', 'paid': 0}];
+      await tall(t, HistoryScreen(env: till.env(), source: 'all', onOpen: (_) {}, now: now));
+      expect(find.text('Past orders'), findsWidgets);
+      expect(lastQuery(till)['source'], 'all');
+      expect(find.text('Order P-00121'), findsOneWidget);
+      expect(find.text('Order P-00122'), findsNothing);
+      await t.tap(find.text('View card'));
+      await t.pumpAndSettle();
+      expect(find.text('Refund this bill'), findsNothing);
+    });
+
     testWidgets('refund: the server\'s refusal is shown (manager only); a good refund asks with a key and reloads', (t) async {
       final till = Till();
       var allow = false;
