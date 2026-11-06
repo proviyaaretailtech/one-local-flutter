@@ -54,6 +54,8 @@ class StoreMoneyApi {
   Future<Map<String, dynamic>> voidEntry(String id, String reason) => _call('smoney_void', {'id': id, 'reason': reason});
   Future<Map<String, dynamic>> register({String? day}) => _call('smoney_register', {'day': day});
   Future<Map<String, dynamic>> closeDay(int countedMinor, {String? day}) => _call('smoney_close_day', {'counted_minor': countedMinor, 'day': day});
+  Future<Map<String, dynamic>> reopenDay(String reason, {String? day}) => _call('smoney_reopen_day', {'reason': reason.trim(), 'day': day});
+  Future<Map<String, dynamic>> openingCount(int countedMinor) => _call('smoney_opening_count', {'counted_minor': countedMinor});
   Future<Map<String, dynamic>> dues() => _call('smoney_dues', {});
 
   /// Money ↔ Stock: what the stock is worth at cost, and what was lost (damaged, expired, missing at a count) between [from] and [to].
@@ -542,6 +544,35 @@ class AdsCommissionScreen extends StatelessWidget {
       );
 }
 
+/// Reopens a store's closed day with a reason (the owner and admins). A sale made after it is added to the day end, counted at the next Close day.
+Future<bool> reopenStoreDay(BuildContext context, StoreMoneyApi api, {String? day}) async {
+  final c = TextEditingController();
+  final reason = await showOlDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(tr('Reopen this day?'), style: inter(18, 700)),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(tr('New sales are added to the day end. Count the cash again at the next Close day.'), style: inter(13.5, 500, color: kMuted)),
+        const SizedBox(height: 10),
+        TextField(key: const ValueKey('reopen-reason'), controller: c, autofocus: true, maxLength: 200, decoration: InputDecoration(labelText: tr('Why are you reopening it?'))),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Not now'), style: inter(14, 600))),
+        TextButton(key: const ValueKey('reopen-confirm'), onPressed: () => Navigator.pop(ctx, c.text.trim()), child: Text(tr('Reopen day'), style: inter(14, 700))),
+      ],
+    ),
+  );
+  if (reason == null || !context.mounted) return false;
+  try {
+    await api.reopenDay(reason, day: day == null || day.isEmpty ? null : day);
+    if (context.mounted) showToast(context, tr('Day reopened.'));
+    return true;
+  } catch (e) {
+    if (context.mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not reopen the day. Try again.'));
+    return false;
+  }
+}
+
 // ------------------------------------------------------------------------------------------------------------------- cash register
 class _RegisterPart extends StatefulWidget {
   const _RegisterPart({super.key, required this.api, required this.canRecord, required this.onChanged});
@@ -555,6 +586,52 @@ class _RegisterPart extends StatefulWidget {
 class _RegisterPartState extends State<_RegisterPart> {
   Map<String, dynamic>? _r;
   String? _error;
+  String? _closeError;
+
+  Future<void> _reopen() async {
+    if (await reopenStoreDay(context, widget.api, day: '${_r?['day'] ?? ''}')) {
+      await _load();
+      widget.onChanged();
+    }
+  }
+
+  /// The drawer does not hold what the last day ended with: the exact cash goes in, and the difference is a shortage or an excess in Reports.
+  Future<void> _countOpening() async {
+    final c = TextEditingController();
+    final counted = await showOlDialog<num>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('Opening cash'), style: inter(18, 700)),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${tr('Last day ended with')}: ${rs(_r?['opening_minor'] as num?)}', style: inter(14, 600)),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey('opening-counted'),
+            controller: c,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+            decoration: InputDecoration(labelText: tr('Cash in the drawer now'), prefixText: '₹ '),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Not now'), style: inter(14, 600))),
+          TextButton(key: const ValueKey('opening-confirm'), onPressed: () => Navigator.pop(ctx, num.tryParse(c.text.trim())), child: Text(tr('Save'), style: inter(14, 700))),
+        ],
+      ),
+    );
+    if (counted == null || !mounted) return;
+    try {
+      final r = await widget.api.openingCount((counted * 100).round());
+      if (!mounted) return;
+      setState(() => _r = r);
+      final diff = ((r['opening_count'] as Map?)?['difference_minor'] as num?) ?? 0;
+      showToast(context, diff == 0 ? tr('Opening cash matches.') : '${diff > 0 ? tr('Excess') : tr('Shortage')} ${rs(diff.abs())} ${tr('recorded in Reports.')}');
+      widget.onChanged();
+    } catch (e) {
+      if (mounted) showToast(context, e is PartnerApiException ? e.message : tr('Could not save the opening cash. Try again.'));
+    }
+  }
 
   @override
   void initState() {
@@ -578,28 +655,49 @@ class _RegisterPartState extends State<_RegisterPart> {
 
   Future<void> _close() async {
     final c = TextEditingController();
+    final bills = ((_r?['open_bills'] as Map?)?['count'] as num?) ?? 0;
     final counted = await showOlDialog<num>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(tr('Close day'), style: inter(18, 700)),
-        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${tr('Should be in the drawer')}: ${rs(_r?['expected_minor'] as num?)}', style: inter(14, 600)),
-          const SizedBox(height: 10),
-          TextField(
-            key: const ValueKey('close-counted'),
-            controller: c,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-            decoration: InputDecoration(labelText: tr('Cash you counted'), prefixText: '₹ '),
-          ),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Not now'), style: inter(14, 600))),
-          TextButton(key: const ValueKey('close-confirm'), onPressed: () => Navigator.pop(ctx, num.tryParse(c.text.trim())), child: Text(tr('Close day'), style: inter(14, 700))),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: Text(tr('Close day'), style: inter(18, 700)),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${tr('Should be in the drawer')}: ${rs(_r?['expected_minor'] as num?)}', style: inter(14, 600)),
+            if (bills > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                '$bills ${bills == 1 ? tr('bill is') : tr('bills are')} ${tr('still unpaid')} (${rs((_r?['open_bills'] as Map?)?['due_minor'] as num?)}).',
+                key: const ValueKey('close-open-bills'),
+                style: inter(13, 600, color: kMoneyRed),
+              ),
+            ],
+            const SizedBox(height: 10),
+            TextField(
+              key: const ValueKey('close-counted'),
+              controller: c,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              decoration: InputDecoration(labelText: tr('Cash you counted'), prefixText: '₹ ', errorText: _closeError),
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Not now'), style: inter(14, 600))),
+            TextButton(
+              key: const ValueKey('close-confirm'),
+              onPressed: () {
+                final v = num.tryParse(c.text.trim());
+                if (v == null) return setInner(() => _closeError = tr('Enter the cash you counted, like 1250.50.'));
+                _closeError = null;
+                Navigator.pop(ctx, v);
+              },
+              child: Text(tr('Close day'), style: inter(14, 700)),
+            ),
+          ],
+        ),
       ),
     );
+    _closeError = null;
     if (counted == null || !mounted) return;
     try {
       final r = await widget.api.closeDay((counted * 100).round());
@@ -627,6 +725,8 @@ class _RegisterPartState extends State<_RegisterPart> {
     if (_error != null && r == null) return Text(_error!, style: inter(13.5, 500, color: kMuted));
     if (r == null) return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()));
     final closed = r['closed'] as Map?;
+    final openingDiff = ((r['opening_count'] as Map?)?['difference_minor'] as num?) ?? 0;
+    final reopens = (r['reopens'] as List?)?.length ?? 0;
     return Container(
       key: const ValueKey('cash-register'),
       padding: const EdgeInsets.all(16),
@@ -635,6 +735,18 @@ class _RegisterPartState extends State<_RegisterPart> {
         Text('${tr('Cash drawer')} · ${dayMonth('${r['day']}')}', style: inter(15.5, 800)),
         const SizedBox(height: 8),
         _kv('Opening cash', r['opening_minor'] as num?),
+        if (openingDiff > 0) _kv('Excess at opening', openingDiff, sign: '+ ', color: kMoneyGreen),
+        if (openingDiff < 0) _kv('Shortage at opening', openingDiff.abs(), sign: '− ', color: kMoneyRed),
+        if (r['can_count_opening'] == true && widget.canRecord)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              key: const ValueKey('count-opening'),
+              onPressed: _countOpening,
+              style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+              child: Text(tr('Drawer different? Enter the exact cash'), style: inter(13, 600, color: kMoneyGreen)),
+            ),
+          ),
         _kv('Cash sales', r['sales_minor'] as num?, sign: '+ ', color: kMoneyGreen),
         _kv('Other cash in', r['cash_in_minor'] as num?, sign: '+ ', color: kMoneyGreen),
         _kv('Cash refunds', r['refunds_minor'] as num?, sign: '− ', color: kMoneyRed),
@@ -642,6 +754,11 @@ class _RegisterPartState extends State<_RegisterPart> {
         const Divider(height: 20),
         _kv('Should be in the drawer', r['expected_minor'] as num?, bold: true),
         const SizedBox(height: 10),
+        if (reopens > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('${tr('Reopened')} $reopens ${reopens == 1 ? tr('time') : tr('times')} ${tr('today')}', key: const ValueKey('day-reopens'), style: inter(13, 500, color: kMuted)),
+          ),
         if (closed != null)
           Container(
             key: const ValueKey('day-closed'),
@@ -660,6 +777,10 @@ class _RegisterPartState extends State<_RegisterPart> {
             style: FilledButton.styleFrom(backgroundColor: kPrimary, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
             child: Text(tr('Close day · count the cash'), style: inter(15, 700, color: Colors.white)),
           ),
+        if (closed != null && r['can_reopen'] == true) ...[
+          const SizedBox(height: 8),
+          OutlinedButton(key: const ValueKey('reopen-day'), onPressed: _reopen, child: Text(tr('Reopen day'), style: inter(14, 700))),
+        ],
       ]),
     );
   }

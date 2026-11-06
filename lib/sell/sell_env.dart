@@ -66,7 +66,7 @@ class SellEnv {
     open(context, id);
   }
 
-  void open(BuildContext context, String id) {
+  Future<void> open(BuildContext context, String id) async {
     final nav = Navigator.of(context);
     Widget? page = switch (id) {
       'sell' => SellScreen(env: this),
@@ -80,6 +80,6 @@ class SellEnv {
       _ => null,
     };
     if (page == null) return;
-    nav.push(MaterialPageRoute(settings: RouteSettings(name: id == 'sell' ? 'sell' : null), builder: (_) => page));
+    await nav.push(MaterialPageRoute(settings: RouteSettings(name: id == 'sell' ? 'sell' : null), builder: (_) => page));
   }
 }

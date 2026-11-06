@@ -73,6 +73,8 @@ export const StoreRecord = obj({
 export const StoreVoid = obj({ id, reason: z.string().trim().min(3, 'Say why (3 to 200 characters).').max(200) });
 export const StoreRegister = obj({ day: day.nullish() });
 export const StoreClose = obj({ day: day.nullish(), counted_minor: z.number().int().min(0).max(99_999_999_999) });
+export const StoreReopen = obj({ day: day.nullish(), reason: z.string({ message: 'Write why the day is reopened.' }).trim().min(3, 'Write why the day is reopened.').max(200, 'Keep the reason under 200 characters.') });
+export const StoreOpeningCount = obj({ counted_minor: z.number().int().min(0).max(99_999_999_999) });
 // Money redesign (founder's sketches, 28 Oct 2026; C:\onelocal\hosted_money_redesign_2026-10-28.sql): contacts to pay, proof photos.
 export const StoreContacts = obj({ q: z.string().max(60).optional() });
 export const StoreContactSave = obj({ id: id.nullish(), name: z.string().trim().min(1, 'Enter the name.').max(60), phone: z.string().max(20).optional(), upi_id: z.string().max(100).optional() });

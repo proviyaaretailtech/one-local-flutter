@@ -22,7 +22,7 @@ class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key, required this.env, this.source = 'offline', this.onOpen, this.bottomNav, this.now});
   final SellEnv env;
 
-  /// offline: counter bills; online: orders customers placed.
+  /// offline: counter bills; online: orders customers placed; all: a store's Past orders, both, without the bills still waiting for payment.
   final String source;
 
   /// Online: opens an order's own page (accept, pack, return…).
@@ -40,6 +40,9 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   SellEnv get env => widget.env;
   bool get _online => widget.source == 'online';
+  bool get _past => widget.source == 'all';
+  // a bill not paid yet is on hold, not past
+  List<Receipt> _shown(List<Receipt> rows) => _past ? rows.where((r) => r.status != 'unpaid').toList() : rows;
   DateTime get _today {
     final n = (widget.now ?? DateTime.now)();
     return DateTime(n.year, n.month, n.day);
@@ -72,6 +75,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     };
   }
 
+  /// The bills that brought money in, what they kept, and the unpaid ones apart: the count and the amount are about the same bills.
+  String _countLine(List<Receipt> rows) {
+    final taken = rows.where((r) => r.paid > 0).toList();
+    final unpaid = rows.where((r) => r.paid <= 0 && r.status != 'cancelled').length; // a cancelled bill is owed nothing
+    return '${taken.length}${_more ? '+' : ''} ${taken.length == 1 ? 'order' : 'orders'} · ${rupees(taken.fold<num>(0, (s, r) => s + r.paid - r.refunded))}${unpaid > 0 ? ' · $unpaid unpaid' : ''}';
+  }
+
   String get _spanText {
     final (a, b) = _span;
     return a == b ? fmtDay(a) : '${a.day} ${_mon(a)}${a.year == b.year ? '' : ' ${a.year}'} – ${fmtDay(b)}';
@@ -93,7 +103,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final all = await env.sell.receipts(from: isoDay(a), to: isoDay(b), source: widget.source, limit: _pageSize);
       if (!mounted || mine != _seq) return;
       setState(() {
-        _rows = all;
+        _rows = _shown(all);
         _more = all.length >= _pageSize;
       });
     } catch (e) {
@@ -113,7 +123,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final next = await env.sell.receipts(from: isoDay(a), to: isoDay(b), source: widget.source, limit: _pageSize, before: rows.last.createdAt);
       if (!mounted || mine != _seq) return;
       setState(() {
-        _rows = [...rows, ...next];
+        _rows = [...rows, ..._shown(next)];
         _more = next.length >= _pageSize;
       });
     } catch (e) {
@@ -204,10 +214,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        SellTopBar(title: tr(_online ? 'Past online orders' : 'Order history'), initials: env.initials),
+        SellTopBar(title: tr(_past ? 'Past orders' : _online ? 'Past online orders' : 'Order history'), initials: env.initials),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
-            SellTitle(_online ? 'Past online orders' : 'Order History', sub: env.storeLine),
+            SellTitle(_past ? 'Past orders' : _online ? 'Past online orders' : 'Order History', sub: env.storeLine),
             const SizedBox(height: 10),
             _ranges(),
             const SizedBox(height: 10),
@@ -215,7 +225,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               Expanded(child: Text(_spanText, key: const ValueKey('hist-span'), style: inter(15, 700, color: kMuted))),
               if (rows != null)
                 Text(
-                  '${rows.length}${_more ? '+' : ''} ${rows.length == 1 ? 'order' : 'orders'} · ${rupees(rows.fold<num>(0, (s, r) => s + r.paid - r.refunded))}',
+                  _countLine(rows),
                   key: const ValueKey('hist-count'),
                   style: inter(14, 400, color: kMuted),
                 ),
@@ -224,7 +234,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             if (_error != null) StateCard(icon: LucideIcons.database, danger: true, title: tr('History could not load'), body: _error!, primary: 'Retry', onPrimary: _load),
             if (_error == null && rows == null) const SkeletonRows(),
             if (rows != null && rows.isEmpty)
-              StateCard(icon: LucideIcons.history, title: tr('No orders'), body: tr(_online ? 'No online orders in this time.' : 'No counter orders in this time.')),
+              StateCard(icon: LucideIcons.history, title: tr('No orders'), body: tr(_past ? 'No orders in this time.' : _online ? 'No online orders in this time.' : 'No counter orders in this time.')),
             if (rows != null) for (final r in rows) ...[_card(r), const SizedBox(height: 12)],
             if (_more)
               Center(
@@ -314,7 +324,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             }, child: Text(tr('Copy receipt'))),
             TextButton(key: ValueKey('hist-print-${r.id}'), onPressed: () => printBill(context, BillReceipt.fromRecord(r, store: HomeNav.storeName ?? 'OneLocal')), child: Text(tr('Print'))),
             if (widget.onOpen != null) TextButton(key: ValueKey('hist-open-${r.id}'), onPressed: () => widget.onOpen!(r.id), child: Text(tr('Open order'))),
-            if (!_online && r.paid > r.refunded) TextButton(onPressed: () => _refund(r), child: Text(tr('Refund this bill'))),
+            if (widget.source == 'offline' && r.paid > r.refunded) TextButton(onPressed: () => _refund(r), child: Text(tr('Refund this bill'))),
           ]),
         ],
       ]),

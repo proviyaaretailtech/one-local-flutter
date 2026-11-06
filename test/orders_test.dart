@@ -95,6 +95,23 @@ void main() {
   });
 
   group('OrdersHome (Orders History)', () {
+    testWidgets('a store: a counter bill is never here, paid, refunded, cancelled or being returned', (t) async {
+      final s = FakeServer((r) => ok({
+            'orders': [
+              card('1', 'pending', 'Pending', state: 'new', delivery: 'Awaiting acceptance · not dispatched'),
+              {...card('2', 'completed', 'Completed', state: 'counter'), 'channel_label': 'Store Checkout'}, // paid or refunded
+              {...card('3', 'cancelled', 'Cancelled', state: 'cancelled'), 'channel_label': 'Store Checkout'},
+              {...card('4', 'completed', 'Completed', state: 'return'), 'channel_label': 'Store Checkout'},
+              {...card('5', 'pending', 'Pending', state: 'new'), 'channel_label': 'Store Checkout'}, // an old bill that was sent to be packed
+            ]
+          }));
+      await showTall(t, OrdersHome(api: s.api));
+      expect(find.text('1 order'), findsOneWidget);
+      expect(find.text('New orders · 1'), findsOneWidget);
+      expect(find.text('Return requested · 0'), findsOneWidget);
+      expect(find.text('Cancelled · 1'), findsNothing);
+    });
+
     testWidgets('online orders sit in piles by where they are; counter bills are not here; cancelled is a small link', (t) async {
       final s = FakeServer((r) => ok({
             'orders': [

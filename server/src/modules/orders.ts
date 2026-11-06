@@ -25,6 +25,7 @@ type Row = Record<string, any>;
 export const asCaller = (request: Request): SupabaseClient => userClient(request);
 
 const POS_ERRORS: Record<string, { status: number; code: string }> = {
+  POS_DAY_ENDED: { status: 409, code: 'day_ended' },
   POS_BAD_REQUEST: { status: 400, code: 'bad_request' }, POS_BAD_QTY: { status: 400, code: 'bad_quantity' }, POS_EMPTY: { status: 400, code: 'empty_cart' },
   POS_BAD_TABLE: { status: 400, code: 'bad_table' }, POS_FORBIDDEN: { status: 403, code: 'forbidden' }, POS_NOT_FOUND: { status: 404, code: 'not_found' },
   POS_STALE: { status: 409, code: 'version_conflict' }, POS_WRONG_STATE: { status: 409, code: 'wrong_state' }, POS_ITEM_UNAVAILABLE: { status: 409, code: 'item_unavailable' },
@@ -298,7 +299,9 @@ export function shapeCard(r: Row) {
   const f = (r.fulfilment ?? null) as Row | null, ol = (r.online ?? null) as Row | null;
   const total = Number(r.total), paid = Number(r.paid), refunded = Number(r.refunded ?? 0);
   const cancelled = r.status === 'cancelled' || ol?.status === 'cancelled';
-  const completed = !cancelled && (r.status === 'delivered' || ol?.status === 'delivered' || (r.status === 'paid' && !f && !ol));
+  // a paid bill from the counter is finished when it is paid: the customer has the goods, nothing waits to be accepted or dispatched
+  const counterSale = !ol && channelLabel(r) === 'Store Checkout' && (r.status === 'paid' || r.status === 'delivered');
+  const completed = !cancelled && (r.status === 'delivered' || ol?.status === 'delivered' || (r.status === 'paid' && !f && !ol) || counterSale);
   const methods = (r.methods ?? []) as string[];
   const mode = methods.length > 1 ? 'Split' : METHOD[methods[0]] ?? (ol ? OL_METHOD[ol.payment_method] ?? 'Online' : 'Not chosen');
   const onlinePaid = ol?.payment_status === 'paid' || ol?.payment_status === 'refunded';
@@ -308,8 +311,8 @@ export function shapeCard(r: Row) {
   let delivery: string, when: string;
   if (cancelled) { delivery = 'Cancelled · not dispatched'; when = 'Not delivered'; }
   else if (completed) {
-    const at = f?.completed_at ?? ol?.delivered_at ?? r.paid_at;
-    delivery = f ? `Delivered · ${Number(f.units_picked)} of ${units} units` : ol ? 'Delivered' : 'Completed at counter';
+    const at = counterSale ? r.paid_at ?? f?.completed_at : f?.completed_at ?? ol?.delivered_at ?? r.paid_at;
+    delivery = counterSale ? 'Completed at counter' : f ? `Delivered · ${Number(f.units_picked)} of ${units} units` : ol ? 'Delivered' : 'Completed at counter';
     when = at ? `${day(at)} · ${time(at)}` : 'Time not recorded';
   } else if (f) {
     delivery = ({ awaiting_acceptance: 'Awaiting acceptance · not dispatched', picking: `Picking · ${f.units_picked} of ${units} units`, picked: 'Picked · not packed',
@@ -326,7 +329,7 @@ export function shapeCard(r: Row) {
   const fs_ = f?.stage as string | undefined, os = ol?.status as string | undefined;
   const state = cancelled ? 'cancelled'
     : asked ? 'return'
-    : completed ? (f || ol ? 'delivered' : 'counter')
+    : completed ? (counterSale ? 'counter' : f || ol ? 'delivered' : 'counter')
     : fs_ === 'awaiting_acceptance' || os === 'placed' ? 'new'
     : (fs_ === 'ready' && !f?.exception) || os === 'packed' ? 'ready'
     : f || ol ? 'ongoing'
@@ -334,7 +337,7 @@ export function shapeCard(r: Row) {
   const missing = Number(f?.units_missing ?? 0);
   const damages = [refunded > 0 ? `${rupees(refunded)} issued` : null, missing ? plural(missing, 'missing unit') : null].filter(Boolean).join(' · ') || 'None';
   return {
-    id: r.id, display_no: r.display_no, channel_label: channelLabel(r), customer: r.customer_name || 'Guest', placed_at: `${dayYear(r.created_at)} · ${time(r.created_at)}`,
+    id: r.id, display_no: r.display_no, channel_label: channelLabel(r), channel: r.channel, created_at: r.created_at, customer: r.customer_name || 'Guest', placed_at: `${dayYear(r.created_at)} · ${time(r.created_at)}`,
     status: cancelled ? 'cancelled' : completed ? 'completed' : 'pending', status_label: cancelled ? 'Cancelled' : completed ? 'Completed' : 'Pending',
     total, items: `${plural(Number(r.lines), 'line')} · ${plural(units, 'unit')}`, payment_status: payStatus, payment_mode: mode,
     delivery_status: delivery, delivery_time: when, refund_damages: damages,

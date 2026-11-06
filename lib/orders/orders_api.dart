@@ -86,6 +86,10 @@ class OrderCard {
   String get id => _s('id');
   String get displayNo => _s('display_no');
   String get channelLabel => _s('channel_label');
+
+  /// dine_in, pickup, delivery, online … and the exact time, for the next page of orders (restaurant All Orders).
+  String get channel => _s('channel');
+  String get createdAt => _s('created_at');
   String get customer => _s('customer');
   String get placedAt => _s('placed_at');
   String get status => _s('status');
@@ -319,8 +323,8 @@ class OrdersApi {
     return map;
   }
 
-  Future<List<OrderCard>> history({String filter = 'all', String q = ''}) async {
-    final r = await _send('GET', '', query: {'filter': filter, if (q.trim().isNotEmpty) 'q': q.trim()});
+  Future<List<OrderCard>> history({String filter = 'all', String q = '', String? before}) async {
+    final r = await _send('GET', '', query: {'filter': filter, if (q.trim().isNotEmpty) 'q': q.trim(), 'before': ?before});
     return ((r['orders'] as List?) ?? const []).map((e) => OrderCard((e as Map).cast<String, dynamic>())).toList();
   }
 

@@ -309,6 +309,29 @@ void main() {
       expect(env.carts.active.isEmpty, isTrue);
     });
 
+    testWidgets('a return needs a reason, and a damaged seal is marked not to go back on the shelf', (t) async {
+      final till = Till();
+      await tall(t, ReturnsScreen(env: till.env()));
+      await t.tap(find.text('+ Return'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('P-00087 · Rahul Patil'));
+      await t.pumpAndSettle();
+      await t.tap(find.byTooltip('One more Amul Butter 500g'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Record return'));
+      await t.pumpAndSettle();
+      expect(find.text('Choose why it is being returned.'), findsOneWidget);
+      expect(till.where('POST', '/pos_return_create'), isEmpty);
+      await t.tap(find.text('Damaged seal'));
+      await t.pumpAndSettle();
+      expect(find.text('Choose why it is being returned.'), findsNothing);
+      await t.tap(find.text('Record return'));
+      await t.pumpAndSettle();
+      final b = jsonDecode(till.where('POST', '/pos_return_create').single.body);
+      expect(b['reason'], 'Damaged seal');
+      expect(b['lines'], [{'order_item_id': 'i1', 'qty': 1, 'restock': false}]);
+    });
+
     testWidgets('the catalogue failing says so and Retry asks again', (t) async {
       final till = Till();
       var fail = true;
@@ -522,10 +545,15 @@ void main() {
       expect(find.text('Adds up'), findsOneWidget);
       await t.tap(find.text('Pay ₹630'));
       await t.pumpAndSettle();
+      expect(till.where('POST', '/hold'), isEmpty, reason: 'the UPI part needs its reference');
+      await t.enterText(find.byKey(const ValueKey('split-reference-1')), 'UTR4040');
+      await t.pumpAndSettle();
+      await t.tap(find.text('Pay ₹630'));
+      await t.pumpAndSettle();
       expect(till.where('POST', '/hold'), hasLength(1));
       final r = till.where('POST', '/pos_split_pay').single;
       expect(jsonDecode(r.body)['order_id'], orderId);
-      expect(jsonDecode(r.body)['payments'], [{'method': 'cash', 'amount': 300}, {'method': 'upi', 'amount': 330}]);
+      expect(jsonDecode(r.body)['payments'], [{'method': 'cash', 'amount': 300}, {'method': 'upi', 'amount': 330, 'reference': 'UTR4040'}]);
       expect(find.text('Transaction Successful'), findsOneWidget);
     });
 
@@ -540,6 +568,7 @@ void main() {
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const ValueKey('split-amount-0')), '300');
       await t.enterText(find.byKey(const ValueKey('split-amount-1')), '330');
+      await t.enterText(find.byKey(const ValueKey('split-reference-1')), 'UTR4040');
       await t.tap(find.text('Pay ₹630'));
       await t.pumpAndSettle();
       expect(find.text('The parts add up to 600 but 630 is due.'), findsOneWidget);
@@ -958,7 +987,7 @@ void main() {
       expect(find.text('Order History'), findsOneWidget);
       expect(find.text('Rahul Patil'), findsOneWidget);
       expect(find.text('Held one'), findsOneWidget); // every order, not only bills that took money
-      expect(t.widget<Text>(find.byKey(const ValueKey('hist-count'))).data, '2 orders · ₹1,740');
+      expect(t.widget<Text>(find.byKey(const ValueKey('hist-count'))).data, '1 order · ₹1,740 · 1 unpaid');
       expect(find.text('Paid at 6:23 PM'), findsOneWidget);
       final q = lastQuery(till);
       expect([q['source'], q['from'], q['to']], ['offline', '2026-10-31', '2026-10-31']);
@@ -1014,6 +1043,26 @@ void main() {
       expect(find.text('Refund this bill'), findsNothing);
       await t.tap(find.byKey(const ValueKey('hist-open-o1')));
       expect(opened, 'o1');
+    });
+
+    testWidgets('a cancelled bill is not counted as unpaid', (t) async {
+      final till = Till()..receipts = [receipt('c1', 'P-00121', 'Paid one', 40), receipt('c3', 'P-00123', 'Cancelled one', 38, status: 'cancelled', paid: 0)];
+      await tall(t, HistoryScreen(env: till.env(), source: 'all', onOpen: (_) {}, now: now));
+      expect(find.text('Order P-00123'), findsOneWidget);
+      expect(t.widget<Text>(find.byKey(const ValueKey('hist-count'))).data, '1 order · ₹40');
+    });
+
+    testWidgets('a store\'s Past orders: paid bills are there, a bill still unpaid is not, and no refund here', (t) async {
+      final till = Till()..receipts = [receipt('c1', 'P-00121', 'Counter sale', 40), {...receipt('c2', 'P-00122', 'On hold', 90), 'status': 'unpaid', 'paid': 0}];
+      await tall(t, HistoryScreen(env: till.env(), source: 'all', onOpen: (_) {}, now: now));
+      expect(find.text('Past orders'), findsWidgets);
+      expect(lastQuery(till)['source'], 'all');
+      expect(find.text('Order P-00121'), findsOneWidget);
+      expect(find.text('Order P-00122'), findsNothing);
+      expect(t.widget<Text>(find.byKey(const ValueKey('hist-count'))).data, '1 order · ₹40');
+      await t.tap(find.text('View card'));
+      await t.pumpAndSettle();
+      expect(find.text('Refund this bill'), findsNothing);
     });
 
     testWidgets('refund: the server\'s refusal is shown (manager only); a good refund asks with a key and reloads', (t) async {
@@ -1161,11 +1210,13 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byTooltip('One more Amul Butter 500g'));
       await t.pumpAndSettle();
+      await t.tap(find.text('Wrong item'));
+      await t.pumpAndSettle();
       await t.tap(find.text('Record return'));
       await t.pumpAndSettle();
       final r = till.where('POST', '/pos_return_create').single;
       expect(r.headers['Idempotency-Key'], startsWith('pos-'));
-      expect(jsonDecode(r.body), {'order_id': 'r1', 'lines': [{'order_item_id': 'i1', 'qty': 1}], 'reason': 'Damaged seal', 'note': ''});
+      expect(jsonDecode(r.body), {'order_id': 'r1', 'lines': [{'order_item_id': 'i1', 'qty': 1}], 'reason': 'Wrong item', 'note': ''});
       expect(find.text('Return recorded. A manager approves it next.'), findsOneWidget);
     });
 
@@ -1179,6 +1230,8 @@ void main() {
       await t.tap(find.byTooltip('One more Amul Butter 500g'));
       await t.pumpAndSettle();
       await t.tap(find.text('Damaged'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Wrong item'));
       await t.pumpAndSettle();
       await t.tap(find.text('Record return'));
       await t.pumpAndSettle();
@@ -1198,6 +1251,8 @@ void main() {
       await t.tap(find.text('Damaged'));
       await t.pumpAndSettle();
       await t.tap(find.text('Damaged'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Wrong item'));
       await t.pumpAndSettle();
       await t.tap(find.text('Record return'));
       await t.pumpAndSettle();

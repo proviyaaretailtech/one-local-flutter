@@ -283,6 +283,8 @@ class _SellScreenState extends State<SellScreen> {
       setState(() {});
       _requote();
       _loadFacts(); // a sale changes the stock counts
+      _loadHeld();
+      _loadShift(); // Pay may have opened the shift
     }
   }
 
@@ -374,9 +376,18 @@ class _SellScreenState extends State<SellScreen> {
                 ('returns', LucideIcons.undo2, 'Returns'),
                 ('receipts', LucideIcons.receiptText, 'Invoices'),
                 ('shift', LucideIcons.wallet, 'Cash shift'),
-                ('daily', LucideIcons.calendarClock, 'Daily operations'),
               ])
-                _Shortcut(icon: icon, label: label, onTap: () => env.open(context, id)),
+                _Shortcut(
+                  icon: icon,
+                  label: label,
+                  onTap: () async {
+                    await env.open(context, id);
+                    if (mounted) {
+                      _loadHeld(); // a held bill may have been paid or cancelled there
+                      _loadShift(); // a shift may have been opened or closed there
+                    }
+                  },
+                ),
             ]),
           ),
         ),

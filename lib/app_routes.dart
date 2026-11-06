@@ -43,6 +43,7 @@ import 'money/store_money.dart';
 import 'team/staff_screen.dart';
 import 'orders/online_locked.dart';
 import 'orders/orders_home.dart';
+import 'restaurant/rst_all_orders_screen.dart';
 import 'plans/subscription_plans.dart';
 import 'stock/product_page.dart';
 import 'stock/stock_env.dart';
@@ -91,7 +92,9 @@ void installRoutes() {
     Navigator.of(c).push(MaterialPageRoute(
         builder: (_) => OnlineOrdersGate(child: restaurant ? OrdersBoardScreen(onNavigate: (id) => _tab(c, id)) : OrdersHome(onNavigate: (id) => _tab(c, id)))));
   };
-  HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(builder: (_) => OrdersHome(onNavigate: (id) => _tab(c, id))));
+  // A restaurant's All Orders is every order (dine-in too, founder 6 Nov 2026); a store keeps its Orders History.
+  HomeNav.orderHistory = (c) => Navigator.of(c).push(MaterialPageRoute(
+      builder: (_) => HomeNav.shell?.kind == 'restaurant' ? RstAllOrdersScreen(onNavigate: (id) => _tab(c, id)) : OrdersHome(onNavigate: (id) => _tab(c, id))));
   // Section F: the till (sell, search, carts, payment, history, returns, receipts). Section E's cart screen stays reachable from the orders list.
   HomeNav.bill = (c) {
     if (HomeNav.shell?.kind == 'store' && _inShell('Bill')) return;

@@ -181,6 +181,15 @@ export function fulfilment(channel: string, hasAddress: boolean): string {
   return 'other';
 }
 
+// A store's sales are the money it kept: paid bills, less what was refunded on them (an unpaid held bill is not a sale yet).
+function isPaidBill(o: Row) { return o.status !== 'cancelled' && (SETTLED.includes(o.status) || !!o.paid_at); }
+async function refundsOn(client: SupabaseClient, ids: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (const r of await rowsFor(client, 'pos_refunds', 'order_id', ids, 'order_id, amount')) out.set(String(r.order_id), (out.get(String(r.order_id)) ?? 0) + num(r.amount));
+  return out;
+}
+const keptOn = (o: Row, refunds: Map<string, number>) => num(o.total) - (refunds.get(String(o.id)) ?? 0);
+
 export async function homeSummary(staff: Staff, wanted?: string | null, now = new Date(), client: SupabaseClient = db()) {
   const d = client;
   const s = await scopeFor(staff, wanted, client);
@@ -194,6 +203,8 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
   // Today's bills (Commerce). Cancelled bills are not sales.
   const day = await ordersBetween(s, from, to, 'id, status, total, guest_count, paid_at');
   const sold = day.filter(o => o.status !== 'cancelled');
+  const paidToday = kind === 'store' ? sold.filter(isPaidBill) : sold;
+  const refundsToday = kind === 'store' ? await refundsOn(d, paidToday.map(o => o.id as string)) : new Map<string, number>();
   const lines = await rowsFor(d, 'order_items', 'order_id', sold.map(o => o.id as string), 'name, qty, unit_price, status', q => q.neq('status', 'cancelled'));
   const byItem = new Map<string, { qty: number; revenue: number }>();
   for (const l of lines) {
@@ -288,8 +299,8 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
     timezone: s.timezone,
     as_of: now.toISOString(),
     sales: {
-      total: money(sold.reduce((n, o) => n + num(o.total), 0)),
-      orders: sold.length,
+      total: money(paidToday.reduce((n, o) => n + keptOn(o, refundsToday), 0)),
+      orders: paidToday.length,
       settled: sold.filter(o => SETTLED.includes(o.status) || o.paid_at).length,
       pax: sold.reduce((n, o) => n + num(o.guest_count), 0),
       units: lines.reduce((n, l) => n + num(l.qty), 0),
@@ -319,6 +330,12 @@ export async function homeSummary(staff: Staff, wanted?: string | null, now = ne
 
 // ---------------- the owner's feed ----------------
 
+function storePeriodTotals(rows: Row[], refunds: Map<string, number>) {
+  const paid = rows.filter(isPaidBill);
+  const net = paid.reduce((n, o) => n + keptOn(o, refunds), 0);
+  return { net_sales: money(net), orders: paid.length, orders_completed: paid.length, aov: paid.length ? money(net / paid.length) : null };
+}
+
 function periodTotals(rows: Row[]) {
   const sold = rows.filter(o => o.status !== 'cancelled');
   const net = sold.reduce((n, o) => n + num(o.total), 0);
@@ -340,16 +357,25 @@ export async function homeFeed(staff: Staff, opts: { days: number; compare: bool
   const prevFrom = startOfLocalDay(s.timezone, addDays(firstDay, -opts.days));
   const todayFrom = startOfLocalDay(s.timezone, today).getTime();
 
-  const rows = await ordersBetween(s, opts.compare ? prevFrom : from, to, 'id, status, total, created_at');
+  const org = must(await client.from('organizations').select('business_domain').eq('id', staff.organizationId).maybeSingle()) as Row | null;
+  const isStore = kindOf(org?.business_domain, s.outlets[0]?.kind) === 'store';
+  const rows = await ordersBetween(s, opts.compare ? prevFrom : from, to, 'id, status, total, created_at, paid_at');
+  const refunds = isStore ? await refundsOn(client, rows.filter(isPaidBill).map(o => o.id as string)) : new Map<string, number>();
+  const totals = (list: Row[]) => (isStore ? storePeriodTotals(list, refunds) : periodTotals(list));
+  // cash found short or extra, at a day's opening or its Close day, in this period (0665)
+  // (a role that may not see money gets none: the feed itself still loads)
+  const differences = isStore
+    ? (await s.client.rpc('smoney_cash_differences', { p: { from: firstDay, to: today, location_id: s.outlets.length === 1 ? s.outlets[0].id : null } })).data as Row | null
+    : null;
   const inPeriod = rows.filter(o => Date.parse(o.created_at) >= from.getTime());
   const before = rows.filter(o => Date.parse(o.created_at) < from.getTime());
-  const todays = periodTotals(inPeriod.filter(o => Date.parse(o.created_at) >= todayFrom));
+  const todays = totals(inPeriod.filter(o => Date.parse(o.created_at) >= todayFrom));
 
   const daily = Array.from({ length: opts.days }, (_, i) => ({ date: addDays(firstDay, i), sales: 0 }));
   for (const o of inPeriod) {
-    if (o.status === 'cancelled') continue;
+    if (o.status === 'cancelled' || (isStore && !isPaidBill(o))) continue;
     const slot = daily.find(x => x.date === localDate(s.timezone, new Date(o.created_at)));
-    if (slot) slot.sales = money(slot.sales + num(o.total));
+    if (slot) slot.sales = money(slot.sales + keptOn(o, refunds));
   }
 
   return {
@@ -359,8 +385,12 @@ export async function homeFeed(staff: Staff, opts: { days: number; compare: bool
     date: today,
     as_of: now.toISOString(),
     today: { sales: todays.net_sales, orders: todays.orders, is_open: await accepting(s.client, staff.organizationId) },
-    period: periodTotals(inPeriod),
-    previous: opts.compare ? periodTotals(before) : null,
+    period: totals(inPeriod),
+    previous: opts.compare ? totals(before) : null,
+    cash_difference: isStore ? {
+      short: money(num(differences?.short_minor) / 100),
+      extra: money(num(differences?.extra_minor) / 100),
+    } : null,
     daily,
   };
 }

@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../inventory/inventory_api.dart' show Facts;
 import '../ui/theme.dart';
+import 'table_widgets.dart' show elapsed;
 
 /// Floating stacked bars for the tables (founder, 27 Oct 2026; the till's "Current Cart #1 · 9 on hold" look): the front bar is one
 /// table, the other tables' bars peek out behind it, each table in its own colour. ⌃ fans the deck out into one bar per table; tapping
@@ -32,6 +33,19 @@ class TableDeck extends StatefulWidget {
   State<TableDeck> createState() => _TableDeckState();
 }
 
+/// What a table's bar says.
+class TableDeckStatus {
+  static String of(Facts t) {
+    final mins = t.n('elapsed_minutes').toInt();
+    return switch (t.s('status')) {
+      'occupied' => mins > 0 ? 'Occupied · ${elapsed(mins)}' : 'Occupied', // the same "69h 33m" as the table chooser, not "4173m"
+      'reserved' => 'Reserved',
+      'cleaning' => 'Cleaning',
+      _ => 'Available',
+    };
+  }
+}
+
 class _TableDeckState extends State<TableDeck> {
   int _front = 0;
   bool _open = false;
@@ -45,17 +59,7 @@ class _TableDeckState extends State<TableDeck> {
     if (widget.focus != old.focus && i >= 0) _front = i;
   }
 
-  String _status(Facts t) => widget.pending[t.s('id')] ?? status(t);
-
-  static String status(Facts t) {
-    final mins = t.n('elapsed_minutes').toInt();
-    return switch (t.s('status')) {
-      'occupied' => mins > 0 ? 'Occupied · ${mins}m' : 'Occupied',
-      'reserved' => 'Reserved',
-      'cleaning' => 'Cleaning',
-      _ => 'Available',
-    };
-  }
+  String _status(Facts t) => widget.pending[t.s('id')] ?? TableDeckStatus.of(t);
 
   void _pick(int i) {
     setState(() {

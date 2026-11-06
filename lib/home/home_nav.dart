@@ -28,6 +28,9 @@ class HomeNav {
   // The app shell, set while it is mounted; the tab hooks below switch its tabs instead of pushing a new page.
   static TabShell? shell;
 
+  /// The tab now on screen (the store's Home reads its figures again when it comes back).
+  static final tabShown = ValueNotifier<String>('Home');
+
   // Set by the dashboard: the side menu (☰ on every screen's header) and the store's name (the header's top line).
   static HomeRoute? openMenu;
   static String? storeName;

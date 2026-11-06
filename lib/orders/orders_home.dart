@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../api/net_guard.dart';
+import '../home/home_nav.dart';
 import '../sell/history_screen.dart';
 import '../sell/sell_env.dart';
 import '../ui/theme.dart';
@@ -19,7 +20,8 @@ import '../ui/wallet.dart';
 /// Cancelled ones are a small link under the piles. Counter bills are not online orders, so they are not here (they live in Carts).
 /// Tapping a pile fans its orders out; tapping a card opens its details. Search narrows every pile.
 /// [onNavigate] receives the bottom-bar tabs this section does not own ('home', 'item', 'online', 'stock'); 'bill' opens a new cart.
-/// Past orders (31 Oct 2026) lists the online orders of a day, a week, a month or a chosen month.
+/// Past orders (31 Oct 2026) lists the orders of a day, a week, a month or a chosen month. A store's paid counter bills are there with its online
+/// orders (founder, 6 Nov 2026: "Paid bills should move to past orders"); a restaurant or service business still sees its online orders only.
 class OrdersHome extends StatefulWidget {
   const OrdersHome({super.key, this.api, this.onNavigate, this.onMenu, this.sellEnv});
   final OrdersApi? api;
@@ -70,8 +72,10 @@ class _OrdersHomeState extends State<OrdersHome> {
     _ => WalletColors.slate,
   };
 
-  /// Online orders only: a counter bill is not one.
-  List<OrderCard> get _online => (_orders ?? const <OrderCard>[]).where((o) => o.state != 'counter').toList();
+  /// Online orders only: a counter bill is not one. In a store that holds whatever became of the bill, cancelled or being returned too
+  /// (founder, 6 Nov 2026: "Only online orders should appear"); those are in Past orders, Bill → History and Returns.
+  bool _isOnline(OrderCard o) => o.state != 'counter' && (const {'restaurant', 'service'}.contains(HomeNav.shell?.kind) || o.channelLabel != 'Store Checkout');
+  List<OrderCard> get _online => (_orders ?? const <OrderCard>[]).where(_isOnline).toList();
 
   List<OrderCard> _in(String pile) => _online.where((o) => o.state == pile).toList();
 
@@ -112,12 +116,12 @@ class _OrdersHomeState extends State<OrdersHome> {
     if (mounted) _load();
   }
 
-  /// Past orders: the online orders by date; one opens its own page.
+  /// Past orders: the finished orders by date; one opens its own page.
   Future<void> _past() async {
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => HistoryScreen(
         env: widget.sellEnv ?? SellEnv(),
-        source: 'online',
+        source: const {'restaurant', 'service'}.contains(HomeNav.shell?.kind) ? 'online' : 'all',
         onOpen: _open,
         bottomNav: PosBottomNav(active: 'online', onTap: _tab),
       ),

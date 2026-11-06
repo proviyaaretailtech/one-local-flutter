@@ -87,6 +87,7 @@ class _AdjustFormState extends State<AdjustForm> {
     if (d == null) return showToast(context, 'Choose a product first.');
     if (p == null) return showToast(context, _damage ? 'There is no stock of this product to mark as damaged.' : 'Nothing of this product is held apart.');
     if (n == null || n <= 0) return showToast(context, 'Enter how many units.');
+    if (halfOfAWholeUnit(n, d.m('item').s('unit'))) return showToast(context, 'Enter a whole number: this is counted in ${d.m('item').s('unit')}.');
     if (n > p.onHand) return showToast(context, 'Only ${qty(p.onHand)} there. Enter ${qty(p.onHand)} or fewer.');
     if (_reason.isEmpty) return showToast(context, 'Choose why.');
     final item = d.m('item');

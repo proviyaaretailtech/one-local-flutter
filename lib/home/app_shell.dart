@@ -108,6 +108,7 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
         _current = label;
         _opened.add(label);
       });
+      HomeNav.tabShown.value = label;
       _playSwap();
     }
     return true;
@@ -129,6 +130,7 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
       nav.pop();
     } else if (_current != 'Home') {
       setState(() => _current = 'Home');
+      HomeNav.tabShown.value = 'Home';
       _playSwap();
     } else {
       Navigator.of(context).pop();

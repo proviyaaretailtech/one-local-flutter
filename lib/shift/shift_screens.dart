@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../home/home_nav.dart';
 import '../orders/order_widgets.dart';
 import '../orders/orders_api.dart';
 import '../sell/sell_widgets.dart';
 import '../ui/theme.dart';
 import 'shift_api.dart';
+
+/// A store's cash shift is the handover between cashiers (founder, 6 Nov 2026); a restaurant or service business keeps its own wording.
+bool get _storeWording => !const {'restaurant', 'service'}.contains(HomeNav.shell?.kind);
 
 String _amountText(num v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
 
@@ -125,7 +129,7 @@ class _OpenShiftScreenState extends State<OpenShiftScreen> {
                       ),
                   ]),
                   const SizedBox(height: 12),
-                  Text('Count the notes and coins before the first bill. You open the shift once; everyone billing at this store bills into it until it is closed.',
+                  Text(_storeWording ? 'Count the notes and coins when a cashier takes over. Bills go into this shift until it is closed at the next handover.' : 'Count the notes and coins before the first bill. You open the shift once; everyone billing at this store bills into it until it is closed.',
                       style: inter(13, 400, color: kMuted, height: 1.4)),
                 ]),
               ),
@@ -305,7 +309,7 @@ class _ShiftScreenState extends State<ShiftScreen> {
                   StateCard(
                     icon: LucideIcons.wallet,
                     title: 'No shift open',
-                    body: st.requireOpenShift ? 'This store takes no payment until a shift is open.' : 'Open a shift to count the drawer at the end of the day.',
+                    body: st.requireOpenShift ? 'This store takes no payment until a shift is open.' : _storeWording ? 'Open a shift when a cashier starts, and close it when they hand over. The day is closed in Money.' : 'Open a shift to count the drawer at the end of the day.',
                     primary: 'Open shift',
                     onPrimary: _busy ? null : _openShift,
                   )
@@ -345,10 +349,12 @@ class _ShiftScreenState extends State<ShiftScreen> {
         if (s.cashRefunds > 0) KeyValue('Cash refunds', '−${rupees(s.cashRefunds)}', size: 14, valueColor: kBadText),
         const Divider(height: 22, color: kLine),
         Row(children: [
-          Text('Expected in drawer', style: inter(16, 800)),
+          Text('Expected for this shift', style: inter(16, 800)),
           const Spacer(),
           Text(rupees(s.expectedCash), key: const ValueKey('expected-cash'), style: inter(24, 800, color: kGreenText)),
         ]),
+        const SizedBox(height: 6),
+        Text('A handover for this shift only. Money shows the whole drawer and closes the day.', key: const ValueKey('shift-handover-note'), style: inter(12, 400, color: kKicker)),
         if (methods.keys.any((m) => m != 'cash')) ...[
           const SizedBox(height: 10),
           Wrap(spacing: 6, runSpacing: 6, children: [

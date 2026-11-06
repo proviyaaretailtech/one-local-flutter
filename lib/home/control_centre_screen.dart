@@ -54,14 +54,21 @@ class _ControlCentreScreenState extends State<ControlCentreScreen> {
   void initState() {
     super.initState();
     OutletScope.selected.addListener(_followScope);
+    HomeNav.tabShown.addListener(_followTab);
     HomeNav.openMenu = _menuHook;
   }
 
   @override
   void dispose() {
     OutletScope.selected.removeListener(_followScope);
+    HomeNav.tabShown.removeListener(_followTab);
     if (HomeNav.openMenu == _menuHook) HomeNav.openMenu = null;
     super.dispose();
+  }
+
+  // a store's sale, refund or day end happens on another tab: Home shows it on the way back
+  void _followTab() {
+    if (mounted && HomeNav.tabShown.value == 'Home' && _kind == 'store') _reload();
   }
 
   void _followScope() {

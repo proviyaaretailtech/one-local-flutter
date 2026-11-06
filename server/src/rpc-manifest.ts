@@ -427,6 +427,8 @@ export const MANIFEST: Entry[] = [
   db('smoney_void', { args: mo.StoreVoid, map: P, rate: 'money', roles: 'staff with money:approve' }),
   db('smoney_register', { args: mo.StoreRegister, map: P, rate: 'read', roles: 'staff with money:read' }),
   db('smoney_close_day', { args: mo.StoreClose, map: P, rate: 'money', roles: 'staff with money:record' }),
+  db('smoney_reopen_day', { args: mo.StoreReopen, map: P, rate: 'money', roles: 'the owner and admins (money:approve; checked in the database)' }),
+  db('smoney_opening_count', { args: mo.StoreOpeningCount, map: P, rate: 'money', roles: 'staff with money:record' }),
   db('smoney_dues', { args: mo.Options, map: P, rate: 'read', roles: 'staff with money:read' }),
   // Money ↔ Stock (hosted_money_stock_2026-10-31.sql): stock worth at cost and stock lost, for the Money page
   db('smoney_stock', { args: mo.StockRange, map: P, rate: 'read', roles: 'staff with money:read' }),

@@ -215,7 +215,8 @@ class _NewReturnState extends State<_NewReturn> {
   Receipt? _bill;
   final _qty = <String, int>{};
   final _damaged = <String>{}; // items that come back broken: refunded, but not put back in stock
-  String _reason = _ReturnsScreenState._reasons.first;
+  String? _reason; // chosen by the person, never assumed
+  static const _damagedReason = 'Damaged seal';
   String? _error;
   bool _busy = false;
   String? _key;
@@ -263,13 +264,17 @@ class _NewReturnState extends State<_NewReturn> {
       setState(() => _error = 'Choose the items being returned.');
       return;
     }
+    if (_reason == null) {
+      setState(() => _error = 'Choose why it is being returned.');
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
     });
     _key ??= OrdersApi.newKey();
     try {
-      await widget.env.sell.createReturn(orderId: _bill!.id, lines: lines, reason: _reason, note: _note.text.trim(), key: _key!);
+      await widget.env.sell.createReturn(orderId: _bill!.id, lines: lines, reason: _reason!, note: _note.text.trim(), key: _key!);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) setState(() => _error = sellErrorText(e));
@@ -313,10 +318,18 @@ class _NewReturnState extends State<_NewReturn> {
               ),
             IconButton(tooltip: 'One less ${i['name']}', onPressed: (_qty[i['order_item_id']] ?? 0) > 0 ? () => setState(() => _qty[i['order_item_id']] = _qty[i['order_item_id']]! - 1) : null, icon: const Icon(LucideIcons.minus, size: 16)),
             Text('${_qty[i['order_item_id']] ?? 0}', style: inter(15, 700)),
-            IconButton(tooltip: 'One more ${i['name']}', onPressed: (_qty[i['order_item_id']] ?? 0) < (i['qty'] as num) ? () => setState(() => _qty[i['order_item_id']] = (_qty[i['order_item_id']] ?? 0) + 1) : null, icon: const Icon(LucideIcons.plus, size: 16)),
+            IconButton(tooltip: 'One more ${i['name']}', onPressed: (_qty[i['order_item_id']] ?? 0) < (i['qty'] as num) ? () => setState(() {
+              _qty[i['order_item_id']] = (_qty[i['order_item_id']] ?? 0) + 1;
+              if (_reason == _damagedReason) _damaged.add('${i['order_item_id']}');
+            }) : null, icon: const Icon(LucideIcons.plus, size: 16)),
           ]),
         const SizedBox(height: 8),
-        Wrap(spacing: 8, runSpacing: 8, children: [for (final r in _ReturnsScreenState._reasons) ChoiceChip(label: Text(r), selected: _reason == r, selectedColor: const Color(0xFFA5FF2D), onSelected: (_) => setState(() => _reason = r))]),
+        Wrap(spacing: 8, runSpacing: 8, children: [for (final r in _ReturnsScreenState._reasons) ChoiceChip(label: Text(r), selected: _reason == r, selectedColor: const Color(0xFFA5FF2D), onSelected: (_) => setState(() {
+          _reason = r;
+          _error = null;
+          // a broken seal is refunded but not sold again; the Damaged mark can still be switched off
+          if (r == _damagedReason) _damaged.addAll([for (final e in _qty.entries) if (e.value > 0) e.key]);
+        }))]),
         const SizedBox(height: 10),
         TextField(controller: _note, decoration: InputDecoration(hintText: tr('Note (optional)'))),
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: inter(13, 400, color: kBadText))),

@@ -131,6 +131,8 @@ class HubFeed {
   int? get prevDelivered => _int(previous['orders_completed']);
   num? get prevAov => _num(previous['aov']);
   List<DayTotal> get daily => _list(raw['daily']).map(DayTotal.new).toList();
+  num get cashShort => _num(raw['cash_difference'] == null ? null : _map(raw['cash_difference'])['short']) ?? 0;
+  num get cashExtra => _num(raw['cash_difference'] == null ? null : _map(raw['cash_difference'])['extra']) ?? 0;
 }
 
 /// Change from [prev] to [now] in percent, or null when there is nothing to compare with.
