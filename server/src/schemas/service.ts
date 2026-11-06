@@ -105,6 +105,9 @@ const templateFields = {
   requirements: z.array(z.record(z.string(), z.unknown())).max(50).optional(), rules: z.array(z.record(z.string(), z.unknown())).max(50).optional(),
   notes: text(500).nullish(),
 };
+// One pricing rule saved under a name, to use on any listing (founder, 6 Nov 2026)
+export const RuleTemplateList = obj({});
+export const RuleTemplateSave = obj({ name: text(60), rule: z.record(z.string(), z.unknown()).refine(v => JSON.stringify(v).length <= 4000, 'The rule is too long.'), ...key });
 export const TemplateList = obj({ q: text(100).optional() });
 export const TemplateSave = obj({ id: id.nullish(), ...templateFields, name: text(60).optional(), archived: z.boolean().optional(), ...key });
 export const TemplateImport = obj({ templates: z.array(obj(templateFields)).min(1, 'The file has no templates.').max(200, 'Import up to 200 templates at a time.'), ...key });

@@ -462,7 +462,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
             NeedsEditor(rows: _needs, options: _options, keyPrefix: 'te-need', onChanged: (r) => setState(() => _needs = r)),
             needsTotal(_needs, _rules, key: const ValueKey('te-total')),
           ]),
-        2 => RulesEditor(rows: _rules, keyPrefix: 'te-rule', onChanged: (r) => setState(() => _rules = r)),
+        2 => RulesEditor(rows: _rules, keyPrefix: 'te-rule', api: widget.api, onChanged: (r) => setState(() => _rules = r)),
         _ => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: TextField(key: const ValueKey('te-notes'), controller: _notes, maxLines: 3, minLines: 2, style: inter(14, 500), decoration: formBox(hint: 'Prep notes (optional)')),

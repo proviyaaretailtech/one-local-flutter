@@ -527,6 +527,9 @@ void main() {
     await add('photo');
     await add('video');
     await add('photo');
+    // Add comes first, so the newest are further along the row
+    await t.drag(find.byKey(const ValueKey('sf-cover')), const Offset(-200, 0));
+    await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('sf-media-2')), findsOneWidget);
     expect(find.text('Video'), findsOneWidget);
     await _tap(t, const ValueKey('sf-media-remove-2'));
@@ -718,14 +721,14 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Price for everyone else'), findsOneWidget, reason: 'the price stays: whoever no rule matches pays it');
     await _tap(t, const ValueKey('sf-rule-add'));
-    expect(find.text('Rule 1'), findsOneWidget);
+    expect(find.text('Rule 1 name'), findsOneWidget);
     expect(t.getTopLeft(find.byKey(const ValueKey('sf-rule-add'))).dy, greaterThan(t.getTopLeft(find.byKey(const ValueKey('sf-price'))).dy), reason: 'after the base price');
     await t.tap(find.byKey(const ValueKey('sf-rules-on')));
     await t.pumpAndSettle();
-    expect(find.text('Rule 1'), findsNothing);
+    expect(find.text('Rule 1 name'), findsNothing);
 
     await show(t, ServiceFormScreen(key: UniqueKey(), api: f.api, template: ServiceTemplate(_manicure()), photos: _NoPhotos()));
     await _step(t, 4);
-    expect(find.text('Rule 1'), findsOneWidget, reason: 'the template\'s rule shows without turning anything on');
+    expect(find.text('Rule 1 name'), findsOneWidget, reason: 'the template\'s rule shows without turning anything on');
   });
 }

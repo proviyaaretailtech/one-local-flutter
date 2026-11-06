@@ -225,7 +225,7 @@ class _NewJobScreenState extends State<NewJobScreen> {
             SvcCard(title: 'Customer', children: [
               _field('Customer name', _name, 'job-name'),
               _field('Mobile number', _phone, 'job-phone', keyboard: TextInputType.phone),
-              _field('Address (where the work is)', _address, 'job-address', hint: 'Leave empty when the work is at your place'),
+              _field('Address (where the work is)', _address, 'job-address', hint: 'Leave empty when the customer comes to you'),
             ]),
             SvcCard(title: 'Job', children: [
               _field('Job title (optional)', _title, 'job-title', hint: 'e.g. AC repair and service'),

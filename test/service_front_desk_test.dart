@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:vinii_pos/home/home_nav.dart';
 import 'package:vinii_pos/service/front_desk_screen.dart';
 import 'package:vinii_pos/service/service_api.dart';
+import 'package:vinii_pos/service/service_widgets.dart';
 
 import 'helpers.dart';
 
@@ -119,6 +120,54 @@ void main() {
     expect(find.text('Waiting · 3'), findsOneWidget);
     expect(find.text('Done · 1'), findsOneWidget);
     expect(find.text('Due ₹300'), findsOneWidget, reason: 'what is due sits on the row');
+  });
+
+  testWidgets('two filter rows work together: status and type, and each row\'s counts follow the other', (t) async {
+    final all = [...rows, _row('06', 'Gone', 'cancelled'), _row('07', 'Event guest', 'confirmed', category: 'events', actions: ['check_in'])];
+    await show(t, FrontDeskScreen(api: _Fake(all, kinds: const ['events', 'play', 'service']).api));
+    await t.pumpAndSettle();
+    String chip(String key) => t.widget<ModeChip>(find.byKey(ValueKey(key))).label;
+    expect(chip('desk-status-all'), 'All 5', reason: 'All leaves out the cancelled, as before');
+    expect(chip('desk-status-waiting'), 'Waiting 4');
+    expect(chip('desk-status-cancelled'), 'Cancelled 1');
+    expect(chip('desk-status-in_progress'), 'In progress', reason: 'no number when there are none');
+    expect(chip('desk-tab-all'), 'All 5');
+
+    await _tap(t, 'desk-status-done');
+    expect(find.text('Done person'), findsOneWidget);
+    expect(find.text('Riya'), findsNothing);
+    expect(chip('desk-tab-all'), 'All 1');
+    expect(chip('desk-tab-play'), 'Play', reason: 'the type stays, showing none done');
+
+    await _tap(t, 'desk-status-due');
+    expect(find.text('Riya'), findsOneWidget, reason: 'she still owes money');
+    expect(find.text('Gone'), findsNothing, reason: 'a cancelled booking is not due');
+
+    await _tap(t, 'desk-tab-play');
+    expect(find.text('Court player'), findsOneWidget);
+    expect(find.text('Riya'), findsNothing);
+    expect(chip('desk-status-due'), 'Due 1');
+
+    await _tap(t, 'desk-status-cancelled');
+    expect(find.text('No bookings with this status here today.'), findsOneWidget);
+  });
+
+  testWidgets('a picked status lists an event\'s bookings; All brings the door count back; Bills hides the status row', (t) async {
+    final f = _Fake([_row('01', 'Riya', 'confirmed', category: 'events', actions: ['check_in'])], kinds: const ['events']);
+    await show(t, FrontDeskScreen(api: f.api));
+    await t.pumpAndSettle();
+    await _tap(t, 'desk-tab-events');
+    expect(find.byKey(const ValueKey('desk-history')), findsOneWidget, reason: 'the door view');
+
+    await _tap(t, 'desk-status-waiting');
+    expect(find.byKey(const ValueKey('desk-history')), findsNothing);
+    expect(find.text('Waiting · 1'), findsOneWidget);
+
+    await _tap(t, 'desk-status-all');
+    expect(find.byKey(const ValueKey('desk-history')), findsOneWidget);
+
+    await _tap(t, 'desk-tab-bills');
+    expect(find.byKey(const ValueKey('desk-status-all')), findsNothing);
   });
 
   testWidgets('a type\'s tab shows only its bookings; a court shows its court and people', (t) async {

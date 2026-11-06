@@ -27,6 +27,9 @@ const _sections = [
   ('Cancelled', ['cancelled', 'no_show']),
 ];
 
+/// The status row: the queue's sections, and Due, which is about money so it can overlap them.
+const _statuses = [('all', 'All'), ('due', 'Due'), ('waiting', 'Waiting'), ('in_progress', 'In progress'), ('done', 'Done'), ('cancelled', 'Cancelled')];
+
 class FrontDeskScreen extends StatefulWidget {
   const FrontDeskScreen({super.key, this.api, this.onNavigate, this.now});
   final ServiceApi? api;
@@ -41,6 +44,7 @@ class FrontDeskScreen extends StatefulWidget {
 class _FrontDeskScreenState extends State<FrontDeskScreen> {
   late final ServiceApi _api = widget.api ?? ServiceApi();
   String _tab = 'all';
+  String _status = 'all';
   String _q = '';
   FrontDeskData? _data;
   String? _error, _busy;
@@ -292,37 +296,59 @@ class _FrontDeskScreenState extends State<FrontDeskScreen> {
     return a.customer.toLowerCase().contains(q) || a.customerPhone.contains(q) || a.displayNo.toLowerCase().contains(q) || a.title.toLowerCase().contains(q);
   }
 
+  bool _isCancelled(AppointmentView a) => a.status == 'cancelled' || a.status == 'no_show';
+
+  bool _hasStatus(AppointmentView a, String status) => switch (status) {
+        'due' => !_isCancelled(a) && a.amount - a.paid > 0,
+        'waiting' => _sections[0].$2.contains(a.status),
+        'in_progress' => _sections[1].$2.contains(a.status),
+        'done' => _sections[2].$2.contains(a.status),
+        'cancelled' => _isCancelled(a),
+        _ => true,
+      };
+
+  /// Two rows that work together: what state a booking is in, and what type it is. Each row's counts follow the other row's choice.
+  /// Bills has its own piles, so the status row steps aside there.
   Widget _tabs(FrontDeskData d) {
-    int open(String? kind) => d.items.where((a) => a.status != 'cancelled' && a.status != 'no_show' && (kind == null || a.category == kind)).length;
+    final kind = _tab == 'bills' ? 'all' : _tab;
+    int byStatus(String status) => d.items.where((a) => (kind == 'all' || a.category == kind) && (status != 'all' || !_isCancelled(a)) && _hasStatus(a, status)).length;
+    int byKind(String? id) => d.items.where((a) => (id == null || a.category == id) && (_status != 'all' || !_isCancelled(a)) && _hasStatus(a, _status)).length;
     String label(String name, int n) => n == 0 ? name : '$name $n';
     final tabs = <(String, String)>[
-      ('all', label('All', open(null))),
+      ('all', label('All', byKind(null))),
       for (final (id, name) in _kinds)
-        if (d.kinds.contains(id) || open(id) > 0) (id, label(name, open(id))),
+        // a type stays while the business offers it or has bookings in it today, whatever status is picked
+        if (d.kinds.contains(id) || d.items.any((a) => a.category == id && !_isCancelled(a))) (id, label(name, byKind(id))),
     ];
     Widget chip(String id, String text) => ModeChip(text, key: ValueKey('desk-tab-$id'), selected: _tab == id, onTap: () => setState(() => _tab = id));
-    // the types scroll; Bills stays in sight on the right
-    return Row(children: [
-      Expanded(
-        child: SingleChildScrollView(
+    Widget rowOf(List<Widget> chips) => SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: Row(children: [
-            for (final (id, text) in tabs) Padding(padding: const EdgeInsets.only(right: 6), child: chip(id, text)),
-          ]),
-        ),
-      ),
-      const SizedBox(width: 2),
-      chip('bills', 'Bills'),
+          child: Row(children: [for (final c in chips) Padding(padding: const EdgeInsets.only(right: 6), child: c)]),
+        );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (_tab != 'bills') ...[
+        rowOf([
+          for (final (id, name) in _statuses)
+            ModeChip(label(name, byStatus(id)), key: ValueKey('desk-status-$id'), selected: _status == id, onTap: () => setState(() => _status = id)),
+        ]),
+        const SizedBox(height: 6),
+      ],
+      // the types scroll; Bills stays in sight on the right
+      Row(children: [
+        Expanded(child: rowOf([for (final (id, text) in tabs) chip(id, text)])),
+        const SizedBox(width: 2),
+        chip('bills', 'Bills'),
+      ]),
     ]);
   }
 
   List<Widget> _queue(FrontDeskData d) {
-    final shown = d.items.where((a) => (_tab == 'all' || a.category == _tab) && _matches(a)).toList();
+    final shown = d.items.where((a) => (_tab == 'all' || a.category == _tab) && _hasStatus(a, _status) && _matches(a)).toList();
     return [
       SvcSearch(hint: 'Search name, phone or booking', fieldKey: const ValueKey('desk-search'), onChanged: (v) => setState(() => _q = v)),
       const SizedBox(height: 10),
       if (shown.isEmpty)
-        OrderCardBox(child: Text(_q.trim().isEmpty ? 'No bookings here today.' : 'No booking matches that.', style: inter(14, 400, color: kMuted))),
+        OrderCardBox(child: Text(_q.trim().isNotEmpty ? 'No booking matches that.' : _status == 'all' ? 'No bookings here today.' : 'No bookings with this status here today.', style: inter(14, 400, color: kMuted))),
       for (final (name, statuses) in _sections) ...() {
         final rows = shown.where((a) => statuses.contains(a.status)).toList();
         if (rows.isEmpty) return const <Widget>[];
@@ -703,7 +729,8 @@ class _FrontDeskScreenState extends State<FrontDeskScreen> {
               if (_tab == 'bills')
                 BillsScreen(key: ValueKey('desk-bills-$_billsRefresh'), api: _api, onNavigate: widget.onNavigate, embedded: true)
               else
-                ...(_tab == 'events' || _tab == 'activities' ? _door(d) : _tab == 'play' && d.courts.isNotEmpty ? _courts(d) : _queue(d)),
+                // a picked status asks for a list of bookings, so the door count and courts wait until it is back on All
+                ...(_status != 'all' ? _queue(d) : _tab == 'events' || _tab == 'activities' ? _door(d) : _tab == 'play' && d.courts.isNotEmpty ? _courts(d) : _queue(d)),
             ],
     );
   }

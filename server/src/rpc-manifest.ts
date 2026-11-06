@@ -378,6 +378,8 @@ export const MANIFEST: Entry[] = [
   db('svc_template_list', { args: svc.TemplateList, map: P, rate: 'read', roles: 'staff who may book' }),
   db('svc_template_save', { args: svc.TemplateSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('svc_template_import', { args: svc.TemplateImport, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
+  db('svc_rule_template_list', { args: svc.RuleTemplateList, map: P, rate: 'read', roles: 'staff who may book' }),
+  db('svc_rule_template_save', { args: svc.RuleTemplateSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('svc_listing_view',{ args: svc.ListingView, map: P, rate: 'read', roles: 'staff who may book' }),
   db('svc_listing_save', { args: svc.ListingSave, map: P, rate: 'write', idem: true, roles: 'manager roles only' }),
   db('svc_inventory', { args: svc.Inventory, map: P, rate: 'read', roles: 'staff who may book' }),

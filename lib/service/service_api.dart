@@ -307,6 +307,13 @@ class TemplateListData extends SvcData {
   int get updated => i('updated');
 }
 
+/// One pricing rule saved under a name, to use on any listing (`svc_rule_templates`, 6 Nov 2026).
+class RuleTemplate extends SvcData {
+  const RuleTemplate(super.raw);
+  String get name => s('name');
+  Map<String, dynamic> get rule => Map<String, dynamic>.from(raw['rule'] as Map? ?? const {});
+}
+
 /// A listing form's answers and what it picks from (`svc_listing_view`, 3 Nov 2026).
 class ListingData extends SvcData {
   const ListingData(super.raw);
@@ -625,6 +632,15 @@ class ServiceApi {
   Future<TemplateListData> templates({String q = ''}) async => TemplateListData(await _call('svc_template_list', {if (q.trim().isNotEmpty) 'q': q.trim()}));
 
   /// Add or change a template ({id?, name, category, subcategory, duration_min, requirements, rules, notes}); `archived: true` deletes it.
+  /// The business's saved pricing rules.
+  Future<List<RuleTemplate>> ruleTemplates() async => _ruleTemplates(await _call('svc_rule_template_list', {}));
+
+  /// Saves a pricing rule under [name] (the same name replaces it) and answers with the whole list.
+  Future<List<RuleTemplate>> saveRuleTemplate(String name, Map<String, dynamic> rule, {required String key}) async =>
+      _ruleTemplates(await _call('svc_rule_template_save', {'name': name, 'rule': rule}, key: key));
+
+  List<RuleTemplate> _ruleTemplates(Map<String, dynamic> d) => [for (final t in d['templates'] as List? ?? const []) RuleTemplate(Map<String, dynamic>.from(t as Map))];
+
   Future<TemplateListData> saveTemplate(Map<String, Object?> fields, {required String key}) async => TemplateListData(await _call('svc_template_save', fields, key: key));
 
   /// Templates from Excel: one with the same name is replaced, a new one added.

@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'service_api.dart';
-import 'service_widgets.dart' show numberOnly;
+import 'service_widgets.dart' show askText, numberOnly;
 
 // The pieces the template editor and the one Add service form share (founder, 3 Nov 2026: "like a restaurant's recipe master"): the
 // categories, compact dropdown boxes, and the two row editors — what a service needs (a person, a place, a tool, a material, anything
@@ -81,9 +81,11 @@ class ListingProfile {
   String get pricingDefault => pricing.first;
 }
 
-const _wherePlace = ['At your place', 'Both', 'On call'];
-const _whereCall = ['On call', 'Both', 'At your place'];
-const _whereBoth = ['Both', 'At your place', 'On call'];
+/// On site: customers come to the business. On call: the business goes to the customer. "At your place" was unclear (founder, 6 Nov 2026).
+const kWhereOnSite = 'On site';
+const _wherePlace = [kWhereOnSite, 'Both', 'On call'];
+const _whereCall = ['On call', 'Both', kWhereOnSite];
+const _whereBoth = ['Both', kWhereOnSite, 'On call'];
 const _amenPlay = ['Equipment for rent', 'Washroom', 'Drinking water', 'Parking', 'WiFi', 'Flood lights', 'First aid', 'Seating lounge', 'Changing room', 'Showers', 'Cafeteria'];
 const _amenStay = ['WiFi', 'AC', 'Breakfast', 'Parking', 'Hot water', 'TV', 'Room service', 'Power backup', 'Lift', 'Swimming pool', 'Laundry', 'Kitchen'];
 const _amenEvent = ['Parking', 'Washroom', 'AC', 'Seating', 'Stage', 'Sound system', 'Food counter', 'Wheelchair access', 'Coat check'];
@@ -414,7 +416,7 @@ String? tidyCount(String s) {
 /// The choices for a dropdown, opened right under the box that was tapped (as wide as it, scrolling when long); [groups] puts headings over
 /// them (Doctors, Salon ...). Without a box (called from elsewhere) they come up in a sheet. Returns the one picked.
 ///
-/// Every dropdown ends with "+ Add" (founder, 4 Nov 2026) unless [canAdd] is false: a small frosted box opens where the dropdown was
+/// Every dropdown starts with "+ Add" (founder, 4 Nov 2026; first, not last, 6 Nov 2026: no scrolling to reach it) unless [canAdd] is false: a small frosted box opens where the dropdown was
 /// and asks for the new option ([input] says what it takes), keeps it for next time under [addKey] (the title by default) and returns it.
 Future<String?> pickOne(BuildContext context, String title, List<String> options,
     {String? current, List<(String, List<String>)>? groups, bool canAdd = true, String? addKey, OwnInput input = OwnInput.text}) async {
@@ -607,6 +609,10 @@ Future<String?> _pickFrom(BuildContext context, Rect? anchor, String title, List
     elevation: 8,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: kLine)),
     items: [
+      if (add) ...[
+        PopupMenuItem<String>(key: const ValueKey('opt-add'), value: _addValue, height: 42, child: _addRow(title)),
+        const PopupMenuDivider(height: 8),
+      ],
       for (final (group, names) in groups ?? [('', options)]) ...[
         if (group.isNotEmpty)
           PopupMenuItem<String>(
@@ -624,10 +630,6 @@ Future<String?> _pickFrom(BuildContext context, Rect? anchor, String title, List
               if (current == x) const Icon(LucideIcons.check, size: 16, color: kGreenText),
             ]),
           ),
-      ],
-      if (add) ...[
-        const PopupMenuDivider(height: 8),
-        PopupMenuItem<String>(key: const ValueKey('opt-add'), value: _addValue, height: 42, child: _addRow(title)),
       ],
     ],
   );
@@ -648,6 +650,14 @@ Future<String?> _pickSheet(BuildContext context, String title, List<String> opti
         constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.6),
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (add)
+              ListTile(
+                key: const ValueKey('opt-add'),
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                title: _addRow(title),
+                onTap: () => Navigator.pop(ctx, _addValue),
+              ),
             for (final (group, names) in groups ?? [('', options)]) ...[
               if (group.isNotEmpty)
                 Padding(padding: const EdgeInsets.fromLTRB(4, 12, 4, 2), child: Text(group.toUpperCase(), style: inter(11.5, 800, color: kMuted).copyWith(letterSpacing: 0.6))),
@@ -661,14 +671,6 @@ Future<String?> _pickSheet(BuildContext context, String title, List<String> opti
                   onTap: () => Navigator.pop(ctx, x),
                 ),
             ],
-            if (add)
-              ListTile(
-                key: const ValueKey('opt-add'),
-                dense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                title: _addRow(title),
-                onTap: () => Navigator.pop(ctx, _addValue),
-              ),
           ]),
         ),
       ),
@@ -792,20 +794,43 @@ String needsSummary(List<Map<String, dynamic>> rows) {
   ].where((s) => s.isNotEmpty).join(' · ');
 }
 
+/// What the needs cost for one booking: each row's cost times how many. Optional, for the owner's cost analysis; customers never see it.
+num needsCost(List<Map<String, dynamic>> rows) => rows.fold<num>(0, (sum, r) {
+      final cost = r['cost'] is num ? r['cost'] as num : num.tryParse('${r['cost'] ?? ''}') ?? 0;
+      final qty = r['qty'] is num ? r['qty'] as num : num.tryParse('${r['qty'] ?? ''}') ?? 1;
+      return sum + cost * qty;
+    });
+
 /// What a service needs, row by row like a recipe's ingredients: type, item (from the team, places, tools or materials; typed for
-/// Other), how many, and the unit. [onChanged] gets the whole list each time.
-class NeedsEditor extends StatelessWidget {
+/// Other), how many, the unit, and what it costs (optional). [onChanged] gets the whole list each time.
+class NeedsEditor extends StatefulWidget {
   const NeedsEditor({super.key, required this.rows, required this.options, required this.onChanged, this.keyPrefix = 'need'});
   final List<Map<String, dynamic>> rows;
   final NeedsOptions options;
   final ValueChanged<List<Map<String, dynamic>>> onChanged;
   final String keyPrefix;
+  @override
+  State<NeedsEditor> createState() => _NeedsEditorState();
+}
+
+class _NeedsEditorState extends State<NeedsEditor> {
+  List<Map<String, dynamic>> get rows => widget.rows;
+  NeedsOptions get options => widget.options;
+  ValueChanged<List<Map<String, dynamic>>> get onChanged => widget.onChanged;
+  String get keyPrefix => widget.keyPrefix;
+
+  /// Moves on when a row is removed: the boxes below it start again from what they now hold, not what the removed row's boxes held.
+  int _gen = 0;
 
   void _put(int i, Map<String, dynamic> row) => onChanged([...rows]..[i] = row);
 
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (var i = 0; i < rows.length; i++) _row(context, i),
+        KeyedSubtree(
+          key: ValueKey('$keyPrefix-rows-$_gen'),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [for (var i = 0; i < rows.length; i++) _row(context, i)]),
+        ),
+        if (rows.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('Cost is optional, for your cost analysis. Customers never see it.', style: inter(12, 400, color: kMuted))),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -860,7 +885,16 @@ class NeedsEditor extends StatelessWidget {
       inputFormatters: numberOnly(const TextInputType.numberWithOptions(decimal: true)),
       style: inter(14, 500),
       decoration: formBox(label: 'Qty'),
-      onChanged: (s) => rows[i] = {...rows[i], 'qty': num.tryParse(s) ?? s},
+      onChanged: (s) => _put(i, {...rows[i], 'qty': num.tryParse(s) ?? s}),
+    );
+    final costBox = TextFormField(
+      key: ValueKey('$keyPrefix-$i-cost'),
+      initialValue: '${r['cost'] ?? ''}',
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: numberOnly(const TextInputType.numberWithOptions(decimal: true)),
+      style: inter(14, 500),
+      decoration: formBox(label: 'Cost', prefix: '₹ '),
+      onChanged: (s) => _put(i, {...rows[i], 'cost': num.tryParse(s)}),
     );
     final unitBox = PickBox(
       fieldKey: ValueKey('$keyPrefix-$i-unit'),
@@ -884,7 +918,10 @@ class NeedsEditor extends StatelessWidget {
     final remove = IconButton(
       key: ValueKey('$keyPrefix-$i-remove'),
       tooltip: 'Remove',
-      onPressed: () => onChanged([...rows]..removeAt(i)),
+      onPressed: () {
+        setState(() => _gen++);
+        onChanged([...rows]..removeAt(i));
+      },
       icon: const Icon(LucideIcons.trash2, size: 17, color: kError),
     );
     return Padding(
@@ -902,6 +939,8 @@ class NeedsEditor extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(flex: 2, child: unitOn ? unitBox : const SizedBox.shrink()),
             if (perOn) ...[const SizedBox(width: 8), Expanded(flex: 2, child: perBox)],
+            const SizedBox(width: 8),
+            Expanded(flex: 2, child: costBox),
             remove,
           ]);
         }
@@ -914,10 +953,15 @@ class NeedsEditor extends StatelessWidget {
             Row(children: [
               Expanded(child: qtyBox),
               const SizedBox(width: 8),
-              Expanded(child: unitOn ? unitBox : const SizedBox.shrink()),
+              Expanded(child: unitOn ? unitBox : costBox),
               if (perOn) ...[const SizedBox(width: 8), Expanded(child: perBox)],
               const SizedBox(width: 48),
             ]),
+            // the four boxes of a material or other item do not fit one phone line: its cost goes under them
+            if (unitOn) ...[
+              const SizedBox(height: 8),
+              Row(children: [Expanded(child: costBox), const SizedBox(width: 56), const Spacer()]),
+            ],
           ]),
         );
       }),
@@ -960,35 +1004,102 @@ String ruleSummary(Map<String, dynamic> r) {
 
 /// Rules like the design's builder: each rule combines conditions (+ and), then a result and a price each or per group. Anyone not
 /// matched books at the base price. [onChanged] gets the whole list each time.
-class RulesEditor extends StatelessWidget {
-  const RulesEditor({super.key, required this.rows, required this.onChanged, this.keyPrefix = 'rule'});
+///
+/// A rule can be named ("Under 18 women") and saved as a template (founder, 6 Nov 2026), to pick for any listing later: needs [api].
+class RulesEditor extends StatefulWidget {
+  const RulesEditor({super.key, required this.rows, required this.onChanged, this.keyPrefix = 'rule', this.api});
   final List<Map<String, dynamic>> rows;
   final ValueChanged<List<Map<String, dynamic>>> onChanged;
   final String keyPrefix;
+  final ServiceApi? api;
+  @override
+  State<RulesEditor> createState() => _RulesEditorState();
+}
+
+class _RulesEditorState extends State<RulesEditor> {
+  List<Map<String, dynamic>> get rows => widget.rows;
+  ValueChanged<List<Map<String, dynamic>>> get onChanged => widget.onChanged;
+  String get keyPrefix => widget.keyPrefix;
+
+  /// Rule templates saved for this business. Empty when none are saved or they could not be read: the form still works.
+  List<RuleTemplate> _saved = const [];
+
+  /// Moves on when a row is removed: the boxes below it start again from what they now hold, not what the removed row's boxes held.
+  int _gen = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.api?.ruleTemplates().then((t) {
+      if (mounted) setState(() => _saved = t);
+    }).catchError((_) {});
+  }
 
   void _put(int i, Map<String, dynamic> row) => onChanged([...rows]..[i] = row);
+
+  Future<void> _saveTemplate(int i) async {
+    final api = widget.api;
+    if (api == null) return;
+    final name = await askText(context, 'Save rule as a template', initial: '${rows[i]['name'] ?? ''}'.trim(), hint: 'e.g. Under 18 women', action: 'Save template');
+    if (name == null || !mounted) return;
+    if (name.trim().length < 2) return showToast(context, 'Name the rule.');
+    try {
+      final rule = {...rows[i], 'name': name.trim()};
+      final saved = await api.saveRuleTemplate(name.trim(), rule, key: ServiceApi.newKey());
+      if (!mounted) return;
+      setState(() {
+        _saved = saved;
+        _gen++; // the name box shows the name just saved
+      });
+      _put(i, rule);
+      showToast(context, 'Saved "${name.trim()}". Pick it from Use a saved rule on any listing.');
+    } catch (e) {
+      if (mounted) showServiceError(context, e);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (rows.isEmpty) Padding(padding: const EdgeInsets.only(bottom: 6), child: Text('No rules: anyone can book at the base price.', style: inter(12.5, 400, color: kMuted))),
-        for (var i = 0; i < rows.length; i++) _rule(context, i),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: ValueKey('$keyPrefix-add'),
-            onPressed: () => onChanged([
-              ...rows,
-              {
-                'conditions': [
-                  {'category': 'Gender', 'condition': 'Women'}
-                ],
-                'result': 'Allowed',
-                'per': 'each',
-              }
-            ]),
-            icon: const Icon(LucideIcons.plus, size: 16, color: kGreenText),
-            label: Text('Add rule', style: inter(13.5, 700, color: kGreenText)),
-          ),
+        KeyedSubtree(
+          key: ValueKey('$keyPrefix-rows-$_gen'),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [for (var i = 0; i < rows.length; i++) _rule(context, i)]),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(children: [
+            TextButton.icon(
+              key: ValueKey('$keyPrefix-add'),
+              onPressed: () => onChanged([
+                ...rows,
+                {
+                  'conditions': [
+                    {'category': 'Gender', 'condition': 'Women'}
+                  ],
+                  'result': 'Allowed',
+                  'per': 'each',
+                }
+              ]),
+              icon: const Icon(LucideIcons.plus, size: 16, color: kGreenText),
+              label: Text('Add rule', style: inter(13.5, 700, color: kGreenText)),
+            ),
+            if (_saved.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: PickBox(
+                  fieldKey: ValueKey('$keyPrefix-saved'),
+                  value: null,
+                  hint: 'Use a saved rule',
+                  onTap: () async {
+                    final p = await pickOne(context, 'Saved rule', [for (final t in _saved) t.name], canAdd: false);
+                    if (p == null) return;
+                    final t = _saved.firstWhere((x) => x.name == p);
+                    onChanged([...rows, {...t.rule, 'name': t.name}]);
+                  },
+                ),
+              ),
+            ],
+          ]),
         ),
       ]);
 
@@ -1083,16 +1194,31 @@ class RulesEditor extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 6, 4, 4),
       decoration: BoxDecoration(color: const Color(0xFFF9FAF9), borderRadius: BorderRadius.circular(12), border: Border.all(color: kLine)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Expanded(child: Text('Rule ${i + 1}', style: inter(13, 700))),
-          IconButton(
-            key: ValueKey('$keyPrefix-$i-remove'),
-            tooltip: 'Remove rule',
-            visualDensity: VisualDensity.compact,
-            onPressed: () => onChanged([...rows]..removeAt(i)),
-            icon: const Icon(LucideIcons.trash2, size: 17, color: kError),
-          ),
-        ]),
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 6),
+          child: Row(children: [
+            Expanded(
+              child: TextFormField(
+                key: ValueKey('$keyPrefix-$i-name'),
+                initialValue: '${r['name'] ?? ''}',
+                maxLength: 60,
+                style: inter(14, 600),
+                decoration: formBox(label: 'Rule ${i + 1} name', hint: 'e.g. Under 18 women').copyWith(counterText: ''),
+                onChanged: (v) => rows[i] = {...rows[i], 'name': v},
+              ),
+            ),
+            IconButton(
+              key: ValueKey('$keyPrefix-$i-remove'),
+              tooltip: 'Remove rule',
+              visualDensity: VisualDensity.compact,
+              onPressed: () {
+                setState(() => _gen++);
+                onChanged([...rows]..removeAt(i));
+              },
+              icon: const Icon(LucideIcons.trash2, size: 17, color: kError),
+            ),
+          ]),
+        ),
         for (var j = 0; j < conds.length; j++) condition(j),
         Align(
           alignment: Alignment.centerLeft,
@@ -1114,6 +1240,17 @@ class RulesEditor extends StatelessWidget {
             if (priced) ...[const SizedBox(width: 8), Expanded(flex: 3, child: priceBox), const SizedBox(width: 8), Expanded(flex: 3, child: perBox)],
           ]),
         ),
+        if (widget.api != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: ValueKey('$keyPrefix-$i-template'),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 4)),
+              onPressed: () => _saveTemplate(i),
+              icon: const Icon(LucideIcons.bookmarkPlus, size: 15, color: kGreenText),
+              label: Text('Save as a template', style: inter(12.5, 700, color: kGreenText)),
+            ),
+          ),
       ]),
     );
   }
@@ -1135,6 +1272,14 @@ Widget needsTotal(List<Map<String, dynamic>> needs, List<Map<String, dynamic>> r
           Expanded(child: Text('Rules', style: inter(13, 600, color: kMuted))),
           Text(rules.isEmpty ? 'None' : '${rules.length} ${rules.length == 1 ? 'rule' : 'rules'}', style: inter(13.5, 800, color: kGreenText)),
         ]),
+        if (needsCost(needs) > 0) ...[
+          const SizedBox(height: 4),
+          Row(children: [
+            // a material used per guest or per night is counted once here
+            Expanded(child: Text(needs.any((r) => r['type'] == 'material' && (r['per'] ?? 'booking') != 'booking') ? 'Cost, for 1 guest and 1 night' : 'Cost per booking', style: inter(13, 600, color: kMuted))),
+            Text('₹${needsCost(needs) % 1 == 0 ? needsCost(needs).toInt() : needsCost(needs).toStringAsFixed(2)}', key: const ValueKey('needs-cost'), style: inter(13.5, 800)),
+          ]),
+        ],
       ]),
     );
 

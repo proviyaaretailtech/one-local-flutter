@@ -558,7 +558,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   for (final a in d.addons) SvcLine('${a.s('name')} · +${a.i('duration_min')} min', qty: '1×', amount: svcRupees(a.n('price'))),
                 ]),
               SvcCard(title: 'Booking rules', children: [
-                SvcKV('Notice', _hours(d.i('min_notice_min'))),
+                SvcKV('Notice to book', _hours(d.i('min_notice_min'))),
                 SvcKV('Buffer', d.i('buffer_min') == 0 ? 'No buffer' : '${d.i('buffer_min')} min after each appointment'),
                 SvcKV('Deposit', d.n('deposit') > 0 ? '${svcRupees(d.n('deposit'))} at booking' : 'No deposit'),
                 SvcKV('Cancellation', 'Free until ${d.i('free_cancel_hours')} hours before'),

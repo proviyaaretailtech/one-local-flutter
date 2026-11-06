@@ -462,3 +462,15 @@ All pass: service screens and frames, service dashboard, shell, navigation, rout
 - Bills: paid walk-ins left the Due, Taken today and Paid lists and sit in their own Walk-ins pile, one dropdown per session. Their money still counts in the Taken today and Paid totals. A search still finds them.
 - History button on Events and Activities: finished and past sessions, last 90 days, 100 at most (svc_session_history). Read only.
 - Hosted SQL: C:\onelocal\hosted_service_door_finish_2026-11-06.sql (now also replaces svc_bill_list). Run on hosted 6 Nov; all functions match local. The door total uses pos_tax_bill, because hosted also charges GST on the service charge.
+
+## 6 Nov 2026: Today's two filter rows, and listing form changes
+
+- Today has two filter rows that work together: status (All, Due, Waiting, In progress, Done, Cancelled) and type (Events, Activities ...). A picked status shows a plain list instead of the door count or courts; Bills hides the status row.
+- Photos: Add sits at the top of Basics, first in the row. A crop button on each photo opens Adjust photo: crop (Free, Square, 4:5, 16:9), rotate, flip. Runs on the device with the `image` package.
+- "+ Add" is the first choice in every service dropdown, not the last.
+- "Minimum notice" is now "Minimum notice to book": the database refuses bookings inside it; it has nothing to do with cancelling (Cancellation on the Price step does that).
+- "At your place" is now "On site" in the Where dropdown; saved listings read the old answer as On site.
+- Where and who asks Type of entry (Open to all, Ticket or pass, Members only, Invite only, + Add). Saved with the listing only: nothing checks it at booking yet.
+- A pricing rule has a name and can be saved as a template (svc_rule_templates, svc_rule_template_list, svc_rule_template_save); the same name replaces it. Use a saved rule adds it to any listing or template.
+- What it uses: each row takes an optional Cost, kept in the listing's requirements; the summary shows Cost per booking. No function open to customers returns it.
+- Hosted SQL: C:\onelocal\hosted_service_rule_templates_2026-11-06.sql. Run on hosted 6 Nov; matches local.

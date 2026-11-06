@@ -10,6 +10,7 @@ import '../orders/order_widgets.dart';
 import '../ui/theme.dart';
 import 'service_api.dart';
 import 'catalogue_screen.dart' show serviceFields;
+import 'image_adjust_screen.dart';
 import 'service_parts.dart';
 import 'service_widgets.dart';
 import 'step_form.dart';
@@ -62,6 +63,9 @@ final _times = [for (var m = 0; m < 24 * 60; m += 30) '${(m ~/ 60) % 12 == 0 ? 1
 final _nights = [for (var i = 1; i <= 7; i++) '$i ${i == 1 ? 'night' : 'nights'}'];
 const _bookAhead = ['7 days ahead', '30 days ahead', '60 days ahead', '90 days ahead'];
 const _notice = ['None', '1 hr', '3 hr', '1 day'];
+
+/// How people get in (founder, 6 Nov 2026); "+ Add" takes the business's own. Kept with the listing.
+const _entryTypes = ['Open to all', 'Ticket or pass', 'Members only', 'Invite only'];
 const _onCallArea = ['Within 3 km', 'Within 5 km', 'Within 10 km', 'Whole city'];
 const _travel = ['Free', 'Fixed', 'Per km'];
 const _ageRules = ['Anyone', '18+ only', '21+ only', 'Children with an adult', 'Children under 6 stay free', 'Children under 12 stay free'];
@@ -113,7 +117,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
     final p = _p;
     v['booking_type'] = p.bookingType;
     v['unit_kind'] = p.unitKind;
-    v['where'] = p.whereDefault ?? 'At your place';
+    v['where'] = p.whereDefault ?? kWhereOnSite;
     v['pricing'] = p.pricingDefault;
     v['booked_for'] = p.bookedFor;
   }
@@ -145,7 +149,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
       'buffer': d == null || d.i('buffer_min') == 0 ? 'None' : '${d.i('buffer_min')} min',
       'people_min': '1',
       'people_max': d == null ? '1' : '${d.i('capacity')}',
-      'where': d?.fulfilment == 'on_location' ? 'On call' : p.whereDefault ?? 'At your place',
+      'where': d?.fulfilment == 'on_location' ? 'On call' : p.whereDefault ?? kWhereOnSite,
       'confirm': 'Auto-confirm',
       'pricing': p.pricingDefault,
       'advance': 'None',
@@ -156,6 +160,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
       ...l,
       'subcategory': sub,
     };
+    if (s['where'] == 'At your place') s['where'] = kWhereOnSite; // saved before the new wording
     s['requirements'] = [for (final r in (s['requirements'] as List? ?? const [])) Map<String, dynamic>.from(r as Map)];
     s['rules'] = [for (final r in (s['rules'] as List? ?? const [])) Map<String, dynamic>.from(r as Map)];
     for (final k in ['types', 'parts', 'addons', 'units', 'bands']) {
@@ -237,6 +242,38 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
       return await _addMedia(video: false);
     } on ItemPhotoUnavailable catch (e) {
       if (mounted) showToast(context, e.message);
+    }
+  }
+
+  /// Crop or rotate the cover. It is sent when the listing is saved, like a newly picked cover.
+  Future<void> _adjustCover() async {
+    try {
+      final now = _photo ?? await widget.photos.load(_savedCover!);
+      if (!mounted) return;
+      final out = await ImageAdjustScreen.open(context, now);
+      if (out != null && mounted) setState(() => _photo = out);
+    } catch (_) {
+      if (mounted) showToast(context, 'Could not open this photo. Check the connection and try again.');
+    }
+  }
+
+  /// Crop or rotate a banner photo: the adjusted photo is uploaded and takes its place.
+  Future<void> _adjustMedia(int i) async {
+    try {
+      final url = '${_media[i]['url']}';
+      final now = await widget.photos.load(url);
+      if (!mounted) return;
+      final out = await ImageAdjustScreen.open(context, now);
+      if (out == null || !mounted || identical(out, now)) return;
+      setState(() => _uploading = true);
+      final got = await widget.api.uploadMedia(PickedDocument(name: 'photo.${out.contentType == 'image/png' ? 'png' : 'jpg'}', bytes: out.bytes, contentType: out.contentType));
+      if (mounted) setState(() => v['media'] = [..._media]..[i] = {'kind': got.kind, 'url': got.url});
+    } on ServiceApiException catch (e) {
+      if (mounted) showServiceError(context, e);
+    } catch (_) {
+      if (mounted) showToast(context, 'Could not open this photo. Check the connection and try again.');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
     }
   }
 
@@ -470,6 +507,8 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
       // 1 Basics
       0 => [
           _hero(),
+          // at the top, not under the fields (founder, 6 Nov 2026): the Add tile comes first
+          if (_hasCover || _media.isNotEmpty || _uploading) Padding(padding: const EdgeInsets.only(bottom: 12), child: _mediaField()),
           if (v['template_name'] != null) _fromTemplate(),
           if (!_catFixed || cat == null) _categoryFirst() else _categoryLine(cat),
           card(FieldGrid(children: [
@@ -478,7 +517,6 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
               (true, _pick('sub_group', cat.key == 'service' ? 'Type of service' : 'Type', [for (final (g, _) in cat.subcategories) g], canAdd: false)),
             (true, _subcategoryPick(cat)),
             (false, _input('description', 'Description', hint: 'e.g. ${eg.description}')),
-            if (_hasCover || _media.isNotEmpty || _uploading) (false, _mediaField()),
             // amenities on every category (founder, 4 Nov 2026: "add to all")
             (false, Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 fieldLabel('Amenities'),
@@ -518,7 +556,8 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                 (true, _pick('min_stay', 'Minimum stay', _nights, input: OwnInput.nights)),
               ],
               (true, _pick('book_up_to', 'Book up to', _bookAhead, input: OwnInput.days)),
-              (true, _pick('min_notice', 'Minimum notice', _notice, input: OwnInput.length)),
+              // how close to the start a customer can still book; cancelling has its own question on the Price step
+              (true, _pick('min_notice', 'Minimum notice to book', _notice, input: OwnInput.length)),
               if (_cat == 'play') ...[
                 (true, _pick('late_grace', 'Late arrival grace', _grace, input: OwnInput.length)),
                 (true, _pick('no_show', 'If no one arrives', _noShow)),
@@ -576,11 +615,12 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
             FieldGrid(children: [
               if (p.where.isNotEmpty) (true, _pick('where', 'Where', p.where)),
               if (_branches.isNotEmpty && v['where'] != 'On call') (true, _pick('branch', _cat == 'events' ? 'Venue' : 'Branch', _branches)),
-              if (p.where.isNotEmpty && v['where'] != 'At your place') ...[
+              if (p.where.isNotEmpty && v['where'] != kWhereOnSite) ...[
                 (true, _pick('oncall_area', 'On-call area', _onCallArea, input: OwnInput.km)),
                 (true, _pick('travel_charge', 'Travel charge', _travel)),
                 if (v['travel_charge'] == 'Fixed' || v['travel_charge'] == 'Per km') (true, _input('travel_amount', v['travel_charge'] == 'Per km' ? 'Per km' : 'Travel charge', money: true)),
               ],
+              (true, _pick('entry_type', 'Type of entry', _entryTypes)),
               (true, _pick('booked_for', 'Booked for', _bookedFor)),
               if (type == 'Nights') ...[
                 (true, _pick('adults', 'Adults, up to', _people, input: OwnInput.count)),
@@ -661,7 +701,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                       if (!x) v['rules'] = <Map<String, dynamic>>[];
                     })),
             if (v['rules_on'] == true || _rules.isNotEmpty) ...[
-              RulesEditor(rows: _rules, keyPrefix: 'sf-rule', onChanged: (r) => _set('rules', r)),
+              RulesEditor(rows: _rules, keyPrefix: 'sf-rule', api: widget.api, onChanged: (r) => _set('rules', r)),
               if (_rules.length > 1) FieldGrid(children: [(false, _pick('rule_order', 'When more than one rule fits', kRuleOrder, canAdd: false))]),
             ],
             FieldGrid(children: [
@@ -790,8 +830,9 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
     ]);
   }
 
-  /// Photos and videos in one compact row (founder, 4 Nov 2026): the cover first (shown on the list), then the banner photos and videos
-  /// (shown at the top of the service), then a small dashed Add tile whose menu opens right on it: Photo, Video or Camera.
+  /// Photos and videos in one compact row (founder, 4 Nov 2026): first a small dashed Add tile whose menu opens right on it (Photo, Video or
+  /// Camera), then the cover (shown on the list), then the banner photos and videos (shown at the top of the service). A photo can be
+  /// cropped or rotated from its tile.
   Widget _mediaField() {
     final media = _media;
     const w = 92.0, h = 72.0;
@@ -807,6 +848,24 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
               height: 22,
               decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: kLine)),
               child: const Icon(LucideIcons.x, size: 13, color: kInk),
+            ),
+          ),
+        );
+    Widget adjust(String key, VoidCallback onTap) => Positioned(
+          right: 4,
+          bottom: 4,
+          child: Tooltip(
+            message: 'Crop or rotate',
+            child: InkWell(
+              key: ValueKey(key),
+              customBorder: const CircleBorder(),
+              onTap: _uploading ? null : onTap,
+              child: Container(
+                width: 26,
+                height: 26,
+                decoration: const BoxDecoration(color: Color(0xCC111827), shape: BoxShape.circle),
+                child: const Icon(LucideIcons.crop, size: 14, color: Colors.white),
+              ),
             ),
           ),
         );
@@ -840,11 +899,30 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
       SizedBox(
         height: h + 8,
         child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.only(top: 6, right: 6), clipBehavior: Clip.none, children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: _addMenu(
+              child: CustomPaint(
+                painter: const _DashedBox(),
+                child: SizedBox(
+                  width: w,
+                  height: h,
+                  child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(LucideIcons.camera, size: 20, color: kInk),
+                    const SizedBox(height: 3),
+                    Text('Add', style: inter(12.5, 700)),
+                    Text('jpg · png · mp4', style: inter(10, 400, color: kMuted)),
+                  ])),
+                ),
+              ),
+            ),
+          ),
           if (cover != null)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Stack(clipBehavior: Clip.none, children: [
                 tile(const ValueKey('sf-cover'), cover, tag: 'Cover'),
+                adjust('sf-cover-adjust', _adjustCover),
                 remove('sf-cover-remove', () => setState(() {
                       if (_photo != null) {
                         _photo = null;
@@ -865,6 +943,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                       : Image.network('${m['url']}', fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(LucideIcons.image, color: Colors.white)),
                   tag: m['kind'] == 'video' ? 'Video' : null,
                 ),
+                if (m['kind'] != 'video') adjust('sf-media-adjust-$i', () => _adjustMedia(i)),
                 remove('sf-media-remove-$i', () => setState(() => v['media'] = [...media]..removeAt(i))),
               ]),
             ),
@@ -879,21 +958,6 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                 child: const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: kGreenText)),
               ),
             ),
-          _addMenu(
-            child: CustomPaint(
-              painter: const _DashedBox(),
-              child: SizedBox(
-                width: w,
-                height: h,
-                child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(LucideIcons.camera, size: 20, color: kInk),
-                  const SizedBox(height: 3),
-                  Text('Add', style: inter(12.5, 700)),
-                  Text('jpg · png · mp4', style: inter(10, 400, color: kMuted)),
-                ])),
-              ),
-            ),
-          ),
         ]),
       ),
     ]);
