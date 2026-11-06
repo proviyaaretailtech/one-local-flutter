@@ -363,6 +363,12 @@ void main() {
       expect(opened, ['T1'], reason: 'the front bar opens its table');
     });
 
+    test('a long-occupied table reads in hours on its bar, as in the table chooser (not "4173m")', () {
+      Facts occupied(int mins) => Facts({'status': 'occupied', 'elapsed_minutes': mins});
+      expect(TableDeckStatus.of(occupied(4173)), 'Occupied · 69h 33m');
+      expect(TableDeckStatus.of(occupied(12)), 'Occupied · 12m');
+    });
+
     testWidgets('⌃ fans out one bar per table (T6 is not in the deck); tapping one brings it to the front and opens it', (t) async {
       final opened = await pumpDeck(t);
       await t.tap(find.byKey(const ValueKey('deck-toggle-T1')));
