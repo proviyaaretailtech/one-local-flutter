@@ -49,6 +49,8 @@ class AppointmentView extends SvcData {
   String get customer => raw['customer'] is Map ? _s(_map(raw['customer']), 'name') : s('customer');
   String get customerPhone => raw['customer'] is Map ? _s(_map(raw['customer']), 'phone') : s('customer_phone');
   String get serviceAddress => s('service_address');
+  /// The listing's type on the Bill tab (`svc_front_desk`): events, activities, play, service or stay.
+  String get category => s('category');
   /// Calendar rows (svc_calendar, 2 Nov 2026): the order total and what is paid so far; the local day it starts.
   num get amount => n('amount');
   num get paid => n('paid');
@@ -99,6 +101,20 @@ class CalendarData {
   List<AppointmentView> get items => _list(raw['appointments']).map(AppointmentView.new).toList();
 }
 
+/// One day on the Bill tab (`svc_front_desk`): the types this business offers and every booking with what can be done next.
+class FrontDeskData extends SvcData {
+  const FrontDeskData(super.raw);
+  String get dateLabel => s('date_label');
+  String get business => s('business');
+  List<String> get kinds => ls('kinds');
+  List<AppointmentView> get items => _list(raw['appointments']).map(AppointmentView.new).toList();
+  List<SvcData> get sessions => l('sessions');
+  List<SvcData> get groupListings => l('group_listings');
+
+  /// Listings booked by the unit, each with all its courts.
+  List<SvcData> get courts => l('courts');
+}
+
 /// A service the booking form can pick (`svc_catalogue`).
 class ServiceOption {
   ServiceOption(this.raw);
@@ -110,6 +126,16 @@ class ServiceOption {
   String get fulfilment => raw['fulfilment'] == null ? 'appointment' : _s(raw, 'fulfilment');
   List<Map<String, dynamic>> get addons => _list(raw['addons']);
   List<String> get staffIds => ((raw['staff_ids'] as List?) ?? const []).map((e) => '$e').toList();
+
+  /// Courts, turfs, tables: what this listing is booked by (empty: booked with a provider, as before).
+  List<Map<String, dynamic>> get units => _list(raw['units']);
+  bool get byUnit => units.isNotEmpty;
+
+  /// Named parts of a unit (North half), each with its own price or none.
+  List<Map<String, dynamic>> get parts => _list(raw['parts']);
+
+  /// 'court', 'turf', 'unit'.
+  String get unitWord => (raw['unit_word'] == null || _s(raw, 'unit_word').isEmpty ? 'unit' : _s(raw, 'unit_word')).toLowerCase();
 }
 
 class ProviderOption {
@@ -474,12 +500,22 @@ class ServiceApi {
   Future<CalendarData> calendar({required String date, String view = 'day', String? locationId, String? staffId, bool withCancelled = false, String? source}) async =>
       CalendarData(await _call('svc_calendar', {'date': date, 'view': view, 'location_id': locationId, 'staff_id': staffId, if (withCancelled) 'with_cancelled': true, 'source': source}));
 
-  /// [party]: who is coming ({group, guests: [{g, a}]}); [startsAt]: the time picked, for peak prices and time rules.
-  Future<ServiceQuote> quote({required String serviceId, List<String> addonIds = const [], String? staffId, Map<String, Object?>? party, String? startsAt}) async =>
-      ServiceQuote(await _call('svc_quote', {'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': staffId, 'party': party, 'starts_at': startsAt}));
+  Future<FrontDeskData> frontDesk({String? date}) async => FrontDeskData(await _call('svc_front_desk', {'date': date}));
 
-  Future<List<SlotProvider>> slots({required String date, required String serviceId, List<String> addonIds = const [], String? staffId}) async {
-    final r = await _call('svc_slots', {'date': date, 'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': staffId});
+  /// One walk-in on (+1) or off (-1) an event or activity; 0 starts a count now. Answers with the whole day.
+  Future<FrontDeskData> countWalkIn(String serviceId, {String? startsAt, int delta = 0}) async =>
+      FrontDeskData(await _call('svc_session_count', key: newKey(), {'service_id': serviceId, 'starts_at': startsAt, 'delta': delta}));
+
+  /// How many on a booking are in; none undoes the check-in. Answers with the whole day.
+  Future<FrontDeskData> admit(String id, int admitted, {required int version}) async =>
+      FrontDeskData(await _call('svc_appointment_admit', key: newKey(), {'id': id, 'admitted': admitted, 'expected_version': version}));
+
+  /// [party]: who is coming ({group, guests: [{g, a}]}); [startsAt]: the time picked, for peak prices and time rules.
+  Future<ServiceQuote> quote({required String serviceId, List<String> addonIds = const [], String? staffId, Map<String, Object?>? party, String? startsAt, String? unit, String? part}) async =>
+      ServiceQuote(await _call('svc_quote', {'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': staffId, 'party': party, 'starts_at': startsAt, 'unit': ?unit, 'part': ?part}));
+
+  Future<List<SlotProvider>> slots({required String date, required String serviceId, List<String> addonIds = const [], String? staffId, String? unit, String? part, String? exceptId}) async {
+    final r = await _call('svc_slots', {'date': date, 'service_id': serviceId, 'addon_ids': addonIds, 'staff_id': staffId, 'unit': ?unit, 'part': ?part, 'except_id': ?exceptId});
     return _list(r['providers']).map(SlotProvider.new).toList();
   }
 
@@ -490,8 +526,10 @@ class ServiceApi {
     String? customerPhone,
     required String serviceId,
     List<String> addonIds = const [],
-    required String staffId,
+    String? staffId,
     String? resourceId,
+    String? unit,
+    String? part,
     required String startsAt,
     String? depositMethod,
     num? tendered,
@@ -508,6 +546,8 @@ class ServiceApi {
         'addon_ids': addonIds,
         'staff_id': staffId,
         'resource_id': resourceId,
+        'unit': ?unit,
+        'part': ?part,
         'starts_at': startsAt,
         'entitlement_id': entitlementId,
         if (serviceAddress != null && serviceAddress.trim().isNotEmpty) 'service_address': serviceAddress.trim(),

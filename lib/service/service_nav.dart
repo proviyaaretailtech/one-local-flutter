@@ -7,7 +7,7 @@ import '../home/side_nav.dart';
 import 'manage_screen.dart';
 import 'bookings_screen.dart';
 import 'catalogue_screen.dart';
-import 'bills_screen.dart';
+import 'front_desk_screen.dart';
 import 'history_screen.dart';
 import 'service_api.dart';
 import 'service_media.dart';
@@ -33,7 +33,7 @@ Widget? serviceTabRoot(String label, {required Widget home, required ValueChange
   return switch (label) {
     'Home' => home,
     'Catalogue' => ServiceCatalogueScreen(api: a, onNavigate: onNavigate),
-    'Bill' => BillsScreen(api: a, onNavigate: onNavigate),
+    'Bill' => FrontDeskScreen(api: a, onNavigate: onNavigate),
     'Bookings' => BookingsScreen(api: a, onNavigate: onNavigate),
     _ => null,
   };
