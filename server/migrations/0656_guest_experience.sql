@@ -601,7 +601,7 @@ $$;
 
 -- the menu answer (table QR and public link) also carries the experience
 do $$
-declare v_src text := pg_get_functiondef('public.guest__menu'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.guest__menu'::regproc), E'\r', '');
 begin
   if v_src not like '%''experience'', public.gx__public_def%' then
     v_src := replace(v_src, $r$'items', v_items);$r$, $r$'items', v_items,
@@ -721,7 +721,7 @@ returns jsonb language sql stable security definer set search_path = public, pg_
 $$;
 
 do $$
-declare v_src text := pg_get_functiondef('public.guest_request_decide'::regproc);
+declare v_src text := replace(pg_get_functiondef('public.guest_request_decide'::regproc), E'\r', '');
 begin
   if v_src not like '%r.kind = ''preorder''%' then
     v_src := replace(v_src,
