@@ -312,6 +312,21 @@ void main() {
       expect(find.text('₹782'), findsWidgets);
     });
 
+    testWidgets('a store with nothing available: Request withdrawal says so and sends nothing', (t) async {
+      final w = wallet();
+      (w['unsettled'] as Map)['due'] = 0;
+      (w['on_the_way'] as Map)['amount'] = 0;
+      final s = FakeRpc((fn, b) => switch (fn) {
+            'wallet_overview' => ok(w),
+            _ => err(404, 'nope'),
+          });
+      await show(t, WalletScreen(api: s.wallet, settings: s.settings));
+      await t.tap(find.byKey(const ValueKey('wallet-withdraw')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('wallet-withdraw-send')), findsNothing);
+      expect(find.textContaining('Nothing to withdraw yet'), findsOneWidget);
+    });
+
     testWidgets('Request withdrawal asks the One Local team for an early payout of what is available', (t) async {
       final s = FakeRpc((fn, b) => switch (fn) {
             'wallet_overview' => ok(wallet()),

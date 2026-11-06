@@ -494,6 +494,21 @@ void main() {
   });
 
   group('Item creation', () {
+    testWidgets('a store leaving with typed changes is asked first', (t) async {
+      final s = Fake((r) => err(404, 'nope'));
+      await phone(t, Builder(builder: (c) => Scaffold(body: TextButton(onPressed: () => Navigator.of(c).push(MaterialPageRoute(builder: (_) => ItemFormScreen(api: s.api))), child: const Text('Open form')))), height: 6400);
+      await t.tap(find.text('Open form'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byType(TextField).first, 'Test name');
+      await t.pump();
+      await t.pageBack();
+      await t.pumpAndSettle();
+      expect(find.text('Leave without saving?'), findsOneWidget);
+      await t.tap(find.text('Keep editing'));
+      await t.pumpAndSettle();
+      expect(find.text('Item Creation'), findsOneWidget);
+    });
+
     testWidgets('a full save without tax shows the database message as a red banner and keeps the form', (t) async {
       final s = Fake((r) => err(422, 'Complete the HSN and GST rate to save the item, or save it as a draft.', 'tax_required'));
       await phone(t, ItemFormScreen(api: s.api), height: 6400);

@@ -1025,4 +1025,12 @@ const _words = <String, (String, String)>{
   'Payment Method': ('भुगतान का तरीका', 'Payment ka tareeka'),
   'Date & Time': ('तारीख और समय', 'Date aur time'),
   'Use New Order to start the next sale.': ('अगली बिक्री के लिए नया ऑर्डर दबाएँ।', 'Agli sale ke liye New Order dabayein.'),
+  'Taking online orders': ('ऑनलाइन ऑर्डर ले रहे हैं', 'Online orders le rahe hain'),
+  'Not taking online orders': ('ऑनलाइन ऑर्डर बंद हैं', 'Online orders band hain'),
+  'Online orders not set': ('ऑनलाइन ऑर्डर तय नहीं', 'Online orders set nahi'),
+  'Leave without saving?': ('बिना सेव किए निकलें?', 'Bina save kiye niklein?'),
+  'What you typed here will be lost.': ('यहाँ लिखा हुआ मिट जाएगा।', 'Yahan likha hua mit jayega.'),
+  'Keep editing': ('बदलते रहें', 'Edit karte rahein'),
+  'Leave': ('निकलें', 'Niklein'),
+  'Nothing to withdraw yet. Your balance is ₹0.': ('अभी निकालने के लिए कुछ नहीं। आपका बैलेंस ₹0 है।', 'Abhi nikaalne ke liye kuch nahi. Balance ₹0 hai.'),
 };

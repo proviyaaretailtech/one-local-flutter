@@ -134,11 +134,17 @@ class TransactionSuccessCard extends StatelessWidget {
           if (onWhatsApp == null)
             LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt)
           else
-            Row(children: [
-              Expanded(child: LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt)),
-              const SizedBox(width: 10),
-              Expanded(child: LightCta(key: const ValueKey('receipt-whatsapp'), label: tr('Send by WhatsApp'), onPressed: onWhatsApp)),
-            ]),
+            MediaQuery.sizeOf(context).width < 420
+                ? Column(children: [
+                    LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt),
+                    const SizedBox(height: 10),
+                    LightCta(key: const ValueKey('receipt-whatsapp'), label: tr('Send by WhatsApp'), onPressed: onWhatsApp),
+                  ])
+                : Row(children: [
+                    Expanded(child: LightCta(label: tr('Print Receipt'), onPressed: onPrintReceipt)),
+                    const SizedBox(width: 10),
+                    Expanded(child: LightCta(key: const ValueKey('receipt-whatsapp'), label: tr('Send by WhatsApp'), onPressed: onWhatsApp)),
+                  ]),
           if (footnote != null) ...[const SizedBox(height: 14), Text(footnote!, style: inter(12.5, 400, color: kKicker))],
         ]),
       );

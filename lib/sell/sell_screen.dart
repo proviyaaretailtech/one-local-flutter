@@ -547,15 +547,26 @@ class _SellScreenState extends State<SellScreen> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text([tr('Current Cart'), cart.label, if (units > 0) rupees(worth)].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(11, 600, color: Colors.white70)),
-                    Text(
-                      cart.customerPhone.isEmpty
-                          ? tr(cart.customerSkipped ? 'Walk-in · add number' : 'Add customer number')
-                          : [if (cart.customerName.isNotEmpty) cart.customerName, showMobile(cart.customerPhone)].join(' · '),
-                      key: const ValueKey('cart-wallet-customer'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: inter(15, 800, color: cart.customerPhone.isEmpty ? kLime : Colors.white),
-                    ),
+                    // the prompt shrinks to fit a phone rather than lose its last word
+                    if (cart.customerPhone.isEmpty)
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          tr(cart.customerSkipped ? 'Walk-in · add number' : 'Add customer number'),
+                          key: const ValueKey('cart-wallet-customer'),
+                          maxLines: 1,
+                          style: inter(15, 800, color: kLime),
+                        ),
+                      )
+                    else
+                      Text(
+                        [if (cart.customerName.isNotEmpty) cart.customerName, showMobile(cart.customerPhone)].join(' · '),
+                        key: const ValueKey('cart-wallet-customer'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: inter(15, 800, color: Colors.white),
+                      ),
                   ]),
                 ),
                 IconButton(
@@ -698,6 +709,8 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // a store on a phone: two narrow columns, so nothing sits on top of the picture
+    final narrow = MediaQuery.sizeOf(context).width < 420 && !const {'restaurant', 'service'}.contains(HomeNav.shell?.kind);
     final mrp = facts?.mrp;
     final low = !_out && facts?.lowInventory == true;
     final below = _known && _left < 0;
@@ -745,9 +758,9 @@ class ProductCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (item.sku.isNotEmpty)
+                  if (item.sku.isNotEmpty && !narrow)
                     Positioned(left: 6, top: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(8)), child: Text(item.sku, style: inter(10.5, 700, color: kMuted)))),
-                  if (why != null && !picked)
+                  if (why != null && !picked && !narrow)
                     Positioned(
                       left: 6,
                       bottom: 6,
@@ -778,6 +791,11 @@ class ProductCard extends StatelessWidget {
                     ),
                 ]),
                 const SizedBox(height: 6),
+                // on a phone the badge sits under the picture, so it does not cover it
+                if (why != null && !picked && narrow) ...[
+                  Text(tr(why!), maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(10, 700, color: const Color(0xFF2F8F4E))),
+                  const SizedBox(height: 2),
+                ],
                 Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: inter(13, 600, height: 1.2)),
                 const Spacer(),
                 Row(children: [

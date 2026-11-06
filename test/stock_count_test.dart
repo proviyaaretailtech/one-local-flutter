@@ -27,6 +27,7 @@ Map<String, dynamic> doc({String status = 'draft', num? counted, int version = 1
 void main() {
   late List<(String, Map<String, dynamic>)> calls;
   late Map<String, dynamic> current;
+  var answerExtra = <String, Map<String, dynamic>>{};
 
   StockEnv env() {
     calls = [];
@@ -41,7 +42,7 @@ void main() {
         'inv_document_act' => current = doc(
             status: body['action'] == 'submit' ? 'review' : 'draft', counted: (current['lines'] as List).first['counted_qty'] as num?, version: (current['version'] as int) + 1),
         'inv_document_view' => current,
-        _ => <String, dynamic>{},
+        _ => answerExtra[fn] ?? <String, dynamic>{},
       };
       return http.Response(jsonEncode(answer), 200, headers: {'content-type': 'application/json'});
     });
@@ -95,6 +96,19 @@ void main() {
     await tap(t, 'count-finish');
     expect(find.textContaining('Enter a whole number'), findsOneWidget);
     expect(calls.where((c) => c.$1 == 'inv_document_save'), isEmpty);
+    expect(calls.where((c) => c.$1 == 'inv_document_act'), isEmpty);
+  });
+
+  testWidgets('a count already sent says so in plain words, and is not sent twice', (t) async {
+    final e = env();
+    current = doc(status: 'review', counted: 1.75);
+    final sent = {...doc(status: 'awaiting_approval'), 'doc_no': 'ADJ-0021'};
+    answerExtra = {'inv_audit_to_adjustment': sent};
+    addTearDown(() => answerExtra = {});
+    await show(t, StockCountScreen(env: e));
+    await tap(t, 'count-doc1');
+    await tap(t, 'count-fix');
+    expect(find.textContaining('ADJ-0021 is already waiting for approval'), findsOneWidget);
     expect(calls.where((c) => c.$1 == 'inv_document_act'), isEmpty);
   });
 

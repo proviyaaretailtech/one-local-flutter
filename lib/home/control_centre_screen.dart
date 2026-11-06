@@ -311,7 +311,7 @@ class _Body extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(tr(open == true ? 'Store open' : open == false ? 'Store closed' : 'Status not set'), style: inter(14, 700)),
+                      Text(tr(open == true ? 'Taking online orders' : open == false ? 'Not taking online orders' : 'Online orders not set'), style: inter(14, 700)),
                       Text('${tr('Today')} · ${dayLabel(s.day, caps: false)}', style: inter(11, 400, color: kMuted)),
                     ]),
                   ),
@@ -345,7 +345,7 @@ class _Body extends StatelessWidget {
                     child: Row(children: [
                       Expanded(
                         child: Text(
-                          '${s.settledCount ?? 0} ${tr('bills settled')} · ${s.pax ?? 0} ${tr('pax')} · ${s.activeCount ?? 0} ${tr('open')}',
+                          '${s.settledCount ?? 0} ${tr('bills settled')} · ${s.activeCount ?? 0} ${tr('open')}',
                           style: inter(11.5, 400, color: kMuted),
                         ),
                       ),

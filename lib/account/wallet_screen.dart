@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../customers/customer_widgets.dart';
+import '../home/home_nav.dart';
 import '../home/home_widgets.dart' show rupees;
+import '../ui/i18n.dart';
 import '../ui/app_header.dart' show shortStoreName;
 import '../ui/theme.dart';
 import '../auth/partner_api.dart';
@@ -90,6 +92,7 @@ class _WalletScreenState extends State<WalletScreen> {
   /// One Local team (a support request) to pay out early; nothing is moved from the app.
   Future<void> _requestWithdrawal(WalletOverview o) async {
     final available = o.unsettledDue + o.onTheWay;
+    if (available <= 0 && !const {'restaurant', 'service'}.contains(HomeNav.shell?.kind)) return showToast(context, tr('Nothing to withdraw yet. Your balance is ₹0.'));
     final note = TextEditingController();
     final ok = await showOlDialog<bool>(
       context: context,

@@ -150,8 +150,13 @@ class _StockCountScreenState extends State<StockCountScreen> {
     if (d == null) return;
     await _run(() async {
       final adj = await env.api.adjustmentFromAudit(d.id);
-      final sent = await env.api.act(adj.id, 'submit', version: adj.version);
-      if (mounted) showToast(context, 'Sent for approval as ${sent.number}. Stock changes once a manager approves it.');
+      if (adj.status != 'draft') {
+        // already sent from this count: nothing more to do here
+        if (mounted) showToast(context, adj.status == 'posted' ? '${adj.number} is already approved. The stock is corrected.' : '${adj.number} is already waiting for approval. Approve it in Adjust stock.');
+      } else {
+        final sent = await env.api.act(adj.id, 'submit', version: adj.version);
+        if (mounted) showToast(context, 'Sent for approval as ${sent.number}. Stock changes once a manager approves it.');
+      }
       setState(() => _doc = null);
       await _load();
     });

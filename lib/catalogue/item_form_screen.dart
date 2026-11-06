@@ -16,6 +16,7 @@ import 'price_basis.dart';
 import 'sku_api.dart';
 import 'sku_picker.dart';
 import '../ui/item_name.dart';
+import '../home/home_nav.dart';
 import '../ui/i18n.dart';
 
 /// Figma "Item Creation" (Store Standard / Screens): identity, units and storage, tax and pricing, then a save checklist.
@@ -71,6 +72,23 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
   num? _gst;
   String _storage = '';
   bool _busy = false, _bannerOpen = true;
+  bool _typed = false; // something was typed here and not saved
+
+  /// A store's Back with typed changes: leaving would lose them, so ask first.
+  Future<void> _leaveAsking() async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(tr('Leave without saving?')),
+        content: Text(tr('What you typed here will be lost.')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('Keep editing'))),
+          TextButton(key: const ValueKey('item-leave'), onPressed: () => Navigator.pop(c, true), child: Text(tr('Leave'))),
+        ],
+      ),
+    );
+    if (leave == true && mounted) Navigator.of(context).pop();
+  }
   String? _error, _errorTitle;
 
   static const _storages = ['Ambient · Dry shelf', 'Ambient', 'Chilled', 'Frozen'];
@@ -475,6 +493,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
               controller: c,
               keyboardType: type,
               inputFormatters: formatters,
+              onChanged: (_) => _typed = true,
               style: inter(14, 400),
               decoration: plainInput.copyWith(hintText: hint, hintStyle: inter(14, 400, color: bad ? kError : kHint)),
             ),
@@ -554,7 +573,13 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
     final unitsDone = netQty != null && num.tryParse(_packUnits.text.trim()) != null;
     final pricingDone = !taxOpen && price != null;
     final title = _editing ? 'Edit Item' : 'Item Creation';
-    return Scaffold(
+    final ask = _typed && !const {'restaurant', 'service'}.contains(HomeNav.shell?.kind);
+    return PopScope(
+      canPop: !ask,
+      onPopInvokedWithResult: (popped, _) {
+        if (!popped) _leaveAsking();
+      },
+      child: Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
         OrdersTopBar(title: tr('Item'), onBack: () => Navigator.of(context).maybePop()),
@@ -709,6 +734,7 @@ class _ItemFormScreenState extends State<ItemFormScreen> {
         ),
         PosBottomNav(active: 'item', onTap: _tab),
       ]),
+    ),
     );
   }
 }

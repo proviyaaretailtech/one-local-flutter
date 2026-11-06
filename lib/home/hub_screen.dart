@@ -236,7 +236,7 @@ class _TodayCard extends StatelessWidget {
             const Spacer(),
             Dot(f.isOpen == true ? kUp : f.isOpen == false ? kRed : kMuted, size: 14),
             const SizedBox(width: 6),
-            Text(f.isOpen == true ? 'Open' : f.isOpen == false ? 'Closed' : 'Status not set', style: inter(10.5, 500)),
+            Text(!const {'restaurant', 'service'}.contains(HomeNav.shell?.kind) ? tr(f.isOpen == true ? 'Taking online orders' : f.isOpen == false ? 'Not taking online orders' : 'Online orders not set') : f.isOpen == true ? 'Open' : f.isOpen == false ? 'Closed' : 'Status not set', style: inter(10.5, 500)),
           ]),
           const SizedBox(height: 12),
           FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(rupees(f.todaySales.round()), style: inter(27, 800))),
