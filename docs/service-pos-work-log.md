@@ -474,3 +474,7 @@ All pass: service screens and frames, service dashboard, shell, navigation, rout
 - A pricing rule has a name and can be saved as a template (svc_rule_templates, svc_rule_template_list, svc_rule_template_save); the same name replaces it. Use a saved rule adds it to any listing or template.
 - What it uses: each row takes an optional Cost, kept in the listing's requirements; the summary shows Cost per booking. No function open to customers returns it.
 - Hosted SQL: C:\onelocal\hosted_service_rule_templates_2026-11-06.sql. Run on hosted 6 Nov; matches local.
+
+## 6 Nov 2026: store and restaurant floating bars move like the service bar
+
+- The founder asked for the service bar's look and animation on the store and restaurant bars, with their words unchanged. The design moved into the shared `AppTabBar` (lib/ui/app_tab_bar.dart), so Orders, Kitchen, Inventory and the shells all have it; `ServiceTabBar` is now a thin wrapper over it. No SQL.
