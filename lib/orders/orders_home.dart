@@ -72,8 +72,10 @@ class _OrdersHomeState extends State<OrdersHome> {
     _ => WalletColors.slate,
   };
 
-  /// Online orders only: a counter bill is not one.
-  List<OrderCard> get _online => (_orders ?? const <OrderCard>[]).where((o) => o.state != 'counter').toList();
+  /// Online orders only: a counter bill is not one. In a store that holds whatever became of the bill, cancelled or being returned too
+  /// (founder, 6 Nov 2026: "Only online orders should appear"); those are in Past orders, Bill → History and Returns.
+  bool _isOnline(OrderCard o) => o.state != 'counter' && (const {'restaurant', 'service'}.contains(HomeNav.shell?.kind) || o.channelLabel != 'Store Checkout');
+  List<OrderCard> get _online => (_orders ?? const <OrderCard>[]).where(_isOnline).toList();
 
   List<OrderCard> _in(String pile) => _online.where((o) => o.state == pile).toList();
 

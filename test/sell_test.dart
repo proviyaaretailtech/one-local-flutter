@@ -1045,6 +1045,13 @@ void main() {
       expect(opened, 'o1');
     });
 
+    testWidgets('a cancelled bill is not counted as unpaid', (t) async {
+      final till = Till()..receipts = [receipt('c1', 'P-00121', 'Paid one', 40), receipt('c3', 'P-00123', 'Cancelled one', 38, status: 'cancelled', paid: 0)];
+      await tall(t, HistoryScreen(env: till.env(), source: 'all', onOpen: (_) {}, now: now));
+      expect(find.text('Order P-00123'), findsOneWidget);
+      expect(t.widget<Text>(find.byKey(const ValueKey('hist-count'))).data, '1 order · ₹40');
+    });
+
     testWidgets('a store\'s Past orders: paid bills are there, a bill still unpaid is not, and no refund here', (t) async {
       final till = Till()..receipts = [receipt('c1', 'P-00121', 'Counter sale', 40), {...receipt('c2', 'P-00122', 'On hold', 90), 'status': 'unpaid', 'paid': 0}];
       await tall(t, HistoryScreen(env: till.env(), source: 'all', onOpen: (_) {}, now: now));
@@ -1052,6 +1059,7 @@ void main() {
       expect(lastQuery(till)['source'], 'all');
       expect(find.text('Order P-00121'), findsOneWidget);
       expect(find.text('Order P-00122'), findsNothing);
+      expect(t.widget<Text>(find.byKey(const ValueKey('hist-count'))).data, '1 order · ₹40');
       await t.tap(find.text('View card'));
       await t.pumpAndSettle();
       expect(find.text('Refund this bill'), findsNothing);

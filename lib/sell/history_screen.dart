@@ -78,7 +78,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   /// The bills that brought money in, what they kept, and the unpaid ones apart: the count and the amount are about the same bills.
   String _countLine(List<Receipt> rows) {
     final taken = rows.where((r) => r.paid > 0).toList();
-    final unpaid = rows.length - taken.length;
+    final unpaid = rows.where((r) => r.paid <= 0 && r.status != 'cancelled').length; // a cancelled bill is owed nothing
     return '${taken.length}${_more ? '+' : ''} ${taken.length == 1 ? 'order' : 'orders'} · ${rupees(taken.fold<num>(0, (s, r) => s + r.paid - r.refunded))}${unpaid > 0 ? ' · $unpaid unpaid' : ''}';
   }
 
