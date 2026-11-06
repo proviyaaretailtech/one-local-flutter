@@ -65,13 +65,13 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('go-Bill')));
     await t.pumpAndSettle();
-    expect(find.textContaining('Red bills are due'), findsOneWidget);
+    expect(find.textContaining('check people in here'), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('ol-bubble-close')));
     await t.tap(find.byKey(const ValueKey('go-Home')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('go-Bill')));
     await t.pumpAndSettle();
-    expect(find.textContaining('Red bills are due'), findsNothing, reason: 'a tip is said once');
+    expect(find.textContaining('check people in here'), findsNothing, reason: 'a tip is said once');
   });
 
   testWidgets("no tip over a walkthrough; the tab's tip waits for the next time it opens", (t) async {
@@ -87,20 +87,20 @@ void main() {
     await t.pump(const Duration(milliseconds: 600));
     await t.pump();
     expect(find.text('Done.'), findsOneWidget, reason: 'the walkthrough moved on');
-    expect(find.textContaining('Red bills are due'), findsNothing);
+    expect(find.textContaining('check people in here'), findsNothing);
     OlWalk.current?.stop();
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('go-Home')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('go-Bill')));
     await t.pumpAndSettle();
-    expect(find.textContaining('Red bills are due'), findsOneWidget);
+    expect(find.textContaining('check people in here'), findsOneWidget);
   });
 
   testWidgets('tapped: "Where do you want to go?" with places, walkthroughs and this tab\'s questions; a place opens in its tab', (t) async {
     final opened = await _show(t);
     await _openOl(t);
-    for (final s in ['Where do you want to go?', 'Take me to', 'Bookings', 'Bills', 'Services', 'Inventory', 'Service management', 'Free slots', 'Money',
+    for (final s in ['Where do you want to go?', 'Take me to', 'Bookings', 'Bills', 'Services', 'Costing', 'Service management', 'Free slots', 'Money',
       'Show me how', 'Book a visit', 'Lend out a tool', 'Change opening hours', 'Ask me', 'Who is free now?']) {
       expect(find.text(s), findsWidgets, reason: s);
     }
@@ -119,7 +119,7 @@ void main() {
     await _openOl(t);
     await t.enterText(find.byKey(const ValueKey('service-ol-ask')), 'tool');
     await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('service-ol-place-Inventory')), findsOneWidget);
+    expect(find.byKey(const ValueKey('service-ol-place-Costing')), findsOneWidget);
     expect(find.byKey(const ValueKey('service-ol-place-Money')), findsNothing);
     expect(find.text('Lend out a tool'), findsOneWidget);
     expect(find.text('Book a visit'), findsNothing);
@@ -136,7 +136,7 @@ void main() {
     expect(opened.single.$2, isA<ManageScreen>());
   });
 
-  testWidgets('Show me how starts the walkthrough on the real screens; Inventory is a tab plus a walk to it', (t) async {
+  testWidgets('Show me how starts the walkthrough on the real screens; Costing is a tab plus a walk to it', (t) async {
     final opened = await _show(t);
     await _openOl(t);
     await t.tap(find.byKey(const ValueKey('service-ol-tour-Book a visit')));
@@ -145,17 +145,17 @@ void main() {
     OlWalk.current?.stop();
     await t.pumpAndSettle();
     await _openOl(t);
-    await t.tap(find.byKey(const ValueKey('service-ol-place-Inventory')));
+    await t.tap(find.byKey(const ValueKey('service-ol-place-Costing')));
     await t.pumpAndSettle();
     expect(opened.single, ('Catalogue', null));
-    expect(OlWalk.current?.tour.name, 'Open Inventory');
+    expect(OlWalk.current?.tour.name, 'Open Costing');
     OlWalk.current?.stop();
     await t.pumpAndSettle();
   });
 
   test('answers: the topic with the most shared words; otherwise not sure', () {
     expect(serviceOlAnswer('book an appointment').place, 'Bookings');
-    expect(serviceOlAnswer('lend the ladder tool').place, 'Inventory');
+    expect(serviceOlAnswer('lend the ladder tool').place, 'Costing');
     expect(serviceOlAnswer('send the bill on whatsapp').place, 'Bills');
     expect(serviceOlAnswer('who is free').place, 'Free slots');
     expect(serviceOlAnswer('xyz qwerty').text, serviceOlNotSure);

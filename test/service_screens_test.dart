@@ -281,7 +281,7 @@ void main() {
     testWidgets('Services tab: Add service, search, Filter, status and category chips, and rows with type and status pills', (t) async {
       final s = FakeRpc({'svc_service_list': (_) => serviceList()});
       await show(t, ServiceCatalogueScreen(api: s.api, business: 'Sharma Services · Bengaluru'));
-      for (final text in ['Service catalogue', '18 services', 'Services', 'Inventory', 'Add service', 'Filter', 'All', 'Active 16', 'Paused 2', 'Grooming', 'Home care',
+      for (final text in ['Service catalogue', '18 services', 'Services', 'Costing', 'Add service', 'Filter', 'All', 'Active 16', 'Paused 2', 'Grooming', 'Home care',
         'Precision haircut', 'APT-01 · Grooming', 'Appointment', 'Active', '₹600', '45 min', '₹999/mo', 'Membership']) {
         expect(find.text(text), findsWidgets, reason: text);
       }

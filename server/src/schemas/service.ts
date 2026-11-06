@@ -27,15 +27,19 @@ export const Calendar = obj({
   date: day.nullish(), view: z.enum(['day', 'week', 'month']).optional(), location_id: id.nullish(), staff_id: id.nullish(), with_cancelled: z.boolean().optional(),
   source: z.enum(['pos', 'app']).nullish(), // offline (logged in the POS) or online (booked in the customer app), 2 Nov 2026
 });
+export const FrontDesk = obj({ date: day.nullish(), location_id: id.nullish() }); // the Bill tab's day, 5 Nov 2026
+// the door's count: one walk-in on or off, 0 starts a count now; how many on a booking are in
+export const SessionCount = obj({ service_id: id, starts_at: when.nullish(), delta: z.number().int().min(-1).max(1), location_id: id.nullish(), ...key });
+export const Admit = obj({ id, admitted: z.number().int().min(0).max(500), expected_version: ver, ...key });
 // who is coming (4 Nov 2026): checked against the listing's rules and limits, and priced by them
 const party = obj({
   group: z.enum(['Single', 'Couple', 'Family', 'Group'], { message: 'Choose single, couple, family or group.' }).nullish(),
   guests: z.array(obj({ g: z.enum(['woman', 'man', 'any']), a: z.enum(['under_8', '8_11', '12_17', '18_59', '60_plus']) })).min(1, 'Add who is coming.').max(200, 'At most 200 people in one booking.'),
 });
-export const Quote = obj({ service_id: id, addon_ids: ids.optional(), staff_id: id.nullish(), party: party.nullish(), starts_at: when.nullish() });
-export const Slots = obj({ date: day, service_id: id, addon_ids: ids.optional(), staff_id: id.nullish(), location_id: id.nullish() });
+export const Quote = obj({ service_id: id, addon_ids: ids.optional(), staff_id: id.nullish(), party: party.nullish(), starts_at: when.nullish(), unit: text(80).nullish(), part: text(80).nullish() });
+export const Slots = obj({ date: day, service_id: id, addon_ids: ids.optional(), staff_id: id.nullish(), location_id: id.nullish(), unit: text(80).nullish(), part: text(80).nullish(), except_id: id.nullish() });
 export const Book = obj({
-  customer_name: text(80), customer_phone: text(20).nullish(), service_id: id, addon_ids: ids.optional(), staff_id: id, resource_id: id.nullish(),
+  customer_name: text(80), customer_phone: text(20).nullish(), service_id: id, addon_ids: ids.optional(), staff_id: id.nullish(), resource_id: id.nullish(), unit: text(80).nullish(), part: text(80).nullish(),
   starts_at: when, notes: text(300).nullish(), service_address: text(300).nullish(), access_note: text(200).nullish(), entitlement_id: id.nullish(),
   deposit: obj({ method, tendered: money.nullish(), reference: text(60).nullish() }).nullish(), party: party.nullish(), ...key,
 });

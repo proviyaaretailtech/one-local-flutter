@@ -137,6 +137,10 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
           serviceId: service.s('menu_item_id'),
           addonIds: [for (final l in a.lines) if (l.s('kind') == 'addon') l.s('menu_item_id')],
           staffId: a.m('provider').s('staff_id'),
+          // a court moves on its own: the same court and part, not counting this booking
+          unit: a.s('unit').isEmpty ? null : a.s('unit'),
+          part: a.s('part').isEmpty ? null : a.s('part'),
+          exceptId: a.s('unit').isEmpty ? null : a.id,
         ));
     if (slot == null) return;
     await _act('reschedule', {'starts_at': slot['starts_at']});
@@ -178,6 +182,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
         child: Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [svcStatus(a.statusLabel, a.tone), SourceTag(online: a.online)]),
       ),
       SvcCard(title: a.title, children: [
+        if (a.s('unit').isNotEmpty) SvcKV('Booked', [a.s('unit'), if (a.s('part').isNotEmpty) a.s('part')].join(' · ')),
         SvcKV('Provider', a.resource == null ? a.provider : '${a.provider} · ${a.resource}'),
         SvcKV('Schedule', '${a.dateLabel} · ${a.timeLabel}'),
         if (a.onLocation) SvcKV('Address', a.s('service_address')) else SvcKV('Location', a.location),
@@ -224,6 +229,8 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
       'appointment_reschedule': 'Rescheduled',
       'arrival_confirmation_requested': 'Confirmation requested',
       'appointment_check_in': 'Customer checked in',
+      'appointment_admit': 'People admitted',
+      'appointment_check_in_undone': 'Check-in undone',
       'appointment_start': 'Service started',
       'extra_added': 'Extra charge added',
       'appointment_completed': 'Completed and billed',
@@ -267,9 +274,10 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
 
 /// Free start times for a reschedule (same service, add-ons and provider).
 class _Slots extends StatefulWidget {
-  const _Slots({required this.api, required this.date, required this.serviceId, required this.addonIds, required this.staffId});
+  const _Slots({required this.api, required this.date, required this.serviceId, required this.addonIds, required this.staffId, this.unit, this.part, this.exceptId});
   final ServiceApi api;
   final String date, serviceId, staffId;
+  final String? unit, part, exceptId;
   final List<String> addonIds;
   @override
   State<_Slots> createState() => _SlotsState();
@@ -281,7 +289,7 @@ class _SlotsState extends State<_Slots> {
   @override
   void initState() {
     super.initState();
-    widget.api.slots(date: widget.date, serviceId: widget.serviceId, addonIds: widget.addonIds, staffId: widget.staffId).then((d) {
+    widget.api.slots(date: widget.date, serviceId: widget.serviceId, addonIds: widget.addonIds, staffId: widget.staffId, unit: widget.unit, part: widget.part, exceptId: widget.exceptId).then((d) {
       if (mounted) setState(() => _slots = d.expand((p) => p.slots).toList());
     }).catchError((Object e) {
       if (mounted) setState(() => _error = _err(e));

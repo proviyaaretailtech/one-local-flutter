@@ -295,7 +295,7 @@ class _ServiceCatalogueScreenState extends State<ServiceCatalogueScreen> {
 
   /// Services · Templates · Inventory; the white highlight slides to the picked tab (the store's segmented tabs).
   Widget _tabs(ServiceListData d) {
-    final tabs = [('services', 'Services', '${d.total}'), ('templates', 'Templates', ''), ('inventory', 'Inventory', (_alerts ?? 0) == 0 ? '' : '$_alerts')];
+    final tabs = [('services', 'Services', '${d.total}'), ('templates', 'Templates', ''), ('inventory', 'Costing', (_alerts ?? 0) == 0 ? '' : '$_alerts')];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(color: kInfoGreyBg, borderRadius: BorderRadius.circular(14)),

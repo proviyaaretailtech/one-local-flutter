@@ -104,7 +104,7 @@ Widget billWalletCard(BillView b, VoidCallback onTap, {List<Color>? colors}) =>
 
 /// The tab's first screen: what is due now and paid this month, Due · Paid · All, search, and the bills.
 class BillsScreen extends StatefulWidget {
-  const BillsScreen({super.key, this.api, this.onNavigate, this.openUrl, this.printer, this.filter});
+  const BillsScreen({super.key, this.api, this.onNavigate, this.openUrl, this.printer, this.filter, this.embedded = false});
   final ServiceApi? api;
   final ValueChanged<String>? onNavigate;
   final Future<bool> Function(Uri url)? openUrl;
@@ -112,6 +112,9 @@ class BillsScreen extends StatefulWidget {
   /// The pile to open on: due, today, paid or all; null shows every pile (the dashboard's Money tile opens Taken today, 2 Nov 2026).
   final String? filter;
   final Future<void> Function(BuildContext context, BillReceipt bill)? printer;
+
+  /// Inside the Bill tab's Bills tab: just the bills, on the page that holds the tabs.
+  final bool embedded;
   @override
   State<BillsScreen> createState() => _BillsScreenState();
 }
@@ -188,16 +191,9 @@ class _BillsScreenState extends State<BillsScreen> {
     final d = _data;
     final searching = _q.trim().isNotEmpty;
     final open = _piles.where((p) => p.$1 == _pile).firstOrNull;
-    return ServicePage(
-      title: 'Bills',
-      subtitle: 'Every bill, from bookings, jobs and made here',
-      onMenu: HomeNav.openMenu == null ? null : () => HomeNav.openMenu!(context),
-      onRefresh: _load,
-      error: _error,
-      onRetry: _load,
-      body: d == null
-          ? null
-          : [
+    final body = d == null
+        ? null
+        : <Widget>[
               // create first, where it is seen without scrolling (founder, 2 Nov 2026)
               SvcTopButton('+ New bill', key: const ValueKey('new-bill'), onTap: _new),
               const SizedBox(height: 10),
@@ -218,7 +214,20 @@ class _BillsScreenState extends State<BillsScreen> {
                   OrderCardBox(child: Text(switch (_pile) { 'due' => 'Nothing is due. Every bill is paid.', 'today' => 'No money taken today yet.', _ => 'No bills here.' }, style: inter(14, 400, color: kMuted))),
                 for (final b in d.bills) billWalletCard(b, () => _open(b.id), colors: open?.$5),
               ],
-            ],
+            ];
+    if (widget.embedded) {
+      if (_error != null) return OrderCardBox(child: Text(_error!, style: inter(13.5, 500)));
+      if (body == null) return const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(color: kGreenText)));
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: body);
+    }
+    return ServicePage(
+      title: 'Bills',
+      subtitle: 'Every bill, from bookings, jobs and made here',
+      onMenu: HomeNav.openMenu == null ? null : () => HomeNav.openMenu!(context),
+      onRefresh: _load,
+      error: _error,
+      onRetry: _load,
+      body: body,
     );
   }
 

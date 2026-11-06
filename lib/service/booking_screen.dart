@@ -37,6 +37,9 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
   ProviderOption? _provider;
   Map<String, dynamic>? _slot;
   Map<String, dynamic>? _resource;
+  // a listing booked by the court (5 Nov 2026): which court, which part (null: the full court); the times reload after a clash
+  String? _unit, _part;
+  int _timesEpoch = 0;
   ServiceQuote? _quote;
   String? _quoteError;
   bool _policyShown = true;
@@ -101,7 +104,7 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     if (s == null) return;
     final mine = ++_seq;
     try {
-      final q = await _api.quote(serviceId: s.id, addonIds: _addons.toList(), staffId: _provider?.id, party: _party, startsAt: _slot == null ? null : '${_slot!['starts_at']}');
+      final q = await _api.quote(serviceId: s.id, addonIds: _addons.toList(), staffId: _provider?.id, party: _party, startsAt: _slot == null ? null : '${_slot!['starts_at']}', unit: _unit, part: _part);
       if (!mounted || mine != _seq) return;
       setState(() {
         _quote = q;
@@ -189,8 +192,11 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     if (picked == null) return;
     _service = picked;
     _addons.clear();
-    if (_provider != null && !picked.staffIds.contains(_provider!.id)) _provider = null;
+    if (picked.byUnit || (_provider != null && !picked.staffIds.contains(_provider!.id))) _provider = null;
     _slot = null;
+    _unit = null;
+    _part = null;
+    if (picked.byUnit) _resource = null;
     _quote = null;
     _changed();
     _requote();
@@ -258,7 +264,24 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     _changed();
   }
 
-  bool get _ready => _name.isNotEmpty && _service != null && _provider != null && _slot != null && _quote != null;
+  bool get _ready => _name.isNotEmpty && _service != null && (_provider != null || _service!.byUnit) && _slot != null && _quote != null;
+
+  /// A court's time was tapped: the court stays if it is free then, else the first free one. The price follows.
+  void _pickUnitTime(Map<String, dynamic> slot) {
+    final free = ((slot['units'] as List?) ?? const []).map((e) => '$e').toList();
+    _slot = slot;
+    if (!free.contains(_unit)) _unit = free.firstOrNull;
+    _changed();
+    _requote();
+  }
+
+  void _pickPart(String? part) {
+    _part = part;
+    _slot = null;
+    _unit = null;
+    _changed();
+    _requote();
+  }
 
   Future<void> _confirm() async {
     // something missing on an earlier step: open that step, then say what (4 Nov 2026)
@@ -292,8 +315,10 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
         customerPhone: _phone,
         serviceId: _service!.id,
         addonIds: _addons.toList(),
-        staffId: _provider!.id,
+        staffId: _provider?.id,
         resourceId: _resource?['id'] as String?,
+        unit: _unit,
+        part: _part,
         startsAt: '${_slot!['starts_at']}',
         depositMethod: method,
         entitlementId: _ent?.id,
@@ -317,6 +342,8 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
         showToast(context, e.message);
         if (e.status == 409) {
           _slot = null; // the time was taken: choose again on the Time step
+          _unit = null;
+          _timesEpoch++;
           _step = 2;
         }
         if (e.status < 500) _key = null; // a refusal is final; after a server fault the same key is kept so the retry cannot book twice
@@ -337,7 +364,9 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
         1 => _service == null
             ? 'Choose a service.'
             : (_quote?.partyAsks == true && _people == 0 ? 'Say who is coming.' : _quote?.notAllowed),
-        2 => _provider == null
+        2 => _service?.byUnit == true
+            ? (_slot == null ? 'Choose a date and time.' : (_unit == null ? 'Choose a ${_service!.unitWord}.' : null))
+            : _provider == null
             ? 'Choose a provider.'
             : (_slot == null ? 'Choose a date and time.' : (_service?.fulfilment == 'on_location' && _address.trim().isEmpty ? 'Add the customer\'s address for an on-location job.' : null)),
         _ => null,
@@ -387,8 +416,31 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
           _field('Service', s == null ? 'Choose a service' : '${s.name} · ${rupees(s.price)} · ${s.durationMin} min', s == null, _pickService, key: 'service'),
           if (_ents.isNotEmpty) _field('Package', _ent == null ? 'Do not use a package' : _ent!.name, _ent == null, _pickEntitlement, key: 'package'),
           if (_ent != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('${_ent!.name} credit is applied when the booking is made; the advance is then taken only on what is left.', style: inter(12.5, 400, color: kMuted))),
+          if (s != null && s.parts.isNotEmpty) ...[const SizedBox(height: 4), _partCard(s)],
           if (s != null && s.addons.isNotEmpty) ...[const SizedBox(height: 4), _addonsCard(s, q)],
           if (q != null && q.partyAsks) ...[const SizedBox(height: 4), _whoCard(q)],
+        ],
+      2 when s?.byUnit == true => [
+          const SizedBox(height: 10),
+          _field('Date', _dateLabel(_date), false, _pickDate, key: 'date'),
+          _UnitTimes(
+            key: ValueKey('unit-times-${s!.id}-${_iso(_date)}-$_part-$_timesEpoch'),
+            api: _api,
+            date: _iso(_date),
+            service: s,
+            addonIds: _addons.toList(),
+            part: _part,
+            slot: _slot,
+            unit: _unit,
+            onTime: _pickUnitTime,
+            onUnit: (u) {
+              _unit = u;
+              _changed();
+              _requote();
+            },
+          ),
+          const SizedBox(height: 12),
+          _field('Business location', _locationText(), false, null, key: 'location'),
         ],
       2 => [
           const SizedBox(height: 10),
@@ -410,6 +462,33 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
           if (_policyShown) ...[const SizedBox(height: 14), _policy(q?.freeCancelHours ?? _cat?.freeCancelHours ?? 12, q?.deposit ?? _cat?.deposit ?? 0)],
         ],
     };
+  }
+
+  /// Full court or a named part, right on the page; the part's own price, else the listing's.
+  Widget _partCard(ServiceOption s) {
+    Widget chip(String? part, String label, num price) => ChoiceChip(
+          key: ValueKey('book-part-${part ?? 'full'}'),
+          label: Text('$label · ${rupees(price)}'),
+          selected: _part == part,
+          showCheckmark: false,
+          labelStyle: inter(13, 600, color: _part == part ? kGreenText : kInk),
+          selectedColor: kChipGreen,
+          backgroundColor: Colors.white,
+          side: BorderSide(color: _part == part ? kGreenText : kLine),
+          onSelected: (_) => _pickPart(part),
+        );
+    return OrderCardBox(
+      key: const ValueKey('book-parts'),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('What they are booking', style: inter(15, 700)),
+        Text('The full ${s.unitWord} blocks every part.', style: inter(12.5, 400, color: kMuted)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          chip(null, 'Full ${s.unitWord}', s.price),
+          for (final p in s.parts) chip('${p['name']}', '${p['name']}', num.tryParse('${p['price']}') ?? s.price),
+        ]),
+      ]),
+    );
   }
 
   /// Who is coming (4 Nov 2026): a count for each kind of guest and the group type; the price and the rules follow it.
@@ -476,7 +555,7 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
     final rows = [
       ('Customer', _name.isEmpty ? '-' : (_phone.isEmpty ? _name : '$_name · +91 $_phone'), 0),
       ('Service', s == null ? '-' : [s.name, if (_ent != null) _ent!.name].join(' · '), 1),
-      ('Provider', p?.name ?? '-', 2),
+      if (s?.byUnit == true) ('Booked', [_unit ?? '-', if (_part != null) _part!].join(' · '), 2) else ('Provider', p?.name ?? '-', 2),
       ('When', '${_dateLabel(_date)}${_slot == null ? '' : ' · ${_slot!['range_label']}'}', 2),
       if (s?.fulfilment == 'on_location') ('Address', _address.isEmpty ? '-' : _address, 2) else ('Location', _locationText(), 2),
     ];
@@ -632,6 +711,100 @@ class Dot extends StatelessWidget {
   const Dot({super.key});
   @override
   Widget build(BuildContext context) => Container(width: 6, height: 6, decoration: const BoxDecoration(color: kLink, shape: BoxShape.circle));
+}
+
+/// A court's free times on one day, right on the page (no sheet): grouped under the listing's time bands, then the courts free at the time tapped,
+/// each its own card with its setting, surface and grade.
+class _UnitTimes extends StatefulWidget {
+  const _UnitTimes({super.key, required this.api, required this.date, required this.service, required this.addonIds, required this.part, required this.slot, required this.unit, required this.onTime, required this.onUnit});
+  final ServiceApi api;
+  final String date;
+  final ServiceOption service;
+  final List<String> addonIds;
+  final String? part, unit;
+  final Map<String, dynamic>? slot;
+  final ValueChanged<Map<String, dynamic>> onTime;
+  final ValueChanged<String> onUnit;
+  @override
+  State<_UnitTimes> createState() => _UnitTimesState();
+}
+
+class _UnitTimesState extends State<_UnitTimes> {
+  List<Map<String, dynamic>>? _slots;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.api.slots(date: widget.date, serviceId: widget.service.id, addonIds: widget.addonIds, part: widget.part).then((d) {
+      if (mounted) setState(() => _slots = d.expand((p) => p.slots).toList());
+    }).catchError((Object e) {
+      if (mounted) setState(() => _error = e.toString());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null) return Text(_error!, style: inter(14, 400, color: kMuted));
+    final all = _slots;
+    if (all == null) return const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator(color: kGreenText)));
+    final word = widget.service.unitWord;
+    if (all.isEmpty) return Text('No $word is free that day. Try another date.', key: const ValueKey('unit-times-none'), style: inter(14, 400, color: kMuted));
+    final bands = <String, List<Map<String, dynamic>>>{};
+    for (final s in all) {
+      bands.putIfAbsent('${s['band'] ?? ''}', () => []).add(s);
+    }
+    final at = widget.slot?['starts_at'];
+    final free = ((widget.slot?['units'] as List?) ?? const []).map((e) => '$e').toSet();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Text('Time', style: inter(14.5, 700)),
+      for (final b in bands.entries) ...[
+        if (b.key.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(b.key, style: inter(12.5, 600, color: kMuted))),
+        const SizedBox(height: 6),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          for (final s in b.value)
+            ChoiceChip(
+              key: ValueKey('unit-time-${s['label']}'),
+              label: Text('${s['label']}'),
+              selected: s['starts_at'] == at,
+              showCheckmark: false,
+              labelStyle: inter(13, 600, color: s['starts_at'] == at ? kGreenText : kInk),
+              selectedColor: kChipGreen,
+              backgroundColor: Colors.white,
+              side: BorderSide(color: s['starts_at'] == at ? kGreenText : kLine),
+              onSelected: (_) => widget.onTime(s),
+            ),
+        ]),
+      ],
+      if (widget.slot != null) ...[
+        const SizedBox(height: 14),
+        Text('${word[0].toUpperCase()}${word.substring(1)} · free at ${widget.slot!['label']}', style: inter(14.5, 700)),
+        const SizedBox(height: 6),
+        for (final u in widget.service.units.where((u) => free.contains('${u['name']}')))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: InkWell(
+              key: ValueKey('unit-${u['name']}'),
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => widget.onUnit('${u['name']}'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: widget.unit == u['name'] ? kChipGreen : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: widget.unit == u['name'] ? kGreenText : kLine),
+                ),
+                child: Row(children: [
+                  Text('${u['name']}', style: inter(14, 700)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text([for (final k in const ['setting', 'surface', 'grade']) if (u[k] != null) '${u[k]}'].join(' · '), textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: inter(12, 400, color: kMuted))),
+                ]),
+              ),
+            ),
+          ),
+      ],
+    ]);
+  }
 }
 
 /// Free start times of one provider on one day, from the server. Returns the slot tapped.

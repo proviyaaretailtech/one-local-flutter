@@ -839,7 +839,7 @@ class NeedsEditor extends StatelessWidget {
             key: ValueKey('$keyPrefix-$i-name'),
             initialValue: '${r['name'] ?? ''}',
             style: inter(14, 500),
-            decoration: formBox(label: items.isEmpty && type != 'other' ? 'Add ${needLabel(type).toLowerCase()}s in Inventory, or type' : 'Item'),
+            decoration: formBox(label: items.isEmpty && type != 'other' ? 'Add ${needLabel(type).toLowerCase()}s in Costing, or type' : 'Item'),
             onChanged: (s) => rows[i] = {...rows[i], 'name': s, 'item_id': null},
           )
         : PickBox(

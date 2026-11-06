@@ -25,8 +25,8 @@ import 'service_money.dart';
 /// Each tab's tip, said the first time that tab is ever opened on this device.
 const _tips = {
   'Home': "Today's visits, money and free slots are here. Tap me whenever you want to go somewhere.",
-  'Catalogue': 'Your services are here. Inventory, next to Services, has your team, places, tools and materials.',
-  'Bill': "Red bills are due, green are today's, blue are paid. Tap a bill to collect it or send it on WhatsApp.",
+  'Catalogue': 'Your services are here. Costing, next to Services, has your team, places, tools and materials.',
+  'Bill': "Today's bookings by type: check people in here, count walk-ins with +1 on Events and Activities, and see who is on each court on Play. Bills are in the last tab: tap one to collect it or send it on WhatsApp.",
   'Bookings': 'Pick a day to see its bookings. Pull the handle up to see the day hour by hour.',
 };
 
@@ -57,11 +57,11 @@ ServiceApi _api() => ServiceApi();
 /// Every place in the Service POS, in the order "Take me to" shows them.
 final List<ServiceOlPlace> serviceOlPlaces = [
   ServiceOlPlace(LucideIcons.calendarDays, 'Bookings', 'Calendar, list, board, map', 'booking appointment calendar schedule visit today week month', tab: 'Bookings'),
-  ServiceOlPlace(LucideIcons.receiptText, 'Bills', 'Due, today and paid', 'bill payment collect due paid invoice receipt whatsapp', tab: 'Bill'),
+  ServiceOlPlace(LucideIcons.receiptText, 'Bills', 'Bookings today, due and paid', 'bill payment collect due paid invoice receipt whatsapp check in arrived today', tab: 'Bill'),
   ServiceOlPlace(LucideIcons.layoutList, 'Services', 'Your catalogue', 'service catalogue price add pause photo menu list', tab: 'Catalogue'),
-  ServiceOlPlace(LucideIcons.boxes, 'Inventory', 'Team, places, tools, materials, items in care', 'inventory stock tool material place room chair court care lend gear', tab: 'Catalogue',
-      tour: OlTour('Open Inventory', [
-        OlStep('Inventory sits next to Services. Tap it.', target: OlTarget.key('tab-inventory')),
+  ServiceOlPlace(LucideIcons.boxes, 'Costing', 'Team, places, tools, materials, items in care', 'costing cost inventory stock tool material place room chair court care lend gear', tab: 'Catalogue',
+      tour: OlTour('Open Costing', [
+        OlStep('Costing sits next to Services. Tap it.', target: OlTarget.key('tab-inventory')),
         OlStep('Pick Team, Places, Tools, Materials or In care at the top. Anything that needs you shows a dot.', next: true),
       ])),
   ServiceOlPlace(LucideIcons.slidersHorizontal, 'Service management', 'Opening hours, slots, who works when', 'manage management hours open close slot timing break staff hours week',
@@ -99,7 +99,7 @@ const serviceOlTours = <OlTour>[
   ]),
   OlTour('Lend out a tool', [
     OlStep('Tap Catalogue at the bottom.', target: OlTarget.key('tab-Catalogue')),
-    OlStep('Tap Inventory.', target: OlTarget.key('tab-inventory')),
+    OlStep('Tap Costing.', target: OlTarget.key('tab-inventory')),
     OlStep('Tap Tools.', target: OlTarget.key('inv-tile-tools')),
     OlStep('Tap the tool, then Lend out. Say how many and who has them; tap Got back when they return.', next: true),
   ]),
@@ -127,18 +127,18 @@ const _topics = <(List<String>, ServiceOlAnswer)>[
   (['job', 'home', 'site', 'location', 'repeat', 'team', 'start'], ServiceOlAnswer('For work at the customer\'s place:',
       steps: ['Open Bookings', 'Tap New job', 'Add the customer, services, team and time (one visit or repeating)', 'Save'], place: 'Bookings')),
   (['bill', 'pay', 'payment', 'collect', 'due', 'cash', 'upi', 'card', 'paid'], ServiceOlAnswer('To collect a payment:',
-      steps: ['Open Bill', 'Red bills are due: tap one', 'Take cash, card or UPI'], place: 'Bills')),
+      steps: ['Open Bill, then the Bills tab', 'Red bills are due: tap one', 'Take cash, card or UPI'], place: 'Bills')),
   (['whatsapp', 'send', 'share', 'receipt', 'link'], ServiceOlAnswer('To send a bill:',
-      steps: ['Open Bill and tap the bill', 'Tap WhatsApp: the customer gets a short note and a link to the bill'], place: 'Bills')),
+      steps: ['Open Bill, then the Bills tab, and tap the bill', 'Tap WhatsApp: the customer gets a short note and a link to the bill'], place: 'Bills')),
   (['discount', 'off', 'less', 'percent'], ServiceOlAnswer('A discount goes on the bill:',
-      steps: ['Open Bill and tap the bill (or make a new bill)', 'Enter the discount in ₹ or %'], place: 'Bills')),
+      steps: ['Open Bill, then the Bills tab, and tap the bill (or make a new bill)', 'Enter the discount in ₹ or %'], place: 'Bills')),
   (['service', 'add', 'price', 'catalogue', 'create', 'new'], ServiceOlAnswer('To add a service:',
       steps: ['Open Catalogue', 'Tap Add service', 'Pick what you are adding and fill its form'], place: 'Services')),
   (['pause', 'stop', 'hide', 'off'], ServiceOlAnswer('To stop taking bookings for a service:',
       steps: ['Open Catalogue', 'Tap ⋮ on the service', 'Tap Pause bookings (Take bookings again turns it back on)'], place: 'Services')),
-  (['inventory', 'tool', 'lend', 'material', 'stock', 'place', 'room', 'chair', 'court', 'care', 'gear'], ServiceOlAnswer('Tools, materials, places and items in care are in Inventory:',
-      steps: ['Open Catalogue', 'Tap Inventory', 'Pick the section and tap an item for Lend out, Add stock, Block and more'], place: 'Inventory')),
-  (['team', 'staff', 'provider', 'worker', 'people', 'skill'], ServiceOlAnswer('Your team and what each person does are in Team & providers. Inventory shows who is free right now.',
+  (['costing', 'cost', 'inventory', 'tool', 'lend', 'material', 'stock', 'place', 'room', 'chair', 'court', 'care', 'gear'], ServiceOlAnswer('Tools, materials, places and items in care are in Costing:',
+      steps: ['Open Catalogue', 'Tap Costing', 'Pick the section and tap an item for Lend out, Add stock, Block and more'], place: 'Costing')),
+  (['team', 'staff', 'provider', 'worker', 'people', 'skill'], ServiceOlAnswer('Your team and what each person does are in Team & providers. Costing shows who is free right now.',
       place: 'Team & providers')),
   (['hour', 'open', 'opening', 'closing', 'time', 'timing', 'break', 'slot', 'length', 'week'], ServiceOlAnswer('Opening hours and slots are in Service management:',
       steps: ['Open the menu (☰) on Home', 'Tap Service management', 'Tap Edit hours'], place: 'Service management')),
